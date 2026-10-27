@@ -6,7 +6,13 @@ An educational mobile app where teachers, mentors and students work together:
 - **Mentors** see their students' homework, leave a comment and mark it as checked.
 - **Teachers** share learning materials (lessons, notes, links) with the class and see all homework.
 
-Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript) and Expo Router.
+Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Router and [Supabase](https://supabase.com) (auth, Postgres, storage, realtime).
+
+## Setup
+
+1. Copy `.env.example` to `.env.local` and fill in the Supabase project URL and publishable key.
+2. In the Supabase SQL Editor run, in order, `supabase/migrations/0001_init.sql` and `supabase/migrations/0002_realtime.sql`.
+3. For development, turn off **Authentication → Email → Confirm email**.
 
 ## Run it
 
@@ -16,8 +22,12 @@ npm start          # then press i (iOS Simulator), a (Android) or scan the QR co
 npm run web        # run in the browser
 ```
 
-On the first screen pick a demo user to sign in as teacher, mentor or student.
-Data is stored on the device; **Profile → Reset demo data** restores the seed data.
+Restart `npm start` after changing `.env.local`.
+
+## Users and roles
+
+Everyone who creates an account in the app starts as a **student**. Promote teachers and mentors, and
+assign students to mentors, with the queries in [`supabase/manage-roles.sql`](supabase/manage-roles.sql).
 
 ## Checks
 
@@ -30,16 +40,17 @@ npx expo lint
 
 ```
 src/app/                  screens (Expo Router — every file is a route)
-  index.tsx               demo sign-in (pick a user)
+  index.tsx               sign in / create account
   (tabs)/                 Homework · Materials · Profile tabs
   homework/new.tsx        student adds homework
   homework/[id].tsx       homework details; mentor marks it checked
   materials/new.tsx       teacher shares a material
   materials/[id].tsx      material details
 src/components/           shared UI
-src/lib/store.tsx         data + role rules (local mock store)
-src/lib/seed.ts           demo users, homework, materials
-supabase/migrations/      database schema + access rules for the real backend
+src/lib/supabase.ts       Supabase client
+src/lib/store.tsx         data loading, actions, live updates
+supabase/migrations/      database schema + row-level security (the real access rules)
+supabase/manage-roles.sql admin queries for roles and mentor assignment
 ```
 
 ## Roles and access
@@ -54,7 +65,6 @@ supabase/migrations/      database schema + access rules for the real backend
 
 ## Next steps
 
-1. Create a Supabase project and run `supabase/migrations/0001_init.sql`.
-2. Replace the mock store in `src/lib/store.tsx` with Supabase calls and real sign-in.
-3. Upload homework photos to the `homework` storage bucket.
-4. Push notifications (new homework for mentors, feedback for students) and chat.
+1. In-app screen for teachers to manage roles and mentor assignments.
+2. Push notifications (new homework for mentors, feedback for students).
+3. Chat between teacher, mentors and students.

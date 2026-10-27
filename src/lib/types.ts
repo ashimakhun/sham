@@ -15,7 +15,10 @@ export type Homework = {
   studentId: string;
   title: string;
   description: string;
-  photoUri?: string;
+  /** Path in the "homework" storage bucket. */
+  photoPath?: string;
+  /** Short-lived signed URL for displaying the photo. */
+  photoUrl?: string;
   status: HomeworkStatus;
   createdAt: string;
   checkedById?: string;
@@ -32,5 +35,5 @@ export type Material = {
   createdAt: string;
 };
 
-export type NewHomework = Pick<Homework, 'title' | 'description' | 'photoUri'>;
+export type NewHomework = { title: string; description: string; photoUri?: string };
 export type NewMaterial = Pick<Material, 'title' | 'body' | 'link'>;

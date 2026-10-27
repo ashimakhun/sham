@@ -2,19 +2,23 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 
-import { Button, Field, styles } from '@/components/ui';
+import { Button, ErrorText, Field, styles } from '@/components/ui';
 import { useStore } from '@/lib/store';
+import { useAction } from '@/lib/useAction';
 
 export default function NewMaterialScreen() {
   const { addMaterial } = useStore();
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [link, setLink] = useState('');
+  const { busy, error, run } = useAction();
 
   function submit() {
-    addMaterial({ title, body, link });
-    if (router.canGoBack()) router.back();
-    else router.replace('/materials');
+    run(async () => {
+      await addMaterial({ title, body, link });
+      if (router.canGoBack()) router.back();
+      else router.replace('/materials');
+    });
   }
 
   return (
@@ -36,7 +40,12 @@ export default function NewMaterialScreen() {
           autoCapitalize="none"
           keyboardType="url"
         />
-        <Button title="Share with class" onPress={submit} disabled={!title.trim() || !body.trim()} />
+        <ErrorText error={error} />
+        <Button
+          title={busy ? 'Sharing…' : 'Share with class'}
+          onPress={submit}
+          disabled={!title.trim() || !body.trim() || busy}
+        />
       </ScrollView>
     </KeyboardAvoidingView>
   );

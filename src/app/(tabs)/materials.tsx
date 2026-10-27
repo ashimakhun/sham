@@ -6,7 +6,7 @@ import { useStore } from '@/lib/store';
 import { formatDate } from '@/lib/theme';
 
 export default function MaterialsScreen() {
-  const { currentUser, materials, getUser } = useStore();
+  const { currentUser, loading, refresh, materials, getUser } = useStore();
   const isTeacher = currentUser?.role === 'teacher';
   const sorted = [...materials].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
@@ -15,6 +15,8 @@ export default function MaterialsScreen() {
       style={styles.screen}
       contentContainerStyle={styles.content}
       data={sorted}
+      refreshing={loading}
+      onRefresh={() => refresh().catch(() => {})}
       keyExtractor={(m) => m.id}
       ListHeaderComponent={
         isTeacher ? <Button title="+ Share material" onPress={() => router.push('/materials/new')} /> : undefined

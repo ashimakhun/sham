@@ -2,14 +2,16 @@ import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Image, KeyboardAvoidingView, Platform, ScrollView, Text } from 'react-native';
 
-import { Button, Card, EmptyState, Field, StatusBadge, styles } from '@/components/ui';
+import { Button, Card, EmptyState, ErrorText, Field, StatusBadge, styles } from '@/components/ui';
 import { useStore } from '@/lib/store';
+import { useAction } from '@/lib/useAction';
 import { formatDate } from '@/lib/theme';
 
 export default function HomeworkDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { visibleHomework, currentUser, getUser, checkHomework } = useStore();
   const [comment, setComment] = useState('');
+  const { busy, error, run } = useAction();
 
   const item = visibleHomework.find((h) => h.id === id);
   if (!item) return <EmptyState title="Homework not found" />;
@@ -28,8 +30,8 @@ export default function HomeworkDetailScreen() {
             {student?.name} · {formatDate(item.createdAt)}
           </Text>
           {item.description ? <Text style={styles.body}>{item.description}</Text> : null}
-          {item.photoUri && (
-            <Image source={{ uri: item.photoUri }} style={{ width: '100%', height: 260, borderRadius: 10 }} />
+          {item.photoUrl && (
+            <Image source={{ uri: item.photoUrl }} style={{ width: '100%', height: 260, borderRadius: 10 }} />
           )}
         </Card>
 
@@ -53,7 +55,12 @@ export default function HomeworkDetailScreen() {
               onChangeText={setComment}
               multiline
             />
-            <Button title="✓ Mark as checked" onPress={() => checkHomework(item.id, comment)} />
+            <ErrorText error={error} />
+            <Button
+              title={busy ? 'Saving…' : '✓ Mark as checked'}
+              disabled={busy}
+              onPress={() => run(() => checkHomework(item.id, comment))}
+            />
           </Card>
         )}
       </ScrollView>

@@ -16,7 +16,7 @@ const emptyText: Record<string, { title: string; hint: string }> = {
 };
 
 export default function HomeworkScreen() {
-  const { currentUser, visibleHomework } = useStore();
+  const { currentUser, loading, refresh, visibleHomework } = useStore();
   const role = currentUser?.role ?? 'student';
   // Mentors land on what still needs checking; others see everything.
   const [filter, setFilter] = useState<Filter>(role === 'mentor' ? 'submitted' : 'all');
@@ -29,6 +29,8 @@ export default function HomeworkScreen() {
       style={styles.screen}
       contentContainerStyle={styles.content}
       data={data}
+      refreshing={loading}
+      onRefresh={() => refresh().catch(() => {})}
       keyExtractor={(h) => h.id}
       renderItem={({ item }) => <HomeworkCard item={item} />}
       ListHeaderComponent={

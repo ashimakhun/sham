@@ -87,6 +87,11 @@ export function EmptyState({ title, hint }: { title: string; hint?: string }) {
   );
 }
 
+export function ErrorText({ error }: { error: string | null }) {
+  if (!error) return null;
+  return <Text style={{ color: colors.danger, fontSize: 14 }}>{error}</Text>;
+}
+
 export function Segmented<T extends string>({
   options,
   value,

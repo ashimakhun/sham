@@ -3,14 +3,16 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Image, KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 
-import { Button, Field, styles } from '@/components/ui';
+import { Button, ErrorText, Field, styles } from '@/components/ui';
 import { useStore } from '@/lib/store';
+import { useAction } from '@/lib/useAction';
 
 export default function NewHomeworkScreen() {
   const { addHomework, currentUser, getUser } = useStore();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [photoUri, setPhotoUri] = useState<string>();
+  const { busy, error, run } = useAction();
 
   const mentor = getUser(currentUser?.mentorId);
 
@@ -20,9 +22,11 @@ export default function NewHomeworkScreen() {
   }
 
   function submit() {
-    addHomework({ title, description, photoUri });
-    if (router.canGoBack()) router.back();
-    else router.replace('/homework');
+    run(async () => {
+      await addHomework({ title, description, photoUri });
+      if (router.canGoBack()) router.back();
+      else router.replace('/homework');
+    });
   }
 
   return (
@@ -41,7 +45,8 @@ export default function NewHomeworkScreen() {
           {photoUri && <Image source={{ uri: photoUri }} style={{ width: '100%', height: 220, borderRadius: 10 }} />}
           <Button title={photoUri ? 'Change photo' : 'Attach a photo'} variant="secondary" onPress={pickPhoto} />
         </View>
-        <Button title="Send to mentor" onPress={submit} disabled={!title.trim()} />
+        <ErrorText error={error} />
+        <Button title={busy ? 'Sending…' : 'Send to mentor'} onPress={submit} disabled={!title.trim() || busy} />
         <Text style={[styles.muted, { textAlign: 'center' }]}>
           {mentor ? `${mentor.name} will check it.` : 'You do not have a mentor assigned yet.'}
         </Text>
