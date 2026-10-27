@@ -22,7 +22,8 @@ export default function HomeworkDetailScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled"
+        contentInsetAdjustmentBehavior="automatic">
         <Card>
           <StatusBadge status={item.status} />
           <Text style={styles.h1}>{item.title}</Text>

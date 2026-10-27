@@ -15,7 +15,10 @@ export default function MaterialDetailScreen() {
   if (!item) return <EmptyState title="Material not found" />;
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      contentInsetAdjustmentBehavior="automatic">
       <Card>
         <Text style={styles.h1}>{item.title}</Text>
         <Text style={styles.muted}>

@@ -12,6 +12,8 @@ export default function RootLayout() {
         screenOptions={{
           headerTintColor: colors.primary,
           headerBackButtonDisplayMode: 'minimal',
+          // Solid header on iOS so screen content starts below it instead of underneath.
+          headerTransparent: false,
           headerTitleStyle: { color: colors.text },
           contentStyle: { backgroundColor: colors.bg },
         }}>
