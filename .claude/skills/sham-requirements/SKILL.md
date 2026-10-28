@@ -21,6 +21,9 @@ Rate every Idea issue that has no difficulty label yet, using the code in the re
 - **hard**: new native module or Expo config plugin (for example push notifications), new realtime feature (for example chat), new roles or access model changes, or anything needing a development build or external service.
 Apply it as the label difficulty/easy, difficulty/medium or difficulty/hard. A difficulty label a human set is an override: never change it.
 
+## Combining similar issues (step 0)
+Before choosing, load the `sham-merge-issues` skill with the Skill tool and follow it. It merges Idea issues that describe the same or overlapping work into one and marks the rest Duplicate (at most 3 merges per run; merges don't count as the run's one requirements issue). Then continue below; Duplicate issues are no longer candidates.
+
 ## Choosing the issue for this run
 1. Using the Linear connector, list Sham issues with status **Idea**. Skip any with the `agent:working` label.
 2. Rate every unrated Idea issue (difficulty label only; do not rewrite them yet). This keeps the whole backlog sorted for you and for later runs.
@@ -32,7 +35,7 @@ Apply it as the label difficulty/easy, difficulty/medium or difficulty/hard. A d
    c. then issues that are sub-issues of, or related to, an issue already in Requirements ready or later (keeps one area moving together);
    d. then oldest first.
 6. Take the first one. If none is left, stop and report "nothing to do".
-7. In the run summary, list the top 3 candidates in order with one line each on why, so the choice is visible.
+7. In the run summary, list the merges made (from step 0), then the top 3 candidates in order with one line each on why, so the choice is visible.
 
 ## Writing the requirements
 1. Add the label `agent:working` before doing anything else.
@@ -51,5 +54,5 @@ Apply it as the label difficulty/easy, difficulty/medium or difficulty/hard. A d
 
 ## Rules
 - Never write code or change the repo.
-- Write requirements for one issue per run (rating others is fine).
+- Write requirements for one issue per run (rating and merging others per `sham-merge-issues` is fine).
 - Do not invent features beyond the idea; put extras under Out of scope.

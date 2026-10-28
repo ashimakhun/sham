@@ -3,7 +3,7 @@
 Sham is built by three Claude agents that move work through Linear. They never talk to each other directly: the issue status in Linear is the handoff, and a person reviews and merges every PR.
 
 - Linear workspace: team **Sham** (key `ARU`), project **Sham**. The project document "Sham: what is already done" describes the current state of the app.
-- Agent instructions: [`.claude/skills/`](../.claude/skills/) (`sham-requirements`, `sham-dev`, `sham-qa`).
+- Agent instructions: [`.claude/skills/`](../.claude/skills/) (`sham-requirements` with its helper `sham-merge-issues`, `sham-dev`, `sham-qa`).
 
 ## Workflow
 
@@ -20,6 +20,7 @@ Idea → Requirements ready → In Dev → Ready for QA → Done
 
 ### How the requirements agent picks an idea
 
+0. Combines ideas that describe the same or overlapping work (skill `sham-merge-issues`): keeps the oldest (or best-linked) issue, copies the others' titles, descriptions, relations and labels into it, and marks them **Duplicate** with a comment explaining how to undo. Ideas that only share an area get a related link instead. It only proposes, by comment, when an issue has an assignee, a person's comment, or is locked. At most 3 merges per run.
 1. Rates every unrated idea with a `difficulty` label.
 2. Skips ideas blocked by an issue still in Idea or Needs Clarification.
 3. Sorts the rest by difficulty (current policy: **easy first**, set in the skill's "Current priority policy" line), then by how many issues each one unblocks, then related work already in progress, then oldest.
