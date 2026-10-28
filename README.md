@@ -14,7 +14,8 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
 1. Copy `.env.example` to `.env.local` and fill in the Supabase project URL and publishable key.
 2. In the Supabase SQL Editor run, in order, `supabase/migrations/0001_init.sql`, `supabase/migrations/0002_realtime.sql`,
    `supabase/migrations/0003_courses.sql`, `supabase/migrations/0004_course_members.sql`,
-   `supabase/migrations/0005_homework_by_course.sql`, then `supabase/migrations/0006_course_chat.sql`.
+   `supabase/migrations/0005_homework_by_course.sql`, `supabase/migrations/0006_course_chat.sql`, then
+   `supabase/migrations/0009_roles_screen.sql`.
    Course meetings (ARU-10): `supabase/migrations/0010_course_meetings.sql` (adds a table; deletes nothing).
    Editing meetings (ARU-15): `supabase/migrations/0011_edit_meetings.sql` (adds a column and a function).
 3. For development, turn off **Authentication → Email → Confirm email**.
@@ -25,6 +26,13 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
 Run it when nobody is using the app: every open app reloads once per deleted row. Right after it, empty the
 `homework` bucket once in **Storage → homework → select all → Delete**, because SQL cannot delete Storage files.
 The deleted homework and photos cannot be restored.
+
+### Upgrading an existing project to 0009 (ARU-13)
+
+There can be only one teacher. If your database already has two or more, `0009_roles_screen.sql` stops with
+"More than one teacher exists: …; make all but one a mentor first". Run
+`update profiles set role = 'mentor' where id = (select id from auth.users where email = '…');` for each extra
+teacher in the SQL Editor, then run the migration again.
 
 ## Run it
 
@@ -38,8 +46,11 @@ Restart `npm start` after changing `.env.local`.
 
 ## Users and roles
 
-Everyone who creates an account in the app starts as a **student**. Promote the teacher (there is only one) and
-mentors with the queries in [`supabase/manage-roles.sql`](supabase/manage-roles.sql). There is no per-student
+Everyone who creates an account in the app starts as a **student**. Make the first teacher once with the query in
+[`supabase/manage-roles.sql`](supabase/manage-roles.sql); there is exactly one teacher, and after that the database
+rejects any change to or from teacher. The teacher then switches users between student and mentor in the app
+(**Profile → Manage roles**). A mentor who owns courses can't be made a student until their courses are given a
+new owner. A user sees their new role after pull-to-refresh or reopening the app. There is no per-student
 mentor: adding someone to a course as a listener makes the course owner their mentor for that course.
 
 ## Checks
@@ -65,13 +76,14 @@ src/app/                  screens (Expo Router — every file is a route)
   courses/[id].tsx        course details, listeners and the course's homework
   courses/[id]/listeners.tsx  teacher or mentor adds listeners
   courses/[id]/chat.tsx   course chat (owner, listeners and the teacher)
+  roles.tsx               teacher switches users between student and mentor
   materials/new.tsx       teacher shares a material
   materials/[id].tsx      material details
 src/components/           shared UI
 src/lib/supabase.ts       Supabase client
 src/lib/store.tsx         data loading, actions, live updates
 supabase/migrations/      database schema + row-level security (the real access rules)
-supabase/manage-roles.sql admin queries for roles and mentor assignment
+supabase/manage-roles.sql admin queries: list users, make the first teacher
 ```
 
 ## Roles and access
@@ -92,6 +104,8 @@ supabase/manage-roles.sql admin queries for roles and mentor assignment
 | Edit / reschedule a scheduled meeting | | own courses           | any course |
 | See materials              | ✓         | ✓                  | ✓       |
 | Share / delete materials   |           |                    | ✓       |
+| Switch student ↔ mentor    |           |                    | ✓       |
+| Become / stop being teacher |          |                    | (nobody) |
 
 ## Development workflow
 
@@ -101,6 +115,5 @@ instructions are in [`.claude/skills/`](.claude/skills/).
 
 ## Next steps
 
-1. In-app screen for teachers to manage roles and mentor assignments.
-2. Push notifications (new homework for mentors, feedback for students).
-3. Chat between teacher, mentors and students.
+1. Push notifications (new homework for mentors, feedback for students).
+2. Chat between teacher, mentors and students.

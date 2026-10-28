@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { ScrollView, Text, View } from 'react-native';
 
 import { Button, Card, ErrorText, RoleBadge, styles } from '@/components/ui';
+import { canManageRoles } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
 
@@ -70,6 +71,9 @@ export default function ProfileScreen() {
       )}
 
       <View style={{ gap: 10, marginTop: 8 }}>
+        {canManageRoles(currentUser.role) && (
+          <Button title="Manage roles" variant="secondary" onPress={() => router.push('/roles')} />
+        )}
         <ErrorText error={error} />
         {/* The root screen redirects to sign-in once the session is gone. */}
         <Button title="Sign out" variant="secondary" disabled={busy} onPress={() => run(signOut)} />

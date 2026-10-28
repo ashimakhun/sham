@@ -69,6 +69,8 @@ type Store = {
   sendMessage: (input: { id: string; courseId: string; body: string }) => Promise<void>;
   /** Live inserts for one course's chat (its own channel, not the global refetch). Returns an unsubscribe. */
   subscribeToMessages: (courseId: string, onMessage: (m: CourseMessage) => void) => () => void;
+  /** Teacher only (ARU-13): switches a user between student and mentor via set_user_role(), then refetches. */
+  setUserRole: (userId: string, role: 'student' | 'mentor') => Promise<void>;
 };
 
 export const MESSAGES_PAGE = 50;
@@ -517,6 +519,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return () => {
         supabase.removeChannel(channel);
       };
+    },
+    setUserRole: async (userId, role) => {
+      requireRole('teacher');
+      check(await supabase.rpc('set_user_role', { target: userId, new_role: role }));
+      // profiles is not in realtime: refetch so the user moves to their new section.
+      await load();
     },
   };
 
