@@ -71,6 +71,7 @@ export function fakeStore(who: keyof typeof users | null, over: Partial<Store> =
     loadMessages: jest.fn(async () => ({ messages: [], hasMore: false })),
     sendMessage: jest.fn(async () => {}),
     subscribeToMessages: jest.fn(() => () => {}),
+    setUserRole: jest.fn(async () => {}),
     ...over,
   };
 }
