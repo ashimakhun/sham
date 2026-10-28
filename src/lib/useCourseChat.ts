@@ -42,9 +42,19 @@ export function useCourseChat(courseId: string, enabled: boolean) {
     if (!enabled) return;
     try {
       const page = await api.current.loadMessages(courseId);
-      setMessages((list) => mergeMessages(list, page.messages));
-      // Only the first load decides whether older pages exist; later refreshes just add what was missed.
-      setHasMore((h) => (messagesRef.current.length ? h : page.hasMore));
+      const newestShown = messagesRef.current[0];
+      const oldestFetched = page.messages[page.messages.length - 1];
+      // A gap: more than a page arrived since the newest message shown (e.g. while in the background), so
+      // the fresh page doesn't reach back to it. Paging only goes backwards from the oldest message shown and
+      // would never fill the gap, so start over from the fresh page; scrolling up then loads everything older.
+      const gap = !!newestShown && page.hasMore && !!oldestFetched && newestFirst(oldestFetched, newestShown) < 0;
+      if (!newestShown || gap) {
+        setMessages(page.messages);
+        setHasMore(page.hasMore);
+      } else {
+        // Overlaps what is shown: just add what was missed; whether older pages exist is unchanged.
+        setMessages((list) => mergeMessages(list, page.messages));
+      }
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load messages.');
