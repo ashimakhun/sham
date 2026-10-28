@@ -2,7 +2,7 @@ import type { Session } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { supabase } from './supabase';
-import type { Course, CourseMember, Homework, Material, NewCourse, NewHomework, NewMaterial, User } from './types';
+import type { Course, CourseMember, CourseMessage, Homework, Material, NewCourse, NewHomework, NewMaterial, User } from './types';
 
 // All data access goes through this context. Row-level security in Supabase
 // (supabase/migrations) decides what each role can read and change; the role
@@ -41,7 +41,15 @@ type Store = {
   /** Teachers and mentors only. Deletes the listener's homework for the course (and photos), then the membership. */
   removeListener: (courseId: string, userId: string) => Promise<void>;
   deleteMaterial: (id: string) => Promise<void>;
+  /** Course chat (ARU-8): a page of messages, newest first, older than `before` when given. */
+  loadMessages: (courseId: string, before?: CourseMessage) => Promise<{ messages: CourseMessage[]; hasMore: boolean }>;
+  /** Posts as the current user. `id` is generated once per message so a retry cannot post twice. */
+  sendMessage: (input: { id: string; courseId: string; body: string }) => Promise<void>;
+  /** Live inserts for one course's chat (its own channel, not the global refetch). Returns an unsubscribe. */
+  subscribeToMessages: (courseId: string, onMessage: (m: CourseMessage) => void) => () => void;
 };
+
+export const MESSAGES_PAGE = 50;
 
 const StoreContext = createContext<Store | null>(null);
 
@@ -67,6 +75,7 @@ type CourseRow = {
   created_at: string;
 };
 type CourseMemberRow = { course_id: string; user_id: string; added_by: string; added_at: string };
+type MessageRow = { id: string; course_id: string; author_id: string; body: string; created_at: string };
 type MaterialRow = {
   id: string;
   teacher_id: string;
@@ -110,6 +119,14 @@ const toCourseMember = (r: CourseMemberRow): CourseMember => ({
   userId: r.user_id,
   addedById: r.added_by,
   addedAt: r.added_at,
+});
+
+const toMessage = (r: MessageRow): CourseMessage => ({
+  id: r.id,
+  courseId: r.course_id,
+  authorId: r.author_id,
+  body: r.body,
+  createdAt: r.created_at,
 });
 
 const toMaterial = (r: MaterialRow): Material => ({
@@ -372,6 +389,42 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       requireRole('teacher');
       check(await supabase.from('materials').delete().eq('id', id));
       await load();
+    },
+    loadMessages: async (courseId, before) => {
+      let query = supabase
+        .from('course_messages')
+        .select('*')
+        .eq('course_id', courseId)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(MESSAGES_PAGE + 1);
+      if (before) {
+        // Stable cursor: older timestamp, or the same timestamp with a smaller id.
+        query = query.or(
+          `created_at.lt."${before.createdAt}",and(created_at.eq."${before.createdAt}",id.lt.${before.id})`,
+        );
+      }
+      const list = rows<MessageRow>(await query).map(toMessage);
+      return { messages: list.slice(0, MESSAGES_PAGE), hasMore: list.length > MESSAGES_PAGE };
+    },
+    sendMessage: async ({ id, courseId, body }) => {
+      if (!currentUser) throw new Error('Please sign in again.');
+      checkInsert(
+        await supabase.from('course_messages').insert({ id, course_id: courseId, author_id: currentUser.id, body: body.trim() }),
+      );
+    },
+    subscribeToMessages: (courseId, onMessage) => {
+      const channel = supabase
+        .channel(`chat-${courseId}-${Math.random().toString(36).slice(2)}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'course_messages', filter: `course_id=eq.${courseId}` },
+          (payload) => onMessage(toMessage(payload.new as MessageRow)),
+        )
+        .subscribe();
+      return () => {
+        supabase.removeChannel(channel);
+      };
     },
   };
 

@@ -13,7 +13,8 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
 
 1. Copy `.env.example` to `.env.local` and fill in the Supabase project URL and publishable key.
 2. In the Supabase SQL Editor run, in order, `supabase/migrations/0001_init.sql`, `supabase/migrations/0002_realtime.sql`,
-   `supabase/migrations/0003_courses.sql` and `supabase/migrations/0004_course_members.sql`.
+   `supabase/migrations/0003_courses.sql`, `supabase/migrations/0004_course_members.sql` and
+   `supabase/migrations/0006_course_chat.sql` (plus `0005` when present).
 3. For development, turn off **Authentication → Email → Confirm email**.
 
 ## Run it
@@ -53,6 +54,7 @@ src/app/                  screens (Expo Router — every file is a route)
   courses/new.tsx         teacher or mentor creates a course
   courses/[id].tsx        course details, listeners and the course's homework
   courses/[id]/listeners.tsx  teacher or mentor adds listeners
+  courses/[id]/chat.tsx   course chat (owner, listeners and the teacher)
   materials/new.tsx       teacher shares a material
   materials/[id].tsx      material details
 src/components/           shared UI
@@ -74,6 +76,7 @@ supabase/manage-roles.sql admin queries for roles and mentor assignment
 | Be a course listener       | ✓         | ✓ (not own course) |         |
 | See course listeners       | own courses | ✓                | ✓       |
 | Add / remove listeners     |           | ✓ (any course)     | ✓       |
+| Course chat (read / post)  | courses they're in | own courses + courses they're in | all |
 | See materials              | ✓         | ✓                  | ✓       |
 | Share / delete materials   |           |                    | ✓       |
 
