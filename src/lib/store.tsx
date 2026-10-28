@@ -2,7 +2,7 @@ import type { Session } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { supabase } from './supabase';
-import type { Course, Homework, Material, NewCourse, NewHomework, NewMaterial, User } from './types';
+import type { Course, CourseMember, Homework, Material, NewCourse, NewHomework, NewMaterial, User } from './types';
 
 // All data access goes through this context. Row-level security in Supabase
 // (supabase/migrations) decides what each role can read and change; the role
@@ -16,6 +16,8 @@ type Store = {
   materials: Material[];
   /** All courses, newest first. */
   courses: Course[];
+  /** Listeners the current user may see: all for teachers and mentors, own courses' for students. */
+  courseMembers: CourseMember[];
   /** Homework the current user is allowed to see, newest first. */
   visibleHomework: Homework[];
   loading: boolean;
@@ -32,6 +34,12 @@ type Store = {
   addMaterial: (input: NewMaterial) => Promise<void>;
   /** Teachers and mentors only (also enforced by RLS). */
   addCourse: (input: NewCourse) => Promise<void>;
+  /** Teachers and mentors only. Adds all users in one insert: all of them or none. */
+  addListeners: (courseId: string, userIds: string[]) => Promise<void>;
+  /** Teachers and mentors only. How many homework items removing this listener would delete. */
+  countListenerHomework: (courseId: string, userId: string) => Promise<number>;
+  /** Teachers and mentors only. Deletes the listener's homework for the course (and photos), then the membership. */
+  removeListener: (courseId: string, userId: string) => Promise<void>;
   deleteMaterial: (id: string) => Promise<void>;
 };
 
@@ -58,6 +66,7 @@ type CourseRow = {
   created_by: string;
   created_at: string;
 };
+type CourseMemberRow = { course_id: string; user_id: string; added_by: string; added_at: string };
 type MaterialRow = {
   id: string;
   teacher_id: string;
@@ -96,6 +105,13 @@ const toCourse = (r: CourseRow): Course => ({
   createdAt: r.created_at,
 });
 
+const toCourseMember = (r: CourseMemberRow): CourseMember => ({
+  courseId: r.course_id,
+  userId: r.user_id,
+  addedById: r.added_by,
+  addedAt: r.added_at,
+});
+
 const toMaterial = (r: MaterialRow): Material => ({
   id: r.id,
   teacherId: r.teacher_id,
@@ -104,6 +120,8 @@ const toMaterial = (r: MaterialRow): Material => ({
   link: r.link ?? undefined,
   createdAt: r.created_at,
 });
+
+type ListenerHomeworkRow = { id: string; photo_path: string | null };
 
 type Result = { error: { message: string; code?: string } | null };
 
@@ -137,6 +155,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [homework, setHomework] = useState<Homework[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
+  const [courseMembers, setCourseMembers] = useState<CourseMember[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
 
@@ -155,6 +174,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setHomework([]);
         setMaterials([]);
         setCourses([]);
+        setCourseMembers([]);
         setLoadedFor(null);
       }
     });
@@ -166,16 +186,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const load = useCallback(async () => {
     if (!userId) return;
     try {
-      const [profiles, hw, mats, crs] = await Promise.all([
+      const [profiles, hw, mats, crs, members] = await Promise.all([
         supabase.from('profiles').select('id, full_name, role, mentor_id').order('full_name'),
         supabase.from('homework').select('*').order('created_at', { ascending: false }),
         supabase.from('materials').select('*').order('created_at', { ascending: false }),
         supabase.from('courses').select('*').order('created_at', { ascending: false }),
+        supabase.from('course_members').select('*'),
       ]);
       setUsers(rows<ProfileRow>(profiles).map(toUser));
       setHomework(await withSignedPhotoUrls(rows<HomeworkRow>(hw).map(toHomework)));
       setMaterials(rows<MaterialRow>(mats).map(toMaterial));
       setCourses(rows<CourseRow>(crs).map(toCourse));
+      setCourseMembers(rows<CourseMemberRow>(members).map(toCourseMember));
     } finally {
       setLoadedFor(userId);
     }
@@ -200,6 +222,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'homework' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'materials' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'courses' }, () => load().catch(() => {}))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'course_members' }, () => load().catch(() => {}))
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
@@ -230,6 +253,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     users,
     materials,
     courses: sortedCourses,
+    courseMembers,
     visibleHomework,
     loading,
     dataLoaded: !!userId && loadedFor === userId,
@@ -310,6 +334,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           created_by: creator.id,
         }),
       );
+      await load();
+    },
+    addListeners: async (courseId, userIds) => {
+      const adder = requireRole('teacher', 'mentor');
+      if (!userIds.length) return;
+      // One insert, so it is all or nothing. A duplicate key on retry means an earlier attempt saved it.
+      checkInsert(
+        await supabase
+          .from('course_members')
+          .insert(userIds.map((userId) => ({ course_id: courseId, user_id: userId, added_by: adder.id }))),
+      );
+      await load();
+    },
+    countListenerHomework: async (courseId, userId) => {
+      requireRole('teacher', 'mentor');
+      return rows<ListenerHomeworkRow>(
+        await supabase.rpc('listener_homework_photos', { course: courseId, member: userId }),
+      ).length;
+    },
+    removeListener: async (courseId, userId) => {
+      requireRole('teacher', 'mentor');
+      // 1. Which homework (and photos) go away. Security definer: works even for homework the caller can't read.
+      const items = rows<ListenerHomeworkRow>(
+        await supabase.rpc('listener_homework_photos', { course: courseId, member: userId }),
+      );
+      // 2. Photos first: Supabase only deletes storage objects through the Storage API. If this fails,
+      //    nothing else has changed. Deleting a photo that is already gone is not an error (retry).
+      const paths = items.map((i) => i.photo_path).filter((p): p is string => !!p);
+      if (paths.length) check(await supabase.storage.from('homework').remove(paths));
+      // 3. Homework and membership in one transaction. If this fails after step 2, the listener stays with
+      //    their homework minus photos, and tapping "Remove" again finishes the job.
+      check(await supabase.rpc('remove_listener', { course: courseId, member: userId }));
       await load();
     },
     deleteMaterial: async (id) => {

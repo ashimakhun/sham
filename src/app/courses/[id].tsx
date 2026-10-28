@@ -1,7 +1,8 @@
 import { useLocalSearchParams } from 'expo-router';
-import { FlatList, Text } from 'react-native';
+import { FlatList, Text, View } from 'react-native';
 
 import { HomeworkCard } from '@/components/HomeworkCard';
+import { ListenersSection } from '@/components/ListenersSection';
 import { Card, EmptyState, styles } from '@/components/ui';
 import { useStore } from '@/lib/store';
 import { formatDate } from '@/lib/theme';
@@ -27,13 +28,17 @@ export default function CourseDetailScreen() {
       keyExtractor={(h) => h.id}
       renderItem={({ item }) => <HomeworkCard item={item} />}
       ListHeaderComponent={
-        <Card>
-          <Text style={styles.h1}>{course.title}</Text>
-          <Text style={styles.muted}>
-            {getUser(course.createdById)?.name ?? 'Unknown'} · {formatDate(course.createdAt)}
-          </Text>
-          {course.description ? <Text style={styles.body}>{course.description}</Text> : null}
-        </Card>
+        <View style={{ gap: 12 }}>
+          <Card>
+            <Text style={styles.h1}>{course.title}</Text>
+            <Text style={styles.muted}>
+              {getUser(course.createdById)?.name ?? 'Unknown'} · {formatDate(course.createdAt)}
+            </Text>
+            {course.description ? <Text style={styles.body}>{course.description}</Text> : null}
+          </Card>
+          <ListenersSection course={course} />
+          <Text style={styles.label}>HOMEWORK</Text>
+        </View>
       }
       ListEmptyComponent={<EmptyState title="No homework for this course yet" />}
     />
