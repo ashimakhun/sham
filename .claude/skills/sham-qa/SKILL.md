@@ -16,8 +16,9 @@ This skill owns **Ready for QA → Done**, or back to **In Dev** on failure. (Th
 2. Add `agent:working`. Read the acceptance criteria, find the PR link in the comments, and find the `TEST DESIGN` comment written during requirements analysis: use it as the test plan, adding cases only where the PR changed something it didn't foresee.
 3. Clone ashimakhun/sham and check out the PR branch.
 4. Review the diff against every acceptance criterion and the roles/access table. Check new migrations have RLS policies that match the access rules.
-5. Run `npm run typecheck` and `npx expo lint`.
-6. Write automated tests for the criteria in the repo's test setup (if none exists yet, add jest-expo with `npx expo install` and a `test` script in the first QA run, in its own commit). Cover each role that the criteria mention, including the denied cases. Run them.
+5. Run `npm ci`, then `npm run typecheck` and `npx expo lint`.
+   In the cloud sandbox, npm only reaches the registry through the proxy: run `export NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 npm_config_noproxy=localhost,127.0.0.1` before `npm ci`, `npm install` or `npx expo install`. A "getaddrinfo ENOTFOUND registry.npmjs.org" error means this step was skipped.
+6. Write automated tests for the criteria: screen tests in `__tests__/` (jest-expo + Testing Library, reuse `__tests__/helpers/`) and access-rule tests in `supabase/tests/*.test.sql` (real Postgres, see `supabase/tests/run.sh`). Cover each role that the criteria mention, including the denied cases. Run `npm test` and `npm run test:db`.
 7. Commit the tests to the same PR branch.
 8. Report on the Linear issue as a checklist, one line per acceptance criterion: pass/fail with evidence.
    - All pass: comment starting "QA PASSED", move to **Done**, and note that the PR is ready for a human to merge.
