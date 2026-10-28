@@ -15,7 +15,7 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
 2. In the Supabase SQL Editor run, in order, `supabase/migrations/0001_init.sql`, `supabase/migrations/0002_realtime.sql`,
    `supabase/migrations/0003_courses.sql`, `supabase/migrations/0004_course_members.sql`,
    `supabase/migrations/0005_homework_by_course.sql`, `supabase/migrations/0006_course_chat.sql`, then
-   `supabase/migrations/0009_roles_screen.sql`.
+   `supabase/migrations/0007_course_owner.sql` and `supabase/migrations/0009_roles_screen.sql`.
    Course meetings (ARU-10): `supabase/migrations/0010_course_meetings.sql` (adds a table; deletes nothing).
    Editing meetings (ARU-15): `supabase/migrations/0011_edit_meetings.sql` (adds a column and a function).
 3. For development, turn off **Authentication → Email → Confirm email**.
@@ -76,6 +76,7 @@ src/app/                  screens (Expo Router — every file is a route)
   courses/[id].tsx        course details, listeners and the course's homework
   courses/[id]/listeners.tsx  teacher or mentor adds listeners
   courses/[id]/chat.tsx   course chat (owner, listeners and the teacher)
+  courses/[id]/owner.tsx  teacher or mentor changes the course owner
   roles.tsx               teacher switches users between student and mentor
   materials/new.tsx       teacher shares a material
   materials/[id].tsx      material details
@@ -95,6 +96,8 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Mark homework checked      |           | any (not their own) | any    |
 | See courses                | all       | all                | all     |
 | Create courses             |           | ✓                  | ✓       |
+| Change course owner        |           | ✓ (any course)     | ✓       |
+| Own a course               | never     | ✓ (not if a listener) | ✓    |
 | Be a course listener       | ✓         | ✓ (not own course) |         |
 | See course listeners       | own courses | ✓                | ✓       |
 | Add / remove listeners     |           | ✓ (any course)     | ✓       |

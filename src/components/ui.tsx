@@ -78,6 +78,18 @@ export function RoleBadge({ role }: { role: Role }) {
   );
 }
 
+/** "Owner: <name> · <date>" line for a course (ARU-9); the owner is `Course.createdById`. */
+export function OwnerLine({ name, date }: { name: string; date: string }) {
+  return (
+    <Text style={styles.muted} numberOfLines={1}>
+      <Text style={{ fontWeight: '600' }}>Owner: </Text>
+      <Text>
+        {name} · {date}
+      </Text>
+    </Text>
+  );
+}
+
 export function EmptyState({ title, hint }: { title: string; hint?: string }) {
   return (
     <View style={styles.empty}>

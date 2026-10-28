@@ -40,7 +40,7 @@ export type Course = {
   id: string;
   title: string;
   description: string;
-  /** The teacher or mentor who created the course. */
+  /** The course's current owner (ARU-9): always a teacher or mentor; the creator unless reassigned. DB: created_by. */
   createdById: string;
   createdAt: string;
 };
