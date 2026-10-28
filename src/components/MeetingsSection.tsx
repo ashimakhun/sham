@@ -72,6 +72,7 @@ export function MeetingsSection({ course }: { course: Course }) {
       ) : (
         list.map((m) => {
           const started = hasStarted(m, now);
+          const canEdit = canManage && m.status === 'scheduled';
           const actions: { title: string; status: Target }[] =
             !canManage || m.status !== 'scheduled'
               ? []
@@ -84,7 +85,10 @@ export function MeetingsSection({ course }: { course: Course }) {
           return (
             <View key={m.id} testID={`meeting-${m.id}`} style={{ gap: 4 }}>
               <View style={[styles.row, { alignItems: 'flex-start' }]}>
-                <Text style={[styles.body, { flex: 1, fontWeight: '600' }]}>{formatDateTime(m.startsAt)}</Text>
+                <Text style={[styles.body, { flex: 1, fontWeight: '600' }]}>
+                  {formatDateTime(m.startsAt)}
+                  {m.rescheduledAt ? <Text style={styles.muted}>{'  '}Rescheduled</Text> : null}
+                </Text>
                 <MeetingBadge status={m.status} />
               </View>
               <Text style={styles.body} numberOfLines={2}>
@@ -105,12 +109,32 @@ export function MeetingsSection({ course }: { course: Course }) {
                   </Text>
                 )
               ) : null}
-              {actions.length > 0 && (
+              {(actions.length > 0 || canEdit) && (
                 <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap', paddingTop: 2 }}>
                   {changing === m.id ? (
                     <Text style={styles.muted}>Saving…</Text>
                   ) : (
-                    actions.map((a) => (
+                    [
+                      ...(canEdit
+                        ? [
+                            <Pressable
+                              key="edit"
+                              accessibilityRole="button"
+                              accessibilityLabel="Edit"
+                              accessibilityState={{ disabled: busy }}
+                              disabled={busy}
+                              hitSlop={8}
+                              onPress={() =>
+                                router.push({
+                                  pathname: '/courses/[id]/meetings/[meetingId]',
+                                  params: { id: course.id, meetingId: m.id },
+                                })
+                              }>
+                              <Text style={{ color: colors.primary, fontWeight: '600', opacity: busy ? 0.4 : 1 }}>Edit</Text>
+                            </Pressable>,
+                          ]
+                        : []),
+                      ...actions.map((a) => (
                       <Pressable
                         key={a.title}
                         accessibilityRole="button"
@@ -128,7 +152,8 @@ export function MeetingsSection({ course }: { course: Course }) {
                           {a.title}
                         </Text>
                       </Pressable>
-                    ))
+                    )),
+                    ]
                   )}
                 </View>
               )}
