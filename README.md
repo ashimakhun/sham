@@ -56,7 +56,7 @@ GitHub Actions runs both on every pull request and on pushes to `main` (`.github
 ```
 src/app/                  screens (Expo Router — every file is a route)
   index.tsx               sign in / create account
-  (tabs)/                 Homework · Courses · Materials · Profile tabs
+  (tabs)/                 Homework · Courses (My courses / All courses) · Materials · Profile tabs
   homework/new.tsx        student adds homework for a course
   homework/[id].tsx       homework details; mentor marks it checked
   courses/new.tsx         teacher or mentor creates a course

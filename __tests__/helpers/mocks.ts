@@ -20,10 +20,23 @@ export const store = {
 
 export const params: { id?: string } = {};
 
+// The latest focus effect a screen registered, so a test can simulate the screen gaining focus again.
+let focusEffect: (() => void | (() => void)) | null = null;
+/** Simulates the screen losing and regaining focus (switching tabs, or coming back from a pushed screen). */
+export async function refocus() {
+  const { act } = require('@testing-library/react-native');
+  await act(async () => {
+    focusEffect?.();
+  });
+}
+
 export const expoRouter = {
   router: { push: jest.fn(), back: jest.fn(), replace: jest.fn(), canGoBack: jest.fn(() => true) },
   useLocalSearchParams: () => params,
-  // Runs once on mount, like a screen gaining focus the first time.
-  useFocusEffect: (effect: () => void | (() => void)) => require('react').useEffect(effect, []),
+  // Runs once on mount, like a screen gaining focus the first time; refocus() runs it again.
+  useFocusEffect: (effect: () => void | (() => void)) => {
+    focusEffect = effect;
+    return require('react').useEffect(effect, []);
+  },
   Stack: { Screen: () => null },
 };
