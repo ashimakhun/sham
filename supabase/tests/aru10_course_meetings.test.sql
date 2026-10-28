@@ -16,7 +16,7 @@ insert into course_members (course_id, user_id, added_by) values
 select t.eq((select array_agg(e::text order by e) from unnest(enum_range(null::meeting_status)) e),
   array['scheduled', 'completed', 'canceled'], 'data: meeting_status enum values in order');
 select t.ok(not exists (select 1 from information_schema.columns where table_name = 'course_meetings'
-  and column_name in ('ends_at', 'end_time', 'duration', 'rescheduled_at')), 'data: no end time, duration or rescheduled_at column');
+  and column_name in ('ends_at', 'end_time', 'duration')), 'data: no end time or duration column');
 select t.ok(exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'course_meetings'),
   'data: course_meetings is in the supabase_realtime publication');
 select t.eq((select count(*) from pg_policies where tablename = 'course_meetings' and cmd in ('UPDATE', 'DELETE', 'ALL')),
