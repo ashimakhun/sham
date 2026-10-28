@@ -4,14 +4,13 @@ export type User = {
   id: string;
   name: string;
   role: Role;
-  /** Students only: the mentor who checks this student's homework. */
-  mentorId?: string;
 };
 
 export type HomeworkStatus = 'submitted' | 'checked';
 
 export type Homework = {
   id: string;
+  /** Who submitted it: a listener of the course (student or mentor). */
   studentId: string;
   /** Course the homework was submitted for; undefined for homework created before courses existed. */
   courseId?: string;

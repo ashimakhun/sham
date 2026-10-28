@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Image, KeyboardAvoidingView, Platform, ScrollView, Text } from 'react-native';
 
 import { Button, Card, EmptyState, ErrorText, Field, StatusBadge, styles } from '@/components/ui';
+import { canCheckHomework } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
 import { colors, formatDate } from '@/lib/theme';
@@ -18,7 +19,7 @@ export default function HomeworkDetailScreen() {
 
   const student = getUser(item.studentId);
   const checker = getUser(item.checkedById);
-  const canCheck = currentUser?.role === 'mentor' && item.status === 'submitted';
+  const canCheck = canCheckHomework(currentUser, item);
 
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>

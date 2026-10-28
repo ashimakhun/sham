@@ -91,7 +91,7 @@ grant execute on function t.login(text) to anon, authenticated;
 -- Fixture used by every test file:
 --   teacher T; mentors M (owns A), N (owns B), M2 (no course); students S1 (mentor_id = M), S2, S3.
 --   Course A by M, course B by N. S1: two homework in A (one checked, one with a photo), one in B (photo),
---   and one legacy homework with no course.
+--   (Homework without a course no longer exists: ARU-14 made homework.course_id not null.)
 create function t.seed() returns void language plpgsql as $$
 begin
   insert into auth.users (id, email, raw_user_meta_data) values
@@ -113,8 +113,7 @@ begin
   insert into homework (id, student_id, course_id, title, photo_path, status, checked_by) values
     (t.id('HW_A1'), t.id('S1'), t.id('A'), 'A one', t.id('S1') || '/a1.jpg', 'submitted', null),
     (t.id('HW_A2'), t.id('S1'), t.id('A'), 'A two', null, 'checked', t.id('M')),
-    (t.id('HW_B1'), t.id('S1'), t.id('B'), 'B one', t.id('S1') || '/b1.jpg', 'submitted', null),
-    (t.id('HW_OLD'), t.id('S1'), null, 'Before courses', null, 'submitted', null);
+    (t.id('HW_B1'), t.id('S1'), t.id('B'), 'B one', t.id('S1') || '/b1.jpg', 'submitted', null);
   insert into storage.objects (bucket_id, name, owner) values
     ('homework', t.id('S1') || '/a1.jpg', t.id('S1')),
     ('homework', t.id('S1') || '/b1.jpg', t.id('S1'));
