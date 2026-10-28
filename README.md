@@ -36,6 +36,8 @@ assign students to mentors, with the queries in [`supabase/manage-roles.sql`](su
 ```bash
 npm run typecheck
 npx expo lint
+npm test           # screen tests (jest-expo)
+npm run test:db    # applies supabase/migrations to a throwaway Postgres and tests the access rules
 ```
 
 GitHub Actions runs both on every pull request and on pushes to `main` (`.github/workflows/ci.yml`).

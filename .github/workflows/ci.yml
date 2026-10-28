@@ -23,3 +23,13 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npx expo lint
+      - run: npm test
+
+  db-tests:
+    name: Database tests (RLS and functions)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      # ubuntu-latest ships Postgres binaries; the script starts a throwaway server.
+      - run: bash supabase/tests/run.sh
