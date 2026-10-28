@@ -34,12 +34,15 @@ describe('Add homework', () => {
     expect(screen.queryByText('Biology')).toBeNull();
   });
 
-  it('AC4: "will check it" shows the selected course owner', async () => {
-    setStore(fakeStore('S1', { courseMembers: members }));
+  it('AC4 (changed by decision 2): the selected course\'s owner is shown as "Mentor: <owner>"', async () => {
+    setStore(fakeStore('S1', { courseMembers: [...members, member('B', 'S1')] }));
     await render(<NewHomeworkScreen />);
-    expect(screen.getByText('Pick a course to see who will check it.')).toBeTruthy();
     await fireEvent.press(screen.getByText('Algebra'));
-    expect(screen.getByText('Mentor Max will check it.')).toBeTruthy();
+    expect(screen.getByText('Mentor: Mentor Max')).toBeTruthy();
+    await fireEvent.press(screen.getByText('Biology'));
+    expect(screen.getByText('Mentor: Mentor Nina')).toBeTruthy();
+    // Any mentor or the teacher may check, so the screen must not promise that the owner will.
+    expect(screen.queryByText(/will check it/)).toBeNull();
   });
 
   it('AC2: a mentor who is a listener submits to that course', async () => {
