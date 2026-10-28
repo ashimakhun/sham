@@ -2,7 +2,8 @@
 
 An educational mobile app where teachers, mentors and students work together:
 
-- **Students** send homework (text + optional photo) to their mentor.
+- **Teachers and mentors** create courses.
+- **Students** send homework (text + optional photo) for a course to their mentor.
 - **Mentors** see their students' homework, leave a comment and mark it as checked.
 - **Teachers** share learning materials (lessons, notes, links) with the class and see all homework.
 
@@ -11,7 +12,8 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
 ## Setup
 
 1. Copy `.env.example` to `.env.local` and fill in the Supabase project URL and publishable key.
-2. In the Supabase SQL Editor run, in order, `supabase/migrations/0001_init.sql` and `supabase/migrations/0002_realtime.sql`.
+2. In the Supabase SQL Editor run, in order, `supabase/migrations/0001_init.sql`, `supabase/migrations/0002_realtime.sql`
+   and `supabase/migrations/0003_courses.sql`.
 3. For development, turn off **Authentication → Email → Confirm email**.
 
 ## Run it
@@ -41,9 +43,11 @@ npx expo lint
 ```
 src/app/                  screens (Expo Router — every file is a route)
   index.tsx               sign in / create account
-  (tabs)/                 Homework · Materials · Profile tabs
-  homework/new.tsx        student adds homework
+  (tabs)/                 Homework · Courses · Materials · Profile tabs
+  homework/new.tsx        student adds homework for a course
   homework/[id].tsx       homework details; mentor marks it checked
+  courses/new.tsx         teacher or mentor creates a course
+  courses/[id].tsx        course details and its homework
   materials/new.tsx       teacher shares a material
   materials/[id].tsx      material details
 src/components/           shared UI
@@ -58,8 +62,10 @@ supabase/manage-roles.sql admin queries for roles and mentor assignment
 | Action                     | Student   | Mentor             | Teacher |
 | -------------------------- | --------- | ------------------ | ------- |
 | See homework               | own       | own students'      | all     |
-| Add homework               | ✓         |                    |         |
+| Add homework (for a course)| ✓         |                    |         |
 | Mark homework checked      |           | own students'      |         |
+| See courses                | all       | all                | all     |
+| Create courses             |           | ✓                  | ✓       |
 | See materials              | ✓         | ✓                  | ✓       |
 | Share / delete materials   |           |                    | ✓       |
 

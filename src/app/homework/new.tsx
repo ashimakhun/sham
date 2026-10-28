@@ -1,17 +1,22 @@
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Button, ErrorText, Field, styles } from '@/components/ui';
+import { newId } from '@/lib/id';
 import { useStore } from '@/lib/store';
+import { colors } from '@/lib/theme';
 import { useAction } from '@/lib/useAction';
 
 export default function NewHomeworkScreen() {
-  const { addHomework, currentUser, getUser } = useStore();
+  const { addHomework, currentUser, getUser, courses } = useStore();
+  const [courseId, setCourseId] = useState<string>();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [photoUri, setPhotoUri] = useState<string>();
+  // One id per form: a retry after a network error cannot save the homework twice.
+  const [id] = useState(newId);
   const { busy, error, run } = useAction();
 
   const mentor = getUser(currentUser?.mentorId);
@@ -23,7 +28,8 @@ export default function NewHomeworkScreen() {
 
   function submit() {
     run(async () => {
-      await addHomework({ title, description, photoUri });
+      if (!courseId) return;
+      await addHomework({ id, courseId, title, description, photoUri });
       if (router.canGoBack()) router.back();
       else router.replace('/homework');
     });
@@ -33,6 +39,35 @@ export default function NewHomeworkScreen() {
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={[styles.content, { gap: 16 }]} keyboardShouldPersistTaps="handled"
         contentInsetAdjustmentBehavior="automatic">
+        <View style={{ gap: 8 }}>
+          <Text style={styles.label}>Course</Text>
+          {courses.length === 0 ? (
+            <Text style={styles.body}>No courses yet — ask your teacher or mentor to create one.</Text>
+          ) : (
+            courses.map((c) => {
+              const selected = c.id === courseId;
+              return (
+                <Pressable
+                  key={c.id}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  onPress={() => setCourseId(c.id)}
+                  style={[
+                    styles.input,
+                    { flexDirection: 'row', alignItems: 'center', gap: 10 },
+                    selected && { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+                  ]}>
+                  <Text style={{ color: selected ? colors.primary : colors.muted, fontSize: 16 }}>
+                    {selected ? '●' : '○'}
+                  </Text>
+                  <Text style={[styles.body, { flex: 1 }]} numberOfLines={2}>
+                    {c.title}
+                  </Text>
+                </Pressable>
+              );
+            })
+          )}
+        </View>
         <Field label="Title" placeholder="e.g. Fractions — exercises 1–10" value={title} onChangeText={setTitle} />
         <Field
           label="Description"
@@ -47,7 +82,7 @@ export default function NewHomeworkScreen() {
           <Button title={photoUri ? 'Change photo' : 'Attach a photo'} variant="secondary" onPress={pickPhoto} />
         </View>
         <ErrorText error={error} />
-        <Button title={busy ? 'Sending…' : 'Send to mentor'} onPress={submit} disabled={!title.trim() || busy} />
+        <Button title={busy ? 'Sending…' : 'Send to mentor'} onPress={submit} disabled={!title.trim() || !courseId || busy} />
         <Text style={[styles.muted, { textAlign: 'center' }]}>
           {mentor ? `${mentor.name} will check it.` : 'You do not have a mentor assigned yet.'}
         </Text>
