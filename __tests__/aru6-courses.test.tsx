@@ -19,6 +19,8 @@ jest.mock('@/lib/store', () => require('./helpers/mocks').store);
 jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn() }));
 
 const button = (name: string | RegExp) => screen.getByRole('button', { name });
+// Since ARU-12 the Courses tab opens on "My courses"; ARU-6's list is the "All courses" view.
+const showAll = () => fireEvent.press(screen.getByRole('tab', { name: 'All courses' }));
 
 beforeEach(() => jest.clearAllMocks());
 
@@ -34,6 +36,7 @@ describe('Courses tab', () => {
   it('AC4: a student sees the courses but no "+ New course"', async () => {
     setStore(fakeStore('S1'));
     await render(<CoursesScreen />);
+    await showAll();
     expect(screen.queryByRole('button', { name: '+ New course' })).toBeNull();
     expect(screen.getByText('Algebra')).toBeTruthy();
     expect(screen.getByText('Biology')).toBeTruthy();
@@ -42,6 +45,7 @@ describe('Courses tab', () => {
   it('AC6: each course shows title, creator and creation date, in the store order (newest first)', async () => {
     setStore(fakeStore('S1'));
     await render(<CoursesScreen />);
+    await showAll();
     const titles = screen.getAllByText(/^(Algebra|Biology)$/).map((t) => t.props.children);
     expect(titles).toEqual(['Biology', 'Algebra']);
     expect(screen.getByText(`Mentor Max · ${formatDate(courseA.createdAt)}`)).toBeTruthy();
@@ -51,6 +55,7 @@ describe('Courses tab', () => {
   it('AC6: tapping a course opens its details', async () => {
     setStore(fakeStore('S1'));
     await render(<CoursesScreen />);
+    await showAll();
     await fireEvent.press(screen.getByText('Algebra'));
     expect(router.push).toHaveBeenCalledWith({ pathname: '/courses/[id]', params: { id: 'A' } });
   });
@@ -58,11 +63,13 @@ describe('Courses tab', () => {
   it('edge: empty state with a hint per role', async () => {
     setStore(fakeStore('M', { courses: [] }));
     const { unmount } = await render(<CoursesScreen />);
+    await showAll();
     expect(screen.getByText('No courses yet')).toBeTruthy();
     expect(screen.getByText('Tap "+ New course" to create the first one.')).toBeTruthy();
     await unmount();
     setStore(fakeStore('S1', { courses: [] }));
     await render(<CoursesScreen />);
+    await showAll();
     expect(screen.getByText('Your teacher or mentor has not created any courses yet.')).toBeTruthy();
   });
 
