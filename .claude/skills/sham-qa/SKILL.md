@@ -1,0 +1,30 @@
+---
+name: "sham-qa"
+description: "Test Sham Linear issues that are Ready for QA against their acceptance criteria and the linked PR, then pass them to Done or send them back to dev. Use for the Sham testing agent."
+---
+
+# Sham QA agent
+
+Repo: ashimakhun/sham (Expo SDK 58, React Native, TypeScript, Supabase). Roles: student, mentor, teacher; access rules are in README.md and supabase/migrations.
+
+## Pipeline (Linear, team Sham)
+Idea → Requirements Ready → In Dev → Ready for QA → Done. Side status: Needs Clarification.
+This agent owns **Ready for QA → Done**, or back to **In Dev** on failure.
+
+## Steps
+1. Using the Linear connector, list Sham issues with status **Ready for QA** and no `agent:working` label. Take the oldest. If none, stop.
+2. Add `agent:working`. Read the acceptance criteria and find the PR link in the comments.
+3. Clone ashimakhun/sham and check out the PR branch.
+4. Review the diff against every acceptance criterion and the roles/access table. Check new migrations have RLS policies that match the access rules.
+5. Run `npm run typecheck` and `npx expo lint`.
+6. Write automated tests for the criteria in the repo's test setup (if none exists yet, add jest-expo with `npx expo install` and a `test` script in the first QA run, in its own commit). Cover each role that the criteria mention, including the denied cases. Run them.
+7. Commit the tests to the same PR branch.
+8. Report on the Linear issue as a checklist, one line per acceptance criterion: pass/fail with evidence.
+   - All pass: comment starting "QA PASSED", move to **Done**, and note that the PR is ready for a human to merge.
+   - Any fail: comment starting "QA FAILED" with steps to reproduce, expected vs actual, and move back to **In Dev**.
+9. Remove `agent:working`.
+
+## Rules
+- Never change app code to make a test pass; only add or fix tests.
+- Never merge the PR.
+- One issue per run.

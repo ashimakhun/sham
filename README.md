@@ -63,6 +63,12 @@ supabase/manage-roles.sql admin queries for roles and mentor assignment
 | See materials              | ✓         | ✓                  | ✓       |
 | Share / delete materials   |           |                    | ✓       |
 
+## Development workflow
+
+New work goes through three Claude agents (requirements → dev → QA) coordinated in Linear. Every PR is
+reviewed and merged by a person. See [`docs/agent-pipeline.md`](docs/agent-pipeline.md); the agents'
+instructions are in [`.claude/skills/`](.claude/skills/).
+
 ## Next steps
 
 1. In-app screen for teachers to manage roles and mentor assignments.
