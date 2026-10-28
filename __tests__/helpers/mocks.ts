@@ -23,4 +23,7 @@ export const params: { id?: string } = {};
 export const expoRouter = {
   router: { push: jest.fn(), back: jest.fn(), replace: jest.fn(), canGoBack: jest.fn(() => true) },
   useLocalSearchParams: () => params,
+  // Runs once on mount, like a screen gaining focus the first time.
+  useFocusEffect: (effect: () => void | (() => void)) => require('react').useEffect(effect, []),
+  Stack: { Screen: () => null },
 };
