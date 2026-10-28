@@ -47,7 +47,8 @@
     },
     "testPathIgnorePatterns": [
       "/node_modules/",
-      "/supabase/"
+      "/supabase/",
+      "/__tests__/helpers/"
     ]
   }
 }
