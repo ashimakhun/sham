@@ -36,6 +36,8 @@ npm run typecheck
 npx expo lint
 ```
 
+GitHub Actions runs both on every pull request and on pushes to `main` (`.github/workflows/ci.yml`).
+
 ## Project structure
 
 ```
