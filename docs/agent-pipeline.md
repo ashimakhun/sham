@@ -14,12 +14,24 @@ Idea → Requirements ready → Ready for Dev → In Dev → Ready for QA → Do
                      ↘ Needs Clarification (any agent, when a person must decide)
 ```
 
+QA files every failure as a **Bug** issue that blocks its story (the story waits in In Dev):
+
+```
+QA finds a failure ─┬─ bug-cause/code ─────────→ Ready for Dev ─→ dev fixes on the story's PR branch ─→ Ready for QA ─→ QA verifies ─→ Done
+                    └─ bug-cause/requirements ─→ Requirements ready ─→ analysis decides:
+                                                   code bug after all ─→ Ready for Dev
+                                                   CRITERION CHANGE (new/revised AC) ─→ Ready for Dev
+                                                   not a bug ─→ Canceled
+                                                   needs a decision ─→ Needs Clarification
+When a story's last open bug is closed, the story goes back to Ready for QA for a re-test.
+```
+
 | Agent | Skill | Picks up | Does | Hands off to |
 | --- | --- | --- | --- | --- |
 | Requirements | `sham-requirements` (+ `sham-merge-issues`) | Idea (revisions sent back by analysis first) | Merges overlapping ideas, then writes the user story, testable acceptance criteria, roles and access, dependencies, edge cases and out of scope | Requirements ready |
-| QA: requirements analysis | `sham-requirements-analysis` | Requirements ready | Independent review against the code: testable criteria, roles and RLS, data impact, dependencies, edge cases, size. Never edits the story; posts `ANALYSIS: READY` plus a `TEST DESIGN`, or the problems found | Ready for Dev, back to Idea, or Needs Clarification |
-| Dev | `sham-dev` | Ready for Dev, or In Dev issues QA sent back | Applies the analysis notes, implements on branch `sham-<issue>-<slug>`, runs typecheck and lint, opens a PR and links it in the issue | Ready for QA |
-| QA: testing | `sham-qa` | Ready for QA | Checks the PR against every acceptance criterion and the access rules, writes and runs tests from the `TEST DESIGN`, posts a pass/fail checklist | Done, or back to In Dev |
+| QA: requirements analysis | `sham-requirements-analysis` | Requirements ready (requirements bugs first) | Independent review against the code: testable criteria, roles and RLS, data impact, dependencies, edge cases, size. Never edits the story; posts `ANALYSIS: READY` plus a `TEST DESIGN`, or the problems found. For a requirements bug: reroutes it to dev, writes an `ANALYSIS: CRITERION CHANGE`, or cancels it | Ready for Dev, back to Idea, Canceled, or Needs Clarification |
+| Dev | `sham-dev` | Ready for Dev (bugs first) | Fixes bugs on the story's PR branch until QA's reproduction test passes. For stories: applies the analysis notes, implements on branch `sham-<issue>-<slug>`, runs typecheck and lint, opens a PR and links it in the issue | Ready for QA |
+| QA: testing | `sham-qa` | Ready for QA (bug fixes first) | Checks the PR against every acceptance criterion and the access rules, writes and runs tests from the `TEST DESIGN`, posts a pass/fail checklist, files each failure as a Bug issue, verifies bug fixes | Done; story to In Dev with its bugs |
 
 ### How the requirements agent picks an idea
 
@@ -41,13 +53,18 @@ Idea → Requirements ready → Ready for Dev → In Dev → Ready for QA → Do
   - `hard`: native modules (for example push notifications), realtime features (for example chat), access model changes, or anything needing a development build or external service.
 
   A difficulty label set by a person is an override the agent never changes.
+- `Bug`: an issue the QA agent filed for a failure, with one label from the `bug-cause` group:
+  - `code`: the code doesn't meet a clear criterion, crashes, regresses, or breaks the access rules → dev agent.
+  - `requirements`: the criterion is ambiguous, contradictory, silent about the case, or wrong → requirements analysis first.
 
 ## Guardrails
 
 - Agents never push to `main` and never merge a PR.
 - One issue per agent per run.
 - The QA agent only adds or fixes tests, never app code.
-- After two QA failures on the same issue, it goes to Needs Clarification for a person.
+- A story failing QA a third time goes to Needs Clarification (with its new bugs) for a person.
+- A bug reopened twice goes to Needs Clarification.
+- The dev agent never edits a QA test to make it pass; if it thinks the test is wrong, the bug goes to requirements analysis.
 - After two `ANALYSIS: CHANGES NEEDED` rounds on the same story, the third problem goes to Needs Clarification instead of back to Idea.
 - The dev agent never codes a story that hasn't passed analysis.
 
@@ -58,7 +75,7 @@ Idea → Requirements ready → Ready for Dev → In Dev → Ready for QA → Do
 Each agent is a Claude routine (shown as a scheduled task) that runs in a fresh cloud session with Claude Code tools (shell, git, npm). Runs act without asking for approval; this can be changed in each routine's settings.
 
 - **Requirements agent: started by Linear.** When an issue is created in, or moved to, **Idea** in the Sham team, Linear calls the `linear-webhook` Supabase Edge Function, which starts the routine through its API trigger (see [Event trigger setup](#event-trigger-setup)).
-- **QA agent, requirements analysis: hourly.** Reviews one Requirements ready story per run.
+- **QA agent, requirements analysis: hourly at :43.** Reviews one Requirements ready issue per run (requirements bugs first).
 - **Dev agent and QA testing: hourly at :06** (paused while the backlog is being prepared).
 
 The prompts are:
@@ -77,25 +94,25 @@ The prompts are:
 
 > You are the Sham QA agent doing requirements analysis. Load the sham-requirements-analysis skill with the Skill tool and follow it exactly for one run.
 >
-> Context: Linear team "Sham" (key ARU). Statuses: Idea, Requirements ready, Ready for Dev, In Dev, Ready for QA, Done, Needs Clarification. Lock label: agent:working. Difficulty labels: difficulty/easy, difficulty/medium, difficulty/hard. Repo: ashimakhun/sham (attach it read-only to read the code).
+> Context: Linear team "Sham" (key ARU). Statuses: Idea, Requirements ready, Ready for Dev, In Dev, Ready for QA, Done, Needs Clarification, Canceled. Lock label: agent:working. Bug labels: Bug, bug-cause/code, bug-cause/requirements. Difficulty labels: difficulty/easy, difficulty/medium, difficulty/hard. Repo: ashimakhun/sham (attach it read-only to read the code).
 >
-> Review at most one issue in Requirements ready that does not have the agent:working label. If there is none, end the run quietly with "nothing to do". If the team has no Ready for Dev status yet, stop and say it must be added in Linear. Never write code or tests and never change the repo.
+> Review at most one issue in Requirements ready that does not have the agent:working label: requirements bugs (Bug + bug-cause/requirements) first, then stories. If there is none, end the run quietly with "nothing to do". If the team has no Ready for Dev status yet, stop and say it must be added in Linear. Never write code or tests and never change the repo.
 
 **Sham dev agent**
 
 > You are the Sham dev agent. Load the sham-dev skill with the Skill tool and follow it exactly for one run.
 >
-> Context: Linear team "Sham" (key ARU). Statuses: Idea, Requirements ready, Ready for Dev, In Dev, Ready for QA, Done, Needs Clarification. Lock label: agent:working. Repo: ashimakhun/sham — attach it with push access, clone it, and read AGENTS.md before coding.
+> Context: Linear team "Sham" (key ARU). Statuses: Idea, Requirements ready, Ready for Dev, In Dev, Ready for QA, Done, Needs Clarification, Canceled. Lock label: agent:working. Bug labels: Bug, bug-cause/code, bug-cause/requirements. Repo: ashimakhun/sham — attach it with push access, clone it, and read AGENTS.md before coding.
 >
-> Take at most one issue: first an In Dev issue sent back by QA (a comment starting "QA FAILED"), otherwise the oldest Ready for Dev issue (never one still in Requirements ready), skipping any with the agent:working label. If there is none, end the run quietly with "nothing to do". Never push to main and never merge a PR.
+> Take at most one issue in Ready for Dev without the agent:working label: bugs first (by severity, then oldest), otherwise the oldest story. Never pick up anything still in Requirements ready. Fix bugs on the open PR branch of the story they block. If there is none, end the run quietly with "nothing to do". Never push to main, never change QA tests to make them pass, and never merge a PR.
 
 **Sham QA agent**
 
 > You are the Sham QA agent. Load the sham-qa skill with the Skill tool and follow it exactly for one run.
 >
-> Context: Linear team "Sham" (key ARU). Statuses: Idea, Requirements ready, Ready for Dev, In Dev, Ready for QA, Done, Needs Clarification. Lock label: agent:working. Repo: ashimakhun/sham — attach it with push access, clone it, and check out the PR branch linked in the issue comments.
+> Context: Linear team "Sham" (key ARU). Statuses: Idea, Requirements ready, Ready for Dev, In Dev, Ready for QA, Done, Needs Clarification, Canceled. Lock label: agent:working. Bug labels: Bug, bug-cause/code, bug-cause/requirements. Repo: ashimakhun/sham — attach it with push access, clone it, and check out the branch linked in the issue comments.
 >
-> Take at most one issue in status Ready for QA that does not have the agent:working label. If there is none, end the run quietly with "nothing to do". Only add or fix tests, never app code, and never merge a PR.
+> Take at most one issue in Ready for QA without the agent:working label: bug fixes to verify first, otherwise the oldest story not blocked by an open bug. File every failure as a Bug issue in Linear, routed by cause (code → Ready for Dev, requirements → Requirements ready). If there is none, end the run quietly with "nothing to do". Only add or fix tests, never app code, and never merge a PR.
 
 ### Event trigger setup
 
