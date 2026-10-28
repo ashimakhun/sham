@@ -28,3 +28,19 @@ export function inCourseChat(user: User | null | undefined, course: Course, memb
     members.some((m) => m.courseId === course.id && m.userId === user.id)
   );
 }
+
+/** Mirrors the course_meetings insert policy and set_meeting_status() (supabase/migrations/0010_course_meetings.sql):
+ *  the course's current owner or the teacher (any course) schedules meetings and sets their status. */
+export function canManageMeetings(user: User | null | undefined, course: Course) {
+  return !!user && (course.createdById === user.id || user.role === 'teacher');
+}
+
+/** Mirrors the course_meetings select policy: the teacher and every mentor, or a listener of the course. */
+export function canSeeMeetings(user: User | null | undefined, course: Course, members: CourseMember[]) {
+  if (!user) return false;
+  return (
+    user.role === 'teacher' ||
+    user.role === 'mentor' ||
+    members.some((m) => m.courseId === course.id && m.userId === user.id)
+  );
+}

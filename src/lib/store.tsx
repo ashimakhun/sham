@@ -2,7 +2,20 @@ import type { Session } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { supabase } from './supabase';
-import type { Course, CourseMember, CourseMessage, Homework, Material, NewCourse, NewHomework, NewMaterial, User } from './types';
+import type {
+  Course,
+  CourseMember,
+  CourseMessage,
+  Homework,
+  Material,
+  Meeting,
+  MeetingStatus,
+  NewCourse,
+  NewHomework,
+  NewMaterial,
+  NewMeeting,
+  User,
+} from './types';
 
 // All data access goes through this context. Row-level security in Supabase
 // (supabase/migrations) decides what each role can read and change; the role
@@ -20,6 +33,8 @@ type Store = {
   courseMembers: CourseMember[];
   /** Homework the current user is allowed to see, newest first. */
   visibleHomework: Homework[];
+  /** Course meetings the current user may see (ARU-10): all for teachers and mentors, own courses' for students. */
+  meetings: Meeting[];
   loading: boolean;
   /** True once data has been fetched (successfully or not) for the signed-in user. */
   dataLoaded: boolean;
@@ -41,6 +56,10 @@ type Store = {
   /** Teachers and mentors only. Deletes the listener's homework for the course (and photos), then the membership. */
   removeListener: (courseId: string, userId: string) => Promise<void>;
   deleteMaterial: (id: string) => Promise<void>;
+  /** Course owner or teacher (also enforced by RLS). `id` is generated once per form, so a retry saves once. */
+  addMeeting: (input: NewMeeting) => Promise<void>;
+  /** Course owner or teacher: Scheduled -> completed (after the start) or canceled. Final; a retry is a no-op. */
+  setMeetingStatus: (id: string, status: Exclude<MeetingStatus, 'scheduled'>) => Promise<void>;
   /** Course chat (ARU-8): a page of messages, newest first, older than `before` when given. */
   loadMessages: (courseId: string, before?: CourseMessage) => Promise<{ messages: CourseMessage[]; hasMore: boolean }>;
   /** Posts as the current user. `id` is generated once per message so a retry cannot post twice. */
@@ -75,6 +94,18 @@ type CourseRow = {
   created_at: string;
 };
 type CourseMemberRow = { course_id: string; user_id: string; added_by: string; added_at: string };
+type MeetingRow = {
+  id: string;
+  course_id: string;
+  starts_at: string;
+  topic: string;
+  location: string | null;
+  status: MeetingStatus;
+  created_by: string;
+  created_at: string;
+  status_changed_by: string | null;
+  status_changed_at: string | null;
+};
 type MessageRow = { id: string; course_id: string; author_id: string; body: string; created_at: string };
 type MaterialRow = {
   id: string;
@@ -118,6 +149,19 @@ const toCourseMember = (r: CourseMemberRow): CourseMember => ({
   userId: r.user_id,
   addedById: r.added_by,
   addedAt: r.added_at,
+});
+
+const toMeeting = (r: MeetingRow): Meeting => ({
+  id: r.id,
+  courseId: r.course_id,
+  startsAt: r.starts_at,
+  topic: r.topic,
+  location: r.location ?? undefined,
+  status: r.status,
+  createdById: r.created_by,
+  createdAt: r.created_at,
+  statusChangedById: r.status_changed_by ?? undefined,
+  statusChangedAt: r.status_changed_at ?? undefined,
 });
 
 const toMessage = (r: MessageRow): CourseMessage => ({
@@ -172,6 +216,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [courseMembers, setCourseMembers] = useState<CourseMember[]>([]);
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
 
@@ -191,6 +236,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setMaterials([]);
         setCourses([]);
         setCourseMembers([]);
+        setMeetings([]);
         setLoadedFor(null);
       }
     });
@@ -202,18 +248,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const load = useCallback(async () => {
     if (!userId) return;
     try {
-      const [profiles, hw, mats, crs, members] = await Promise.all([
+      const [profiles, hw, mats, crs, members, mtgs] = await Promise.all([
         supabase.from('profiles').select('id, full_name, role').order('full_name'),
         supabase.from('homework').select('*').order('created_at', { ascending: false }),
         supabase.from('materials').select('*').order('created_at', { ascending: false }),
         supabase.from('courses').select('*').order('created_at', { ascending: false }),
         supabase.from('course_members').select('*'),
+        supabase.from('course_meetings').select('*').order('starts_at'),
       ]);
       setUsers(rows<ProfileRow>(profiles).map(toUser));
       setHomework(await withSignedPhotoUrls(rows<HomeworkRow>(hw).map(toHomework)));
       setMaterials(rows<MaterialRow>(mats).map(toMaterial));
       setCourses(rows<CourseRow>(crs).map(toCourse));
       setCourseMembers(rows<CourseMemberRow>(members).map(toCourseMember));
+      setMeetings(rows<MeetingRow>(mtgs).map(toMeeting));
     } finally {
       setLoadedFor(userId);
     }
@@ -239,6 +287,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'materials' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'courses' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'course_members' }, () => load().catch(() => {}))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'course_meetings' }, () => load().catch(() => {}))
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
@@ -271,6 +320,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     courses: sortedCourses,
     courseMembers,
     visibleHomework,
+    meetings,
     loading,
     dataLoaded: !!userId && loadedFor === userId,
     refresh,
@@ -393,6 +443,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     deleteMaterial: async (id) => {
       requireRole('teacher');
       check(await supabase.from('materials').delete().eq('id', id));
+      await load();
+    },
+    addMeeting: async (input) => {
+      const owner = requireRole('teacher', 'mentor');
+      checkInsert(
+        await supabase.from('course_meetings').insert({
+          id: input.id,
+          course_id: input.courseId,
+          starts_at: input.startsAt,
+          // The topic can't be blank in the database: an empty field means the default.
+          topic: input.topic.trim() || 'Meeting',
+          location: input.location.trim() || null,
+          created_by: owner.id,
+        }),
+      );
+      await load();
+    },
+    setMeetingStatus: async (id, status) => {
+      requireRole('teacher', 'mentor');
+      check(await supabase.rpc('set_meeting_status', { meeting: id, new_status: status }));
       await load();
     },
     loadMessages: async (courseId, before) => {
