@@ -29,6 +29,12 @@ export function inCourseChat(user: User | null | undefined, course: Course, memb
   );
 }
 
+/** Mirrors change_course_owner() (supabase/migrations/0007_course_owner.sql): the teacher or any mentor, including a
+ *  mentor who is a listener of the course. */
+export function canChangeOwner(role: Role | undefined) {
+  return role === 'teacher' || role === 'mentor';
+}
+
 /** Mirrors set_user_role() (supabase/migrations/0009_roles_screen.sql): only the teacher manages roles. */
 export function canManageRoles(role: Role | undefined) {
   return role === 'teacher';
