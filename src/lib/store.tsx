@@ -2,7 +2,7 @@ import type { Session } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { supabase } from './supabase';
-import type { Homework, Material, NewHomework, NewMaterial, User } from './types';
+import type { Course, Homework, Material, NewCourse, NewHomework, NewMaterial, User } from './types';
 
 // All data access goes through this context. Row-level security in Supabase
 // (supabase/migrations) decides what each role can read and change; the role
@@ -14,6 +14,8 @@ type Store = {
   currentUser: User | null;
   users: User[];
   materials: Material[];
+  /** All courses, newest first. */
+  courses: Course[];
   /** Homework the current user is allowed to see, newest first. */
   visibleHomework: Homework[];
   loading: boolean;
@@ -21,12 +23,15 @@ type Store = {
   dataLoaded: boolean;
   refresh: () => Promise<void>;
   getUser: (id: string | undefined) => User | undefined;
+  getCourse: (id: string | undefined) => Course | undefined;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   addHomework: (input: NewHomework) => Promise<void>;
   checkHomework: (id: string, comment: string) => Promise<void>;
   addMaterial: (input: NewMaterial) => Promise<void>;
+  /** Teachers and mentors only (also enforced by RLS). */
+  addCourse: (input: NewCourse) => Promise<void>;
   deleteMaterial: (id: string) => Promise<void>;
 };
 
@@ -36,6 +41,7 @@ type ProfileRow = { id: string; full_name: string; role: User['role']; mentor_id
 type HomeworkRow = {
   id: string;
   student_id: string;
+  course_id: string | null;
   title: string;
   description: string;
   photo_path: string | null;
@@ -43,6 +49,13 @@ type HomeworkRow = {
   checked_by: string | null;
   checked_at: string | null;
   mentor_comment: string | null;
+  created_at: string;
+};
+type CourseRow = {
+  id: string;
+  title: string;
+  description: string;
+  created_by: string;
   created_at: string;
 };
 type MaterialRow = {
@@ -64,6 +77,7 @@ const toUser = (r: ProfileRow): User => ({
 const toHomework = (r: HomeworkRow): Homework => ({
   id: r.id,
   studentId: r.student_id,
+  courseId: r.course_id ?? undefined,
   title: r.title,
   description: r.description,
   photoPath: r.photo_path ?? undefined,
@@ -72,6 +86,14 @@ const toHomework = (r: HomeworkRow): Homework => ({
   checkedById: r.checked_by ?? undefined,
   checkedAt: r.checked_at ?? undefined,
   mentorComment: r.mentor_comment ?? undefined,
+});
+
+const toCourse = (r: CourseRow): Course => ({
+  id: r.id,
+  title: r.title,
+  description: r.description,
+  createdById: r.created_by,
+  createdAt: r.created_at,
 });
 
 const toMaterial = (r: MaterialRow): Material => ({
@@ -83,10 +105,16 @@ const toMaterial = (r: MaterialRow): Material => ({
   createdAt: r.created_at,
 });
 
-type Result = { error: { message: string } | null };
+type Result = { error: { message: string; code?: string } | null };
 
 function check(res: Result) {
   if (res.error) throw new Error(res.error.message);
+}
+
+/** Like check(), but a duplicate primary key means an earlier attempt already saved this row. */
+function checkInsert(res: Result) {
+  if (res.error?.code === '23505') return;
+  check(res);
 }
 
 function rows<T>(res: Result & { data: unknown }): T[] {
@@ -108,6 +136,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [users, setUsers] = useState<User[]>([]);
   const [homework, setHomework] = useState<Homework[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
 
@@ -125,6 +154,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setUsers([]);
         setHomework([]);
         setMaterials([]);
+        setCourses([]);
         setLoadedFor(null);
       }
     });
@@ -136,14 +166,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const load = useCallback(async () => {
     if (!userId) return;
     try {
-      const [profiles, hw, mats] = await Promise.all([
+      const [profiles, hw, mats, crs] = await Promise.all([
         supabase.from('profiles').select('id, full_name, role, mentor_id').order('full_name'),
         supabase.from('homework').select('*').order('created_at', { ascending: false }),
         supabase.from('materials').select('*').order('created_at', { ascending: false }),
+        supabase.from('courses').select('*').order('created_at', { ascending: false }),
       ]);
       setUsers(rows<ProfileRow>(profiles).map(toUser));
       setHomework(await withSignedPhotoUrls(rows<HomeworkRow>(hw).map(toHomework)));
       setMaterials(rows<MaterialRow>(mats).map(toMaterial));
+      setCourses(rows<CourseRow>(crs).map(toCourse));
     } finally {
       setLoadedFor(userId);
     }
@@ -167,6 +199,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       .channel('sham-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'homework' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'materials' }, () => load().catch(() => {}))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'courses' }, () => load().catch(() => {}))
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
@@ -175,13 +208,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const currentUser = users.find((u) => u.id === userId) ?? null;
   const getUser = useCallback((id: string | undefined) => users.find((u) => u.id === id), [users]);
+  const sortedCourses = useMemo(
+    () => [...courses].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    [courses],
+  );
+  const getCourse = useCallback((id: string | undefined) => courses.find((c) => c.id === id), [courses]);
   const visibleHomework = useMemo(
     () => [...homework].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     [homework],
   );
 
-  const requireRole = (role: User['role']) => {
-    if (currentUser?.role !== role) throw new Error(`Only a ${role} can do this.`);
+  const requireRole = (...roles: User['role'][]) => {
+    if (!currentUser || !roles.includes(currentUser.role)) throw new Error(`Only a ${roles.join(' or ')} can do this.`);
     return currentUser;
   };
 
@@ -191,11 +229,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     currentUser,
     users,
     materials,
+    courses: sortedCourses,
     visibleHomework,
     loading,
     dataLoaded: !!userId && loadedFor === userId,
     refresh,
     getUser,
+    getCourse,
     signIn: async (email, password) => {
       check(await supabase.auth.signInWithPassword({ email: email.trim(), password }));
     },
@@ -216,12 +256,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       let photoPath: string | null = null;
       if (input.photoUri) {
         const file = await fetch(input.photoUri).then((r) => r.arrayBuffer());
-        photoPath = `${student.id}/${Date.now()}.jpg`;
-        check(await supabase.storage.from('homework').upload(photoPath, file, { contentType: 'image/jpeg' }));
+        // Named after the homework id, so a retry finds the photo it already uploaded.
+        photoPath = `${student.id}/${input.id}.jpg`;
+        const upload = await supabase.storage.from('homework').upload(photoPath, file, { contentType: 'image/jpeg' });
+        if (upload.error && !/already exists/i.test(upload.error.message)) throw new Error(upload.error.message);
       }
-      check(
+      checkInsert(
         await supabase.from('homework').insert({
+          id: input.id,
           student_id: student.id,
+          course_id: input.courseId,
           title: input.title.trim(),
           description: input.description.trim(),
           photo_path: photoPath,
@@ -252,6 +296,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           title: input.title.trim(),
           body: input.body.trim(),
           link: input.link?.trim() || null,
+        }),
+      );
+      await load();
+    },
+    addCourse: async (input) => {
+      const creator = requireRole('teacher', 'mentor');
+      checkInsert(
+        await supabase.from('courses').insert({
+          id: input.id,
+          title: input.title.trim(),
+          description: input.description.trim(),
+          created_by: creator.id,
         }),
       );
       await load();

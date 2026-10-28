@@ -5,11 +5,11 @@ import { Image, KeyboardAvoidingView, Platform, ScrollView, Text } from 'react-n
 import { Button, Card, EmptyState, ErrorText, Field, StatusBadge, styles } from '@/components/ui';
 import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
-import { formatDate } from '@/lib/theme';
+import { colors, formatDate } from '@/lib/theme';
 
 export default function HomeworkDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { visibleHomework, currentUser, getUser, checkHomework } = useStore();
+  const { visibleHomework, currentUser, getUser, getCourse, checkHomework } = useStore();
   const [comment, setComment] = useState('');
   const { busy, error, run } = useAction();
 
@@ -27,6 +27,7 @@ export default function HomeworkDetailScreen() {
         <Card>
           <StatusBadge status={item.status} />
           <Text style={styles.h1}>{item.title}</Text>
+          <Text style={[styles.label, { color: colors.primary }]}>{getCourse(item.courseId)?.title ?? 'No course'}</Text>
           <Text style={styles.muted}>
             {student?.name} · {formatDate(item.createdAt)}
           </Text>
