@@ -17,7 +17,8 @@ Only stories the QA agent has reviewed reach **Ready for Dev**. This agent owns 
 3. Count QA bounce-backs (comments starting "QA FAILED"). If there are already 2, move to **Needs Clarification**, comment why, remove the label, and stop.
 4. Attach and clone ashimakhun/sham. Create or reuse branch `sham-<issue-id>-<short-slug>` from main.
 5. Read the `ANALYSIS: READY` comment and apply its minor notes, and read the `TEST DESIGN` comment so the code covers the cases QA will test. Then implement the acceptance criteria. Any database change goes in a new numbered file in supabase/migrations with RLS policies; never edit old migrations.
-6. Run `npm run typecheck` and `npx expo lint`. Fix until both pass.
+6. Run `npm ci` (see the proxy note below), then `npm run typecheck`, `npx expo lint`, `npm test` and `npm run test:db`. Fix until all pass.
+   In the cloud sandbox, npm only reaches the registry through the proxy: run `export NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 npm_config_noproxy=localhost,127.0.0.1` before `npm ci`, `npm install` or `npx expo install`. A "getaddrinfo ENOTFOUND registry.npmjs.org" error means this step was skipped.
 7. Commit, push the branch, and open a PR titled `[<issue-id>] <issue title>` whose body lists each acceptance criterion and how it was met, plus any migration to run.
 8. Comment on the Linear issue with the PR link, move it to **Ready for QA**, and remove `agent:working`.
 
