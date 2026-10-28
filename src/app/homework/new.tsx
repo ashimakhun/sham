@@ -10,7 +10,7 @@ import { colors } from '@/lib/theme';
 import { useAction } from '@/lib/useAction';
 
 export default function NewHomeworkScreen() {
-  const { addHomework, currentUser, getUser, courses } = useStore();
+  const { addHomework, currentUser, getUser, courses, courseMembers } = useStore();
   const [courseId, setCourseId] = useState<string>();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -19,7 +19,9 @@ export default function NewHomeworkScreen() {
   const [id] = useState(newId);
   const { busy, error, run } = useAction();
 
-  const mentor = getUser(currentUser?.mentorId);
+  // Only courses I am a listener of (ARU-14; also enforced by RLS). The course owner is its mentor.
+  const myCourses = courses.filter((c) => courseMembers.some((m) => m.courseId === c.id && m.userId === currentUser?.id));
+  const owner = getUser(myCourses.find((c) => c.id === courseId)?.createdById);
 
   async function pickPhoto() {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
@@ -41,10 +43,10 @@ export default function NewHomeworkScreen() {
         contentInsetAdjustmentBehavior="automatic">
         <View style={{ gap: 8 }}>
           <Text style={styles.label}>Course</Text>
-          {courses.length === 0 ? (
-            <Text style={styles.body}>No courses yet — ask your teacher or mentor to create one.</Text>
+          {myCourses.length === 0 ? (
+            <Text style={styles.body}>You are not in any course yet — ask your teacher or mentor to add you</Text>
           ) : (
-            courses.map((c) => {
+            myCourses.map((c) => {
               const selected = c.id === courseId;
               return (
                 <Pressable
@@ -82,9 +84,13 @@ export default function NewHomeworkScreen() {
           <Button title={photoUri ? 'Change photo' : 'Attach a photo'} variant="secondary" onPress={pickPhoto} />
         </View>
         <ErrorText error={error} />
-        <Button title={busy ? 'Sending…' : 'Send to mentor'} onPress={submit} disabled={!title.trim() || !courseId || busy} />
+        <Button
+          title={busy ? 'Sending…' : 'Send to mentor'}
+          onPress={submit}
+          disabled={!title.trim() || !courseId || !myCourses.some((c) => c.id === courseId) || busy}
+        />
         <Text style={[styles.muted, { textAlign: 'center' }]}>
-          {mentor ? `${mentor.name} will check it.` : 'You do not have a mentor assigned yet.'}
+          {owner ? `${owner.name} will check it.` : 'Pick a course to see who will check it.'}
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>

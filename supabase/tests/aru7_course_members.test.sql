@@ -80,12 +80,11 @@ select t.eq((select string_agg(c.title || ':' || p.full_name, ',' order by c.tit
   from course_members m join courses c on c.id = m.course_id join profiles p on p.id = c.created_by
   where m.user_id = auth.uid()), 'Algebra:Mentor Max,Biology:Mentor Nina', 'AC9 S1 reads own courses with owner as mentor');
 
--- Homework access is unchanged until ARU-14 (still profiles.mentor_id).
+-- Homework access (changed by ARU-14): every mentor sees all homework.
 reset role; select t.login('N');
-select t.eq((select count(*) from homework where student_id = t.id('S1')), 0::bigint,
-  'unchanged: course owner N does not see listener S1''s homework yet');
+select t.eq((select count(*) from homework where student_id = t.id('S1')), 3::bigint, 'ARU-14: mentor N sees S1''s homework');
 reset role; select t.login('M');
-select t.eq((select count(*) from homework where student_id = t.id('S1')), 4::bigint, 'unchanged: assigned mentor M sees S1''s homework');
+select t.eq((select count(*) from homework where student_id = t.id('S1')), 3::bigint, 'ARU-14: mentor M sees S1''s homework');
 
 -- Photos of course homework of non-listeners stay protected from staff deletes.
 reset role;
@@ -95,8 +94,8 @@ insert into storage.objects (bucket_id, name, owner) values ('homework', t.id('S
 select t.login('M2');
 select t.eq(t.affected($$delete from storage.objects where name like '%/x.jpg'$$), 0::bigint,
   'storage: a mentor cannot delete photos of a non-listener''s homework');
-select t.eq((select count(*) from storage.objects where name like '%/x.jpg'), 0::bigint,
-  'storage: a mentor cannot read photos of a non-listener''s homework (not their student)');
+select t.eq((select count(*) from storage.objects where name like '%/x.jpg'), 1::bigint,
+  'storage (changed by ARU-14): any mentor can read homework photos, but still cannot delete a non-listener''s');
 
 -- AC 6: N (a listener of A who does not own it) removes S1 from A, in the app's order.
 reset role; select t.login('N');
@@ -119,7 +118,6 @@ select t.ok(not exists (select 1 from course_members where course_id = t.id('A')
 select t.ok(exists (select 1 from course_members where course_id = t.id('B') and user_id = t.id('S1')), 'AC6 S1 is still in course B');
 select t.ok(not exists (select 1 from homework where id in (t.id('HW_A1'), t.id('HW_A2'))), 'AC6 S1''s checked and unchecked homework in A is deleted');
 select t.ok(exists (select 1 from homework where id = t.id('HW_B1')), 'AC6 S1''s homework in B is untouched');
-select t.ok(exists (select 1 from homework where id = t.id('HW_OLD')), 'AC6 S1''s homework without a course is untouched');
 select t.ok(not exists (select 1 from storage.objects where name = t.id('S1') || '/a1.jpg'), 'AC6 the A photo is gone');
 select t.ok(exists (select 1 from storage.objects where name = t.id('S1') || '/b1.jpg'), 'AC6 the B photo is untouched');
 select t.ok(exists (select 1 from course_members where course_id = t.id('A') and user_id = t.id('N')), 'AC6 other listeners stay');
