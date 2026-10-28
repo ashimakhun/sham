@@ -38,4 +38,5 @@ export const expoRouter = {
     focusEffect = effect;
     return require('react').useEffect(effect, []);
   },
+  Stack: { Screen: () => null },
 };

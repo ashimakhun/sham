@@ -30,3 +30,14 @@ export const roleColor: Record<Role, string> = {
 export function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 }
+
+/** Date and time (device time zone), e.g. for chat messages where several share a day. */
+export function formatDateTime(iso: string) {
+  return new Date(iso).toLocaleString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}

@@ -9,7 +9,7 @@ export const users: Record<string, User> = {
   M: { id: 'M', name: 'Mentor Max', role: 'mentor' },
   N: { id: 'N', name: 'Mentor Nina', role: 'mentor' },
   M2: { id: 'M2', name: 'Mentor Mo', role: 'mentor' },
-  S1: { id: 'S1', name: 'Student Sam', role: 'student', mentorId: 'M' },
+  S1: { id: 'S1', name: 'Student Sam', role: 'student' },
   S2: { id: 'S2', name: 'Student Sue', role: 'student' },
   S3: { id: 'S3', name: 'Abby Student', role: 'student' },
 };
@@ -68,6 +68,9 @@ export function fakeStore(who: keyof typeof users | null, over: Partial<Store> =
     countListenerHomework: jest.fn(async () => 0),
     removeListener: jest.fn(async () => {}),
     deleteMaterial: jest.fn(async () => {}),
+    loadMessages: jest.fn(async () => ({ messages: [], hasMore: false })),
+    sendMessage: jest.fn(async () => {}),
+    subscribeToMessages: jest.fn(() => () => {}),
     ...over,
   };
 }

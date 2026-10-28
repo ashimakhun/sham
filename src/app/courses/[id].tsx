@@ -1,20 +1,21 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { FlatList, Text, View } from 'react-native';
 
 import { HomeworkCard } from '@/components/HomeworkCard';
 import { ListenersSection } from '@/components/ListenersSection';
-import { Card, EmptyState, styles } from '@/components/ui';
+import { Button, Card, EmptyState, styles } from '@/components/ui';
+import { inCourseChat } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { formatDate } from '@/lib/theme';
 
 export default function CourseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getCourse, getUser, visibleHomework, loading, refresh } = useStore();
+  const { getCourse, getUser, visibleHomework, loading, refresh, currentUser, courseMembers } = useStore();
 
   const course = getCourse(id);
   if (!course) return <EmptyState title="Course not found" />;
 
-  // visibleHomework is already limited by RLS: own (student), own students' (mentor), all (teacher).
+  // visibleHomework is already limited by RLS: own homework for students, all for mentors and the teacher (ARU-14).
   const homework = visibleHomework.filter((h) => h.courseId === course.id);
 
   return (
@@ -36,6 +37,13 @@ export default function CourseDetailScreen() {
             </Text>
             {course.description ? <Text style={styles.body}>{course.description}</Text> : null}
           </Card>
+          {inCourseChat(currentUser, course, courseMembers) && (
+            <Button
+              title="Chat"
+              variant="secondary"
+              onPress={() => router.push({ pathname: '/courses/[id]/chat', params: { id: course.id } })}
+            />
+          )}
           <ListenersSection course={course} />
           <Text style={styles.label}>HOMEWORK</Text>
         </View>

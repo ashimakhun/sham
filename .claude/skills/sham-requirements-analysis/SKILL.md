@@ -1,6 +1,6 @@
 ---
 name: "sham-requirements-analysis"
-description: "Review Sham Linear stories in Requirements ready before coding: check acceptance criteria, roles and access, data impact, dependencies and size against the code, then pass them to Ready for Dev or send them back. Run by the Sham QA agent."
+description: "Review Sham Linear stories and requirements bugs in Requirements ready before coding: check acceptance criteria, roles and access, data impact, dependencies and size against the code, then pass them to Ready for Dev or send them back. Run by the Sham QA agent."
 ---
 
 # Sham requirements analysis (QA agent)
@@ -13,13 +13,16 @@ Sham is an Expo SDK 58 (React Native, TypeScript, Expo Router) + Supabase app. R
 Idea → Requirements ready → **Ready for Dev** → In Dev → Ready for QA → Done. Side status: Needs Clarification.
 This skill owns **Requirements ready → Ready for Dev**, or back to **Idea** (the requirements agent fixes it) or **Needs Clarification** (a person decides).
 
+It also reviews **requirements bugs**: issues the QA agent filed with labels `Bug` + `bug-cause/requirements` (see section 5). They never go back to Idea.
+
 If the team has no **Ready for Dev** status, stop and report that it must be added in Linear first.
 
 ## 1. Choose the issue
 1. Using the Linear connector, list Sham issues in **Requirements ready** without the `agent:working` label.
-2. Sort: by difficulty label (easy → medium → hard, unrated last), then issues that block the most other open issues, then oldest.
-3. Take the first. If none, stop and report "nothing to do".
-4. Add `agent:working` before anything else.
+2. Take **requirements bugs first** (label `Bug`): severity blocker → major → minor, then oldest. Handle them with section 5 instead of sections 3–4.
+3. Otherwise sort the stories: by difficulty label (easy → medium → hard, unrated last), then issues that block the most other open issues, then oldest.
+4. Take the first. If none, stop and report "nothing to do".
+5. Add `agent:working` before anything else.
 
 ## 2. Gather context
 - The issue description, all comments (including earlier `ANALYSIS:` comments, if it came back before), labels and relations.
@@ -70,8 +73,33 @@ Count earlier comments on this issue that start with `ANALYSIS: CHANGES NEEDED`.
 
 Finally remove `agent:working`. In the run summary, give the issue, the verdict, and the blocker count.
 
+## 5. Requirements bugs
+A requirements bug says the story's criteria didn't cover a case, were ambiguous, or asked for the wrong thing. The bug `blocks` its story, which waits in In Dev. Read the bug, its evidence, the story (description, `ANALYSIS:` and `TEST DESIGN` comments, earlier `ANALYSIS: CRITERION CHANGE` comments) and the code. Never edit the story's description, and never move a bug to Idea.
+
+Decide, then comment on the bug:
+
+**A. It's really a code bug** (the criterion is clear and the code doesn't meet it):
+comment `ANALYSIS: CODE BUG` naming the criterion that already covers it, switch the label to `bug-cause/code`, move the bug to **Ready for Dev**.
+
+**B. The criteria need a change, and the right behaviour is clear** from the story's intent, the README access table, other stories or existing behaviour:
+1. Comment on the bug starting `ANALYSIS: CRITERION CHANGE` with:
+   - the exact new or replacement criterion in Given / When / Then form, numbered against the story (`AC 3 (revised)` or `AC 9 (new)`);
+   - why this is the right behaviour;
+   - the test cases QA should run for it, including the denied cases per role.
+2. Post the same `ANALYSIS: CRITERION CHANGE` text on the **story** with `(from ARU-<bug>)`, so the dev and QA agents treat it as part of the story's criteria.
+3. Move the bug to **Ready for Dev**. Keep the `bug-cause/requirements` label for the record.
+
+**C. Not a bug** (the code and the criterion are right; the test or expectation was wrong):
+comment `ANALYSIS: NOT A BUG` explaining the correct reading of the criterion and which test to fix or remove, then move the bug to **Canceled**. If it was the story's last open bug, move the story to **Ready for QA** with a comment `All bugs closed (ARU-x, …), ready for re-test`.
+
+**D. It needs a product decision** (which role may do X, a business rule):
+comment `ANALYSIS: NEEDS A DECISION` with specific questions and options, move the bug to **Needs Clarification**.
+
+Then remove `agent:working`.
+
 ## Rules
 - Never write code, tests or change the repo in this skill.
+- Never change a story's status, except moving it to Ready for QA when you cancel its last open bug (5C).
 - Never edit an issue description, title or difficulty label set by a person.
 - One issue per run.
 - Judge against the code as it is on `main`, not against stories that aren't built yet (but do flag conflicts with them).
