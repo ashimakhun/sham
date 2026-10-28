@@ -48,9 +48,14 @@ Idea → Requirements ready → In Dev → Ready for QA → Done
 
 ## How the agents run
 
-### Scheduled (cloud)
+### Cloud runs (Claude routines)
 
-Each agent is a Claude scheduled task that runs **every hour at :06** in a fresh cloud session (Claude Code tools: shell, git, npm). Runs act without asking for approval; this can be changed in each task's settings. The prompts are:
+Each agent is a Claude routine (shown as a scheduled task) that runs in a fresh cloud session with Claude Code tools (shell, git, npm). Runs act without asking for approval; this can be changed in each routine's settings.
+
+- **Requirements agent: started by Linear.** When an issue is created in, or moved to, **Idea** in the Sham team, Linear calls the `linear-webhook` Supabase Edge Function, which starts the routine through its API trigger (see [Event trigger setup](#event-trigger-setup)).
+- **Dev and QA agents: hourly at :06** (paused while the backlog is being prepared).
+
+The prompts are:
 
 **Sham requirements agent**
 
@@ -58,7 +63,9 @@ Each agent is a Claude scheduled task that runs **every hour at :06** in a fresh
 >
 > Context: Linear team "Sham" (key ARU). Statuses: Idea, Requirements ready, In Dev, Ready for QA, Done, Needs Clarification. Lock label: agent:working. Difficulty labels: difficulty/easy, difficulty/medium, difficulty/hard. Repo: ashimakhun/sham (attach it read-only to read the code).
 >
-> Choose the issue with the skill's prioritisation (difficulty per its current policy, then issue relations), not simply the oldest. Write requirements for at most one issue per run; rating other Idea issues' difficulty is fine. If nothing is eligible, end the run quietly with "nothing to do". Never write code or change the repo.
+> Runs are usually started by Linear: a message after this prompt like "Started by Linear: ARU-12 ... was created in Idea" means new work arrived. Still choose the issue with the skill's prioritisation (difficulty per its current policy, then issue relations), not simply the issue named; the named issue gets rated in this run and written up in a later run if it isn't first. If the named issue is already locked or no longer in Idea, just run normally.
+>
+> Write requirements for at most one issue per run; rating other Idea issues' difficulty is fine. If nothing is eligible, end the run quietly with "nothing to do". Never write code or change the repo.
 
 **Sham dev agent**
 
@@ -75,6 +82,44 @@ Each agent is a Claude scheduled task that runs **every hour at :06** in a fresh
 > Context: Linear team "Sham" (key ARU). Statuses: Idea, Requirements ready, In Dev, Ready for QA, Done, Needs Clarification. Lock label: agent:working. Repo: ashimakhun/sham — attach it with push access, clone it, and check out the PR branch linked in the issue comments.
 >
 > Take at most one issue in status Ready for QA that does not have the agent:working label. If there is none, end the run quietly with "nothing to do". Only add or fix tests, never app code, and never merge a PR.
+
+### Event trigger setup
+
+Linear webhooks can't send the routine's bearer token, so a small relay sits in between:
+
+```
+Linear webhook (Issue events, team Sham)
+  → Supabase Edge Function supabase/functions/linear-webhook
+      checks the Linear signature, keeps only "entered Idea" events
+  → POST <routine API trigger URL>  (starts the requirements agent)
+```
+
+One-time setup:
+
+1. **Routine API trigger.** At [claude.ai/code/routines](https://claude.ai/code/routines), open **Sham requirements agent** → **Add another trigger** → **API** → **Generate token**. Copy the URL and the token (the token is shown once).
+2. **Deploy the function** from the repo folder:
+   ```bash
+   npx supabase login
+   npx supabase link --project-ref <your-project-ref>
+   npx supabase functions deploy linear-webhook --no-verify-jwt
+   ```
+   Its URL is `https://<your-project-ref>.supabase.co/functions/v1/linear-webhook`.
+3. **Linear webhook.** In Linear: Settings → API → Webhooks → New webhook. URL: the function URL above. Team: Sham. Data change events: **Issues** only. Save, then copy its **signing secret**.
+4. **Secrets:**
+   ```bash
+   npx supabase secrets set \
+     LINEAR_WEBHOOK_SECRET=<signing secret> \
+     ROUTINE_FIRE_URL=<routine API trigger URL> \
+     ROUTINE_FIRE_TOKEN=<routine token>
+   ```
+5. **Test:** create an issue in Idea. The function's logs (Supabase dashboard → Edge Functions → linear-webhook) should show `fired requirements agent for ARU-…`, and a new run appears for the routine.
+
+Notes:
+
+- Only creation in Idea, or a status change into Idea, starts a run. Editing an issue that is already in Idea doesn't.
+- Each run writes up one issue, so adding five ideas starts five runs.
+- A routine accepts up to 30 starts per hour. If that is ever exceeded, the remaining ideas wait for the next start.
+- Generating a new routine token revokes the old one; update `ROUTINE_FIRE_TOKEN` when you do.
 
 ### By hand (Claude Code)
 
