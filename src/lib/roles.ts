@@ -4,3 +4,8 @@ import type { Role } from './types';
 export function canCreateCourse(role: Role | undefined) {
   return role === 'teacher' || role === 'mentor';
 }
+
+/** Mirrors the course_members insert policy and remove_listener() (supabase/migrations/0004_course_members.sql). */
+export function canManageListeners(role: Role | undefined) {
+  return role === 'teacher' || role === 'mentor';
+}

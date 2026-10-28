@@ -21,7 +21,7 @@ export function HomeworkCard({ item }: { item: Homework }) {
       <Text style={styles.muted}>
         {showStudent ? `${getUser(item.studentId)?.name ?? 'Unknown student'} · ` : ''}
         {formatDate(item.createdAt)}
-        {item.photoPath ? ' · 📎 photo' : ''}
+        {item.photoUrl ? ' · 📎 photo' : ''}
       </Text>
       <StatusBadge status={item.status} />
     </Card>
