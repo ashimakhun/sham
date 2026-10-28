@@ -18,7 +18,7 @@ export const store = {
   },
 };
 
-export const params: { id?: string } = {};
+export const params: { id?: string; meetingId?: string } = {};
 
 // The latest focus effect a screen registered, so a test can simulate the screen gaining focus again.
 let focusEffect: (() => void | (() => void)) | null = null;

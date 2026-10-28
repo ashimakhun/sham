@@ -9,6 +9,7 @@ import type {
   Homework,
   Material,
   Meeting,
+  MeetingEdit,
   MeetingStatus,
   NewCourse,
   NewHomework,
@@ -60,6 +61,8 @@ type Store = {
   addMeeting: (input: NewMeeting) => Promise<void>;
   /** Course owner or teacher: Scheduled -> completed (after the start) or canceled. Final; a retry is a no-op. */
   setMeetingStatus: (id: string, status: Exclude<MeetingStatus, 'scheduled'>) => Promise<void>;
+  /** Course owner or teacher, Scheduled meetings only (ARU-15). A changed start must be in the future. */
+  updateMeeting: (id: string, input: MeetingEdit) => Promise<void>;
   /** Course chat (ARU-8): a page of messages, newest first, older than `before` when given. */
   loadMessages: (courseId: string, before?: CourseMessage) => Promise<{ messages: CourseMessage[]; hasMore: boolean }>;
   /** Posts as the current user. `id` is generated once per message so a retry cannot post twice. */
@@ -105,6 +108,7 @@ type MeetingRow = {
   created_at: string;
   status_changed_by: string | null;
   status_changed_at: string | null;
+  rescheduled_at: string | null;
 };
 type MessageRow = { id: string; course_id: string; author_id: string; body: string; created_at: string };
 type MaterialRow = {
@@ -162,6 +166,7 @@ const toMeeting = (r: MeetingRow): Meeting => ({
   createdAt: r.created_at,
   statusChangedById: r.status_changed_by ?? undefined,
   statusChangedAt: r.status_changed_at ?? undefined,
+  rescheduledAt: r.rescheduled_at ?? undefined,
 });
 
 const toMessage = (r: MessageRow): CourseMessage => ({
@@ -463,6 +468,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setMeetingStatus: async (id, status) => {
       requireRole('teacher', 'mentor');
       check(await supabase.rpc('set_meeting_status', { meeting: id, new_status: status }));
+      await load();
+    },
+    updateMeeting: async (id, input) => {
+      requireRole('teacher', 'mentor');
+      check(
+        await supabase.rpc('update_meeting', {
+          meeting: id,
+          new_starts_at: input.startsAt,
+          new_topic: input.topic,
+          new_location: input.location,
+        }),
+      );
       await load();
     },
     loadMessages: async (courseId, before) => {
