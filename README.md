@@ -16,6 +16,7 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `supabase/migrations/0003_courses.sql`, `supabase/migrations/0004_course_members.sql`,
    `supabase/migrations/0005_homework_by_course.sql`, `supabase/migrations/0006_course_chat.sql`, then
    `supabase/migrations/0007_course_owner.sql` and `supabase/migrations/0009_roles_screen.sql`.
+   Course meetings (ARU-10): `supabase/migrations/0010_course_meetings.sql` (adds a table; deletes nothing).
 3. For development, turn off **Authentication → Email → Confirm email**.
 
 ### Upgrading an existing project to 0005 (ARU-14)
@@ -100,6 +101,8 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | See course listeners       | own courses | ✓                | ✓       |
 | Add / remove listeners     |           | ✓ (any course)     | ✓       |
 | Course chat (read / post)  | courses they're in | own courses + courses they're in | all |
+| See course meetings        | courses they're in | ✓ (all courses)  | ✓       |
+| Schedule meetings, mark completed / canceled | | own courses    | any course |
 | See materials              | ✓         | ✓                  | ✓       |
 | Share / delete materials   |           |                    | ✓       |
 | Switch student ↔ mentor    |           |                    | ✓       |

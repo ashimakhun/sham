@@ -29,7 +29,8 @@
         {
           "photosPermission": "Sham uses your photos so you can attach pictures of your homework."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "scheme": "sham",
     "experiments": {

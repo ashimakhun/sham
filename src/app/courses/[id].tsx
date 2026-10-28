@@ -3,6 +3,7 @@ import { FlatList, Text, View } from 'react-native';
 
 import { HomeworkCard } from '@/components/HomeworkCard';
 import { ListenersSection } from '@/components/ListenersSection';
+import { MeetingsSection } from '@/components/MeetingsSection';
 import { Button, Card, EmptyState, OwnerLine, styles } from '@/components/ui';
 import { canChangeOwner, inCourseChat } from '@/lib/roles';
 import { useStore } from '@/lib/store';
@@ -49,6 +50,7 @@ export default function CourseDetailScreen() {
               onPress={() => router.push({ pathname: '/courses/[id]/owner', params: { id: course.id } })}
             />
           )}
+          <MeetingsSection course={course} />
           <ListenersSection course={course} />
           <Text style={styles.label}>HOMEWORK</Text>
         </View>
