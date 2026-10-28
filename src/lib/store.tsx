@@ -45,7 +45,7 @@ type Store = {
 
 const StoreContext = createContext<Store | null>(null);
 
-type ProfileRow = { id: string; full_name: string; role: User['role']; mentor_id: string | null };
+type ProfileRow = { id: string; full_name: string; role: User['role'] };
 type HomeworkRow = {
   id: string;
   student_id: string;
@@ -80,7 +80,6 @@ const toUser = (r: ProfileRow): User => ({
   id: r.id,
   name: r.full_name,
   role: r.role,
-  mentorId: r.mentor_id ?? undefined,
 });
 
 const toHomework = (r: HomeworkRow): Homework => ({
@@ -187,7 +186,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!userId) return;
     try {
       const [profiles, hw, mats, crs, members] = await Promise.all([
-        supabase.from('profiles').select('id, full_name, role, mentor_id').order('full_name'),
+        supabase.from('profiles').select('id, full_name, role').order('full_name'),
         supabase.from('homework').select('*').order('created_at', { ascending: false }),
         supabase.from('materials').select('*').order('created_at', { ascending: false }),
         supabase.from('courses').select('*').order('created_at', { ascending: false }),
@@ -276,7 +275,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       check(await supabase.auth.signOut());
     },
     addHomework: async (input) => {
-      const student = requireRole('student');
+      // Students and mentors submit, only to courses they are a listener of (also enforced by RLS).
+      const student = requireRole('student', 'mentor');
+      if (!courseMembers.some((m) => m.courseId === input.courseId && m.userId === student.id)) {
+        throw new Error('You are not a listener of this course.');
+      }
       let photoPath: string | null = null;
       if (input.photoUri) {
         const file = await fetch(input.photoUri).then((r) => r.arrayBuffer());
@@ -298,7 +301,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       await load();
     },
     checkHomework: async (id, comment) => {
-      const mentor = requireRole('mentor');
+      // Any mentor or the teacher checks, never their own homework (also enforced by RLS).
+      const mentor = requireRole('mentor', 'teacher');
+      if (homework.find((h) => h.id === id)?.studentId === mentor.id) throw new Error('You cannot check your own homework.');
       check(
         await supabase
           .from('homework')

@@ -14,7 +14,7 @@ export default function CourseDetailScreen() {
   const course = getCourse(id);
   if (!course) return <EmptyState title="Course not found" />;
 
-  // visibleHomework is already limited by RLS: own (student), own students' (mentor), all (teacher).
+  // visibleHomework is already limited by RLS: own homework for students, all for mentors and the teacher (ARU-14).
   const homework = visibleHomework.filter((h) => h.courseId === course.id);
 
   return (

@@ -13,8 +13,16 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
 
 1. Copy `.env.example` to `.env.local` and fill in the Supabase project URL and publishable key.
 2. In the Supabase SQL Editor run, in order, `supabase/migrations/0001_init.sql`, `supabase/migrations/0002_realtime.sql`,
-   `supabase/migrations/0003_courses.sql` and `supabase/migrations/0004_course_members.sql`.
+   `supabase/migrations/0003_courses.sql`, `supabase/migrations/0004_course_members.sql` and
+   `supabase/migrations/0005_homework_by_course.sql`.
 3. For development, turn off **Authentication → Email → Confirm email**.
+
+### Upgrading an existing project to 0005 (ARU-14)
+
+`0005_homework_by_course.sql` **permanently deletes all homework** (homework now always belongs to a course).
+Run it when nobody is using the app: every open app reloads once per deleted row. Right after it, empty the
+`homework` bucket once in **Storage → homework → select all → Delete**, because SQL cannot delete Storage files.
+The deleted homework and photos cannot be restored.
 
 ## Run it
 
@@ -28,8 +36,9 @@ Restart `npm start` after changing `.env.local`.
 
 ## Users and roles
 
-Everyone who creates an account in the app starts as a **student**. Promote teachers and mentors, and
-assign students to mentors, with the queries in [`supabase/manage-roles.sql`](supabase/manage-roles.sql).
+Everyone who creates an account in the app starts as a **student**. Promote the teacher (there is only one) and
+mentors with the queries in [`supabase/manage-roles.sql`](supabase/manage-roles.sql). There is no per-student
+mentor: adding someone to a course as a listener makes the course owner their mentor for that course.
 
 ## Checks
 
@@ -66,9 +75,9 @@ supabase/manage-roles.sql admin queries for roles and mentor assignment
 
 | Action                     | Student   | Mentor             | Teacher |
 | -------------------------- | --------- | ------------------ | ------- |
-| See homework               | own       | own students'      | all     |
-| Add homework (for a course)| ✓         |                    |         |
-| Mark homework checked      |           | own students'      |         |
+| See homework               | own       | all                | all     |
+| Add homework               | courses they're in | courses they're in |  |
+| Mark homework checked      |           | any (not their own) | any    |
 | See courses                | all       | all                | all     |
 | Create courses             |           | ✓                  | ✓       |
 | Be a course listener       | ✓         | ✓ (not own course) |         |

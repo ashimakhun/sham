@@ -11,7 +11,7 @@ import { HomeworkCard } from '@/components/HomeworkCard';
 import { formatDate } from '@/lib/theme';
 import { router } from 'expo-router';
 
-import { courseA, courseB, fakeStore, hw } from './helpers/fakeStore';
+import { courseA, courseB, fakeStore, hw, member } from './helpers/fakeStore';
 import { params, setStore } from './helpers/mocks';
 
 jest.mock('expo-router', () => require('./helpers/mocks').expoRouter);
@@ -155,8 +155,11 @@ describe('Course details', () => {
 describe('Add homework', () => {
   const titleInput = () => screen.getByPlaceholderText('e.g. Fractions — exercises 1–10');
 
-  it('AC8: "Send to mentor" needs exactly one course picked from all courses', async () => {
-    setStore(fakeStore('S1'));
+  // Since ARU-14 the picker lists only courses the user is a listener of; S1 is a listener of both here.
+  const s1InBoth = { courseMembers: [member('A', 'S1'), member('B', 'S1')] };
+
+  it('AC8: "Send to mentor" needs exactly one course picked from the courses I attend', async () => {
+    setStore(fakeStore('S1', s1InBoth));
     await render(<NewHomeworkScreen />);
     const radios = screen.getAllByRole('radio');
     expect(radios).toHaveLength(2);
@@ -170,7 +173,7 @@ describe('Add homework', () => {
   });
 
   it('AC9: the homework is sent with the selected course', async () => {
-    const store = fakeStore('S1');
+    const store = fakeStore('S1', s1InBoth);
     setStore(store);
     await render(<NewHomeworkScreen />);
     await fireEvent.press(screen.getByText('Biology'));
@@ -180,10 +183,10 @@ describe('Add homework', () => {
     expect(store.addHomework).toHaveBeenCalledWith(expect.objectContaining({ courseId: 'B', title: 'Cells' }));
   });
 
-  it('AC10: with no courses it explains why and "Send to mentor" stays disabled', async () => {
+  it('AC10 (wording changed by ARU-14 AC3): in no course it explains why and "Send to mentor" stays disabled', async () => {
     setStore(fakeStore('S1', { courses: [] }));
     await render(<NewHomeworkScreen />);
-    expect(screen.getByText('No courses yet — ask your teacher or mentor to create one.')).toBeTruthy();
+    expect(screen.getByText('You are not in any course yet — ask your teacher or mentor to add you')).toBeTruthy();
     await fireEvent.changeText(titleInput(), 'Exercises');
     expect(button('Send to mentor')).toBeDisabled();
   });
@@ -209,7 +212,7 @@ describe('Homework card and details', () => {
     expect(screen.getByText('Biology')).toBeTruthy();
   });
 
-  it('AC11/AC12: legacy homework shows "No course" and the mentor can still check it', async () => {
+  it('AC11/AC12: homework with an unknown course shows "No course" and a mentor can check it', async () => {
     params.id = 'old';
     const store = fakeStore('M', { visibleHomework: [hw({ id: 'old' })] });
     setStore(store);

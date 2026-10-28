@@ -49,20 +49,22 @@ select t.eq((select count(*) from courses), 4::bigint, 'AC6 mentor sees all cour
 reset role; select t.login('T');
 select t.eq((select count(*) from courses), 4::bigint, 'AC6 teacher sees all courses');
 
--- AC 7: course homework follows the existing homework visibility.
+-- AC 7: course homework follows the homework visibility (since ARU-14: own for students, all for mentors/teacher).
 reset role; select t.login('S1');
 select t.eq((select count(*) from homework where course_id = t.id('A')), 2::bigint, 'AC7 student sees own homework in a course');
 reset role; select t.login('S2');
 select t.eq((select count(*) from homework where course_id = t.id('A')), 0::bigint, 'AC7 student does not see others'' homework');
 reset role; select t.login('M');
-select t.eq((select count(*) from homework where course_id = t.id('A')), 2::bigint, 'AC7 mentor sees own students'' homework');
+select t.eq((select count(*) from homework where course_id = t.id('A')), 2::bigint, 'AC7 mentor sees the course homework');
 reset role; select t.login('M2');
-select t.eq((select count(*) from homework where course_id = t.id('A')), 0::bigint, 'AC7 mentor does not see other mentors'' students');
+select t.eq((select count(*) from homework where course_id = t.id('A')), 2::bigint, 'AC7 (changed by ARU-14) any mentor sees course homework');
 reset role; select t.login('T');
 select t.eq((select count(*) from homework where course_id = t.id('A')), 2::bigint, 'AC7 teacher sees all homework');
 
--- AC 8/9/10: homework must name an existing course.
-reset role; select t.login('S2');
+-- AC 8/9/10: homework must name an existing course (and, since ARU-14, one the student is a listener of).
+reset role;
+insert into course_members (course_id, user_id, added_by) values (t.id('A'), t.id('S2'), t.id('M'));
+select t.login('S2');
 select t.lives($$insert into homework (student_id, course_id, title) values ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000d1', 'Fractions')$$,
   'AC9 student submits homework for a course');
 select t.eq((select course_id from homework where title = 'Fractions'), t.id('A'), 'AC9 homework is saved with its course');
@@ -88,20 +90,8 @@ insert into courses (id, title, created_by) values ('00000000-0000-0000-0000-000
 select t.throws($$insert into courses (id, title, created_by) values ('00000000-0000-0000-0000-00000000aaaa', 'Retry', '00000000-0000-0000-0000-0000000000b3')$$, '23505',
   'edge: retrying a course with the same id cannot save twice');
 
--- AC 11: homework from before courses is still visible to the student and their mentor.
-reset role; select t.login('S1');
-select t.ok(exists (select 1 from homework where id = t.id('HW_OLD') and course_id is null), 'AC11 student still sees legacy homework');
+-- AC 11/12 (legacy homework without a course, checking by profiles.mentor_id) were superseded by ARU-14:
+-- homework without a course no longer exists and checking follows supabase/tests/aru14_homework_by_course.test.sql.
 reset role; select t.login('M');
-select t.ok(exists (select 1 from homework where id = t.id('HW_OLD')), 'AC11 mentor still sees legacy homework');
-
--- AC 11/12: checking is unchanged — only the student's assigned mentor (profiles.mentor_id).
-select t.eq(t.affected($$update homework set status = 'checked', checked_by = '00000000-0000-0000-0000-0000000000b1', checked_at = now() where id = '00000000-0000-0000-0000-0000000000e4'$$), 1::bigint,
-  'AC11 assigned mentor checks legacy homework (no course)');
 select t.eq(t.affected($$update homework set status = 'checked', checked_by = '00000000-0000-0000-0000-0000000000b1', checked_at = now() where id = '00000000-0000-0000-0000-0000000000e1'$$), 1::bigint,
-  'AC12 assigned mentor checks course homework');
-reset role; select t.login('N');
-select t.eq(t.affected($$update homework set status = 'checked', checked_by = '00000000-0000-0000-0000-0000000000b2' where id = '00000000-0000-0000-0000-0000000000e3'$$), 0::bigint,
-  'AC12 the course owner who is not the assigned mentor cannot check (unchanged until ARU-14)');
-reset role; select t.login('T');
-select t.eq(t.affected($$update homework set status = 'checked', checked_by = '00000000-0000-0000-0000-0000000000a1' where id = '00000000-0000-0000-0000-0000000000e3'$$), 0::bigint,
-  'AC12 teacher cannot check homework (unchanged)');
+  'AC12 a mentor checks course homework');
