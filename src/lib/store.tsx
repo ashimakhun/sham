@@ -34,6 +34,8 @@ type Store = {
   addMaterial: (input: NewMaterial) => Promise<void>;
   /** Teachers and mentors only (also enforced by RLS). */
   addCourse: (input: NewCourse) => Promise<void>;
+  /** Teachers and mentors only (ARU-9). Makes `userId` (a teacher or mentor, not a listener) the course owner. */
+  changeCourseOwner: (courseId: string, userId: string) => Promise<void>;
   /** Teachers and mentors only. Adds all users in one insert: all of them or none. */
   addListeners: (courseId: string, userIds: string[]) => Promise<void>;
   /** Teachers and mentors only. How many homework items removing this listener would delete. */
@@ -356,6 +358,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           created_by: creator.id,
         }),
       );
+      await load();
+    },
+    changeCourseOwner: async (courseId, userId) => {
+      requireRole('teacher', 'mentor');
+      // Idempotent on the server: a retry after a lost response is a no-op.
+      check(await supabase.rpc('change_course_owner', { course: courseId, new_owner: userId }));
       await load();
     },
     addListeners: async (courseId, userIds) => {

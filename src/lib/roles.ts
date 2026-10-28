@@ -28,3 +28,9 @@ export function inCourseChat(user: User | null | undefined, course: Course, memb
     members.some((m) => m.courseId === course.id && m.userId === user.id)
   );
 }
+
+/** Mirrors change_course_owner() (supabase/migrations/0007_course_owner.sql): the teacher or any mentor, including a
+ *  mentor who is a listener of the course. */
+export function canChangeOwner(role: Role | undefined) {
+  return role === 'teacher' || role === 'mentor';
+}
