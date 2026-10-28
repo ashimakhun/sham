@@ -28,3 +28,8 @@ export function inCourseChat(user: User | null | undefined, course: Course, memb
     members.some((m) => m.courseId === course.id && m.userId === user.id)
   );
 }
+
+/** Mirrors set_user_role() (supabase/migrations/0009_roles_screen.sql): only the teacher manages roles. */
+export function canManageRoles(role: Role | undefined) {
+  return role === 'teacher';
+}
