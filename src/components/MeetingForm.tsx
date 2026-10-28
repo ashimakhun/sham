@@ -7,6 +7,7 @@ import { colors } from '@/lib/theme';
 import { useNow } from '@/lib/useNow';
 
 export type MeetingFormValues = { startsAt: Date; topic: string; location: string };
+export type MeetingFormResult = MeetingFormValues & { timeChanged: boolean };
 
 type Props = {
   initial: MeetingFormValues;
@@ -14,7 +15,9 @@ type Props = {
   busyTitle: string;
   busy: boolean;
   error: string | null;
-  onSubmit: (values: MeetingFormValues) => void;
+  onSubmit: (values: MeetingFormResult) => void;
+  /** Edit (ARU-15): the future-time rule applies only when the date or time was changed. */
+  checkTimeOnlyWhenChanged?: boolean;
 };
 
 /** The next full hour: the default start of a new meeting (always in the future). */
@@ -25,14 +28,16 @@ export function nextFullHour(now = new Date()) {
   return d;
 }
 
-/** Date and start time, topic and link/place of a meeting (ARU-10 "Schedule meeting"). The start must be in the
- *  future (device clock here; the database checks again with its own). */
-export function MeetingForm({ initial, submitTitle, busyTitle, busy, error, onSubmit }: Props) {
+/** Date and start time, topic and link/place of a meeting: "Schedule meeting" (ARU-10) and "Edit meeting"
+ *  (ARU-15). The start must be in the future (device clock here; the database checks again with its own); when
+ *  editing, only if it was changed. */
+export function MeetingForm({ initial, submitTitle, busyTitle, busy, error, onSubmit, checkTimeOnlyWhenChanged }: Props) {
   const [startsAt, setStartsAt] = useState(initial.startsAt);
   const [topic, setTopic] = useState(initial.topic);
   const [location, setLocation] = useState(initial.location);
   const now = useNow(15_000);
-  const inFuture = startsAt.getTime() > now;
+  const timeChanged = startsAt.getTime() !== initial.startsAt.getTime();
+  const timeOk = (checkTimeOnlyWhenChanged && !timeChanged) || startsAt.getTime() > now;
 
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -41,7 +46,7 @@ export function MeetingForm({ initial, submitTitle, busyTitle, busy, error, onSu
         keyboardShouldPersistTaps="handled"
         contentInsetAdjustmentBehavior="automatic">
         <DateTimeField label="Date and start time" value={startsAt} onChange={setStartsAt} />
-        {!inFuture && <Text style={{ color: colors.warning, fontSize: 14 }}>Pick a time in the future</Text>}
+        {!timeOk && <Text style={{ color: colors.warning, fontSize: 14 }}>Pick a time in the future</Text>}
         <Field label="Topic (optional)" placeholder="Meeting" value={topic} onChangeText={setTopic} maxLength={200} />
         <Field
           label="Link or place (optional)"
@@ -55,8 +60,8 @@ export function MeetingForm({ initial, submitTitle, busyTitle, busy, error, onSu
         <ErrorText error={error} />
         <Button
           title={busy ? busyTitle : submitTitle}
-          onPress={() => onSubmit({ startsAt, topic, location })}
-          disabled={!inFuture || busy}
+          onPress={() => onSubmit({ startsAt, topic, location, timeChanged })}
+          disabled={!timeOk || busy}
         />
       </ScrollView>
     </KeyboardAvoidingView>
