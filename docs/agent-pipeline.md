@@ -1,22 +1,25 @@
 # Agent pipeline
 
-Sham is built by three Claude agents that move work through Linear. They never talk to each other directly: the issue status in Linear is the handoff, and a person reviews and merges every PR.
+Sham is built by three Claude agents (requirements, dev and QA; the QA agent has two jobs) that move work through Linear. They never talk to each other directly: the issue status in Linear is the handoff, and a person reviews and merges every PR.
 
 - Linear workspace: team **Sham** (key `ARU`), project **Sham**. The project document "Sham: what is already done" describes the current state of the app.
-- Agent instructions: [`.claude/skills/`](../.claude/skills/) (`sham-requirements`, `sham-dev`, `sham-qa`).
+- Agent instructions: [`.claude/skills/`](../.claude/skills/) (`sham-requirements` with `sham-merge-issues`, `sham-requirements-analysis`, `sham-dev`, `sham-qa`).
 
 ## Workflow
 
 ```
-Idea → Requirements ready → In Dev → Ready for QA → Done
-                     ↘ Needs Clarification (any agent, when stuck)
+Idea → Requirements ready → Ready for Dev → In Dev → Ready for QA → Done
+  ↑              │
+  └──────────────┘ analysis sends a story back with CHANGES NEEDED
+                     ↘ Needs Clarification (any agent, when a person must decide)
 ```
 
 | Agent | Skill | Picks up | Does | Hands off to |
 | --- | --- | --- | --- | --- |
-| Requirements | `sham-requirements` | Idea | Writes the user story, testable acceptance criteria, roles and access, dependencies, edge cases and out of scope | Requirements ready |
-| Dev | `sham-dev` | Requirements ready, or In Dev issues QA sent back | Implements on branch `sham-<issue>-<slug>`, runs typecheck and lint, opens a PR and links it in the issue | Ready for QA |
-| QA | `sham-qa` | Ready for QA | Checks the PR against every acceptance criterion and the access rules, writes and runs tests, posts a pass/fail checklist | Done, or back to In Dev |
+| Requirements | `sham-requirements` (+ `sham-merge-issues`) | Idea (revisions sent back by analysis first) | Merges overlapping ideas, then writes the user story, testable acceptance criteria, roles and access, dependencies, edge cases and out of scope | Requirements ready |
+| QA: requirements analysis | `sham-requirements-analysis` | Requirements ready | Independent review against the code: testable criteria, roles and RLS, data impact, dependencies, edge cases, size. Never edits the story; posts `ANALYSIS: READY` plus a `TEST DESIGN`, or the problems found | Ready for Dev, back to Idea, or Needs Clarification |
+| Dev | `sham-dev` | Ready for Dev, or In Dev issues QA sent back | Applies the analysis notes, implements on branch `sham-<issue>-<slug>`, runs typecheck and lint, opens a PR and links it in the issue | Ready for QA |
+| QA: testing | `sham-qa` | Ready for QA | Checks the PR against every acceptance criterion and the access rules, writes and runs tests from the `TEST DESIGN`, posts a pass/fail checklist | Done, or back to In Dev |
 
 ### How the requirements agent picks an idea
 
@@ -27,7 +30,7 @@ Idea → Requirements ready → In Dev → Ready for QA → Done
 
 ## Linear setup
 
-**Statuses (team Sham):** Idea, Requirements ready, In Dev, Ready for QA, Done, Needs Clarification (plus Linear's Canceled and Duplicate).
+**Statuses (team Sham):** Idea, Requirements ready, Ready for Dev, In Dev, Ready for QA, Done, Needs Clarification (plus Linear's Canceled and Duplicate).
 
 **Labels:**
 
@@ -45,6 +48,8 @@ Idea → Requirements ready → In Dev → Ready for QA → Done
 - One issue per agent per run.
 - The QA agent only adds or fixes tests, never app code.
 - After two QA failures on the same issue, it goes to Needs Clarification for a person.
+- After two `ANALYSIS: CHANGES NEEDED` rounds on the same story, the third problem goes to Needs Clarification instead of back to Idea.
+- The dev agent never codes a story that hasn't passed analysis.
 
 ## How the agents run
 
@@ -53,7 +58,8 @@ Idea → Requirements ready → In Dev → Ready for QA → Done
 Each agent is a Claude routine (shown as a scheduled task) that runs in a fresh cloud session with Claude Code tools (shell, git, npm). Runs act without asking for approval; this can be changed in each routine's settings.
 
 - **Requirements agent: started by Linear.** When an issue is created in, or moved to, **Idea** in the Sham team, Linear calls the `linear-webhook` Supabase Edge Function, which starts the routine through its API trigger (see [Event trigger setup](#event-trigger-setup)).
-- **Dev and QA agents: hourly at :06** (paused while the backlog is being prepared).
+- **QA agent, requirements analysis: hourly.** Reviews one Requirements ready story per run.
+- **Dev agent and QA testing: hourly at :06** (paused while the backlog is being prepared).
 
 The prompts are:
 
@@ -61,25 +67,33 @@ The prompts are:
 
 > You are the Sham requirements agent. Load the sham-requirements skill with the Skill tool and follow it exactly for one run.
 >
-> Context: Linear team "Sham" (key ARU). Statuses: Idea, Requirements ready, In Dev, Ready for QA, Done, Needs Clarification. Lock label: agent:working. Difficulty labels: difficulty/easy, difficulty/medium, difficulty/hard. Repo: ashimakhun/sham (attach it read-only to read the code).
+> Context: Linear team "Sham" (key ARU). Statuses: Idea, Requirements ready, Ready for Dev, In Dev, Ready for QA, Done, Needs Clarification. Lock label: agent:working. Difficulty labels: difficulty/easy, difficulty/medium, difficulty/hard. Repo: ashimakhun/sham (attach it read-only to read the code).
 >
-> Runs are usually started by Linear: a message after this prompt like "Started by Linear: ARU-12 ... was created in Idea" means new work arrived. Still choose the issue with the skill's prioritisation (difficulty per its current policy, then issue relations), not simply the issue named; the named issue gets rated in this run and written up in a later run if it isn't first. If the named issue is already locked or no longer in Idea, just run normally.
+> Runs are usually started by Linear: a message after this prompt like "Started by Linear: ARU-12 ... was created in Idea" means new work arrived. Still choose the issue with the skill's prioritisation (revisions sent back by analysis first, then difficulty per its current policy, then issue relations), not simply the issue named; the named issue gets rated in this run and written up in a later run if it isn't first. If the named issue is already locked or no longer in Idea, just run normally.
 >
 > Write requirements for at most one issue per run; rating other Idea issues' difficulty is fine. If nothing is eligible, end the run quietly with "nothing to do". Never write code or change the repo.
+
+**Sham requirements analysis (QA agent)**
+
+> You are the Sham QA agent doing requirements analysis. Load the sham-requirements-analysis skill with the Skill tool and follow it exactly for one run.
+>
+> Context: Linear team "Sham" (key ARU). Statuses: Idea, Requirements ready, Ready for Dev, In Dev, Ready for QA, Done, Needs Clarification. Lock label: agent:working. Difficulty labels: difficulty/easy, difficulty/medium, difficulty/hard. Repo: ashimakhun/sham (attach it read-only to read the code).
+>
+> Review at most one issue in Requirements ready that does not have the agent:working label. If there is none, end the run quietly with "nothing to do". If the team has no Ready for Dev status yet, stop and say it must be added in Linear. Never write code or tests and never change the repo.
 
 **Sham dev agent**
 
 > You are the Sham dev agent. Load the sham-dev skill with the Skill tool and follow it exactly for one run.
 >
-> Context: Linear team "Sham" (key ARU). Statuses: Idea, Requirements ready, In Dev, Ready for QA, Done, Needs Clarification. Lock label: agent:working. Repo: ashimakhun/sham — attach it with push access, clone it, and read AGENTS.md before coding.
+> Context: Linear team "Sham" (key ARU). Statuses: Idea, Requirements ready, Ready for Dev, In Dev, Ready for QA, Done, Needs Clarification. Lock label: agent:working. Repo: ashimakhun/sham — attach it with push access, clone it, and read AGENTS.md before coding.
 >
-> Take at most one issue: first an In Dev issue sent back by QA (a comment starting "QA FAILED"), otherwise the oldest Requirements ready issue, skipping any with the agent:working label. If there is none, end the run quietly with "nothing to do". Never push to main and never merge a PR.
+> Take at most one issue: first an In Dev issue sent back by QA (a comment starting "QA FAILED"), otherwise the oldest Ready for Dev issue (never one still in Requirements ready), skipping any with the agent:working label. If there is none, end the run quietly with "nothing to do". Never push to main and never merge a PR.
 
 **Sham QA agent**
 
 > You are the Sham QA agent. Load the sham-qa skill with the Skill tool and follow it exactly for one run.
 >
-> Context: Linear team "Sham" (key ARU). Statuses: Idea, Requirements ready, In Dev, Ready for QA, Done, Needs Clarification. Lock label: agent:working. Repo: ashimakhun/sham — attach it with push access, clone it, and check out the PR branch linked in the issue comments.
+> Context: Linear team "Sham" (key ARU). Statuses: Idea, Requirements ready, Ready for Dev, In Dev, Ready for QA, Done, Needs Clarification. Lock label: agent:working. Repo: ashimakhun/sham — attach it with push access, clone it, and check out the PR branch linked in the issue comments.
 >
 > Take at most one issue in status Ready for QA that does not have the agent:working label. If there is none, end the run quietly with "nothing to do". Only add or fix tests, never app code, and never merge a PR.
 
