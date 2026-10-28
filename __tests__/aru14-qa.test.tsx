@@ -78,10 +78,10 @@ describe('Homework tab for the teacher', () => {
 });
 
 describe('Add homework (AC 12: no mentor_id)', () => {
-  it('before a course is picked it says so, never "You do not have a mentor assigned yet"', async () => {
+  it('before a course is picked no mentor is named, and never "You do not have a mentor assigned yet"', async () => {
     setStore(fakeStore('S1', { courseMembers: [member('A', 'S1')] }));
     await render(<NewHomeworkScreen />);
-    expect(screen.getByText('Pick a course to see who will check it.')).toBeTruthy();
+    expect(screen.queryByText(/^Mentor: /)).toBeNull();
     expect(screen.queryByText(/mentor assigned/)).toBeNull();
   });
 

@@ -4,8 +4,8 @@ import { FlatList, Text, View } from 'react-native';
 import { HomeworkCard } from '@/components/HomeworkCard';
 import { ListenersSection } from '@/components/ListenersSection';
 import { MeetingsSection } from '@/components/MeetingsSection';
-import { Button, Card, EmptyState, styles } from '@/components/ui';
-import { inCourseChat } from '@/lib/roles';
+import { Button, Card, EmptyState, OwnerLine, styles } from '@/components/ui';
+import { canChangeOwner, inCourseChat } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { formatDate } from '@/lib/theme';
 
@@ -33,9 +33,7 @@ export default function CourseDetailScreen() {
         <View style={{ gap: 12 }}>
           <Card>
             <Text style={styles.h1}>{course.title}</Text>
-            <Text style={styles.muted}>
-              {getUser(course.createdById)?.name ?? 'Unknown'} · {formatDate(course.createdAt)}
-            </Text>
+            <OwnerLine name={getUser(course.createdById)?.name ?? 'Unknown'} date={formatDate(course.createdAt)} />
             {course.description ? <Text style={styles.body}>{course.description}</Text> : null}
           </Card>
           {inCourseChat(currentUser, course, courseMembers) && (
@@ -43,6 +41,13 @@ export default function CourseDetailScreen() {
               title="Chat"
               variant="secondary"
               onPress={() => router.push({ pathname: '/courses/[id]/chat', params: { id: course.id } })}
+            />
+          )}
+          {canChangeOwner(currentUser?.role) && (
+            <Button
+              title="Change owner"
+              variant="secondary"
+              onPress={() => router.push({ pathname: '/courses/[id]/owner', params: { id: course.id } })}
             />
           )}
           <MeetingsSection course={course} />

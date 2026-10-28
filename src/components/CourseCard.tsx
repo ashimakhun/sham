@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { Text, View } from 'react-native';
 
-import { Card, styles } from '@/components/ui';
+import { Card, OwnerLine, styles } from '@/components/ui';
 import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
 import type { Course } from '@/lib/types';
@@ -38,9 +38,7 @@ export function CourseCard({ course, tag, onOpen }: Props) {
           {course.description}
         </Text>
       ) : null}
-      <Text style={styles.muted} numberOfLines={1}>
-        {getUser(course.createdById)?.name ?? 'Unknown'} · {formatDate(course.createdAt)}
-      </Text>
+      <OwnerLine name={getUser(course.createdById)?.name ?? 'Unknown'} date={formatDate(course.createdAt)} />
     </Card>
   );
 }

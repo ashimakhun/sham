@@ -21,6 +21,7 @@ export default function NewHomeworkScreen() {
 
   // Only courses I am a listener of (ARU-14; also enforced by RLS). The course owner is its mentor.
   const myCourses = courses.filter((c) => courseMembers.some((m) => m.courseId === c.id && m.userId === currentUser?.id));
+  // The selected course's owner, shown as its mentor (ARU-14 AC 4 / ARU-9 AC 11).
   const owner = getUser(myCourses.find((c) => c.id === courseId)?.createdById);
 
   async function pickPhoto() {
@@ -90,7 +91,8 @@ export default function NewHomeworkScreen() {
           disabled={!title.trim() || !courseId || !myCourses.some((c) => c.id === courseId) || busy}
         />
         <Text style={[styles.muted, { textAlign: 'center' }]}>
-          {owner ? `${owner.name} will check it.` : 'Pick a course to see who will check it.'}
+          {/* The course owner is its mentor; any mentor or the teacher may check (ARU-14), so no "will check it". */}
+          {owner ? `Mentor: ${owner.name}` : 'Pick a course to see its mentor.'}
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>
