@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { Text, View } from 'react-native';
 
 import { Card, OwnerLine, styles } from '@/components/ui';
+import { seesOnlyCourseSummary } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
 import type { Course } from '@/lib/types';
@@ -15,7 +16,9 @@ type Props = {
 };
 
 export function CourseCard({ course, tag, onOpen }: Props) {
-  const { getUser } = useStore();
+  const { getUser, currentUser, courseMembers } = useStore();
+  // A student who is not a listener sees only the title and description (ARU-24).
+  const summaryOnly = seesOnlyCourseSummary(currentUser, course, courseMembers);
 
   return (
     <Card
@@ -38,7 +41,9 @@ export function CourseCard({ course, tag, onOpen }: Props) {
           {course.description}
         </Text>
       ) : null}
-      <OwnerLine name={getUser(course.createdById)?.name ?? 'Unknown'} date={formatDate(course.createdAt)} />
+      {!summaryOnly && (
+        <OwnerLine name={getUser(course.createdById)?.name ?? 'Unknown'} date={formatDate(course.createdAt)} />
+      )}
     </Card>
   );
 }

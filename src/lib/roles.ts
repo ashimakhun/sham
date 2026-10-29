@@ -55,3 +55,14 @@ export function canChangeOwner(role: Role | undefined) {
 export function canManageRoles(role: Role | undefined) {
   return role === 'teacher';
 }
+
+/** Mirrors is_member() (supabase/migrations/0004_course_members.sql): the user is a listener of the course. */
+export function isCourseListener(user: User | null | undefined, course: Course, members: CourseMember[]) {
+  return !!user && members.some((m) => m.courseId === course.id && m.userId === user.id);
+}
+
+/** ARU-24: a student who is not a listener of a course sees only its title and description (app-only; the
+ *  courses table stays readable so titles can be listed). Mentors and the teacher always see everything. */
+export function seesOnlyCourseSummary(user: User | null | undefined, course: Course, members: CourseMember[]) {
+  return user?.role === 'student' && !isCourseListener(user, course, members);
+}
