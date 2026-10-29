@@ -110,10 +110,18 @@ describe('Homework tab', () => {
     expect(screen.getByText('To check (2)')).toBeTruthy();
   });
 
-  it('students always get "+ Add homework" and see their own list', async () => {
-    setStore(fakeStore('S2', { courseMembers: members }));
+  // Changed by ARU-19: students get "+ Add homework" only while they are a listener of a course.
+  it('a student in a course gets "+ Add homework" and sees their own list', async () => {
+    setStore(fakeStore('S1', { courseMembers: members }));
     await render(<HomeworkScreen />);
     expect(button('+ Add homework')).toBeTruthy();
+    expect(screen.getByText('No homework yet')).toBeTruthy();
+  });
+
+  it('a student in no course gets no "+ Add homework" (ARU-19)', async () => {
+    setStore(fakeStore('S2', { courseMembers: members }));
+    await render(<HomeworkScreen />);
+    expect(screen.queryByRole('button', { name: '+ Add homework' })).toBeNull();
     expect(screen.getByText('No homework yet')).toBeTruthy();
   });
 
