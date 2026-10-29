@@ -35,7 +35,7 @@ export default function HomeworkScreen() {
   const waiting = base.filter((h) => h.status === 'submitted').length;
 
   const options: { value: Filter; label: string }[] = [
-    { value: 'submitted', label: `To check (${waiting})` },
+    { value: 'submitted', label: `${isChecker ? 'To check' : 'Waiting'} (${waiting})` },
     { value: 'checked', label: 'Checked' },
     { value: 'all', label: 'All' },
   ];
