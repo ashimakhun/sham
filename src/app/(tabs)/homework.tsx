@@ -15,17 +15,21 @@ const emptyText: Record<string, { title: string; hint: string }> = {
   mentor: { title: 'Nothing to check', hint: 'Homework sent by course listeners will appear here.' },
   teacher: { title: 'No homework yet', hint: 'Homework sent by course listeners will appear here.' },
   mine: { title: 'No homework sent yet', hint: 'Tap "Add homework" to send work for a course you attend.' },
+  // A student in no course has no "+ Add homework" button (ARU-19 AC 3).
+  studentNoCourse: { title: 'No homework yet', hint: 'You are not in any course yet — ask your teacher or mentor to add you.' },
 };
 
 export default function HomeworkScreen() {
-  const { currentUser, courseMembers, loading, refresh, visibleHomework } = useStore();
+  const { currentUser, courses, courseMembers, loading, refresh, visibleHomework } = useStore();
   const role = currentUser?.role ?? 'student';
   const me = currentUser?.id;
   // Mentors and the teacher check homework (ARU-14: any course, never their own); students see their own.
   const isChecker = role === 'mentor' || role === 'teacher';
   const isListener = courseMembers.some((m) => m.userId === me);
-  // Students always get the button (the form explains when they are in no course); mentors only as listeners.
-  const canSubmit = role === 'student' || (role === 'mentor' && isListener);
+  // Students: only while a listener of a loaded course, the same rule as the Add homework form's course list, so the
+  // button and the form never disagree (ARU-19). Mentors: only as listeners (ARU-14). The teacher: never.
+  const inLoadedCourse = courses.some((c) => courseMembers.some((m) => m.courseId === c.id && m.userId === me));
+  const canSubmit = (role === 'student' && inLoadedCourse) || (role === 'mentor' && isListener);
   const [filter, setFilter] = useState<Filter>(isChecker ? 'submitted' : 'all');
 
   const mine = visibleHomework.filter((h) => h.studentId === me);
@@ -56,7 +60,11 @@ export default function HomeworkScreen() {
           <Segmented<Filter> value={filter} onChange={setFilter} options={options} />
         </View>
       }
-      ListEmptyComponent={<EmptyState {...emptyText[filter === 'mine' ? 'mine' : role]} />}
+      ListEmptyComponent={
+        <EmptyState
+          {...emptyText[filter === 'mine' ? 'mine' : role === 'student' && !inLoadedCourse ? 'studentNoCourse' : role]}
+        />
+      }
     />
   );
 }
