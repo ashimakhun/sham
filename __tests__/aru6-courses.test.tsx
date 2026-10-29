@@ -43,7 +43,8 @@ describe('Courses tab', () => {
   });
 
   it('AC6: each course shows title, creator and creation date, in the store order (newest first)', async () => {
-    setStore(fakeStore('S1'));
+    // Since ARU-24 a student sees the owner line only on courses they are in, so S1 listens to both here.
+    setStore(fakeStore('S1', { courseMembers: [member('A', 'S1'), member('B', 'S1')] }));
     await render(<CoursesScreen />);
     await showAll();
     const titles = screen.getAllByText(/^(Algebra|Biology)$/).map((t) => t.props.children);
@@ -146,7 +147,8 @@ describe('Course details', () => {
 
   it('edge: a course with no visible homework says so', async () => {
     params.id = 'B';
-    setStore(fakeStore('S2'));
+    // Since ARU-24 a student who is not in the course gets the limited screen (no HOMEWORK section), so S2 is a listener here.
+    setStore(fakeStore('S2', { courseMembers: [member('B', 'S2')] }));
     await render(<CourseDetailScreen />);
     expect(screen.getByText('No homework for this course yet')).toBeTruthy();
   });

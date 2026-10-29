@@ -1,11 +1,11 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { FlatList, Text, View } from 'react-native';
+import { FlatList, RefreshControl, ScrollView, Text, View } from 'react-native';
 
 import { HomeworkCard } from '@/components/HomeworkCard';
 import { ListenersSection } from '@/components/ListenersSection';
 import { MeetingsSection } from '@/components/MeetingsSection';
 import { Button, Card, EmptyState, OwnerLine, styles } from '@/components/ui';
-import { canChangeOwner, inCourseChat } from '@/lib/roles';
+import { canChangeOwner, inCourseChat, seesOnlyCourseSummary } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { formatDate } from '@/lib/theme';
 
@@ -15,6 +15,24 @@ export default function CourseDetailScreen() {
 
   const course = getCourse(id);
   if (!course) return <EmptyState title="Course not found" />;
+
+  // ARU-24: a student who is not a listener sees only the title and description. Derived at render time, so a
+  // live update on course_members switches between this and the full screen on its own.
+  if (seesOnlyCourseSummary(currentUser, course, courseMembers)) {
+    return (
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        contentInsetAdjustmentBehavior="automatic"
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={() => refresh().catch(() => {})} />}>
+        <Card>
+          <Text style={styles.h1}>{course.title}</Text>
+          {course.description ? <Text style={styles.body}>{course.description}</Text> : null}
+        </Card>
+        <EmptyState title="You are not in this course" hint="Ask your teacher or mentor to add you." />
+      </ScrollView>
+    );
+  }
 
   // visibleHomework is already limited by RLS: own homework for students, all for mentors and the teacher (ARU-14).
   const homework = visibleHomework.filter((h) => h.courseId === course.id);

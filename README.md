@@ -94,7 +94,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | See homework               | own       | all                | all     |
 | Add homework               | courses they're in | courses they're in |  |
 | Mark homework checked      |           | any (not their own) | any    |
-| See courses                | all       | all                | all     |
+| See courses                | all (title and description only unless they're in it) | all | all |
 | Create courses             |           | ✓                  | ✓       |
 | Change course owner        |           | ✓ (any course)     | ✓       |
 | Own a course               | never     | ✓ (not if a listener) | ✓    |
