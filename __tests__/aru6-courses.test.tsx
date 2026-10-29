@@ -42,8 +42,9 @@ describe('Courses tab', () => {
     expect(screen.getByText('Biology')).toBeTruthy();
   });
 
+  // Changed by ARU-24: students see owner and date only on courses they are in, so this runs as a mentor.
   it('AC6: each course shows title, creator and creation date, in the store order (newest first)', async () => {
-    setStore(fakeStore('S1'));
+    setStore(fakeStore('M2'));
     await render(<CoursesScreen />);
     await showAll();
     const titles = screen.getAllByText(/^(Algebra|Biology)$/).map((t) => t.props.children);
@@ -144,9 +145,10 @@ describe('Course details', () => {
     expect(screen.queryByText('Cells')).toBeNull();
   });
 
+  // Changed by ARU-24: a student who is not in the course gets the limited screen, so S2 is a listener of B here.
   it('edge: a course with no visible homework says so', async () => {
     params.id = 'B';
-    setStore(fakeStore('S2'));
+    setStore(fakeStore('S2', { courseMembers: [member('B', 'S2')] }));
     await render(<CourseDetailScreen />);
     expect(screen.getByText('No homework for this course yet')).toBeTruthy();
   });
