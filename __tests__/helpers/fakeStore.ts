@@ -63,6 +63,7 @@ export function fakeStore(who: keyof typeof users | null, over: Partial<Store> =
     signOut: jest.fn(),
     addHomework: jest.fn(async () => {}),
     checkHomework: jest.fn(async () => {}),
+    getPhotoUrl: jest.fn(async (path: string) => `https://signed.example/${path}`),
     addMaterial: jest.fn(async () => {}),
     addCourse: jest.fn(async () => {}),
     addListeners: jest.fn(async () => {}),
