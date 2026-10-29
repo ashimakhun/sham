@@ -78,11 +78,13 @@ it('AC6: removed from one of two courses → the button stays', async () => {
 });
 
 describe('AC8: mentors and the teacher unchanged', () => {
-  it('a mentor listener gets the button and "My homework"', async () => {
+  // Changed by ARU-23: the mentor's button is on the Listener tab.
+  it('a mentor listener gets the button on the Listener tab', async () => {
     setStore(fakeStore('M2', { courseMembers: [member('A', 'M2')] }));
     await render(<HomeworkScreen />);
+    expect(addButton()).toBeNull(); // Owner tab
+    await fireEvent.press(screen.getByRole('tab', { name: 'Listener' }));
     expect(addButton()).toBeTruthy();
-    expect(screen.getByText('My homework')).toBeTruthy();
   });
 
   it('a mentor in no course gets neither', async () => {

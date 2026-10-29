@@ -88,15 +88,16 @@ describe('Homework tab', () => {
     hw({ id: 'h3', courseId: 'A', title: 'S1 checked', status: 'checked' }),
   ];
 
-  it('AC2: a mentor who is a listener sees "+ Add homework" and "My homework" with their own submissions', async () => {
+  // Changed by ARU-23: a listener-mentor's own homework and "+ Add homework" live on the Listener tab.
+  it('AC2: a mentor who is a listener sees "+ Add homework" and their own submissions on the Listener tab', async () => {
     setStore(fakeStore('N', { courseMembers: members, visibleHomework: list }));
     await render(<HomeworkScreen />);
-    expect(button('+ Add homework')).toBeTruthy();
-    // Default "To check": others' unchecked homework only, never my own.
+    // Default Owner / "To check": others' unchecked homework only, never my own.
     expect(screen.getByText('S1 in A')).toBeTruthy();
     expect(screen.queryByText('N in A')).toBeNull();
     expect(screen.getByText('To check (1)')).toBeTruthy();
-    await fireEvent.press(screen.getByText('My homework'));
+    await fireEvent.press(screen.getByRole('tab', { name: 'Listener' }));
+    expect(button('+ Add homework')).toBeTruthy();
     expect(screen.getByText('N in A')).toBeTruthy();
     expect(screen.queryByText('S1 in A')).toBeNull();
   });
