@@ -43,6 +43,9 @@
   "private": true,
   "jest": {
     "preset": "jest-expo",
+    "setupFiles": [
+      "<rootDir>/jest.setup.js"
+    ],
     "testTimeout": 20000,
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/src/$1"
