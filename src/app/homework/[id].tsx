@@ -1,6 +1,8 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, ScrollView, Text } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text } from 'react-native';
+
+import { PhotoPreview } from '@/components/PhotoPreview';
 
 import { Button, Card, EmptyState, ErrorText, Field, StatusBadge, styles } from '@/components/ui';
 import { canCheckHomework } from '@/lib/roles';
@@ -12,6 +14,7 @@ export default function HomeworkDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { visibleHomework, currentUser, getUser, getCourse, checkHomework } = useStore();
   const [comment, setComment] = useState('');
+  const [previewOpen, setPreviewOpen] = useState(false);
   const { busy, error, run } = useAction();
 
   const item = visibleHomework.find((h) => h.id === id);
@@ -33,8 +36,16 @@ export default function HomeworkDetailScreen() {
             {student?.name} · {formatDate(item.createdAt)}
           </Text>
           {item.description ? <Text style={styles.body}>{item.description}</Text> : null}
-          {item.photoUrl && (
-            <Image source={{ uri: item.photoUrl }} style={{ width: '100%', height: 260, borderRadius: 10 }} />
+          {item.photoPath && (
+            // The whole photo, letterboxed (ARU-18 AC 1); tap for the full-screen preview.
+            <Pressable accessibilityRole="imagebutton" accessibilityLabel="Open photo" onPress={() => setPreviewOpen(true)}>
+              <Image
+                testID="homework-photo"
+                source={{ uri: item.photoUrl }}
+                resizeMode="contain"
+                style={{ width: '100%', height: 260, borderRadius: 10, backgroundColor: colors.border }}
+              />
+            </Pressable>
           )}
         </Card>
 
@@ -67,6 +78,14 @@ export default function HomeworkDetailScreen() {
           </Card>
         )}
       </ScrollView>
+      {previewOpen && item.photoPath && (
+        <PhotoPreview
+          path={item.photoPath}
+          homeworkId={item.id}
+          title={item.title}
+          onClose={() => setPreviewOpen(false)}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }
