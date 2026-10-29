@@ -153,7 +153,8 @@ export const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.text,
   },
-  button: { borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
+  // Side padding keeps the label inside the background when the button sits in a row and sizes to its text (ARU-22).
+  button: { borderRadius: 10, paddingVertical: 13, paddingHorizontal: 16, alignItems: 'center' },
   buttonText: { fontSize: 15, fontWeight: '600' },
   badge: { alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
   badgeText: { fontSize: 12, fontWeight: '600' },

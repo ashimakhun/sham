@@ -47,6 +47,9 @@ type Store = {
   signOut: () => Promise<void>;
   addHomework: (input: NewHomework) => Promise<void>;
   checkHomework: (id: string, comment: string) => Promise<void>;
+  /** A fresh signed URL for a homework photo (ARU-18). Storage policies allow it only for users who can read
+   *  that homework. With `download`, the file is served as an attachment under that file name. */
+  getPhotoUrl: (path: string, options?: { expiresIn?: number; download?: string }) => Promise<string>;
   addMaterial: (input: NewMaterial) => Promise<void>;
   /** Teachers and mentors only (also enforced by RLS). */
   addCourse: (input: NewCourse) => Promise<void>;
@@ -315,6 +318,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [homework],
   );
 
+  // Stable across renders, so a screen can fetch a link once without refetching on every live update.
+  const getPhotoUrl = useCallback<Store['getPhotoUrl']>(async (path, { expiresIn = 60 * 60, download } = {}) => {
+    const { data, error } = await supabase.storage
+      .from('homework')
+      .createSignedUrl(path, expiresIn, download ? { download } : undefined);
+    if (error || !data?.signedUrl) throw new Error(error?.message ?? 'No photo link.');
+    return data.signedUrl;
+  }, []);
+
   const requireRole = (...roles: User['role'][]) => {
     if (!currentUser || !roles.includes(currentUser.role)) throw new Error(`Only a ${roles.join(' or ')} can do this.`);
     return currentUser;
@@ -393,6 +405,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       );
       await load();
     },
+    getPhotoUrl,
     addMaterial: async (input) => {
       const teacher = requireRole('teacher');
       check(
