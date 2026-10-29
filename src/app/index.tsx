@@ -87,11 +87,6 @@ export default function SignInScreen() {
             disabled={!canSubmit || busy}
             onPress={() => run(() => (mode === 'signIn' ? signIn(email, password) : signUp(name, email, password)))}
           />
-          {mode === 'signUp' && (
-            <Text style={[styles.muted, { textAlign: 'center' }]}>
-              New accounts start as students. Your teacher can make you a mentor or teacher.
-            </Text>
-          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
