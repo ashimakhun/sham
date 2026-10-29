@@ -53,25 +53,23 @@ it('edge: a large count still reads "Waiting (N)"', async () => {
   expect(screen.getByText('Waiting (99)')).toBeTruthy();
 });
 
-it('AC6: the teacher opens on "To check" (only submitted homework listed), with To check, Checked, All in order', async () => {
+// Changed by ARU-23 (AC 8): the teacher has To check and Checked only, no "All".
+it('AC6: the teacher opens on "To check" (only submitted homework listed), with To check, Checked in order', async () => {
   setStore(fakeStore('T', { courseMembers: members, visibleHomework: S1_HOMEWORK }));
   await render(<HomeworkScreen />);
-  expect(screen.getAllByText(FILTER).slice(0, 3).map((t) => t.props.children)).toEqual(['To check (2)', 'Checked', 'All']);
+  expect(screen.getAllByText(FILTER).slice(0, 2).map((t) => t.props.children)).toEqual(['To check (2)', 'Checked']);
+  expect(screen.queryByText('All')).toBeNull();
   expect(titles()).toEqual(['Waiting one', 'Waiting two']);
 });
 
-it('AC6: a listener-mentor has exactly To check, Checked, All, My homework (in order) and opens on To check', async () => {
+// Changed by ARU-23 (AC 2, AC 4): Owner has To check / Checked; the mentor's own homework is on Listener.
+it('AC6: a listener-mentor has exactly To check, Checked on Owner (opens on To check), own homework on Listener', async () => {
   const own = hw({ id: 'm1', courseId: 'A', studentId: 'M2', title: 'Mo sent this' });
   setStore(fakeStore('M2', { courseMembers: members, visibleHomework: [...S1_HOMEWORK, own] }));
   await render(<HomeworkScreen />);
-  expect(screen.getAllByText(FILTER).slice(0, 4).map((t) => t.props.children)).toEqual([
-    'To check (2)',
-    'Checked',
-    'All',
-    'My homework',
-  ]);
+  expect(screen.getAllByText(FILTER).slice(0, 2).map((t) => t.props.children)).toEqual(['To check (2)', 'Checked']);
+  expect(screen.queryByText('All')).toBeNull();
   expect(titles()).toEqual(['Waiting one', 'Waiting two']);
-  await fireEvent.press(screen.getByText('My homework'));
+  await fireEvent.press(screen.getByRole('tab', { name: 'Listener' }));
   expect(titles()).toEqual(['Mo sent this']);
-  expect(screen.queryByText(/^Waiting \(/)).toBeNull();
 });

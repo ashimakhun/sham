@@ -78,12 +78,14 @@ describe('AC6: mentors and the teacher keep today\'s filters', () => {
     expect(screen.queryByText('My homework')).toBeNull();
   });
 
-  it('mentor who is a listener: To check (N) excludes their own homework, plus My homework', async () => {
+  // Changed by ARU-23: "My homework" became the Listener tab, where mentors do get "Waiting (N)".
+  it('mentor who is a listener: Owner "To check (N)" excludes their own homework; own homework on Listener', async () => {
     const own = hw({ id: 'm1', courseId: 'A', studentId: 'M2', title: 'Mo sent this' });
     setStore(fakeStore('M2', { courseMembers: members, visibleHomework: [...S1_HOMEWORK, own] }));
     await render(<HomeworkScreen />);
     expect(screen.getByText('To check (2)')).toBeTruthy();
-    expect(screen.getByText('My homework')).toBeTruthy();
     expect(screen.queryByText(/^Waiting \(/)).toBeNull();
+    await fireEvent.press(screen.getByRole('tab', { name: 'Listener' }));
+    expect(screen.getByText('Waiting (1)')).toBeTruthy();
   });
 });
