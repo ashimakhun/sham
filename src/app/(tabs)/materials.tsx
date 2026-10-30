@@ -7,7 +7,8 @@ import { formatDate } from '@/lib/theme';
 
 export default function MaterialsScreen() {
   const { currentUser, loading, refresh, materials, getUser } = useStore();
-  const isTeacher = currentUser?.role === 'teacher';
+  // Teachers and mentors share materials (ARU-26); students only read.
+  const canShare = currentUser?.role === 'teacher' || currentUser?.role === 'mentor';
   const sorted = [...materials].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   return (
@@ -19,7 +20,7 @@ export default function MaterialsScreen() {
       onRefresh={() => refresh().catch(() => {})}
       keyExtractor={(m) => m.id}
       ListHeaderComponent={
-        isTeacher ? <Button title="+ Share material" onPress={() => router.push('/materials/new')} /> : undefined
+        canShare ? <Button title="+ Share material" onPress={() => router.push('/materials/new')} /> : undefined
       }
       renderItem={({ item }) => (
         <Card onPress={() => router.push({ pathname: '/materials/[id]', params: { id: item.id } })}>
@@ -36,7 +37,11 @@ export default function MaterialsScreen() {
       ListEmptyComponent={
         <EmptyState
           title="No materials yet"
-          hint={isTeacher ? 'Share a lesson, notes or a link with your class.' : 'Your teacher has not shared anything yet.'}
+          hint={
+            canShare
+              ? 'Share a lesson, notes or a link with your class.'
+              : 'Your teacher and mentors have not shared anything yet.'
+          }
         />
       }
     />

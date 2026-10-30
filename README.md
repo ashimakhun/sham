@@ -5,7 +5,7 @@ An educational mobile app where teachers, mentors and students work together:
 - **Teachers and mentors** create courses and add students and mentors to them as listeners.
 - **Students** send homework (text + optional photo) for a course to their mentor.
 - **Mentors** see their students' homework, leave a comment and mark it as checked.
-- **Teachers** share learning materials (lessons, notes, links) with the class and see all homework.
+- **Teachers and mentors** share learning materials (lessons, notes, links) with the class; teachers see all homework.
 
 Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Router and [Supabase](https://supabase.com) (auth, Postgres, storage, realtime).
 
@@ -78,7 +78,7 @@ src/app/                  screens (Expo Router — every file is a route)
   courses/[id]/chat.tsx   course chat (owner, listeners and the teacher)
   courses/[id]/owner.tsx  teacher or mentor changes the course owner
   roles.tsx               teacher switches users between student and mentor
-  materials/new.tsx       teacher shares a material
+  materials/new.tsx       teacher or mentor shares a material
   materials/[id].tsx      material details
 src/components/           shared UI
 src/lib/supabase.ts       Supabase client
@@ -106,7 +106,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Schedule meetings, mark completed / canceled | | own courses    | any course |
 | Edit / reschedule a scheduled meeting | | own courses           | any course |
 | See materials              | ✓         | ✓                  | ✓       |
-| Share / delete materials   |           |                    | ✓       |
+| Share / delete materials   |           | ✓ (own materials)  | ✓ (own) |
 | Switch student ↔ mentor    |           |                    | ✓       |
 | Become / stop being teacher |          |                    | (nobody) |
 

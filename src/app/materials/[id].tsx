@@ -13,6 +13,9 @@ export default function MaterialDetailScreen() {
 
   const item = materials.find((m) => m.id === id);
   if (!item) return <EmptyState title="Material not found" />;
+  // Only the author, and only while they are still a teacher or mentor (a mentor made student can't delete).
+  const canDelete =
+    currentUser?.id === item.teacherId && (currentUser.role === 'teacher' || currentUser.role === 'mentor');
 
   return (
     <ScrollView
@@ -28,7 +31,7 @@ export default function MaterialDetailScreen() {
       </Card>
       {item.link && <Button title="Open link" variant="secondary" onPress={() => Linking.openURL(item.link!)} />}
       <ErrorText error={error} />
-      {currentUser?.id === item.teacherId && (
+      {canDelete && (
         <Button
           title={busy ? 'Deleting…' : 'Delete material'}
           variant="danger"

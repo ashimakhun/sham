@@ -407,10 +407,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     getPhotoUrl,
     addMaterial: async (input) => {
-      const teacher = requireRole('teacher');
+      // Teacher or mentor; teacher_id is the author's id (column name kept for history).
+      const author = requireRole('teacher', 'mentor');
       check(
         await supabase.from('materials').insert({
-          teacher_id: teacher.id,
+          teacher_id: author.id,
           title: input.title.trim(),
           body: input.body.trim(),
           link: input.link?.trim() || null,
@@ -469,8 +470,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       await load();
     },
     deleteMaterial: async (id) => {
-      requireRole('teacher');
-      check(await supabase.from('materials').delete().eq('id', id));
+      requireRole('teacher', 'mentor');
+      // RLS turns a forbidden delete into "0 rows, no error" (e.g. a mentor just made a student), so ask for the
+      // deleted row back and treat none as a refusal instead of a silent success.
+      const deleted = rows<{ id: string }>(await supabase.from('materials').delete().eq('id', id).select('id'));
+      if (!deleted.length) {
+        await load();
+        throw new Error('You can no longer delete this material.');
+      }
       await load();
     },
     addMeeting: async (input) => {
