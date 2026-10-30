@@ -63,14 +63,14 @@ export function CourseCard({ course, tag, onOpen }: Props) {
 
   return (
     // The card opts out of accessibility grouping so screen readers reach the chat icon on its own; the content
-    // column is then its own button that opens the details (ARU-27).
+    // column is then its own button that opens the details (ARU-27). It has no explicit label, so screen readers read
+    // its text like a card without the icon: tag, title, description and owner line (ARU-34).
     <Card
       onPress={() => open('/courses/[id]')}
       accessible={false}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={course.title}
         onPress={() => open('/courses/[id]')}
         style={{ flex: 1, gap: 8 }}>
         {content}
