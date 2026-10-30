@@ -12,7 +12,11 @@ import type { Course, Meeting, MeetingStatus } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
 import { useNow } from '@/lib/useNow';
 
-const statusLabel: Record<MeetingStatus, string> = { scheduled: 'Scheduled', completed: 'Completed', canceled: 'Canceled' };
+const statusLabel: Record<MeetingStatus, string> = {
+  scheduled: 'Scheduled',
+  completed: 'Completed',
+  canceled: 'Canceled',
+};
 const statusColors: Record<MeetingStatus, { bg: string; fg: string }> = {
   scheduled: { bg: colors.primarySoft, fg: colors.primary },
   completed: { bg: colors.successSoft, fg: colors.success },
@@ -44,6 +48,11 @@ export function MeetingsSection({ course }: { course: Course }) {
     now,
   );
   const list = [...upcoming, ...past];
+  const openNotes = (m: Meeting, edit: boolean) =>
+    router.push({
+      pathname: '/courses/[id]/meetings/[meetingId]/notes',
+      params: edit ? { id: course.id, meetingId: m.id, edit: '1' } : { id: course.id, meetingId: m.id },
+    });
 
   function changeStatus(meeting: Meeting, status: Target) {
     const verb = status === 'completed' ? 'completed' : 'canceled';
@@ -70,96 +79,20 @@ export function MeetingsSection({ course }: { course: Course }) {
       {list.length === 0 ? (
         <Text style={styles.muted}>No meetings scheduled yet</Text>
       ) : (
-        list.map((m) => {
-          const started = hasStarted(m, now);
-          const canEdit = canManage && m.status === 'scheduled';
-          const actions: { title: string; status: Target }[] =
-            !canManage || m.status !== 'scheduled'
-              ? []
-              : started
-                ? [
-                    { title: 'Mark completed', status: 'completed' },
-                    { title: 'Mark canceled', status: 'canceled' },
-                  ]
-                : [{ title: 'Cancel meeting', status: 'canceled' }];
-          return (
-            <View key={m.id} testID={`meeting-${m.id}`} style={{ gap: 4 }}>
-              <View style={[styles.row, { alignItems: 'flex-start' }]}>
-                <Text style={[styles.body, { flex: 1, fontWeight: '600' }]}>
-                  {formatDateTime(m.startsAt)}
-                  {m.rescheduledAt ? <Text style={styles.muted}>{'  '}Rescheduled</Text> : null}
+        [
+          upcoming.length > 0 && { heading: 'Upcoming', items: upcoming },
+          past.length > 0 && { heading: 'History', items: past },
+        ].map(
+          (group) =>
+            group && (
+              <View key={group.heading} style={{ gap: 12 }}>
+                <Text accessibilityRole="header" style={[styles.title, { fontSize: 15 }]}>
+                  {group.heading}
                 </Text>
-                <MeetingBadge status={m.status} />
+                {group.items.map((m) => renderMeeting(m))}
               </View>
-              <Text style={styles.body} numberOfLines={2}>
-                {m.topic}
-              </Text>
-              {m.location ? (
-                isLink(m.location) ? (
-                  <Text
-                    accessibilityRole="link"
-                    numberOfLines={2}
-                    style={[styles.body, { color: colors.primary, textDecorationLine: 'underline' }]}
-                    onPress={() => Linking.openURL(m.location!.trim()).catch(() => {})}>
-                    {m.location}
-                  </Text>
-                ) : (
-                  <Text style={styles.muted} numberOfLines={2}>
-                    {m.location}
-                  </Text>
-                )
-              ) : null}
-              {(actions.length > 0 || canEdit) && (
-                <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap', paddingTop: 2 }}>
-                  {changing === m.id ? (
-                    <Text style={styles.muted}>Saving…</Text>
-                  ) : (
-                    [
-                      ...(canEdit
-                        ? [
-                            <Pressable
-                              key="edit"
-                              accessibilityRole="button"
-                              accessibilityLabel="Edit"
-                              accessibilityState={{ disabled: busy }}
-                              disabled={busy}
-                              hitSlop={8}
-                              onPress={() =>
-                                router.push({
-                                  pathname: '/courses/[id]/meetings/[meetingId]',
-                                  params: { id: course.id, meetingId: m.id },
-                                })
-                              }>
-                              <Text style={{ color: colors.primary, fontWeight: '600', opacity: busy ? 0.4 : 1 }}>Edit</Text>
-                            </Pressable>,
-                          ]
-                        : []),
-                      ...actions.map((a) => (
-                      <Pressable
-                        key={a.title}
-                        accessibilityRole="button"
-                        accessibilityLabel={a.title}
-                        accessibilityState={{ disabled: busy }}
-                        disabled={busy}
-                        hitSlop={8}
-                        onPress={() => changeStatus(m, a.status)}>
-                        <Text
-                          style={{
-                            color: a.status === 'canceled' ? colors.danger : colors.primary,
-                            fontWeight: '600',
-                            opacity: busy ? 0.4 : 1,
-                          }}>
-                          {a.title}
-                        </Text>
-                      </Pressable>
-                    )),
-                    ]
-                  )}
-                </View>
-              )}
-            </View>
-          );
-        })
+            ),
+        )
       )}
       <ErrorText error={error} />
       {canManage && (
@@ -171,4 +104,113 @@ export function MeetingsSection({ course }: { course: Course }) {
       )}
     </Card>
   );
+
+  function renderMeeting(m: Meeting) {
+    const started = hasStarted(m, now);
+    const canEdit = canManage && m.status === 'scheduled';
+    const actions: { title: string; status: Target }[] =
+      !canManage || m.status !== 'scheduled'
+        ? []
+        : started
+          ? [
+              { title: 'Mark completed', status: 'completed' },
+              { title: 'Mark canceled', status: 'canceled' },
+            ]
+          : [{ title: 'Cancel meeting', status: 'canceled' }];
+    // Notes (ARU-28): everyone who sees a completed meeting reads them; the owner and the teacher add or edit.
+    const notesActions: { title: string; edit: boolean }[] =
+      m.status !== 'completed'
+        ? []
+        : [
+            ...(m.notes ? [{ title: 'Notes', edit: false }] : []),
+            ...(canManage ? [{ title: m.notes ? 'Edit notes' : 'Add notes', edit: true }] : []),
+          ];
+    return (
+      <View key={m.id} testID={`meeting-${m.id}`} style={{ gap: 4 }}>
+        <View style={[styles.row, { alignItems: 'flex-start' }]}>
+          <Text style={[styles.body, { flex: 1, fontWeight: '600' }]}>
+            {formatDateTime(m.startsAt)}
+            {m.rescheduledAt ? <Text style={styles.muted}>{'  '}Rescheduled</Text> : null}
+          </Text>
+          <MeetingBadge status={m.status} />
+        </View>
+        <Text style={styles.body} numberOfLines={2}>
+          {m.topic}
+        </Text>
+        {m.location ? (
+          isLink(m.location) ? (
+            <Text
+              accessibilityRole="link"
+              numberOfLines={2}
+              style={[styles.body, { color: colors.primary, textDecorationLine: 'underline' }]}
+              onPress={() => Linking.openURL(m.location!.trim()).catch(() => {})}>
+              {m.location}
+            </Text>
+          ) : (
+            <Text style={styles.muted} numberOfLines={2}>
+              {m.location}
+            </Text>
+          )
+        ) : null}
+        {(actions.length > 0 || canEdit || notesActions.length > 0) && (
+          <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap', paddingTop: 2 }}>
+            {changing === m.id ? (
+              <Text style={styles.muted}>Saving…</Text>
+            ) : (
+              [
+                ...(canEdit
+                  ? [
+                      <Pressable
+                        key="edit"
+                        accessibilityRole="button"
+                        accessibilityLabel="Edit"
+                        accessibilityState={{ disabled: busy }}
+                        disabled={busy}
+                        hitSlop={8}
+                        onPress={() =>
+                          router.push({
+                            pathname: '/courses/[id]/meetings/[meetingId]',
+                            params: { id: course.id, meetingId: m.id },
+                          })
+                        }>
+                        <Text style={{ color: colors.primary, fontWeight: '600', opacity: busy ? 0.4 : 1 }}>Edit</Text>
+                      </Pressable>,
+                    ]
+                  : []),
+                ...notesActions.map((a) => (
+                  <Pressable
+                    key={a.title}
+                    accessibilityRole={a.edit ? 'button' : 'link'}
+                    accessibilityLabel={a.title}
+                    hitSlop={8}
+                    onPress={() => openNotes(m, a.edit)}>
+                    <Text style={{ color: colors.primary, fontWeight: '600' }}>{a.title}</Text>
+                  </Pressable>
+                )),
+                ...actions.map((a) => (
+                  <Pressable
+                    key={a.title}
+                    accessibilityRole="button"
+                    accessibilityLabel={a.title}
+                    accessibilityState={{ disabled: busy }}
+                    disabled={busy}
+                    hitSlop={8}
+                    onPress={() => changeStatus(m, a.status)}>
+                    <Text
+                      style={{
+                        color: a.status === 'canceled' ? colors.danger : colors.primary,
+                        fontWeight: '600',
+                        opacity: busy ? 0.4 : 1,
+                      }}>
+                      {a.title}
+                    </Text>
+                  </Pressable>
+                )),
+              ]
+            )}
+          </View>
+        )}
+      </View>
+    );
+  }
 }

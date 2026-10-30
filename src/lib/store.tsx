@@ -1,6 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
+import { NOTES_MAX } from './markdown';
 import { supabase } from './supabase';
 import type {
   Course,
@@ -68,6 +69,8 @@ type Store = {
   setMeetingStatus: (id: string, status: Exclude<MeetingStatus, 'scheduled'>) => Promise<void>;
   /** Course owner or teacher, Scheduled meetings only (ARU-15). A changed start must be in the future. */
   updateMeeting: (id: string, input: MeetingEdit) => Promise<void>;
+  /** Course owner or teacher, Completed meetings only (ARU-28). Blank text removes the notes. */
+  setMeetingNotes: (id: string, notes: string) => Promise<void>;
   /** Course chat (ARU-8): a page of messages, newest first, older than `before` when given. */
   loadMessages: (courseId: string, before?: CourseMessage) => Promise<{ messages: CourseMessage[]; hasMore: boolean }>;
   /** Posts as the current user. `id` is generated once per message so a retry cannot post twice. */
@@ -116,6 +119,9 @@ type MeetingRow = {
   status_changed_by: string | null;
   status_changed_at: string | null;
   rescheduled_at: string | null;
+  notes?: string | null;
+  notes_updated_by?: string | null;
+  notes_updated_at?: string | null;
 };
 type MessageRow = { id: string; course_id: string; author_id: string; body: string; created_at: string };
 type MaterialRow = {
@@ -174,6 +180,9 @@ const toMeeting = (r: MeetingRow): Meeting => ({
   statusChangedById: r.status_changed_by ?? undefined,
   statusChangedAt: r.status_changed_at ?? undefined,
   rescheduledAt: r.rescheduled_at ?? undefined,
+  notes: r.notes ?? undefined,
+  notesUpdatedById: r.notes_updated_by ?? undefined,
+  notesUpdatedAt: r.notes_updated_at ?? undefined,
 });
 
 const toMessage = (r: MessageRow): CourseMessage => ({
@@ -510,6 +519,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           new_location: input.location,
         }),
       );
+      await load();
+    },
+    setMeetingNotes: async (id, notes) => {
+      requireRole('teacher', 'mentor');
+      if (notes.length > NOTES_MAX) throw new Error('Notes can be at most 10,000 characters.');
+      check(await supabase.rpc('set_meeting_notes', { meeting: id, new_notes: notes }));
       await load();
     },
     loadMessages: async (courseId, before) => {
