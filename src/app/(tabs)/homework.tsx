@@ -1,47 +1,61 @@
-import { router } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 
+import { AssignmentCard } from '@/components/AssignmentCard';
 import { HomeworkCard } from '@/components/HomeworkCard';
-import { Button, EmptyState, Segmented, styles } from '@/components/ui';
+import { EmptyState, Segmented, styles } from '@/components/ui';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
-import type { HomeworkStatus } from '@/lib/types';
+import type { Homework, HomeworkAssignment, HomeworkStatus } from '@/lib/types';
+import { useNow } from '@/lib/useNow';
 
-/** Students: 'all' or a status. Checkers (mentor, teacher): a status only (ARU-23 removed "All"). */
-type Filter = 'all' | HomeworkStatus;
+/** Listener views (ARU-32): New (assignments not sent yet) · Waiting · Checked. Checkers: To check · Checked. */
+type Filter = 'new' | HomeworkStatus;
 /** ARU-23: mentors switch between homework they check (Owner) and homework they sent (Listener). */
 type Tab = 'owner' | 'listener';
 
 const NO_COURSE_HINT = 'You are not in any course yet — ask your teacher or mentor to add you.';
+const SENT_HINT = 'Homework you send will appear here.';
 const emptyText: Record<string, { title: string; hint: string }> = {
-  student: { title: 'No homework yet', hint: 'Tap "Add homework" to send your work to your course mentor.' },
+  new: { title: 'No new homework', hint: 'Homework your mentor assigns after a meeting will appear here.' },
+  newNoCourse: { title: 'No new homework', hint: NO_COURSE_HINT },
+  student: { title: 'No homework yet', hint: SENT_HINT },
   mentor: { title: 'Nothing to check', hint: 'Homework sent by course listeners will appear here.' },
   teacher: { title: 'No homework yet', hint: 'Homework sent by course listeners will appear here.' },
-  mine: { title: 'No homework sent yet', hint: 'Tap "Add homework" to send work for a course you attend.' },
-  // Without a course there is no "+ Add homework" button (ARU-19 AC 3, ARU-23 AC 11).
+  mine: { title: 'No homework sent yet', hint: SENT_HINT },
   studentNoCourse: { title: 'No homework yet', hint: NO_COURSE_HINT },
   mineNoCourse: { title: 'No homework sent yet', hint: NO_COURSE_HINT },
 };
 
 export default function HomeworkScreen() {
-  const { currentUser, courses, courseMembers, loading, refresh, visibleHomework } = useStore();
+  const { currentUser, courses, courseMembers, loading, refresh, visibleHomework, assignments } = useStore();
   const role = currentUser?.role ?? 'student';
   const me = currentUser?.id;
+  const now = useNow();
   // Mentors and the teacher check homework (ARU-14: any course, never their own); students see their own.
   const isChecker = role === 'mentor' || role === 'teacher';
-  // A listener of a loaded course: the same rule as the Add homework form's course list, so the button, the
-  // switcher and the form never disagree (ARU-19, ARU-23 analysis note 2).
-  const inLoadedCourse = courses.some((c) => courseMembers.some((m) => m.courseId === c.id && m.userId === me));
+  // Courses I am a listener of (loaded), as in the Add homework rules (ARU-19, ARU-23 analysis note 2).
+  const myCourseIds = new Set(
+    courses.filter((c) => courseMembers.some((m) => m.courseId === c.id && m.userId === me)).map((c) => c.id),
+  );
+  const inLoadedCourse = myCourseIds.size > 0;
 
   const mine = visibleHomework.filter((h) => h.studentId === me);
   // For checkers the Owner lists cover homework they can check, i.e. not their own.
   const base = isChecker ? visibleHomework.filter((h) => h.studentId !== me) : visibleHomework;
+  // New (ARU-32): assignments of my courses I haven't sent homework for, newest first. The teacher has none.
+  const sentFor = new Set(mine.map((h) => h.assignmentId).filter(Boolean));
+  const fresh =
+    role === 'teacher'
+      ? []
+      : assignments
+          .filter((a) => myCourseIds.has(a.courseId) && !sentFor.has(a.id))
+          .sort((x, y) => y.createdAt.localeCompare(x.createdAt));
 
   // Owner | Listener only for mentors who attend a course or have sent homework (AC 1, AC 7).
   const showSwitcher = role === 'mentor' && (inLoadedCourse || mine.length > 0);
   const [selectedTab, setSelectedTab] = useState<Tab>('owner');
-  const [filter, setFilter] = useState<Filter>(isChecker ? 'submitted' : 'all');
+  const [filter, setFilter] = useState<Filter>(isChecker ? 'submitted' : 'new');
   const tab: Tab = showSwitcher ? selectedTab : 'owner';
 
   // The switcher disappeared while on Listener (last course and homework gone): back to Owner / To check
@@ -57,32 +71,35 @@ export default function HomeworkScreen() {
 
   function switchTab(next: Tab) {
     setSelectedTab(next);
-    setFilter('submitted'); // each tab opens on its default filter (AC 9)
+    // Each tab opens on its default filter: Listener on New (ARU-32), Owner on To check.
+    setFilter(next === 'listener' ? 'new' : 'submitted');
   }
 
   const onListener = isChecker && tab === 'listener';
+  const listenerView = !isChecker || onListener;
   const list = onListener ? mine : base;
-  const data = filter === 'all' ? list : list.filter((h) => h.status === filter);
   const waiting = list.filter((h) => h.status === 'submitted').length;
+  // A checker never has "new" (e.g. right after the switcher went away); show their default list.
+  const shown: Filter = filter === 'new' && !listenerView ? 'submitted' : filter;
+  const data: (Homework | HomeworkAssignment)[] = shown === 'new' ? fresh : list.filter((h) => h.status === shown);
 
-  const options: { value: Filter; label: string }[] = !isChecker
+  const options: { value: Filter; label: string }[] = listenerView
     ? [
+        { value: 'new', label: `New (${fresh.length})` },
         { value: 'submitted', label: `Waiting (${waiting})` },
         { value: 'checked', label: 'Checked' },
-        { value: 'all', label: 'All' },
       ]
     : [
-        { value: 'submitted', label: `${onListener ? 'Waiting' : 'To check'} (${waiting})` },
+        { value: 'submitted', label: `To check (${waiting})` },
         { value: 'checked', label: 'Checked' },
       ];
 
-  // Students while in a course (ARU-19); mentors only on the Listener tab while in a course (ARU-23 AC 3, 5, 6);
-  // the teacher never.
-  const canSubmit = (role === 'student' && inLoadedCourse) || (onListener && inLoadedCourse);
-
-  const empty = onListener
-    ? emptyText[canSubmit ? 'mine' : 'mineNoCourse']
-    : emptyText[role === 'student' && !inLoadedCourse ? 'studentNoCourse' : role];
+  const empty =
+    shown === 'new'
+      ? emptyText[inLoadedCourse ? 'new' : 'newNoCourse']
+      : onListener
+        ? emptyText[inLoadedCourse ? 'mine' : 'mineNoCourse']
+        : emptyText[role === 'student' && !inLoadedCourse ? 'studentNoCourse' : role];
 
   return (
     <FlatList
@@ -92,12 +109,13 @@ export default function HomeworkScreen() {
       refreshing={loading}
       onRefresh={() => refresh().catch(() => {})}
       keyExtractor={(h) => h.id}
-      renderItem={({ item }) => <HomeworkCard item={item} />}
+      renderItem={({ item }) =>
+        'meetingId' in item ? <AssignmentCard item={item} now={now} /> : <HomeworkCard item={item} />
+      }
       ListHeaderComponent={
         <View style={{ gap: 12 }}>
           {showSwitcher && <TabSwitch value={tab} onChange={switchTab} />}
-          {canSubmit && <Button title="+ Add homework" onPress={() => router.push('/homework/new')} />}
-          <Segmented<Filter> value={filter} onChange={setFilter} options={options} />
+          <Segmented<Filter> value={shown} onChange={setFilter} options={options} />
         </View>
       }
       ListEmptyComponent={<EmptyState {...empty} />}

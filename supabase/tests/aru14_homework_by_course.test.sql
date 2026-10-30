@@ -3,6 +3,7 @@
 -- Users per the TEST DESIGN: teacher T; mentors M (owns A), N (owns B, listener of A), M2 (no course, S2's mentor_id);
 -- students S1 (listener of A and B), S2 (no course).
 select t.seed();
+select t.make_assignments(t.id('A')), t.make_assignments(t.id('B')); -- ARU-32: homework is sent for an assignment
 -- The seed's homework was created before memberships; AC 13 says the table starts empty, so start from scratch.
 delete from homework;
 insert into course_members (course_id, user_id, added_by) values
@@ -19,30 +20,31 @@ select t.throws($$insert into homework (student_id, title) values ('00000000-000
 
 -- AC 1 / AC 5: submit only to courses you are a listener of.
 select t.login('S1');
-select t.lives($$insert into homework (id, student_id, course_id, title, photo_path) values ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000d1', 'S1 in A', '00000000-0000-0000-0000-0000000000c1/f1.jpg')$$,
+select t.lives($$insert into homework (id, student_id, course_id, title, photo_path, assignment_id) values ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000d1', 'S1 in A', '00000000-0000-0000-0000-0000000000c1/f1.jpg', t.assignment('00000000-0000-0000-0000-0000000000d1', 1))$$,
   'AC1 S1 submits to A (listener)');
-select t.lives($$insert into homework (id, student_id, course_id, title) values ('00000000-0000-0000-0000-0000000000f2', '00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000d2', 'S1 in B')$$,
+select t.lives($$insert into homework (id, student_id, course_id, title, assignment_id) values ('00000000-0000-0000-0000-0000000000f2', '00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000d2', 'S1 in B', t.assignment('00000000-0000-0000-0000-0000000000d2', 1))$$,
   'AC1 S1 submits to B (listener)');
 reset role;
 insert into courses (id, title, created_by) values ('00000000-0000-0000-0000-0000000000d3', 'Chemistry', t.id('M'));
+select t.make_assignments('00000000-0000-0000-0000-0000000000d3');
 insert into storage.objects (bucket_id, name, owner) values ('homework', t.id('S1') || '/f1.jpg', t.id('S1'));
 select t.login('S1');
-select t.throws($$insert into homework (student_id, course_id, title) values ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000d3', 'not a listener')$$, '42501',
+select t.throws($$insert into homework (student_id, course_id, title, assignment_id) values ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000d3', 'not a listener', t.assignment('00000000-0000-0000-0000-0000000000d3', 1))$$, '42501',
   'AC1 submitting to a course you are not a listener of is rejected');
-select t.throws($$insert into homework (student_id, course_id, title, status) values ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000d1', 'pre-checked', 'checked')$$, '42501',
+select t.throws($$insert into homework (student_id, course_id, title, status, assignment_id) values ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000d1', 'pre-checked', 'checked', t.assignment('00000000-0000-0000-0000-0000000000d1', 2))$$, '42501',
   'AC1 cannot submit homework already checked');
 reset role; select t.login('S2');
-select t.throws($$insert into homework (student_id, course_id, title) values ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000d1', 'in no course')$$, '42501',
+select t.throws($$insert into homework (student_id, course_id, title, assignment_id) values ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000d1', 'in no course', t.assignment('00000000-0000-0000-0000-0000000000d1', 3))$$, '42501',
   'AC3 a student in no course cannot submit');
 
 -- AC 2: a mentor who is a listener submits; a mentor who owns but is not a listener cannot; the teacher cannot.
 reset role; select t.login('N');
-select t.lives($$insert into homework (id, student_id, course_id, title) values ('00000000-0000-0000-0000-0000000000f3', '00000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000000d1', 'N in A')$$,
+select t.lives($$insert into homework (id, student_id, course_id, title, assignment_id) values ('00000000-0000-0000-0000-0000000000f3', '00000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000000d1', 'N in A', t.assignment('00000000-0000-0000-0000-0000000000d1', 4))$$,
   'AC2 mentor N (listener of A) submits to A');
-select t.throws($$insert into homework (student_id, course_id, title) values ('00000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000000d2', 'N in own B')$$, '42501',
+select t.throws($$insert into homework (student_id, course_id, title, assignment_id) values ('00000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000000d2', 'N in own B', t.assignment('00000000-0000-0000-0000-0000000000d2', 2))$$, '42501',
   'AC2 a mentor cannot submit to a course they own but are not a listener of');
 reset role; select t.login('T');
-select t.throws($$insert into homework (student_id, course_id, title) values ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000d1', 'teacher hw')$$, '42501',
+select t.throws($$insert into homework (student_id, course_id, title, assignment_id) values ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000d1', 'teacher hw', t.assignment('00000000-0000-0000-0000-0000000000d1', 5))$$, '42501',
   'roles: the teacher cannot submit homework');
 
 -- AC 5: removed from a course (ARU-7) -> can no longer submit to it.
@@ -50,7 +52,7 @@ reset role; select t.login('M');
 select t.lives($$select remove_listener('00000000-0000-0000-0000-0000000000d2', '00000000-0000-0000-0000-0000000000c1')$$,
   'AC5 S1 removed from B');
 reset role; select t.login('S1');
-select t.throws($$insert into homework (student_id, course_id, title) values ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000d2', 'after removal')$$, '42501',
+select t.throws($$insert into homework (student_id, course_id, title, assignment_id) values ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000d2', 'after removal', t.assignment('00000000-0000-0000-0000-0000000000d2', 3))$$, '42501',
   'AC5 a removed listener cannot submit to that course');
 
 -- Seeing (decision: mentors see all).

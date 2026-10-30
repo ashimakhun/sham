@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
 
 import { colors, roleColor, roleLabel } from '@/lib/theme';
 import type { HomeworkStatus, Role } from '@/lib/types';
@@ -141,6 +141,49 @@ export function Segmented<T extends string>({
   );
 }
 
+/**
+ * A horizontal, scrollable row of single-select chips for a variable number of options (ARU-29). Unlike Segmented,
+ * chips size to their label (long labels are cut with an ellipsis) and the row scrolls sideways instead of wrapping.
+ */
+export function FilterChips<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={{ gap: 8 }}>
+      {options.map((o) => {
+        const selected = value === o.value;
+        return (
+          <Pressable
+            key={o.value}
+            accessibilityRole="button"
+            accessibilityLabel={o.label}
+            accessibilityState={{ selected }}
+            // 36 pt chip + 4 pt on each side = a 44 pt touch target.
+            hitSlop={4}
+            onPress={() => {
+              if (!selected) onChange(o.value);
+            }}
+            style={[styles.chip, selected && { backgroundColor: colors.primary, borderColor: colors.primary }]}>
+            <Text numberOfLines={1} style={[styles.chipText, selected && { color: '#fff' }]}>
+              {o.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
 export const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16, gap: 12 },
@@ -179,4 +222,15 @@ export const styles = StyleSheet.create({
   segment: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
   segmentActive: { backgroundColor: colors.card },
   segmentText: { fontSize: 13, fontWeight: '600', color: colors.muted },
+  chip: {
+    maxWidth: 200,
+    minHeight: 36,
+    justifyContent: 'center',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+  },
+  chipText: { fontSize: 13, fontWeight: '600', color: colors.text },
 });

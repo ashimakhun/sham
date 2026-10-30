@@ -135,8 +135,8 @@ describe('AC3/AC7/AC9/AC10: notes actions in History', () => {
   it.each(['M', 'T'] as const)('%s sees Add notes / Edit notes on completed meetings only', async (who) => {
     setStore(fakeStore(who, { courseMembers: members, meetings: [F1, P, C, CN, X] }));
     await render(<CourseDetailScreen />);
-    expect(labels('C')).toEqual(['Add notes']);
-    expect(labels('CN')).toEqual(['Notes', 'Edit notes']);
+    expect(labels('C')).toEqual(['Add notes', 'Assign homework']); // + ARU-32
+    expect(labels('CN')).toEqual(['Notes', 'Edit notes', 'Assign homework']);
     expect(labels('X')).toEqual([]);
     expect(labels('F1')).not.toContain('Add notes');
     expect(labels('P')).not.toContain('Add notes');
