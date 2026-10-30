@@ -11,7 +11,7 @@ import { formatDate } from '@/lib/theme';
 
 export default function CourseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getCourse, getUser, visibleHomework, loading, refresh, currentUser, courseMembers } = useStore();
+  const { getCourse, getUser, visibleHomework, loading, refresh, currentUser, courseMembers, unreadCount } = useStore();
 
   const course = getCourse(id);
   if (!course) return <EmptyState title="Course not found" />;
@@ -58,6 +58,7 @@ export default function CourseDetailScreen() {
             <Button
               title="Chat"
               variant="secondary"
+              unread={unreadCount(course.id)}
               onPress={() => router.push({ pathname: '/courses/[id]/chat', params: { id: course.id } })}
             />
           )}

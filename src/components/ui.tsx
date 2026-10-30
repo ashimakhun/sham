@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextInpu
 
 import { colors, roleColor, roleLabel } from '@/lib/theme';
 import type { HomeworkStatus, Role } from '@/lib/types';
+import { formatUnread, withUnreadLabel } from '@/lib/unread';
 
 type CardProps = {
   children: ReactNode;
@@ -32,12 +33,15 @@ type ButtonProps = {
   onPress: () => void;
   variant?: 'primary' | 'secondary' | 'danger';
   disabled?: boolean;
+  /** New-message count shown next to the title (ARU-31); nothing is shown at 0 and the label stays the title. */
+  unread?: number;
 };
 
-export function Button({ title, onPress, variant = 'primary', disabled }: ButtonProps) {
+export function Button({ title, onPress, variant = 'primary', disabled, unread = 0 }: ButtonProps) {
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={unread > 0 ? withUnreadLabel(title, unread) : undefined}
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [
@@ -56,7 +60,27 @@ export function Button({ title, onPress, variant = 'primary', disabled }: Button
         ]}>
         {title}
       </Text>
+      {unread > 0 && <UnreadBadge count={unread} style={{ position: 'absolute', right: 12, top: 11 }} />}
     </Pressable>
+  );
+}
+
+/** A new-message count bubble (ARU-31), the same on the course card's chat icon and the course's Chat button. Part
+ *  of its button's label, so screen readers don't read it on its own. */
+export function UnreadBadge({ count, style }: { count: number; style?: ViewStyle }) {
+  if (count <= 0) return null;
+  return (
+    <View
+      testID="unread-badge"
+      accessible={false}
+      importantForAccessibility="no-hide-descendants"
+      accessibilityElementsHidden
+      pointerEvents="none"
+      style={[styles.unread, style]}>
+      <Text style={styles.unreadText} numberOfLines={1}>
+        {formatUnread(count)}
+      </Text>
+    </View>
   );
 }
 
@@ -215,6 +239,16 @@ export const styles = StyleSheet.create({
   buttonText: { fontSize: 15, fontWeight: '600' },
   badge: { alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
   badgeText: { fontSize: 12, fontWeight: '600' },
+  unread: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.danger,
+  },
+  unreadText: { fontSize: 11, fontWeight: '700', color: '#fff' },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   empty: { alignItems: 'center', paddingVertical: 48, gap: 6 },
   emptyTitle: { fontSize: 16, fontWeight: '600', color: colors.text },

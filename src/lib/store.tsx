@@ -1,5 +1,6 @@
 import type { Session } from '@supabase/supabase-js';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { AppState } from 'react-native';
 
 import { NOTES_MAX } from './markdown';
 import { supabase } from './supabase';
@@ -86,7 +87,17 @@ type Store = {
   subscribeToMessages: (courseId: string, onMessage: (m: CourseMessage) => void) => () => void;
   /** Teacher only (ARU-13): switches a user between student and mentor via set_user_role(), then refetches. */
   setUserRole: (userId: string, role: 'student' | 'mentor') => Promise<void>;
+  /** New messages from others per course chat since the user last read it (ARU-31). 0 while that chat is open. */
+  unreadCount: (courseId: string) => number;
+  /** Marks a chat read up to `upToMessageId` (the newest message shown), by that message's server time. Clears the
+   *  count at once; a failed save (e.g. offline) is ignored and the count comes back on the next refetch. */
+  markChatRead: (courseId: string, upToMessageId: string) => Promise<void>;
+  /** The chat that is open on screen (or null): its messages are read as they arrive, so it never shows a count. */
+  setActiveChat: (courseId: string | null) => void;
 };
+
+/** Live count refetches are batched: one request at most this often while messages arrive (ARU-31). */
+const UNREAD_DEBOUNCE_MS = 500;
 
 export const MESSAGES_PAGE = 50;
 
@@ -142,6 +153,7 @@ type MeetingRow = {
   notes_updated_at?: string | null;
 };
 type MessageRow = { id: string; course_id: string; author_id: string; body: string; created_at: string };
+type UnreadRow = { course_id: string; unread: number | string };
 type MaterialRow = {
   id: string;
   teacher_id: string;
@@ -280,6 +292,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [assignments, setAssignments] = useState<HomeworkAssignment[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const [unread, setUnread] = useState<Record<string, number>>({});
+  const [activeChat, setActiveChat] = useState<string | null>(null);
 
   const userId = session?.user.id;
 
@@ -299,11 +313,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setCourseMembers([]);
         setMeetings([]);
         setAssignments([]);
+        setUnread({});
+        setActiveChat(null);
         setLoadedFor(null);
       }
     });
     return () => data.subscription.unsubscribe();
   }, []);
+
+  // New-message counts for all the user's chats in one request (ARU-31). Only the latest request's answer is used,
+  // so an older answer arriving late can't bring back a count that was just cleared. Errors keep the last counts.
+  const unreadRequest = useRef(0);
+  const loadUnread = useCallback(async () => {
+    if (!userId) return;
+    const request = ++unreadRequest.current;
+    const res = await supabase.rpc('chat_unread_counts');
+    if (res.error || request !== unreadRequest.current) return;
+    const counts: Record<string, number> = {};
+    for (const r of (res.data as UnreadRow[] | null) ?? []) counts[r.course_id] = Number(r.unread);
+    setUnread(counts);
+  }, [userId]);
 
   // Fetches everything the signed-in user may see. State is only set after the
   // awaits, so it is safe to call from an effect.
@@ -326,10 +355,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setCourseMembers(rows<CourseMemberRow>(members).map(toCourseMember));
       setMeetings(rows<MeetingRow>(mtgs).map(toMeeting));
       setAssignments(rows<AssignmentRow>(asgs).map(toAssignment));
+      await loadUnread().catch(() => {});
     } finally {
       setLoadedFor(userId);
     }
-  }, [userId]);
+  }, [userId, loadUnread]);
 
   /** User-triggered reload (pull to refresh, retry) with a spinner. */
   const refresh = useCallback(async () => {
@@ -344,6 +374,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!userId) return;
     load().catch(() => {});
+    let unreadTimer: ReturnType<typeof setTimeout> | null = null;
     // Live updates: refetch when someone submits, checks or shares something.
     const channel = supabase
       .channel('sham-changes')
@@ -355,11 +386,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'homework_assignments' }, () =>
         load().catch(() => {}),
       )
+      // A chat message refetches only the counts (one request, batched), never the full load() (ARU-31).
+      // Realtime applies RLS, so only messages of chats the user is in arrive; their own never count.
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'course_messages' }, (payload) => {
+        if ((payload.new as MessageRow).author_id === userId) return;
+        if (unreadTimer) return;
+        unreadTimer = setTimeout(() => {
+          unreadTimer = null;
+          loadUnread().catch(() => {});
+        }, UNREAD_DEBOUNCE_MS);
+      })
       .subscribe();
+    // Back from the background: realtime may have missed messages, so refetch the counts.
+    const appState = AppState.addEventListener('change', (state) => {
+      if (state === 'active') loadUnread().catch(() => {});
+    });
     return () => {
+      if (unreadTimer) clearTimeout(unreadTimer);
+      appState.remove();
       supabase.removeChannel(channel);
     };
-  }, [userId, load]);
+  }, [userId, load, loadUnread]);
 
   const currentUser = users.find((u) => u.id === userId) ?? null;
   const getUser = useCallback((id: string | undefined) => users.find((u) => u.id === id), [users]);
@@ -381,6 +428,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (error || !data?.signedUrl) throw new Error(error?.message ?? 'No photo link.');
     return data.signedUrl;
   }, []);
+
+  // Stable, so the chat screen can call it from effects without re-running them on every store update.
+  const markChatRead = useCallback<Store['markChatRead']>(
+    async (courseId, upToMessageId) => {
+      // Clear at once (and drop any count request in flight), then save; the refetch after the save is the truth.
+      unreadRequest.current++;
+      setUnread((counts) => (counts[courseId] ? { ...counts, [courseId]: 0 } : counts));
+      const res = await supabase.rpc('mark_chat_read', { course: courseId, upto: upToMessageId });
+      if (res.error) return;
+      await loadUnread().catch(() => {});
+    },
+    [loadUnread],
+  );
 
   const requireRole = (...roles: User['role'][]) => {
     if (!currentUser || !roles.includes(currentUser.role)) throw new Error(`Only a ${roles.join(' or ')} can do this.`);
@@ -654,6 +714,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // profiles is not in realtime: refetch so the user moves to their new section.
       await load();
     },
+    unreadCount: (courseId) => (courseId === activeChat ? 0 : (unread[courseId] ?? 0)),
+    markChatRead,
+    setActiveChat,
   };
 
   return <StoreContext.Provider value={store}>{children}</StoreContext.Provider>;
