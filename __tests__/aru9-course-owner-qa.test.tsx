@@ -22,13 +22,17 @@ beforeEach(() => {
 });
 
 describe('AC 11: a listener sees the new owner as the course mentor', () => {
+  // Changed by ARU-32: the form opens from an assignment with the course fixed (no course picker).
   it('"Add homework" shows "Mentor: <new owner>" and never promises a checker', async () => {
-    setStore(fakeStore('S1', { courses: [handedOver], courseMembers: [member('A', 'S1')] }));
+    params.assignmentId = 'asgA';
+    setStore(
+      fakeStore('S1', { courses: [handedOver], courseMembers: [member('A', 'S1')], assignments: [{ id: 'asgA', meetingId: 'mA', courseId: 'A', title: 'Exercises 1-10', description: '', createdById: 'M', createdAt: '2026-10-20T10:00:00.000Z' }] }),
+    );
     await render(<NewHomeworkScreen />);
-    await fireEvent.press(screen.getByText('Algebra'));
     expect(screen.getByText('Mentor: Mentor Nina')).toBeTruthy();
     expect(screen.queryByText(/Mentor Max/)).toBeNull();
     expect(screen.queryByText(/will check/)).toBeNull();
+    params.assignmentId = undefined;
   });
 
   it('the Profile tab lists the course with "Mentor: <new owner>"', async () => {

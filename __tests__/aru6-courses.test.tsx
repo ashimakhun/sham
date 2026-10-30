@@ -161,43 +161,44 @@ describe('Course details', () => {
   });
 });
 
+// Changed by ARU-32: homework is sent for an assignment opened from New; the course is fixed (no course picker).
+// What stays from ARU-6 AC 8-10: homework always has a course, the title is required, and nothing can be sent
+// without a course.
 describe('Add homework', () => {
   const titleInput = () => screen.getByPlaceholderText('e.g. Fractions — exercises 1–10');
-
-  // Since ARU-14 the picker lists only courses the user is a listener of; S1 is a listener of both here.
-  const s1InBoth = { courseMembers: [member('A', 'S1'), member('B', 'S1')] };
-
-  it('AC8: "Send to mentor" needs exactly one course picked from the courses I attend', async () => {
-    setStore(fakeStore('S1', s1InBoth));
-    await render(<NewHomeworkScreen />);
-    const radios = screen.getAllByRole('radio');
-    expect(radios).toHaveLength(2);
-    await fireEvent.changeText(titleInput(), 'Exercises');
-    expect(button('Send to mentor')).toBeDisabled();
-    await fireEvent.press(screen.getByText('Algebra'));
-    expect(button('Send to mentor')).toBeEnabled();
-    await fireEvent.press(screen.getByText('Biology'));
-    expect(screen.getAllByRole('radio', { selected: true })).toHaveLength(1);
-    expect(screen.getByRole('radio', { name: /Biology/ })).toBeSelected();
+  const asgB = { id: 'asgB', meetingId: 'mB', courseId: 'B', title: 'Cells', description: '', createdById: 'N', createdAt: '2026-10-20T10:00:00.000Z' };
+  const s1InBoth = { courseMembers: [member('A', 'S1'), member('B', 'S1')], assignments: [asgB] };
+  afterEach(() => {
+    params.assignmentId = undefined;
   });
 
-  it('AC9: the homework is sent with the selected course', async () => {
+  it('AC8: the course is shown fixed and "Send to mentor" needs a title', async () => {
+    params.assignmentId = 'asgB';
+    setStore(fakeStore('S1', s1InBoth));
+    await render(<NewHomeworkScreen />);
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+    expect(screen.getByText('Biology')).toBeTruthy();
+    await fireEvent.changeText(titleInput(), '   ');
+    expect(button('Send to mentor')).toBeDisabled();
+    await fireEvent.changeText(titleInput(), 'Cells');
+    expect(button('Send to mentor')).toBeEnabled();
+  });
+
+  it('AC9: the homework is sent with the assignment\'s course', async () => {
+    params.assignmentId = 'asgB';
     const store = fakeStore('S1', s1InBoth);
     setStore(store);
     await render(<NewHomeworkScreen />);
-    await fireEvent.press(screen.getByText('Biology'));
-    await fireEvent.changeText(titleInput(), 'Cells');
     await fireEvent.press(button('Send to mentor'));
     await waitFor(() => expect(router.back).toHaveBeenCalled());
-    expect(store.addHomework).toHaveBeenCalledWith(expect.objectContaining({ courseId: 'B', title: 'Cells' }));
+    expect(store.addHomework).toHaveBeenCalledWith(expect.objectContaining({ courseId: 'B', assignmentId: 'asgB', title: 'Cells' }));
   });
 
-  it('AC10 (wording changed by ARU-14 AC3): in no course it explains why and "Send to mentor" stays disabled', async () => {
+  it('AC10: without a course (no assignment) the screen explains and nothing can be sent', async () => {
     setStore(fakeStore('S1', { courses: [] }));
     await render(<NewHomeworkScreen />);
-    expect(screen.getByText('You are not in any course yet — ask your teacher or mentor to add you')).toBeTruthy();
-    await fireEvent.changeText(titleInput(), 'Exercises');
-    expect(button('Send to mentor')).toBeDisabled();
+    expect(screen.getByText('Open a homework assignment from New to send homework.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Send to mentor' })).toBeNull();
   });
 });
 
