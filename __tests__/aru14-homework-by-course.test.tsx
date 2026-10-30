@@ -7,6 +7,7 @@ import HomeworkScreen from '@/app/(tabs)/homework';
 import HomeworkDetailScreen from '@/app/homework/[id]';
 import NewHomeworkScreen from '@/app/homework/new';
 import { router } from 'expo-router';
+import type { HomeworkAssignment } from '@/lib/types';
 
 import { courseA, courseB, fakeStore, hw, member } from './helpers/fakeStore';
 import { params, setStore } from './helpers/mocks';
@@ -25,56 +26,59 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
+// Changed by ARU-32: homework is sent for an assignment (opened from New), with the course fixed; no course picker.
+const asgA: HomeworkAssignment = {
+  id: 'asgA',
+  meetingId: 'mA',
+  courseId: 'A',
+  title: 'Exercises 1-10',
+  description: '',
+  createdById: 'M',
+  createdAt: '2026-10-20T10:00:00.000Z',
+};
+
 describe('Add homework', () => {
-  it('AC1: the picker lists only courses I am a listener of', async () => {
-    setStore(fakeStore('S1', { courses: [courseB, courseA], courseMembers: members }));
-    await render(<NewHomeworkScreen />);
-    expect(screen.getAllByRole('radio')).toHaveLength(1);
-    expect(screen.getByText('Algebra')).toBeTruthy();
-    expect(screen.queryByText('Biology')).toBeNull();
+  beforeEach(() => {
+    params.assignmentId = 'asgA';
   });
 
-  it('AC4 (changed by decision 2): the selected course\'s owner is shown as "Mentor: <owner>"', async () => {
-    setStore(fakeStore('S1', { courseMembers: [...members, member('B', 'S1')] }));
+  it('AC1: only an assignment of a course I am a listener of can be sent', async () => {
+    setStore(fakeStore('S2', { courseMembers: members, assignments: [asgA] }));
     await render(<NewHomeworkScreen />);
-    await fireEvent.press(screen.getByText('Algebra'));
+    expect(screen.getByText('Open a homework assignment from New to send homework.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Send to mentor' })).toBeNull();
+  });
+
+  it('AC4 (changed by decision 2): the course owner is shown as "Mentor: <owner>"', async () => {
+    setStore(fakeStore('S1', { courseMembers: members, assignments: [asgA] }));
+    await render(<NewHomeworkScreen />);
     expect(screen.getByText('Mentor: Mentor Max')).toBeTruthy();
-    await fireEvent.press(screen.getByText('Biology'));
-    expect(screen.getByText('Mentor: Mentor Nina')).toBeTruthy();
     // Any mentor or the teacher may check, so the screen must not promise that the owner will.
     expect(screen.queryByText(/will check it/)).toBeNull();
   });
 
   it('AC2: a mentor who is a listener submits to that course', async () => {
-    const store = fakeStore('N', { courseMembers: members });
+    const store = fakeStore('N', { courseMembers: members, assignments: [asgA] });
     setStore(store);
     await render(<NewHomeworkScreen />);
-    await fireEvent.press(screen.getByText('Algebra'));
     await fireEvent.changeText(titleInput(), 'Mentor homework');
     await fireEvent.press(button('Send to mentor'));
     await waitFor(() => expect(router.back).toHaveBeenCalled());
-    expect(store.addHomework).toHaveBeenCalledWith(expect.objectContaining({ courseId: 'A', title: 'Mentor homework' }));
-  });
-
-  it('AC3/AC5: in no course (e.g. after being removed) the form explains why and cannot send', async () => {
-    setStore(fakeStore('S2', { courseMembers: members }));
-    await render(<NewHomeworkScreen />);
-    expect(screen.getByText('You are not in any course yet — ask your teacher or mentor to add you')).toBeTruthy();
-    await fireEvent.changeText(titleInput(), 'Exercises');
-    expect(button('Send to mentor')).toBeDisabled();
+    expect(store.addHomework).toHaveBeenCalledWith(
+      expect.objectContaining({ courseId: 'A', assignmentId: 'asgA', title: 'Mentor homework' }),
+    );
   });
 
   it('edge: a database rejection is shown, not a crash', async () => {
     const store = fakeStore('S1', {
       courseMembers: members,
+      assignments: [asgA],
       addHomework: jest.fn(async () => {
         throw new Error('new row violates row-level security policy for table "homework"');
       }),
     });
     setStore(store);
     await render(<NewHomeworkScreen />);
-    await fireEvent.press(screen.getByText('Algebra'));
-    await fireEvent.changeText(titleInput(), 'x');
     await fireEvent.press(button('Send to mentor'));
     expect(await screen.findByText(/row-level security/)).toBeTruthy();
     expect(router.back).not.toHaveBeenCalled();
@@ -88,8 +92,8 @@ describe('Homework tab', () => {
     hw({ id: 'h3', courseId: 'A', title: 'S1 checked', status: 'checked' }),
   ];
 
-  // Changed by ARU-23: a listener-mentor's own homework and "+ Add homework" live on the Listener tab.
-  it('AC2: a mentor who is a listener sees "+ Add homework" and their own submissions on the Listener tab', async () => {
+  // Changed by ARU-23 and ARU-32: a listener-mentor's own homework is on the Listener tab (Waiting), no top button.
+  it('AC2: a mentor who is a listener sees their own submissions on the Listener tab', async () => {
     setStore(fakeStore('N', { courseMembers: members, visibleHomework: list }));
     await render(<HomeworkScreen />);
     // Default Owner / "To check": others' unchecked homework only, never my own.
@@ -97,33 +101,24 @@ describe('Homework tab', () => {
     expect(screen.queryByText('N in A')).toBeNull();
     expect(screen.getByText('To check (1)')).toBeTruthy();
     await fireEvent.press(screen.getByRole('tab', { name: 'Listener' }));
-    expect(button('+ Add homework')).toBeTruthy();
+    await fireEvent.press(screen.getByText('Waiting (1)'));
     expect(screen.getByText('N in A')).toBeTruthy();
     expect(screen.queryByText('S1 in A')).toBeNull();
   });
 
-  it('AC3: a mentor in no course has no "+ Add homework" and no "My homework"', async () => {
+  it('AC3: a mentor in no course has no Listener tab', async () => {
     setStore(fakeStore('M2', { courseMembers: members, visibleHomework: list }));
     await render(<HomeworkScreen />);
-    expect(screen.queryByRole('button', { name: '+ Add homework' })).toBeNull();
-    expect(screen.queryByText('My homework')).toBeNull();
+    expect(screen.queryByRole('tab', { name: 'Listener' })).toBeNull();
     // Decision: any mentor checks any course's homework.
     expect(screen.getByText('To check (2)')).toBeTruthy();
   });
 
-  // Changed by ARU-19: students get "+ Add homework" only while they are a listener of a course.
-  it('a student in a course gets "+ Add homework" and sees their own list', async () => {
-    setStore(fakeStore('S1', { courseMembers: members }));
+  it('a student in a course sees their own list under Waiting', async () => {
+    setStore(fakeStore('S1', { courseMembers: members, visibleHomework: list.filter((h) => h.studentId === 'S1') }));
     await render(<HomeworkScreen />);
-    expect(button('+ Add homework')).toBeTruthy();
-    expect(screen.getByText('No homework yet')).toBeTruthy();
-  });
-
-  it('a student in no course gets no "+ Add homework" (ARU-19)', async () => {
-    setStore(fakeStore('S2', { courseMembers: members }));
-    await render(<HomeworkScreen />);
-    expect(screen.queryByRole('button', { name: '+ Add homework' })).toBeNull();
-    expect(screen.getByText('No homework yet')).toBeTruthy();
+    await fireEvent.press(screen.getByText('Waiting (1)'));
+    expect(screen.getByText('S1 in A')).toBeTruthy();
   });
 
   it('edge: a mentor with nothing to check sees "Nothing to check"', async () => {

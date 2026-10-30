@@ -170,6 +170,8 @@ describe('AC10: list unchanged', () => {
   it('the card keeps the photo marker and opens the details screen', async () => {
     setStore(fakeStore('S1', { courseMembers: members, visibleHomework: [withPhoto] }));
     await render(<HomeworkScreen />);
+    // ARU-32: a student's list opens on New; sent homework is under Waiting / Checked.
+    await fireEvent.press(screen.getByText(withPhoto.status === 'checked' ? 'Checked' : /^Waiting/));
     expect(screen.getByText(/📎/)).toBeTruthy();
     expect(screen.queryByTestId('photo-preview')).toBeNull();
   });

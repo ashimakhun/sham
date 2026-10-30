@@ -19,6 +19,8 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    Course meetings (ARU-10): `supabase/migrations/0010_course_meetings.sql` (adds a table; deletes nothing).
    Editing meetings (ARU-15): `supabase/migrations/0011_edit_meetings.sql` (adds a column and a function).
    Meeting notes (ARU-28): `supabase/migrations/0012_meeting_notes.sql` (adds three columns, a trigger and a function).
+   Homework assignments (ARU-32): `supabase/migrations/0013_homework_assignments.sql` (adds a table, a column, an
+   index and a trigger; replaces the homework insert rule, so homework is only sent for an assignment; deletes nothing).
 3. For development, turn off **Authentication → Email → Confirm email**.
 
 ### Upgrading an existing project to 0005 (ARU-14)
@@ -71,13 +73,14 @@ GitHub Actions runs both on every pull request and on pushes to `main` (`.github
 src/app/                  screens (Expo Router — every file is a route)
   index.tsx               sign in / create account
   (tabs)/                 Homework · Courses (My courses / All courses) · Materials · Profile tabs
-  homework/new.tsx        student adds homework for a course
+  homework/new.tsx        a listener sends homework for an assignment (opened from New)
   homework/[id].tsx       homework details; mentor marks it checked
   courses/new.tsx         teacher or mentor creates a course
   courses/[id].tsx        course details, listeners and the course's homework
   courses/[id]/listeners.tsx  teacher or mentor adds listeners
   courses/[id]/chat.tsx   course chat (owner, listeners and the teacher)
   courses/[id]/owner.tsx  teacher or mentor changes the course owner
+  courses/[id]/meetings/  schedule / edit a meeting; [meetingId]/notes.tsx notes; [meetingId]/assign-homework.tsx
   roles.tsx               teacher switches users between student and mentor
   materials/new.tsx       teacher or mentor shares a material
   materials/[id].tsx      material details
@@ -93,7 +96,9 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Action                     | Student   | Mentor             | Teacher |
 | -------------------------- | --------- | ------------------ | ------- |
 | See homework               | own       | all                | all     |
-| Add homework               | courses they're in | courses they're in |  |
+| See homework assignments   | courses they're in | ✓ (all courses) | ✓    |
+| Assign homework to a completed meeting | | own courses        | any course |
+| Send homework (for an assignment) | courses they're in | courses they're in |  |
 | Mark homework checked      |           | any (not their own) | any    |
 | See courses                | all (title and description only unless they're in it) | all | all |
 | Create courses             |           | ✓                  | ✓       |

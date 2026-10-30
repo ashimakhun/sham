@@ -139,8 +139,8 @@ describe('Who manages meetings', () => {
     // AC 10: future → only Cancel meeting.
     expect(inMeeting('F').getByRole('button', { name: 'Cancel meeting' })).toBeTruthy();
     expect(inMeeting('F').queryByRole('button', { name: 'Mark completed' })).toBeNull();
-    // AC 12: completed and canceled → no status actions. ARU-28 AC 3 adds "Add notes" to completed meetings.
-    expect(inMeeting('C').queryAllByRole('button').map((b) => b.props.accessibilityLabel)).toEqual(['Add notes']);
+    // AC 12: completed and canceled → no status actions. ARU-28 adds "Add notes" and ARU-32 "Assign homework" to completed ones.
+    expect(inMeeting('C').queryAllByRole('button').map((b) => b.props.accessibilityLabel)).toEqual(['Add notes', 'Assign homework']);
     expect(inMeeting('X').queryAllByRole('button')).toHaveLength(0);
   });
 

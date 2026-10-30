@@ -36,7 +36,7 @@ type Target = Exclude<MeetingStatus, 'scheduled'>;
 /** Meetings of a course (ARU-10): visible to the teacher, mentors and the course's listeners; the owner and the
  *  teacher schedule meetings and mark them completed or canceled. */
 export function MeetingsSection({ course }: { course: Course }) {
-  const { currentUser, courseMembers, meetings, setMeetingStatus } = useStore();
+  const { currentUser, courseMembers, meetings, assignments, setMeetingStatus } = useStore();
   const { busy, error, run } = useAction();
   const [changing, setChanging] = useState<string>();
   const now = useNow();
@@ -125,6 +125,9 @@ export function MeetingsSection({ course }: { course: Course }) {
             ...(m.notes ? [{ title: 'Notes', edit: false }] : []),
             ...(canManage ? [{ title: m.notes ? 'Edit notes' : 'Add notes', edit: true }] : []),
           ];
+    // Homework (ARU-32): one assignment per completed meeting, shown to everyone who sees the meeting.
+    const assignment = assignments.find((a) => a.meetingId === m.id);
+    const canAssign = canManage && m.status === 'completed' && !assignment;
     return (
       <View key={m.id} testID={`meeting-${m.id}`} style={{ gap: 4 }}>
         <View style={[styles.row, { alignItems: 'flex-start' }]}>
@@ -152,7 +155,14 @@ export function MeetingsSection({ course }: { course: Course }) {
             </Text>
           )
         ) : null}
-        {(actions.length > 0 || canEdit || notesActions.length > 0) && (
+        {assignment ? (
+          <Text style={styles.muted} numberOfLines={2} testID={`assignment-${m.id}`}>
+            <Text style={{ fontWeight: '600', color: colors.text }}>Homework: {assignment.title}</Text>
+            {' · '}
+            {assignment.dueAt ? `Due ${formatDateTime(assignment.dueAt)}` : 'No deadline'}
+          </Text>
+        ) : null}
+        {(actions.length > 0 || canEdit || notesActions.length > 0 || canAssign) && (
           <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap', paddingTop: 2 }}>
             {changing === m.id ? (
               <Text style={styles.muted}>Saving…</Text>
@@ -187,6 +197,23 @@ export function MeetingsSection({ course }: { course: Course }) {
                     <Text style={{ color: colors.primary, fontWeight: '600' }}>{a.title}</Text>
                   </Pressable>
                 )),
+                ...(canAssign
+                  ? [
+                      <Pressable
+                        key="assign"
+                        accessibilityRole="button"
+                        accessibilityLabel="Assign homework"
+                        hitSlop={8}
+                        onPress={() =>
+                          router.push({
+                            pathname: '/courses/[id]/meetings/[meetingId]/assign-homework',
+                            params: { id: course.id, meetingId: m.id },
+                          })
+                        }>
+                        <Text style={{ color: colors.primary, fontWeight: '600' }}>Assign homework</Text>
+                      </Pressable>,
+                    ]
+                  : []),
                 ...actions.map((a) => (
                   <Pressable
                     key={a.title}

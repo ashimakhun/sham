@@ -8,11 +8,13 @@ import type {
   CourseMember,
   CourseMessage,
   Homework,
+  HomeworkAssignment,
   Material,
   Meeting,
   MeetingEdit,
   MeetingStatus,
   NewCourse,
+  NewAssignment,
   NewHomework,
   NewMaterial,
   NewMeeting,
@@ -37,6 +39,8 @@ type Store = {
   visibleHomework: Homework[];
   /** Course meetings the current user may see (ARU-10): all for teachers and mentors, own courses' for students. */
   meetings: Meeting[];
+  /** Homework assignments (ARU-32) the current user may see: all for teachers and mentors, own courses' for students. */
+  assignments: HomeworkAssignment[];
   loading: boolean;
   /** True once data has been fetched (successfully or not) for the signed-in user. */
   dataLoaded: boolean;
@@ -46,7 +50,10 @@ type Store = {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  /** A listener sends homework for an assignment of their course (ARU-32): one per assignment. */
   addHomework: (input: NewHomework) => Promise<void>;
+  /** Course owner or teacher, Completed meetings only, one per meeting (ARU-32). `id` makes a retry safe. */
+  addAssignment: (input: NewAssignment) => Promise<void>;
   checkHomework: (id: string, comment: string) => Promise<void>;
   /** A fresh signed URL for a homework photo (ARU-18). Storage policies allow it only for users who can read
    *  that homework. With `download`, the file is served as an attachment under that file name. */
@@ -97,6 +104,17 @@ type HomeworkRow = {
   checked_by: string | null;
   checked_at: string | null;
   mentor_comment: string | null;
+  created_at: string;
+  assignment_id?: string | null;
+};
+type AssignmentRow = {
+  id: string;
+  meeting_id: string;
+  course_id: string;
+  title: string;
+  description: string;
+  due_at: string | null;
+  created_by: string;
   created_at: string;
 };
 type CourseRow = {
@@ -151,6 +169,18 @@ const toHomework = (r: HomeworkRow): Homework => ({
   checkedById: r.checked_by ?? undefined,
   checkedAt: r.checked_at ?? undefined,
   mentorComment: r.mentor_comment ?? undefined,
+  assignmentId: r.assignment_id ?? undefined,
+});
+
+const toAssignment = (r: AssignmentRow): HomeworkAssignment => ({
+  id: r.id,
+  meetingId: r.meeting_id,
+  courseId: r.course_id,
+  title: r.title,
+  description: r.description,
+  dueAt: r.due_at ?? undefined,
+  createdById: r.created_by,
+  createdAt: r.created_at,
 });
 
 const toCourse = (r: CourseRow): Course => ({
@@ -216,6 +246,15 @@ function checkInsert(res: Result) {
   check(res);
 }
 
+const ALREADY_SENT = 'You have already sent homework for this assignment.';
+const DEADLINE_PAST = 'The deadline must be in the future.';
+
+/** Whether a row with this id exists (and is visible): tells a safe retry from a real duplicate. */
+async function rowExists(table: 'homework' | 'homework_assignments', id: string) {
+  const res = await supabase.from(table).select('id').eq('id', id);
+  return !res.error && (res.data?.length ?? 0) > 0;
+}
+
 function rows<T>(res: Result & { data: unknown }): T[] {
   check(res);
   return (res.data as T[] | null) ?? [];
@@ -238,6 +277,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [courses, setCourses] = useState<Course[]>([]);
   const [courseMembers, setCourseMembers] = useState<CourseMember[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [assignments, setAssignments] = useState<HomeworkAssignment[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
 
@@ -258,6 +298,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setCourses([]);
         setCourseMembers([]);
         setMeetings([]);
+        setAssignments([]);
         setLoadedFor(null);
       }
     });
@@ -269,13 +310,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const load = useCallback(async () => {
     if (!userId) return;
     try {
-      const [profiles, hw, mats, crs, members, mtgs] = await Promise.all([
+      const [profiles, hw, mats, crs, members, mtgs, asgs] = await Promise.all([
         supabase.from('profiles').select('id, full_name, role').order('full_name'),
         supabase.from('homework').select('*').order('created_at', { ascending: false }),
         supabase.from('materials').select('*').order('created_at', { ascending: false }),
         supabase.from('courses').select('*').order('created_at', { ascending: false }),
         supabase.from('course_members').select('*'),
         supabase.from('course_meetings').select('*').order('starts_at'),
+        supabase.from('homework_assignments').select('*').order('created_at', { ascending: false }),
       ]);
       setUsers(rows<ProfileRow>(profiles).map(toUser));
       setHomework(await withSignedPhotoUrls(rows<HomeworkRow>(hw).map(toHomework)));
@@ -283,6 +325,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setCourses(rows<CourseRow>(crs).map(toCourse));
       setCourseMembers(rows<CourseMemberRow>(members).map(toCourseMember));
       setMeetings(rows<MeetingRow>(mtgs).map(toMeeting));
+      setAssignments(rows<AssignmentRow>(asgs).map(toAssignment));
     } finally {
       setLoadedFor(userId);
     }
@@ -309,6 +352,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'courses' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'course_members' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'course_meetings' }, () => load().catch(() => {}))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'homework_assignments' }, () =>
+        load().catch(() => {}),
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
@@ -351,6 +397,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     courseMembers,
     visibleHomework,
     meetings,
+    assignments,
     loading,
     dataLoaded: !!userId && loadedFor === userId,
     refresh,
@@ -372,11 +419,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       check(await supabase.auth.signOut());
     },
     addHomework: async (input) => {
-      // Students and mentors submit, only to courses they are a listener of (also enforced by RLS).
+      // Students and mentors submit, only to courses they are a listener of, for an assignment of that course, once
+      // per assignment (ARU-32; also enforced by RLS and a unique index).
       const student = requireRole('student', 'mentor');
       if (!courseMembers.some((m) => m.courseId === input.courseId && m.userId === student.id)) {
         throw new Error('You are not a listener of this course.');
       }
+      // Before uploading the photo, so a rejected send leaves no stray file. A row with this form's id is an
+      // earlier attempt that already saved: done.
+      const sent = rows<{ id: string }>(
+        await supabase
+          .from('homework')
+          .select('id')
+          .eq('assignment_id', input.assignmentId)
+          .eq('student_id', student.id),
+      );
+      if (sent.some((h) => h.id === input.id)) {
+        await load();
+        return;
+      }
+      if (sent.length > 0) throw new Error(ALREADY_SENT);
       let photoPath: string | null = null;
       if (input.photoUri) {
         const file = await fetch(input.photoUri).then((r) => r.arrayBuffer());
@@ -385,16 +447,39 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const upload = await supabase.storage.from('homework').upload(photoPath, file, { contentType: 'image/jpeg' });
         if (upload.error && !/already exists/i.test(upload.error.message)) throw new Error(upload.error.message);
       }
-      checkInsert(
-        await supabase.from('homework').insert({
-          id: input.id,
-          student_id: student.id,
-          course_id: input.courseId,
-          title: input.title.trim(),
-          description: input.description.trim(),
-          photo_path: photoPath,
-        }),
-      );
+      const res = await supabase.from('homework').insert({
+        id: input.id,
+        student_id: student.id,
+        course_id: input.courseId,
+        assignment_id: input.assignmentId,
+        title: input.title.trim(),
+        description: input.description.trim(),
+        photo_path: photoPath,
+      });
+      // A duplicate is either this form's earlier attempt (saved: fine) or another homework for the assignment.
+      if (res.error?.code === '23505' && !(await rowExists('homework', input.id))) {
+        if (photoPath) await supabase.storage.from('homework').remove([photoPath]);
+        throw new Error(ALREADY_SENT);
+      }
+      checkInsert(res);
+      await load();
+    },
+    addAssignment: async (input) => {
+      const owner = requireRole('teacher', 'mentor');
+      if (input.dueAt && new Date(input.dueAt).getTime() <= Date.now()) throw new Error(DEADLINE_PAST);
+      const res = await supabase.from('homework_assignments').insert({
+        id: input.id,
+        meeting_id: input.meetingId,
+        course_id: input.courseId,
+        title: input.title.trim(),
+        description: input.description.trim(),
+        due_at: input.dueAt ?? null,
+        created_by: owner.id,
+      });
+      if (res.error?.code === '23505' && !(await rowExists('homework_assignments', input.id))) {
+        throw new Error('This meeting already has homework.');
+      }
+      checkInsert(res);
       await load();
     },
     checkHomework: async (id, comment) => {
