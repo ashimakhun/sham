@@ -1,13 +1,13 @@
 // ARU-23: mentors get Owner | Listener tabs on the Homework tab. Owner = homework they can check (everyone's but
-// their own): To check / Checked. Listener = their own homework: Waiting / Checked, "+ Add homework" while in a
-// course. The teacher has the Owner view only; students are unchanged. No database change.
+// their own): To check / Checked. Listener = their own homework. Changed by ARU-32: Listener is New / Waiting /
+// Checked and opens on New; there is no "+ Add homework" button (homework is sent from a New card). The teacher has
+// the Owner view only. No database change.
 // TEST DESIGN users mapped onto the fixtures: M2 = listener-mentor M1 (in A, 1 submitted + 1 checked of their own);
 // S1 student in A (2 submitted + 1 checked); N = M3 (no course, no homework); M = M4 (no course, 1 earlier checked).
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import HomeworkScreen from '@/app/(tabs)/homework';
 import type { Homework } from '@/lib/types';
-import { router } from 'expo-router';
 
 import { fakeStore, hw, member } from './helpers/fakeStore';
 import { setStore } from './helpers/mocks';
@@ -24,7 +24,7 @@ const HOMEWORK: Homework[] = [
   hw({ id: 'mxa', courseId: 'B', studentId: 'M', title: 'Max earlier', status: 'checked', checkedById: 'N' }),
 ];
 const members = [member('A', 'S1'), member('A', 'M2')];
-const FILTER = /^(Waiting \(\d+\)|To check \(\d+\)|Checked|All|My homework)$/;
+const FILTER = /^(New \(\d+\)|Waiting \(\d+\)|To check \(\d+\)|Checked|All|My homework)$/;
 const filterRow = (n: number) => screen.getAllByText(FILTER).slice(0, n).map((t) => t.props.children);
 const titles = () => screen.queryAllByText(/^(S1 |Mo |Max )/).map((t) => t.props.children);
 const tab = (name: 'Owner' | 'Listener') => screen.queryByRole('tab', { name });
@@ -51,23 +51,24 @@ describe('Listener-mentor', () => {
     expect(titles()).toEqual(['S1 checked', 'Max earlier']);
   });
 
-  it('AC4/AC5: Listener shows Waiting (1) / Checked over my own homework, and "+ Add homework"', async () => {
+  it('AC4/AC5: Listener shows New (0) / Waiting (1) / Checked over my own homework, opening on New; no button', async () => {
     await open();
     await fireEvent.press(tab('Listener')!);
-    expect(filterRow(2)).toEqual(['Waiting (1)', 'Checked']);
+    expect(filterRow(3)).toEqual(['New (0)', 'Waiting (1)', 'Checked']);
     expect(screen.queryByText('All')).toBeNull();
+    expect(titles()).toEqual([]);
+    await fireEvent.press(screen.getByText('Waiting (1)'));
     expect(titles()).toEqual(['Mo waiting']);
     await fireEvent.press(screen.getAllByText('Checked')[0]);
     expect(titles()).toEqual(['Mo checked']);
-    await fireEvent.press(addButton()!);
-    expect(router.push).toHaveBeenCalledWith('/homework/new');
+    expect(addButton()).toBeNull();
   });
 
   it('AC9: each tab opens on its default filter, even after picking Checked', async () => {
     await open();
     await fireEvent.press(screen.getAllByText('Checked')[0]); // Owner / Checked
     await fireEvent.press(tab('Listener')!);
-    expect(titles()).toEqual(['Mo waiting']); // Listener / Waiting
+    expect(screen.getByText('No new homework')).toBeTruthy(); // Listener / New (ARU-32)
     await fireEvent.press(screen.getAllByText('Checked')[0]);
     await fireEvent.press(tab('Owner')!);
     expect(titles()).toEqual(['S1 waiting 1', 'S1 waiting 2']); // Owner / To check
@@ -86,11 +87,12 @@ describe('Listener-mentor', () => {
     expect(screen.getByText('To check (3)')).toBeTruthy();
   });
 
-  it('AC11: empty Listener / Waiting shows "No homework sent yet" with the Add homework hint', async () => {
+  it('AC11: empty Listener / Waiting shows "No homework sent yet"', async () => {
     await open({ visibleHomework: HOMEWORK.filter((h) => h.id !== 'm2a') });
     await fireEvent.press(tab('Listener')!);
+    await fireEvent.press(screen.getByText('Waiting (0)'));
     expect(screen.getByText('No homework sent yet')).toBeTruthy();
-    expect(screen.getByText('Tap "Add homework" to send work for a course you attend.')).toBeTruthy();
+    expect(screen.getByText('Homework you send will appear here.')).toBeTruthy();
   });
 
   it('AC11: empty Owner lists use the mentor empty state', async () => {
@@ -105,10 +107,11 @@ describe('Mentor without a course', () => {
     await render(<HomeworkScreen />);
     expect(tab('Listener')).toBeTruthy();
     await fireEvent.press(tab('Listener')!);
-    expect(filterRow(2)).toEqual(['Waiting (0)', 'Checked']);
+    expect(filterRow(3)).toEqual(['New (0)', 'Waiting (0)', 'Checked']);
     expect(addButton()).toBeNull();
-    expect(screen.getByText('No homework sent yet')).toBeTruthy();
     expect(screen.getByText('You are not in any course yet — ask your teacher or mentor to add you.')).toBeTruthy();
+    await fireEvent.press(screen.getByText('Waiting (0)'));
+    expect(screen.getByText('No homework sent yet')).toBeTruthy();
     await fireEvent.press(screen.getAllByText('Checked')[0]);
     expect(titles()).toEqual(['Max earlier']);
   });
@@ -125,13 +128,12 @@ describe('Mentor without a course', () => {
 });
 
 describe('Edge: membership changes while on screen', () => {
-  it('losing the last course while on Listener hides the button; losing the switcher returns to Owner / To check', async () => {
+  it('losing the switcher while on Listener returns to Owner / To check', async () => {
     const own = HOMEWORK.filter((h) => h.studentId !== 'M2');
     setStore(fakeStore('M2', { courseMembers: members, visibleHomework: own }));
     const view = await render(<HomeworkScreen />);
     await fireEvent.press(tab('Listener')!);
     await fireEvent.press(screen.getAllByText('Checked')[0]);
-    expect(addButton()).toBeTruthy();
     // Removed from A and has no homework of their own → no switcher.
     setStore(fakeStore('M2', { courseMembers: [member('A', 'S1')], visibleHomework: own }));
     await view.rerender(<HomeworkScreen />);
@@ -160,11 +162,11 @@ it('AC8: the teacher sees no switcher and no button; To check (default) / Checke
   expect(titles()).toEqual(['S1 waiting 1', 'S1 waiting 2', 'Mo waiting']);
 });
 
-it('AC12: students are unchanged (Waiting / Checked / All, default All, no switcher)', async () => {
+// Changed by ARU-32: students get New / Waiting / Checked (default New), no All and no button.
+it('AC12: students have no switcher (New / Waiting / Checked)', async () => {
   setStore(fakeStore('S1', { courseMembers: members, visibleHomework: HOMEWORK.filter((h) => h.studentId === 'S1') }));
   await render(<HomeworkScreen />);
   expect(tab('Owner')).toBeNull();
-  expect(filterRow(3)).toEqual(['Waiting (2)', 'Checked', 'All']);
-  expect(titles()).toHaveLength(3);
-  expect(addButton()).toBeTruthy();
+  expect(filterRow(3)).toEqual(['New (0)', 'Waiting (2)', 'Checked']);
+  expect(addButton()).toBeNull();
 });

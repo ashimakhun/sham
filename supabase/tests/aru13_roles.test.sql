@@ -1,6 +1,7 @@
 -- ARU-13: the teacher switches users between student and mentor (set_user_role, teacher lock, one-teacher index).
 -- Fixture (t.seed): teacher T; mentors M (owns A), N (owns B), M2 (no course); students S1, S2, S3.
 select t.seed();
+select t.make_assignments(t.id('A')); -- ARU-32: homework is sent for an assignment
 -- TEST DESIGN extras: M2 and S1 are listeners of A.
 insert into course_members (course_id, user_id, added_by) values
   (t.id('A'), t.id('M2'), t.id('M')),
@@ -41,7 +42,7 @@ select t.lives($$select set_user_role(t.id('M2'), 'student')$$, 'AC4: the teache
 select t.eq(t.role_of('M2'), 'student'::user_role, 'AC4: M2 is now a student');
 select t.login('M2');
 select t.ok(is_member(t.id('A')), 'AC7: M2 is still a listener of A');
-select t.lives($$insert into homework (student_id, course_id, title) values (t.id('M2'), t.id('A'), 'mine')$$,
+select t.lives($$insert into homework (student_id, course_id, title, assignment_id) values (t.id('M2'), t.id('A'), 'mine', t.assignment(t.id('A'), 1))$$,
   'AC7: M2 made student still submits homework to A');
 select t.eq((select count(*) from homework where student_id <> t.id('M2')), 0::bigint,
   'AC4: M2 made student sees only their own homework');
@@ -53,7 +54,7 @@ select t.login('T');
 select t.lives($$select set_user_role(t.id('S1'), 'mentor')$$, 'AC7: the teacher makes S1 a mentor');
 select t.login('S1');
 select t.ok(is_member(t.id('A')), 'AC7: S1 made mentor is still a listener of A');
-select t.lives($$insert into homework (student_id, course_id, title) values (t.id('S1'), t.id('A'), 'as mentor')$$,
+select t.lives($$insert into homework (student_id, course_id, title, assignment_id) values (t.id('S1'), t.id('A'), 'as mentor', t.assignment(t.id('A'), 2))$$,
   'AC7: S1 made mentor still submits homework to A');
 
 -- AC 5: a mentor who owns courses can't become a student.

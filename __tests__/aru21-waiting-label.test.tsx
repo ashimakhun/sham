@@ -19,17 +19,18 @@ const members = [member('A', 'S1'), member('A', 'M2')];
 
 beforeEach(() => jest.clearAllMocks());
 
-it('AC1/AC3: a student sees Waiting, Checked, All (in order), "All" selected, and no "To check" anywhere', async () => {
+// Changed by ARU-32: students see New (N), Waiting (N), Checked; "All" is gone and New is the default.
+it('AC1/AC3: a student sees New, Waiting, Checked (in order), New selected, and no "To check" anywhere', async () => {
   setStore(fakeStore('S1', { courseMembers: members, visibleHomework: S1_HOMEWORK }));
   await render(<HomeworkScreen />);
-  // The filter row comes first in the tree; status badges on the cards ("Checked") come after it.
-  const filters = screen.getAllByText(/^(Waiting \(\d+\)|To check \(\d+\)|Checked|All|My homework)$/).slice(0, 3);
-  expect(filters.map((t) => t.props.children)).toEqual(['Waiting (2)', 'Checked', 'All']);
+  const filters = screen.getAllByText(/^(New \(\d+\)|Waiting \(\d+\)|To check \(\d+\)|Checked|All|My homework)$/).slice(0, 3);
+  expect(filters.map((t) => t.props.children)).toEqual(['New (0)', 'Waiting (2)', 'Checked']);
+  expect(screen.queryByText('All')).toBeNull();
   expect(screen.queryByText(/To check/)).toBeNull();
   expect(screen.queryByText('My homework')).toBeNull();
-  // "All" is the default: every item is listed.
-  expect(screen.getByText('Waiting one')).toBeTruthy();
-  expect(screen.getByText('Checked one')).toBeTruthy();
+  // New is the default: sent homework is not listed there.
+  expect(screen.queryByText('Waiting one')).toBeNull();
+  expect(screen.getByText('No new homework')).toBeTruthy();
 });
 
 it('AC2: "Waiting (2)" lists exactly the 2 submitted items; Checked lists 1', async () => {
@@ -57,7 +58,7 @@ it('AC4: after the homework is checked and the store refetches, the label reads 
 it('AC5: a student with no homework sees Waiting (0) and the existing empty state', async () => {
   setStore(fakeStore('S1', { courseMembers: members, visibleHomework: [] }));
   await render(<HomeworkScreen />);
-  expect(screen.getByText('Waiting (0)')).toBeTruthy();
+  await fireEvent.press(screen.getByText('Waiting (0)'));
   expect(screen.getByText('No homework yet')).toBeTruthy();
 });
 

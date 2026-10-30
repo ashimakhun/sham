@@ -118,3 +118,28 @@ begin
     ('homework', t.id('S1') || '/a1.jpg', t.id('S1')),
     ('homework', t.id('S1') || '/b1.jpg', t.id('S1'));
 end $$;
+
+-- ARU-32: homework can only be sent for an assignment. t.make_assignments(course) creates five assignments (on five
+-- Completed meetings, by the course owner) as the admin, without triggers; t.assignment(course, n) is the id of the
+-- n-th one. Create them in a statement of their own before the insert that uses them: a row inserted during a
+-- statement isn't visible to that statement's own policy checks.
+create function t.assignment(course uuid, n int default 1) returns uuid language sql immutable as $$
+  select md5('assignment' || course::text || n::text)::uuid
+$$;
+create function t.make_assignments(course uuid) returns void language plpgsql security definer set search_path = public as $$
+declare
+  owner uuid := (select created_by from courses where id = course);
+  meeting uuid;
+begin
+  perform set_config('session_replication_role', 'replica', true);
+  for n in 1..5 loop
+    meeting := md5('meeting' || course::text || n::text)::uuid;
+    insert into course_meetings (id, course_id, starts_at, status, created_by)
+      values (meeting, course, now() - interval '1 day', 'completed', owner);
+    insert into homework_assignments (id, meeting_id, course_id, title, created_by)
+      values (t.assignment(course, n), meeting, course, 'Assignment ' || n, owner);
+  end loop;
+  perform set_config('session_replication_role', 'origin', true);
+end $$;
+grant execute on function t.assignment(uuid, int) to anon, authenticated;
+grant execute on function t.make_assignments(uuid) to anon, authenticated;
