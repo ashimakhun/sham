@@ -8,6 +8,7 @@
 -- Rules under test: supabase/migrations/0005_homework_by_course.sql (my_role() in the policies).
 select t.seed();
 delete from homework;
+select t.make_assignments(t.id('A')); -- ARU-32: homework is sent for an assignment
 delete from storage.objects;
 -- A owned by M: listeners S1, S2 and mentor N. B owned by N: listener S3.
 insert into course_members (course_id, user_id, added_by) values
@@ -47,7 +48,7 @@ select t.eq((select count(*) from storage.objects), 2::bigint, 'after "make ment
 select t.eq(t.affected($$update homework set status = 'checked', checked_by = '00000000-0000-0000-0000-0000000000c2', checked_at = now() where id = '00000000-0000-0000-0000-0000000000e3'$$), 1::bigint,
   'after "make mentor": S2 checks homework in a course they are not in (B)');
 select t.ok(is_member(t.id('A')), 'ARU-13 AC7: S2 is still a listener of A after "make mentor"');
-select t.lives($$insert into homework (student_id, course_id, title) values ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000d1', 'S2 as mentor in A')$$,
+select t.lives($$insert into homework (student_id, course_id, title, assignment_id) values ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000d1', 'S2 as mentor in A', t.assignment('00000000-0000-0000-0000-0000000000d1', 1))$$,
   'ARU-13 AC7: S2, now a mentor listener, can still submit to A');
 
 -- ...and "make student" takes it away again; own homework stays visible.
@@ -58,7 +59,7 @@ select t.eq((select count(*) from homework), 1::bigint, 'after "make student": S
 select t.eq((select count(*) from storage.objects), 0::bigint, 'after "make student": S2 opens no one else''s photos');
 select t.eq(t.affected($$update homework set mentor_comment = 'late edit' where id = '00000000-0000-0000-0000-0000000000e3'$$), 0::bigint,
   'after "make student": S2 can no longer check');
-select t.lives($$insert into homework (student_id, course_id, title) values ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000d1', 'S2 as student in A')$$,
+select t.lives($$insert into homework (student_id, course_id, title, assignment_id) values ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000d1', 'S2 as student in A', t.assignment('00000000-0000-0000-0000-0000000000d1', 2))$$,
   'ARU-13 AC7: S2 can still submit to A as a student');
 
 -- ARU-9 AC 8/10: an owner change moves no homework and changes nobody's access (done here as the SQL owner).

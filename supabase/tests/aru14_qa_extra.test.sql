@@ -2,6 +2,7 @@
 -- retries and anon access to photos. Rules under test: supabase/migrations/0005_homework_by_course.sql.
 select t.seed();
 delete from homework;
+select t.make_assignments(t.id('A')); -- ARU-32: homework is sent for an assignment
 insert into course_members (course_id, user_id, added_by) values
   (t.id('A'), t.id('S1'), t.id('M')),
   (t.id('A'), t.id('N'), t.id('M'));
@@ -31,11 +32,11 @@ select t.eq((select mentor_comment from homework where id = t.id('HW_A1')), 'Goo
 
 -- Submitting: never as someone else; a retry with the same id cannot save twice.
 select t.login('N');
-select t.throws($$insert into homework (student_id, course_id, title) values ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000d1', 'as S1')$$, '42501',
+select t.throws($$insert into homework (student_id, course_id, title, assignment_id) values ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000d1', 'as S1', t.assignment('00000000-0000-0000-0000-0000000000d1', 1))$$, '42501',
   'a listener cannot submit in someone else''s name');
-select t.lives($$insert into homework (id, student_id, course_id, title) values ('00000000-0000-0000-0000-0000000000f9', '00000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000000d1', 'retry')$$,
+select t.lives($$insert into homework (id, student_id, course_id, title, assignment_id) values ('00000000-0000-0000-0000-0000000000f9', '00000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000000d1', 'retry', t.assignment('00000000-0000-0000-0000-0000000000d1', 2))$$,
   'mentor listener N submits');
-select t.throws($$insert into homework (id, student_id, course_id, title) values ('00000000-0000-0000-0000-0000000000f9', '00000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000000d1', 'retry')$$, '23505',
+select t.throws($$insert into homework (id, student_id, course_id, title, assignment_id) values ('00000000-0000-0000-0000-0000000000f9', '00000000-0000-0000-0000-0000000000b2', '00000000-0000-0000-0000-0000000000d1', 'retry', t.assignment('00000000-0000-0000-0000-0000000000d1', 2))$$, '23505',
   'edge: a retry with the same id cannot save twice');
 
 -- AC 8 (superseded by the decision) still keeps students out of others' homework and photos.
@@ -44,7 +45,7 @@ select t.eq((select count(*) from homework), 0::bigint, 'a student in no course 
 select t.eq((select count(*) from storage.objects where bucket_id = 'homework'), 0::bigint, 'a student sees no one else''s photos');
 reset role; select t.login(null);
 select t.eq((select count(*) from storage.objects where bucket_id = 'homework'), 0::bigint, 'anon sees no homework photos');
-select t.throws($$insert into homework (student_id, course_id, title) values ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000d1', 'anon')$$, '42501',
+select t.throws($$insert into homework (student_id, course_id, title, assignment_id) values ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000d1', 'anon', t.assignment('00000000-0000-0000-0000-0000000000d1', 3))$$, '42501',
   'anon cannot submit homework');
 
 -- Old helper is kept but unused (AC 12, out of scope to drop).
