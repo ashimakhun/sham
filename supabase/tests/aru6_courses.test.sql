@@ -1,6 +1,7 @@
 -- ARU-6: teachers and mentors create courses; students submit homework for a course.
 -- Access rules under test: supabase/migrations/0003_courses.sql (+ unchanged 0001 homework rules).
 select t.seed();
+select t.make_assignments(t.id('A')); -- ARU-32: homework is sent for an assignment
 
 -- AC 2 / roles: a teacher and a mentor create courses as themselves.
 reset role; select t.login('T');
@@ -65,25 +66,25 @@ select t.eq((select count(*) from homework where course_id = t.id('A')), 2::bigi
 reset role;
 insert into course_members (course_id, user_id, added_by) values (t.id('A'), t.id('S2'), t.id('M'));
 select t.login('S2');
-select t.lives($$insert into homework (student_id, course_id, title) values ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000d1', 'Fractions')$$,
+select t.lives($$insert into homework (student_id, course_id, title, assignment_id) values ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000d1', 'Fractions', t.assignment('00000000-0000-0000-0000-0000000000d1', 1))$$,
   'AC9 student submits homework for a course');
 select t.eq((select course_id from homework where title = 'Fractions'), t.id('A'), 'AC9 homework is saved with its course');
 select t.throws($$insert into homework (student_id, title) values ('00000000-0000-0000-0000-0000000000c2', 'No course')$$, '42501',
   'AC8 homework without a course is rejected');
-select t.throws($$insert into homework (student_id, course_id, title) values ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-00000000ffff', 'Ghost')$$, '42501',
+select t.throws($$insert into homework (student_id, course_id, title, assignment_id) values ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-00000000ffff', 'Ghost', t.assignment('00000000-0000-0000-0000-0000000000d1', 2))$$, '42501',
   'AC8 homework for a course that does not exist is rejected');
-select t.throws($$insert into homework (student_id, course_id, title) values ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000d1', 'Impersonated')$$, '42501',
+select t.throws($$insert into homework (student_id, course_id, title, assignment_id) values ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000d1', 'Impersonated', t.assignment('00000000-0000-0000-0000-0000000000d1', 3))$$, '42501',
   'student cannot submit homework as another student');
 reset role; select t.login('M');
-select t.throws($$insert into homework (student_id, course_id, title) values ('00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000d1', 'Mentor hw')$$, '42501',
+select t.throws($$insert into homework (student_id, course_id, title, assignment_id) values ('00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000d1', 'Mentor hw', t.assignment('00000000-0000-0000-0000-0000000000d1', 4))$$, '42501',
   'roles: mentor cannot submit homework');
 reset role; select t.login('T');
-select t.throws($$insert into homework (student_id, course_id, title) values ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000d1', 'Teacher hw')$$, '42501',
+select t.throws($$insert into homework (student_id, course_id, title, assignment_id) values ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000d1', 'Teacher hw', t.assignment('00000000-0000-0000-0000-0000000000d1', 5))$$, '42501',
   'roles: teacher cannot submit homework');
 
 -- Duplicate id on retry is rejected (the app treats 23505 as "already saved").
 reset role; select t.login('S2');
-select t.throws($$insert into homework (id, student_id, course_id, title) values ((select id from homework where title = 'Fractions'), '00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000d1', 'Fractions')$$, '23505',
+select t.throws($$insert into homework (id, student_id, course_id, title, assignment_id) values ((select id from homework where title = 'Fractions'), '00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000d1', 'Fractions', t.assignment('00000000-0000-0000-0000-0000000000d1', 1))$$, '23505',
   'edge: retrying homework with the same id cannot save twice');
 reset role; select t.login('M2');
 insert into courses (id, title, created_by) values ('00000000-0000-0000-0000-00000000aaaa', 'Retry', t.id('M2'));

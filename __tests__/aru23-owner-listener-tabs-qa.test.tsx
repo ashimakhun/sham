@@ -1,5 +1,5 @@
 // ARU-23 QA additions to aru23-owner-listener-tabs.test.tsx, from the TEST DESIGN: a mentor who owns one course
-// and attends another, "+ Add homework" opening the form (AC 5), pull-to-refresh on the Listener tab (AC 10),
+// and attends another, sending homework from the Listener tab (AC 5; since ARU-32 from a New card), pull-to-refresh on the Listener tab (AC 10),
 // a membership of a course that isn't loaded (analysis note 2), M4's Listener / Checked list (AC 6) and the
 // teacher's Checked list (AC 8).
 import { fireEvent, render, screen } from '@testing-library/react-native';
@@ -22,6 +22,11 @@ const HOMEWORK: Homework[] = [
   hw({ id: 'b2', courseId: 'B', studentId: 'N', title: 'Nina waiting in B' }),
 ];
 const members = [member('A', 'S1'), member('B', 'M')];
+// ARU-32: one assignment in the course M owns (A) and one in the course M listens to (B).
+const asg = (id: string, courseId: string, title: string, createdById: string) => ({
+  id, meetingId: `m${id}`, courseId, title, description: '', createdById, createdAt: '2026-10-20T10:00:00.000Z',
+});
+const ASSIGNMENTS = [asg('asgA', 'A', 'Task in A', 'M'), asg('asgB', 'B', 'Task in B', 'N')];
 const titles = () => screen.queryAllByText(/^(S1 |Max |Nina )/).map((t) => t.props.children);
 const tab = (name: 'Owner' | 'Listener') => screen.queryByRole('tab', { name });
 const addButton = () => screen.queryByRole('button', { name: '+ Add homework' });
@@ -30,7 +35,12 @@ beforeEach(() => jest.clearAllMocks());
 
 describe('a mentor who owns course A and is a listener of course B', () => {
   const open = async () => {
-    const store = fakeStore('M', { courses: [courseB, courseA], courseMembers: members, visibleHomework: HOMEWORK });
+    const store = fakeStore('M', {
+      courses: [courseB, courseA],
+      courseMembers: members,
+      visibleHomework: HOMEWORK,
+      assignments: ASSIGNMENTS,
+    });
     setStore(store);
     const view = await render(<HomeworkScreen />);
     return { store, view };
@@ -44,13 +54,25 @@ describe('a mentor who owns course A and is a listener of course B', () => {
     expect(addButton()).toBeNull();
   });
 
-  it('AC4/AC5: Listener lists only their own B homework, and "+ Add homework" opens the form', async () => {
+  // Changed by ARU-32: Listener opens on New; homework is sent from a New card, not a top button.
+  it('AC4/AC5: Listener lists only their own B homework, and New only B\'s assignment (never their own course A)', async () => {
     await open();
     await fireEvent.press(tab('Listener')!);
+    expect(screen.getByText('New (1)')).toBeTruthy();
+    expect(screen.getByText('Task in B')).toBeTruthy();
+    expect(screen.queryByText('Task in A')).toBeNull();
+    expect(addButton()).toBeNull();
+    await fireEvent.press(screen.getByRole('button', { name: 'Add homework' }));
+    expect(router.push).toHaveBeenCalledWith({ pathname: '/homework/new', params: { assignmentId: 'asgB' } });
+    await fireEvent.press(screen.getByText('Waiting (1)'));
     expect(titles()).toEqual(['Max waiting in B']);
-    expect(screen.getByText('Waiting (1)')).toBeTruthy();
-    await fireEvent.press(addButton()!);
-    expect(router.push).toHaveBeenCalledWith('/homework/new');
+  });
+
+  it('ARU-32: the Owner tab never lists assignments', async () => {
+    await open();
+    expect(screen.queryByText('Task in A')).toBeNull();
+    expect(screen.queryByText('Task in B')).toBeNull();
+    expect(screen.queryByText(/^New/)).toBeNull();
   });
 
   it('AC10: pull-to-refresh on the Listener tab reloads', async () => {
