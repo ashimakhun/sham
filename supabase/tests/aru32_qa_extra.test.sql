@@ -13,15 +13,12 @@ insert into course_members (course_id, user_id, added_by) values
 -- Anonymous users read and assign nothing.
 select t.login(null);
 select t.eq((select count(*) from homework_assignments), 0::bigint, 'anon reads no assignments');
--- Rejected and nothing saved. (The trigger answers anonymous callers with the meeting's state instead of a
--- permission error, because its role check is NULL without a profile: filed as a separate, non-blocking bug.)
-do $$ begin
-  insert into homework_assignments (id, meeting_id, course_id, title, created_by) values
+-- Rejected with the permission error, whatever the meeting (ARU-36, fixed in 0015: before it, anonymous callers got
+-- the meeting's state, e.g. "Meeting not found.").
+select t.throws($$insert into homework_assignments (id, meeting_id, course_id, title, created_by) values
     ('00000000-0000-0000-0000-00000000aa01', '00000000-0000-0000-0000-00000000ffff', '00000000-0000-0000-0000-0000000000d1', 'x',
-     '00000000-0000-0000-0000-0000000000b1');
-  raise exception 'FAIL: anon assigned homework' using errcode = 'P0001';
-exception when sqlstate 'P0001' then raise; when others then raise notice 'ok - anon cannot assign homework (%)', sqlstate;
-end $$;
+     '00000000-0000-0000-0000-0000000000b1')$$, '42501',
+  'ARU-36 anon cannot assign homework (permission error, not the meeting state)');
 select t.throws($$insert into homework (student_id, course_id, title, assignment_id) values ('00000000-0000-0000-0000-0000000000c1',
   '00000000-0000-0000-0000-0000000000d1', 'anon', t.assignment('00000000-0000-0000-0000-0000000000d1', 1))$$, '42501',
   'anon cannot send homework');
