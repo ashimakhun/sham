@@ -1,7 +1,17 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
-import { useState } from 'react';
-import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  AppState,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { Button, EmptyState, ErrorText, RoleBadge, styles } from '@/components/ui';
 import { newId } from '@/lib/id';
@@ -34,10 +44,41 @@ export default function CourseChatScreen() {
   );
 }
 
+/**
+ * ARU-31: while the chat is open it is the store's active chat (no count), and everything up to the newest message
+ * shown is marked read: on opening, whenever a message arrives, and again on leaving or going to the background.
+ */
+function useMarkChatRead(courseId: string, newestId: string | undefined) {
+  const { markChatRead, setActiveChat } = useStore();
+  const newest = useRef(newestId);
+  useEffect(() => {
+    newest.current = newestId;
+    if (newestId) markChatRead(courseId, newestId).catch(() => {});
+  }, [courseId, newestId, markChatRead]);
+
+  useFocusEffect(
+    useCallback(() => {
+      setActiveChat(courseId);
+      return () => {
+        setActiveChat(null);
+        if (newest.current) markChatRead(courseId, newest.current).catch(() => {});
+      };
+    }, [courseId, markChatRead, setActiveChat]),
+  );
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' && newest.current) markChatRead(courseId, newest.current).catch(() => {});
+    });
+    return () => sub.remove();
+  }, [courseId, markChatRead]);
+}
+
 function Chat({ course }: { course: Course }) {
   const { currentUser } = useStore();
   const headerHeight = useHeaderHeight();
   const chat = useCourseChat(course.id, true);
+  useMarkChatRead(course.id, chat.messages[0]?.id);
   const [text, setText] = useState('');
   // One id per message, kept across retries so a retry never posts twice (AC 6); renewed after a send.
   const [messageId, setMessageId] = useState(newId);

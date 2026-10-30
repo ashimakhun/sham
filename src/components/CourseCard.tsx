@@ -3,11 +3,12 @@ import { router } from 'expo-router';
 import { useRef } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
-import { Card, OwnerLine, styles } from '@/components/ui';
+import { Card, OwnerLine, UnreadBadge, styles } from '@/components/ui';
 import { inCourseChat, seesOnlyCourseSummary } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
 import type { Course } from '@/lib/types';
+import { withUnreadLabel } from '@/lib/unread';
 
 type Props = {
   course: Course;
@@ -21,11 +22,13 @@ type Props = {
 const TAP_GUARD_MS = 800;
 
 export function CourseCard({ course, tag, onOpen }: Props) {
-  const { getUser, currentUser, courseMembers } = useStore();
+  const { getUser, currentUser, courseMembers, unreadCount } = useStore();
   // A student who is not a listener sees only the title and description (ARU-24).
   const summaryOnly = seesOnlyCourseSummary(currentUser, course, courseMembers);
   // The chat icon shows only to people in the course chat; it follows live store updates (ARU-25).
   const showChat = inCourseChat(currentUser, course, courseMembers);
+  // New messages from others since the user last read this chat (ARU-31); only for people in the chat.
+  const unread = showChat ? unreadCount(course.id) : 0;
   const lastTap = useRef(0);
 
   const open = (pathname: '/courses/[id]' | '/courses/[id]/chat') => {
@@ -78,7 +81,8 @@ export function CourseCard({ course, tag, onOpen }: Props) {
       {/* A nested Pressable takes the touch itself, so the card's onPress does not also fire. */}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Open chat for ${course.title}`}
+        // The count is only in the icon's label, never the content's (ARU-34): unchanged at 0 (ARU-31 AC 11).
+        accessibilityLabel={withUnreadLabel(`Open chat for ${course.title}`, unread)}
         onPress={() => open('/courses/[id]/chat')}
         hitSlop={4}
         style={({ pressed }) => ({
@@ -90,6 +94,8 @@ export function CourseCard({ course, tag, onOpen }: Props) {
           backgroundColor: pressed ? colors.primarySoft : 'transparent',
         })}>
         <Ionicons name="chatbubble-outline" size={24} color={colors.primary} />
+        {/* Drawn over the icon's corner, so the 44×44 target and the content column keep their size. */}
+        <UnreadBadge count={unread} style={{ position: 'absolute', top: -2, right: -6 }} />
       </Pressable>
     </Card>
   );
