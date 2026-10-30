@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { Linking, ScrollView, Text } from 'react-native';
 
+import { MarkdownText } from '@/components/MarkdownText';
 import { Button, Card, EmptyState, ErrorText, styles } from '@/components/ui';
 import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
@@ -27,7 +28,8 @@ export default function MaterialDetailScreen() {
         <Text style={styles.muted}>
           {getUser(item.teacherId)?.name} · {formatDate(item.createdAt)}
         </Text>
-        <Text style={styles.body}>{item.body}</Text>
+        {/* Formatted (ARU-38); old plain-text posts keep their text and line breaks. */}
+        <MarkdownText source={item.body} />
       </Card>
       {item.link && <Button title="Open link" variant="secondary" onPress={() => Linking.openURL(item.link!)} />}
       <ErrorText error={error} />

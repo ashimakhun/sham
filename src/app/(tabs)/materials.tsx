@@ -2,11 +2,18 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, Text, View } from 'react-native';
 
-import { Button, Card, EmptyState, FilterChips, styles } from '@/components/ui';
+import { Button, Card, EmptyState, FilterChips, Segmented, styles } from '@/components/ui';
+import { markdownToPlainText } from '@/lib/markdown';
 import { useStore } from '@/lib/store';
 import { formatDate } from '@/lib/theme';
 
 const ALL = 'all';
+
+type Section = 'blog' | 'kb';
+const SECTIONS: { value: Section; label: string }[] = [
+  { value: 'blog', label: 'Blog' },
+  { value: 'kb', label: 'Knowledge base' },
+];
 
 export default function MaterialsScreen() {
   const { currentUser, loading, refresh, materials, getUser } = useStore();
@@ -15,6 +22,10 @@ export default function MaterialsScreen() {
   // Author filter (ARU-29): kept while the tab stays mounted (tab switches, opening a material, sharing one);
   // starts at All after sign-in. Filtering is on the loaded list only: no network call.
   const [selected, setSelected] = useState<string>(ALL);
+  // Blog | Knowledge base (ARU-38): kept here like the author filter, so it survives tab switches and opening a post,
+  // and starts at Blog after sign-in (signing out unmounts the tabs).
+  const [section, setSection] = useState<Section>('blog');
+  const blog = section === 'blog';
 
   const authorName = (id: string) => getUser(id)?.name ?? 'Unknown';
   // One chip per author of a currently loaded material, by name (case-insensitive); by id, so same names stay apart.
@@ -33,30 +44,31 @@ export default function MaterialsScreen() {
     .filter((m) => filter === ALL || m.teacherId === filter)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
-  const header =
-    canShare || materials.length > 0 ? (
-      <View style={{ gap: 12 }}>
-        {canShare && <Button title="+ Share material" onPress={() => router.push('/materials/new')} />}
-        {materials.length > 0 && (
-          <FilterChips options={[{ value: ALL, label: 'All' }, ...authors]} value={filter} onChange={setSelected} />
-        )}
-      </View>
-    ) : undefined;
+  const header = (
+    <View style={{ gap: 12 }}>
+      <Segmented<Section> options={SECTIONS} value={section} onChange={setSection} />
+      {blog && canShare && <Button title="+ Share material" onPress={() => router.push('/materials/new')} />}
+      {blog && materials.length > 0 && (
+        <FilterChips options={[{ value: ALL, label: 'All' }, ...authors]} value={filter} onChange={setSelected} />
+      )}
+    </View>
+  );
 
   return (
     <FlatList
       style={styles.screen}
       contentContainerStyle={styles.content}
-      data={sorted}
-      refreshing={loading}
-      onRefresh={() => refresh().catch(() => {})}
+      data={blog ? sorted : []}
+      // Knowledge base has nothing to load yet (ARU-30 adds its files), so no pull-to-refresh there.
+      refreshing={blog ? loading : undefined}
+      onRefresh={blog ? () => refresh().catch(() => {}) : undefined}
       keyExtractor={(m) => m.id}
       ListHeaderComponent={header}
       renderItem={({ item }) => (
         <Card onPress={() => router.push({ pathname: '/materials/[id]', params: { id: item.id } })}>
           <Text style={styles.title}>{item.title}</Text>
           <Text style={styles.body} numberOfLines={2}>
-            {item.body}
+            {markdownToPlainText(item.body)}
           </Text>
           <Text style={styles.muted}>
             {getUser(item.teacherId)?.name} · {formatDate(item.createdAt)}
@@ -65,14 +77,19 @@ export default function MaterialsScreen() {
         </Card>
       )}
       ListEmptyComponent={
-        <EmptyState
-          title="No materials yet"
-          hint={
-            canShare
-              ? 'Share a lesson, notes or a link with your class.'
-              : 'Your teacher and mentors have not shared anything yet.'
-          }
-        />
+        !blog ? (
+          // Placeholder until ARU-30 lists PDF books here.
+          <EmptyState title="No books or files yet" hint="PDF books will appear here." />
+        ) : (
+          <EmptyState
+            title="No materials yet"
+            hint={
+              canShare
+                ? 'Share a lesson, notes or a link with your class.'
+                : 'Your teacher and mentors have not shared anything yet.'
+            }
+          />
+        )
       }
     />
   );
