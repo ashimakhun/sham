@@ -19,7 +19,7 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    Course meetings (ARU-10): `supabase/migrations/0010_course_meetings.sql` (adds a table; deletes nothing).
    Editing meetings (ARU-15): `supabase/migrations/0011_edit_meetings.sql` (adds a column and a function).
    Meeting notes (ARU-28): `supabase/migrations/0012_meeting_notes.sql` (adds three columns, a trigger and a function).
-   Homework assignments (ARU-32): `supabase/migrations/0013_homework_assignments.sql` (adds a table, a column, an
+   Homework assignments (ARU-32): `supabase/migrations/0014_homework_assignments.sql` (adds a table, a column, an
    index and a trigger; replaces the homework insert rule, so homework is only sent for an assignment; deletes nothing).
 3. For development, turn off **Authentication → Email → Confirm email**.
 
