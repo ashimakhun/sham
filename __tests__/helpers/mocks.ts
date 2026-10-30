@@ -18,7 +18,7 @@ export const store = {
   },
 };
 
-export const params: { id?: string; meetingId?: string } = {};
+export const params: { id?: string; meetingId?: string; edit?: string } = {};
 
 // The latest focus effect a screen registered, so a test can simulate the screen gaining focus again.
 let focusEffect: (() => void | (() => void)) | null = null;
@@ -38,5 +38,7 @@ export const expoRouter = {
     focusEffect = effect;
     return require('react').useEffect(effect, []);
   },
+  // The unsaved-changes prompt (ARU-28) is tested through the callback the screen passes.
+  usePreventRemove: jest.fn(),
   Stack: { Screen: () => null },
 };
