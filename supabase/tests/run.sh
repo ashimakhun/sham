@@ -31,7 +31,9 @@ if [ -z "${DATABASE_URL:-}" ]; then
   bindir="$(pg_config --bindir 2>/dev/null || true)"
   if [ ! -x "$bindir/initdb" ]; then bindir="$(ls -d /usr/lib/postgresql/*/bin 2>/dev/null | sort -V | tail -1)"; fi
   if [ ! -x "$bindir/initdb" ]; then echo "Postgres binaries not found; install Postgres or set DATABASE_URL." >&2; exit 1; fi
-  "${run_as[@]}" "$bindir/initdb" -D "$tmp/data" -U postgres -A trust >/dev/null
+  # UTF8 like Supabase, whatever the machine's locale (a POSIX locale would give SQL_ASCII, where char_length()
+  # counts bytes and multibyte limits are tested wrongly).
+  "${run_as[@]}" "$bindir/initdb" -D "$tmp/data" -U postgres -A trust -E UTF8 --locale=C >/dev/null
   "${run_as[@]}" "$bindir/pg_ctl" -D "$tmp/data" -l "$tmp/pg.log" -w \
     -o "-c listen_addresses='' -c unix_socket_directories='$tmp' -c fsync=off" start >/dev/null
   started=1
