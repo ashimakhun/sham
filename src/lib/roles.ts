@@ -1,4 +1,4 @@
-import type { Course, CourseMember, Homework, Role, User } from './types';
+import type { Course, CourseMember, Homework, Meeting, Role, User } from './types';
 
 /** Mirrors the "teachers and mentors create courses" RLS policy (supabase/migrations/0003_courses.sql). */
 export function canCreateCourse(role: Role | undefined) {
@@ -54,6 +54,29 @@ export function canChangeOwner(role: Role | undefined) {
 /** Mirrors set_user_role() (supabase/migrations/0009_roles_screen.sql): only the teacher manages roles. */
 export function canManageRoles(role: Role | undefined) {
   return role === 'teacher';
+}
+
+/** Mirrors mark_attendance() / unmark_attendance() (supabase/migrations/0017_meeting_attendance.sql): a current
+ *  listener of the course marks their own attendance, for Completed meetings only (ARU-33). */
+export function canMarkAttendance(
+  user: User | null | undefined,
+  course: Course,
+  members: CourseMember[],
+  meeting: Meeting,
+) {
+  return meeting.status === 'completed' && isCourseListener(user, course, members);
+}
+
+/** ARU-33: who sees who attended (the count and the Attendance screen): the course's current owner, the teacher, or
+ *  a mentor who is not a listener of the course. The database lets every mentor read all marks; mentor listeners are
+ *  hidden from others' marks in the app only (like ARU-23). */
+export function canSeeAttendance(user: User | null | undefined, course: Course, members: CourseMember[]) {
+  if (!user) return false;
+  return (
+    user.role === 'teacher' ||
+    course.createdById === user.id ||
+    (user.role === 'mentor' && !isCourseListener(user, course, members))
+  );
 }
 
 /** Mirrors is_member() (supabase/migrations/0004_course_members.sql): the user is a listener of the course. */

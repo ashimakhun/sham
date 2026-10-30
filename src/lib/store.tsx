@@ -12,6 +12,7 @@ import type {
   HomeworkAssignment,
   Material,
   Meeting,
+  MeetingAttendance,
   MeetingEdit,
   MeetingStatus,
   NewCourse,
@@ -42,6 +43,8 @@ type Store = {
   meetings: Meeting[];
   /** Homework assignments (ARU-32) the current user may see: all for teachers and mentors, own courses' for students. */
   assignments: HomeworkAssignment[];
+  /** Attendance marks (ARU-33): own marks for students, all for mentors and the teacher. */
+  attendance: MeetingAttendance[];
   loading: boolean;
   /** True once data has been fetched (successfully or not) for the signed-in user. */
   dataLoaded: boolean;
@@ -79,6 +82,10 @@ type Store = {
   updateMeeting: (id: string, input: MeetingEdit) => Promise<void>;
   /** Course owner or teacher, Completed meetings only (ARU-28). Blank text removes the notes. */
   setMeetingNotes: (id: string, notes: string) => Promise<void>;
+  /** A listener marks their own attendance of a Completed meeting (ARU-33). Marking again is a no-op. */
+  markAttendance: (meetingId: string) => Promise<void>;
+  /** A listener removes their own attendance mark (ARU-33). */
+  unmarkAttendance: (meetingId: string) => Promise<void>;
   /** Course chat (ARU-8): a page of messages, newest first, older than `before` when given. */
   loadMessages: (courseId: string, before?: CourseMessage) => Promise<{ messages: CourseMessage[]; hasMore: boolean }>;
   /** Posts as the current user. `id` is generated once per message so a retry cannot post twice. */
@@ -152,6 +159,7 @@ type MeetingRow = {
   notes_updated_by?: string | null;
   notes_updated_at?: string | null;
 };
+type AttendanceRow = { meeting_id: string; user_id: string; marked_at: string };
 type MessageRow = { id: string; course_id: string; author_id: string; body: string; created_at: string };
 type UnreadRow = { course_id: string; unread: number | string };
 type MaterialRow = {
@@ -227,6 +235,12 @@ const toMeeting = (r: MeetingRow): Meeting => ({
   notesUpdatedAt: r.notes_updated_at ?? undefined,
 });
 
+const toAttendance = (r: AttendanceRow): MeetingAttendance => ({
+  meetingId: r.meeting_id,
+  userId: r.user_id,
+  markedAt: r.marked_at,
+});
+
 const toMessage = (r: MessageRow): CourseMessage => ({
   id: r.id,
   courseId: r.course_id,
@@ -290,6 +304,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [courseMembers, setCourseMembers] = useState<CourseMember[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [assignments, setAssignments] = useState<HomeworkAssignment[]>([]);
+  const [attendance, setAttendance] = useState<MeetingAttendance[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [unread, setUnread] = useState<Record<string, number>>({});
@@ -313,6 +328,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setCourseMembers([]);
         setMeetings([]);
         setAssignments([]);
+        setAttendance([]);
         setUnread({});
         setActiveChat(null);
         setLoadedFor(null);
@@ -339,7 +355,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const load = useCallback(async () => {
     if (!userId) return;
     try {
-      const [profiles, hw, mats, crs, members, mtgs, asgs] = await Promise.all([
+      const [profiles, hw, mats, crs, members, mtgs, asgs, att] = await Promise.all([
         supabase.from('profiles').select('id, full_name, role').order('full_name'),
         supabase.from('homework').select('*').order('created_at', { ascending: false }),
         supabase.from('materials').select('*').order('created_at', { ascending: false }),
@@ -347,6 +363,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         supabase.from('course_members').select('*'),
         supabase.from('course_meetings').select('*').order('starts_at'),
         supabase.from('homework_assignments').select('*').order('created_at', { ascending: false }),
+        supabase.from('meeting_attendance').select('*'),
       ]);
       setUsers(rows<ProfileRow>(profiles).map(toUser));
       setHomework(await withSignedPhotoUrls(rows<HomeworkRow>(hw).map(toHomework)));
@@ -355,6 +372,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setCourseMembers(rows<CourseMemberRow>(members).map(toCourseMember));
       setMeetings(rows<MeetingRow>(mtgs).map(toMeeting));
       setAssignments(rows<AssignmentRow>(asgs).map(toAssignment));
+      setAttendance(rows<AttendanceRow>(att).map(toAttendance));
       await loadUnread().catch(() => {});
     } finally {
       setLoadedFor(userId);
@@ -386,6 +404,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'homework_assignments' }, () =>
         load().catch(() => {}),
       )
+      // Any change (including an Undo, whose DELETE payload carries only the key) reloads (ARU-33).
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'meeting_attendance' }, () => load().catch(() => {}))
       // A chat message refetches only the counts (one request, batched), never the full load() (ARU-31).
       // Realtime applies RLS, so only messages of chats the user is in arrive; their own never count.
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'course_messages' }, (payload) => {
@@ -458,6 +478,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     visibleHomework,
     meetings,
     assignments,
+    attendance,
     loading,
     dataLoaded: !!userId && loadedFor === userId,
     refresh,
@@ -670,6 +691,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       requireRole('teacher', 'mentor');
       if (notes.length > NOTES_MAX) throw new Error('Notes can be at most 10,000 characters.');
       check(await supabase.rpc('set_meeting_notes', { meeting: id, new_notes: notes }));
+      await load();
+    },
+    markAttendance: async (meetingId) => {
+      check(await supabase.rpc('mark_attendance', { meeting: meetingId }));
+      await load();
+    },
+    unmarkAttendance: async (meetingId) => {
+      check(await supabase.rpc('unmark_attendance', { meeting: meetingId }));
       await load();
     },
     loadMessages: async (courseId, before) => {

@@ -3,9 +3,10 @@ import { useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
 
 import { Button, Card, ErrorText, styles } from '@/components/ui';
+import { meetingAttendance } from '@/lib/attendance';
 import { confirmAction } from '@/lib/confirm';
 import { hasStarted, isLink, sortMeetings } from '@/lib/meetings';
-import { canManageMeetings, canSeeMeetings } from '@/lib/roles';
+import { canManageMeetings, canMarkAttendance, canSeeAttendance, canSeeMeetings } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors, formatDateTime } from '@/lib/theme';
 import type { Course, Meeting, MeetingStatus } from '@/lib/types';
@@ -36,13 +37,23 @@ type Target = Exclude<MeetingStatus, 'scheduled'>;
 /** Meetings of a course (ARU-10): visible to the teacher, mentors and the course's listeners; the owner and the
  *  teacher schedule meetings and mark them completed or canceled. */
 export function MeetingsSection({ course }: { course: Course }) {
-  const { currentUser, courseMembers, meetings, assignments, setMeetingStatus } = useStore();
+  const {
+    currentUser,
+    courseMembers,
+    meetings,
+    assignments,
+    attendance,
+    setMeetingStatus,
+    markAttendance,
+    unmarkAttendance,
+  } = useStore();
   const { busy, error, run } = useAction();
   const [changing, setChanging] = useState<string>();
   const now = useNow();
 
   if (!canSeeMeetings(currentUser, course, courseMembers)) return null;
   const canManage = canManageMeetings(currentUser, course);
+  const seesAttendance = canSeeAttendance(currentUser, course, courseMembers);
   const { upcoming, past } = sortMeetings(
     meetings.filter((m) => m.courseId === course.id),
     now,
@@ -67,6 +78,36 @@ export function MeetingsSection({ course }: { course: Course }) {
       setChanging(meeting.id);
       try {
         await setMeetingStatus(meeting.id, status);
+      } finally {
+        setChanging(undefined);
+      }
+    });
+  }
+
+  // Attendance (ARU-33): a listener marks or undoes their own attendance of a Completed meeting.
+  function markAttended(meeting: Meeting) {
+    run(async () => {
+      setChanging(meeting.id);
+      try {
+        await markAttendance(meeting.id);
+      } finally {
+        setChanging(undefined);
+      }
+    });
+  }
+
+  function undoAttended(meeting: Meeting) {
+    run(async () => {
+      const confirmed = await confirmAction(
+        'Undo attendance',
+        `Remove your attendance for ${meeting.topic} on ${formatDateTime(meeting.startsAt)}?`,
+        'Remove',
+        { destructive: true, cancelText: 'Not now' },
+      );
+      if (!confirmed) return;
+      setChanging(meeting.id);
+      try {
+        await unmarkAttendance(meeting.id);
       } finally {
         setChanging(undefined);
       }
@@ -128,6 +169,63 @@ export function MeetingsSection({ course }: { course: Course }) {
     // Homework (ARU-32): one assignment per completed meeting, shown to everyone who sees the meeting.
     const assignment = assignments.find((a) => a.meetingId === m.id);
     const canAssign = canManage && m.status === 'completed' && !assignment;
+    // Attendance (ARU-33): listeners mark their own; the owner, the teacher and non-listener mentors see the count.
+    const canMark = canMarkAttendance(currentUser, course, courseMembers, m);
+    const attended = canMark && attendance.some((a) => a.meetingId === m.id && a.userId === currentUser?.id);
+    const counts =
+      seesAttendance && m.status === 'completed' ? meetingAttendance(m.id, course.id, courseMembers, attendance) : null;
+    const attendanceItems = [
+      ...(canMark && !attended
+        ? [
+            <Pressable
+              key="attend"
+              accessibilityRole="button"
+              accessibilityLabel="I attended"
+              accessibilityState={{ disabled: busy }}
+              disabled={busy}
+              hitSlop={8}
+              onPress={() => markAttended(m)}>
+              <Text style={{ color: colors.primary, fontWeight: '600', opacity: busy ? 0.4 : 1 }}>I attended</Text>
+            </Pressable>,
+          ]
+        : []),
+      ...(attended
+        ? [
+            <Text key="attended" style={{ color: colors.success, fontWeight: '600' }}>
+              ✓ You attended
+            </Text>,
+            <Pressable
+              key="undo"
+              accessibilityRole="button"
+              accessibilityLabel="Undo attendance"
+              accessibilityState={{ disabled: busy }}
+              disabled={busy}
+              hitSlop={8}
+              onPress={() => undoAttended(m)}>
+              <Text style={{ color: colors.primary, fontWeight: '600', opacity: busy ? 0.4 : 1 }}>Undo</Text>
+            </Pressable>,
+          ]
+        : []),
+      ...(counts
+        ? [
+            <Pressable
+              key="count"
+              accessibilityRole="link"
+              accessibilityLabel={`Attended ${counts.attended.length} of ${counts.total}`}
+              hitSlop={8}
+              onPress={() =>
+                router.push({
+                  pathname: '/courses/[id]/meetings/[meetingId]/attendance',
+                  params: { id: course.id, meetingId: m.id },
+                })
+              }>
+              <Text style={{ color: colors.primary, fontWeight: '600' }}>
+                Attended: {counts.attended.length} of {counts.total}
+              </Text>
+            </Pressable>,
+          ]
+        : []),
+    ];
     return (
       <View key={m.id} testID={`meeting-${m.id}`} style={{ gap: 4 }}>
         <View style={[styles.row, { alignItems: 'flex-start' }]}>
@@ -162,7 +260,7 @@ export function MeetingsSection({ course }: { course: Course }) {
             {assignment.dueAt ? `Due ${formatDateTime(assignment.dueAt)}` : 'No deadline'}
           </Text>
         ) : null}
-        {(actions.length > 0 || canEdit || notesActions.length > 0 || canAssign) && (
+        {(actions.length > 0 || canEdit || notesActions.length > 0 || canAssign || attendanceItems.length > 0) && (
           <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap', paddingTop: 2 }}>
             {changing === m.id ? (
               <Text style={styles.muted}>Saving…</Text>
@@ -214,6 +312,7 @@ export function MeetingsSection({ course }: { course: Course }) {
                       </Pressable>,
                     ]
                   : []),
+                ...attendanceItems,
                 ...actions.map((a) => (
                   <Pressable
                     key={a.title}
