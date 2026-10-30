@@ -1,8 +1,8 @@
 -- Homework assignments (ARU-32): the course's current owner or the teacher assigns homework (title, description,
 -- optional deadline) to a Completed meeting, at most one per meeting. Listeners now send homework only for an
--- assignment of their course, one per assignment. Run after 0012_meeting_notes.sql. Adds a table, a column, an
--- index and a trigger, and replaces the homework insert policy; nothing is deleted. Old homework keeps
--- assignment_id = null and stays readable and checkable as before.
+-- assignment of their course, one per assignment. Run after 0012_meeting_notes.sql and the mentor materials
+-- migration (0013 after ARU-35). Adds a table, a column, an index and a trigger, and replaces the homework insert
+-- policy; nothing is deleted. Old homework keeps assignment_id = null and stays readable and checkable as before.
 
 create table homework_assignments (
   id uuid primary key default gen_random_uuid(), -- the app sends its own id so a retry cannot assign twice
