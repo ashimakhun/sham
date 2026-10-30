@@ -85,10 +85,13 @@ describe('Add homework (AC 12: no mentor_id)', () => {
     expect(screen.queryByText(/mentor assigned/)).toBeNull();
   });
 
-  it('AC1: a course the user was removed from is not offered even if the store still lists it', async () => {
-    setStore(fakeStore('S1', { courseMembers: [member('A', 'S2')] }));
+  // Changed by ARU-32: homework is sent for an assignment; the rule that stays is "only for a course I attend".
+  it('AC1: an assignment of a course the user was removed from cannot be sent, even if the store still lists it', async () => {
+    params.assignmentId = 'asgA';
+    setStore(fakeStore('S1', { courseMembers: [member('A', 'S2')], assignments: [{ id: 'asgA', meetingId: 'mA', courseId: 'A', title: 'Exercises 1-10', description: '', createdById: 'M', createdAt: '2026-10-20T10:00:00.000Z' }] }));
     await render(<NewHomeworkScreen />);
-    expect(screen.queryAllByRole('radio')).toHaveLength(0);
-    expect(screen.getByText('You are not in any course yet — ask your teacher or mentor to add you')).toBeTruthy();
+    expect(screen.getByText('Open a homework assignment from New to send homework.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Send/ })).toBeNull();
+    params.assignmentId = undefined;
   });
 });

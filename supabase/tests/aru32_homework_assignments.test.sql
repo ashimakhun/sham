@@ -1,4 +1,4 @@
--- ARU-32: homework assignments on completed meetings. Rules under test: supabase/migrations/0013_homework_assignments.sql.
+-- ARU-32: homework assignments on completed meetings. Rules under test: supabase/migrations/0014_homework_assignments.sql.
 -- Course A owned by mentor M; course B owned by N. S1 a student listener of A, M2 a mentor listener of A, S2 in no
 -- course. Meetings on A (inserted as the admin): C completed, C2 completed, F future scheduled, X canceled; D completed on B.
 select t.seed();
