@@ -113,6 +113,27 @@ export function parseMarkdown(source: string): Block[] {
   return blocks.filter((b) => !(b.type === 'paragraph' && b.lines.length === 0));
 }
 
+function inlineText(nodes: Inline[]): string {
+  return nodes
+    .map((n) => (n.type === 'text' || n.type === 'link' ? n.text : inlineText(n.children)))
+    .join('');
+}
+
+/**
+ * The text of Markdown without its symbols, for one-line previews (ARU-38): bold and italic become plain text, a link
+ * becomes its text, list markers are dropped, and lines, list items and paragraphs are joined with single spaces.
+ * Unclosed markers and non-web links stay literal, as `parseInline` leaves them.
+ */
+export function markdownToPlainText(source: string): string {
+  const pieces: string[] = [];
+  for (const b of parseMarkdown(source)) {
+    if (b.type === 'paragraph') pieces.push(...b.lines.map(inlineText));
+    else if (b.type === 'bullets') pieces.push(...b.items.map(inlineText));
+    else pieces.push(...b.items.map((item) => inlineText(item.content)));
+  }
+  return pieces.join(' ').replace(/\s+/g, ' ').trim();
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // Toolbar edits
 
