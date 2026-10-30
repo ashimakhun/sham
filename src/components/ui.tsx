@@ -4,10 +4,24 @@ import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps, type
 import { colors, roleColor, roleLabel } from '@/lib/theme';
 import type { HomeworkStatus, Role } from '@/lib/types';
 
-export function Card({ children, onPress, style }: { children: ReactNode; onPress?: () => void; style?: ViewStyle }) {
+type CardProps = {
+  children: ReactNode;
+  onPress?: () => void;
+  style?: ViewStyle;
+  /**
+   * Set to false when the card holds its own buttons: on iOS an accessible view groups all its children into one
+   * element, so VoiceOver could not focus a nested button (ARU-27).
+   */
+  accessible?: boolean;
+};
+
+export function Card({ children, onPress, style, accessible }: CardProps) {
   if (!onPress) return <View style={[styles.card, style]}>{children}</View>;
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && { opacity: 0.7 }, style]}>
+    <Pressable
+      onPress={onPress}
+      accessible={accessible}
+      style={({ pressed }) => [styles.card, pressed && { opacity: 0.7 }, style]}>
       {children}
     </Pressable>
   );

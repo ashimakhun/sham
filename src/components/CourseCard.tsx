@@ -62,8 +62,19 @@ export function CourseCard({ course, tag, onOpen }: Props) {
   if (!showChat) return <Card onPress={() => open('/courses/[id]')}>{content}</Card>;
 
   return (
-    <Card onPress={() => open('/courses/[id]')} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-      <View style={{ flex: 1, gap: 8 }}>{content}</View>
+    // The card opts out of accessibility grouping so screen readers reach the chat icon on its own; the content
+    // column is then its own button that opens the details (ARU-27).
+    <Card
+      onPress={() => open('/courses/[id]')}
+      accessible={false}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={course.title}
+        onPress={() => open('/courses/[id]')}
+        style={{ flex: 1, gap: 8 }}>
+        {content}
+      </Pressable>
       {/* A nested Pressable takes the touch itself, so the card's onPress does not also fire. */}
       <Pressable
         accessibilityRole="button"
