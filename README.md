@@ -12,13 +12,16 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
 ## Setup
 
 1. Copy `.env.example` to `.env.local` and fill in the Supabase project URL and publishable key.
-2. In the Supabase SQL Editor run, in order, `supabase/migrations/0001_init.sql`, `supabase/migrations/0002_realtime.sql`,
-   `supabase/migrations/0003_courses.sql`, `supabase/migrations/0004_course_members.sql`,
-   `supabase/migrations/0005_homework_by_course.sql`, `supabase/migrations/0006_course_chat.sql`, then
-   `supabase/migrations/0007_course_owner.sql` and `supabase/migrations/0009_roles_screen.sql`.
-   Course meetings (ARU-10): `supabase/migrations/0010_course_meetings.sql` (adds a table; deletes nothing).
-   Editing meetings (ARU-15): `supabase/migrations/0011_edit_meetings.sql` (adds a column and a function).
-   Meeting notes (ARU-28): `supabase/migrations/0012_meeting_notes.sql` (adds three columns, a trigger and a function).
+2. In the Supabase SQL Editor run every file in `supabase/migrations`, in order:
+   `0001_init.sql`, `0002_realtime.sql`, `0003_courses.sql`, `0004_course_members.sql`,
+   `0005_homework_by_course.sql`, `0006_course_chat.sql`, `0007_course_owner.sql`,
+   `0008_listener_functions_check_membership.sql` (ARU-16: listener functions act only on actual listeners),
+   `0009_roles_screen.sql`,
+   `0010_course_meetings.sql` (ARU-10: course meetings; adds a table, deletes nothing),
+   `0011_edit_meetings.sql` (ARU-15: editing meetings; adds a column and a function),
+   `0012_meeting_notes.sql` (ARU-28: meeting notes; adds three columns, a trigger and a function),
+   `0013_mentor_materials.sql` (ARU-26: mentors share and delete their own materials; replaces two policies).
+   Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 
 ### Upgrading an existing project to 0005 (ARU-14)

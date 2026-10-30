@@ -42,6 +42,13 @@ else
   db_url() { echo "${DATABASE_URL%/*}/$1"; }
 fi
 
+# Every migration needs its own number: the Supabase CLI keys applied migrations by it (ARU-35).
+dupes="$(ls "$root"/supabase/migrations/*.sql | xargs -n1 basename | cut -d_ -f1 | sort | uniq -d)"
+if [ -n "$dupes" ]; then
+  echo "Two or more migrations share the number(s): $dupes. Give each migration the next free number." >&2
+  exit 1
+fi
+
 psql_q() { PGOPTIONS="-c client_min_messages=error" psql -X -q -v ON_ERROR_STOP=1 "$@"; }
 
 # Template: Supabase stand-ins + all migrations in order + test helpers.
