@@ -22,7 +22,8 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `0012_meeting_notes.sql` (ARU-28: meeting notes; adds three columns, a trigger and a function),
    `0013_mentor_materials.sql` (ARU-26: mentors share and delete their own materials; replaces two policies),
    `0014_homework_assignments.sql` (ARU-32: adds a table, a column, an index and a trigger; replaces the homework
-   insert rule, so homework is only sent for an assignment; deletes nothing).
+   insert rule, so homework is only sent for an assignment; deletes nothing),
+   `0015_assign_homework_anon_error.sql` (ARU-36: signed-out callers get the permission error when assigning homework).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 
