@@ -135,8 +135,8 @@ describe('AC3/AC7/AC9/AC10: notes actions in History', () => {
   it.each(['M', 'T'] as const)('%s sees Add notes / Edit notes on completed meetings only', async (who) => {
     setStore(fakeStore(who, { courseMembers: members, meetings: [F1, P, C, CN, X] }));
     await render(<CourseDetailScreen />);
-    expect(labels('C')).toEqual(['Add notes', 'Assign homework']); // + ARU-32
-    expect(labels('CN')).toEqual(['Notes', 'Edit notes', 'Assign homework']);
+    expect(labels('C')).toEqual(['Add notes', 'Assign homework', 'Attended 0 of 1']); // + ARU-32, + ARU-33
+    expect(labels('CN')).toEqual(['Notes', 'Edit notes', 'Assign homework', 'Attended 0 of 1']);
     expect(labels('X')).toEqual([]);
     expect(labels('F1')).not.toContain('Add notes');
     expect(labels('P')).not.toContain('Add notes');
@@ -147,11 +147,15 @@ describe('AC3/AC7/AC9/AC10: notes actions in History', () => {
     });
   });
 
-  it.each(['N', 'S1'] as const)('%s reads notes but has no Add/Edit notes', async (who) => {
+  // ARU-33: N (a mentor who isn't a listener) also sees the attendance count; S1 (a listener) "I attended".
+  it.each([
+    ['N', 'Attended 0 of 1'],
+    ['S1', 'I attended'],
+  ] as const)('%s reads notes but has no Add/Edit notes', async (who, attendance) => {
     setStore(fakeStore(who, { courseMembers: members, meetings: [C, CN] }));
     await render(<CourseDetailScreen />);
-    expect(labels('C')).toEqual([]);
-    expect(labels('CN')).toEqual(['Notes']);
+    expect(labels('C')).toEqual([attendance]);
+    expect(labels('CN')).toEqual(['Notes', attendance]);
     await fireEvent.press(inMeeting('CN').getByRole('link', { name: 'Notes' }));
     expect(router.push).toHaveBeenLastCalledWith({
       pathname: '/courses/[id]/meetings/[meetingId]/notes',
@@ -162,10 +166,10 @@ describe('AC3/AC7/AC9/AC10: notes actions in History', () => {
   it('AC8: notes saved elsewhere appear on the next store update', async () => {
     setStore(fakeStore('S1', { courseMembers: members, meetings: [C] }));
     const { rerender } = await render(<CourseDetailScreen />);
-    expect(labels('C')).toEqual([]);
+    expect(labels('C')).toEqual(['I attended']); // ARU-33
     setStore(fakeStore('S1', { courseMembers: members, meetings: [{ ...C, notes: 'New' }] }));
     await rerender(<CourseDetailScreen />);
-    expect(labels('C')).toEqual(['Notes']);
+    expect(labels('C')).toEqual(['Notes', 'I attended']);
   });
 });
 

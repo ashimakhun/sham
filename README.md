@@ -23,7 +23,11 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `0013_mentor_materials.sql` (ARU-26: mentors share and delete their own materials; replaces two policies),
    `0014_homework_assignments.sql` (ARU-32: adds a table, a column, an index and a trigger; replaces the homework
    insert rule, so homework is only sent for an assignment; deletes nothing),
-   `0015_assign_homework_anon_error.sql` (ARU-36: signed-out callers get the permission error when assigning homework).
+   `0015_assign_homework_anon_error.sql` (ARU-36: signed-out callers get the permission error when assigning homework),
+   `0016_chat_read_positions.sql` (ARU-31: new message counts; adds a table and functions and sets everyone already in
+   a chat to "read up to now"),
+   `0017_meeting_attendance.sql` (ARU-33: listeners mark attendance of completed meetings; adds a table and two
+   functions, deletes nothing).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 
@@ -84,7 +88,8 @@ src/app/                  screens (Expo Router — every file is a route)
   courses/[id]/listeners.tsx  teacher or mentor adds listeners
   courses/[id]/chat.tsx   course chat (owner, listeners and the teacher)
   courses/[id]/owner.tsx  teacher or mentor changes the course owner
-  courses/[id]/meetings/  schedule / edit a meeting; [meetingId]/notes.tsx notes; [meetingId]/assign-homework.tsx
+  courses/[id]/meetings/  schedule / edit a meeting; [meetingId]/notes.tsx notes; [meetingId]/assign-homework.tsx;
+                          [meetingId]/attendance.tsx who attended
   roles.tsx               teacher switches users between student and mentor
   materials/new.tsx       teacher or mentor shares a material
   materials/[id].tsx      material details
@@ -117,6 +122,8 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Edit / reschedule a scheduled meeting | | own courses           | any course |
 | Read meeting notes         | courses they're in | ✓ (all courses)  | ✓       |
 | Add / edit / clear notes on a completed meeting | | own courses | any course |
+| Mark / undo own attendance of a completed meeting | courses they're in | courses they're in |  |
+| See who attended a meeting | own marks only | ✓ (own courses and courses they don't listen to; own marks only where a listener) | ✓ |
 | See materials              | ✓         | ✓                  | ✓       |
 | Share / delete materials   |           | ✓ (own materials)  | ✓ (own) |
 | Switch student ↔ mentor    |           |                    | ✓       |
