@@ -71,6 +71,8 @@ export type Course = {
   /** The course's current owner (ARU-9): always a teacher or mentor; the creator unless reassigned. DB: created_by. */
   createdById: string;
   createdAt: string;
+  /** Hidden course (ARU-40): only its owner, its listeners and the teacher can see it. DB: hidden. */
+  hidden?: boolean;
 };
 
 /** A listener of a course (students and mentors; never the course owner or the teacher). */
@@ -135,7 +137,7 @@ export type NewAssignment = {
   description: string;
   dueAt?: string;
 };
-export type NewCourse = { id: string; title: string; description: string };
+export type NewCourse = { id: string; title: string; description: string; hidden?: boolean };
 export type NewMaterial = Pick<Material, 'title' | 'body' | 'link'>;
 export type NewMeeting = { id: string; courseId: string; startsAt: string; topic: string; location: string };
 /** `startsAt` is sent back exactly as loaded when the time wasn't changed, so it doesn't count as a reschedule. */
