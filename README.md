@@ -36,6 +36,8 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    functions, deletes nothing),
    `0018_material_files.sql` (ARU-30: Knowledge base PDFs; adds a table, a trigger, the private `materials` storage
    bucket (PDF only, 25 MB) and its policies, deletes nothing),
+   `0019_hidden_courses.sql` (ARU-40: hidden courses; adds a column (existing courses stay visible), three helper
+   functions and restrictive policies, and updates the course functions to check visibility; deletes nothing),
    `0020_course_only_material_files.sql` (ARU-42: course-only Knowledge base PDFs; adds a column (existing items stay
    visible to everyone) and a function, replaces the two read policies, deletes nothing).
    Each migration has its own number; `npm run test:db` fails if two files share one.
@@ -122,6 +124,8 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Mark homework checked      |           | any (not their own) | any (not their own) |
 | See courses                | all (title and description only unless they're in it) | all | all |
 | Create courses             |           | ✓                  | ✓       |
+| Create a hidden course     |           | ✓                  | ✓       |
+| See a hidden course and its content | (listeners only) | owner and listeners only | ✓ (all) |
 | Change course owner        |           | ✓ (any course)     | ✓       |
 | Own a course               | never     | ✓ (not if a listener) | ✓    |
 | Be a course listener       | ✓         | ✓ (not own course) |         |

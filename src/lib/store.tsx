@@ -157,6 +157,7 @@ type CourseRow = {
   description: string;
   created_by: string;
   created_at: string;
+  hidden?: boolean | null;
 };
 type CourseMemberRow = { course_id: string; user_id: string; added_by: string; added_at: string };
 type MeetingRow = {
@@ -237,6 +238,7 @@ const toCourse = (r: CourseRow): Course => ({
   description: r.description,
   createdById: r.created_by,
   createdAt: r.created_at,
+  hidden: !!r.hidden,
 });
 
 const toCourseMember = (r: CourseMemberRow): CourseMember => ({
@@ -655,6 +657,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           title: input.title.trim(),
           description: input.description.trim(),
           created_by: creator.id,
+          // Hidden courses (ARU-40): RLS shows them only to the owner, listeners and the teacher.
+          hidden: !!input.hidden,
         }),
       );
       await load();

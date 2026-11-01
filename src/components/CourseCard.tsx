@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useRef } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
-import { Card, OwnerLine, UnreadBadge, styles } from '@/components/ui';
+import { Card, HiddenBadge, OwnerLine, UnreadBadge, styles } from '@/components/ui';
 import { inCourseChat, seesOnlyCourseSummary } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
@@ -48,9 +48,18 @@ export function CourseCard({ course, tag, onOpen }: Props) {
           </Text>
         </View>
       ) : null}
-      <Text style={styles.title} numberOfLines={2}>
-        {course.title}
-      </Text>
+      {course.hidden ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={[styles.title, { flexShrink: 1 }]} numberOfLines={2}>
+            {course.title}
+          </Text>
+          <HiddenBadge />
+        </View>
+      ) : (
+        <Text style={styles.title} numberOfLines={2}>
+          {course.title}
+        </Text>
+      )}
       {course.description ? (
         <Text style={styles.body} numberOfLines={2}>
           {course.description}

@@ -128,6 +128,15 @@ export function OwnerLine({ name, date }: { name: string; date: string }) {
   );
 }
 
+/** "Hidden" next to a hidden course's title (ARU-40); read with the title by screen readers. */
+export function HiddenBadge() {
+  return (
+    <View style={[styles.badge, { backgroundColor: '#F3F4F6', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+      <Text style={[styles.badgeText, { color: colors.muted }]}>Hidden</Text>
+    </View>
+  );
+}
+
 export function EmptyState({ title, hint }: { title: string; hint?: string }) {
   return (
     <View style={styles.empty}>

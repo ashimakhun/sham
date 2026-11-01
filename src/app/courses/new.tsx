@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, Switch, Text, View } from 'react-native';
 
 import { Button, EmptyState, ErrorText, Field, styles } from '@/components/ui';
 import { newId } from '@/lib/id';
@@ -12,6 +12,8 @@ export default function NewCourseScreen() {
   const { addCourse, currentUser } = useStore();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  // ARU-40: off by default; kept on an error so a retry creates the same course.
+  const [hidden, setHidden] = useState(false);
   // One id per form: a retry after a network error cannot create a second course.
   const [id] = useState(newId);
   const { busy, error, run } = useAction();
@@ -22,7 +24,8 @@ export default function NewCourseScreen() {
 
   function submit() {
     run(async () => {
-      await addCourse({ id, title, description });
+      // Off: exactly today's call (a visible course).
+      await addCourse(hidden ? { id, title, description, hidden } : { id, title, description });
       if (router.canGoBack()) router.back();
       else router.replace('/courses');
     });
@@ -40,6 +43,19 @@ export default function NewCourseScreen() {
           onChangeText={setDescription}
           multiline
         />
+        <View style={[styles.row, { alignItems: 'flex-start' }]}>
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={styles.body}>Hidden course</Text>
+            <Text style={styles.muted}>Only the owner, listeners and the teacher will see this course.</Text>
+          </View>
+          <Switch
+            accessibilityLabel="Hidden course"
+            accessibilityHint="Only the owner, listeners and the teacher will see this course."
+            value={hidden}
+            onValueChange={setHidden}
+            disabled={busy}
+          />
+        </View>
         <ErrorText error={error} />
         <Button title={busy ? 'Creating…' : 'Create course'} onPress={submit} disabled={!title.trim() || busy} />
       </ScrollView>
