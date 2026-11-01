@@ -17,6 +17,7 @@
 -- Policies left as they are, because a non-approved account can't own the rows they let through (it can't be a
 -- listener, owner, author or homework sender, see below): the own-row parts of "course members readable",
 -- "homework readable", "attendance readable" and "homework photos readable with their homework".
+-- Null-safe role checks: set_meeting_status(), update_meeting() and set_meeting_notes() (my_role() is null now).
 -- Approved-only targets: adding a listener ("teachers and mentors add listeners"), change_course_owner() and
 -- set_user_role() refuse accounts that aren't Approved.
 -- The teacher is always Approved (trigger below), and only set_access_status() changes the status.
@@ -270,4 +271,98 @@ create or replace function change_course_owner(course uuid, new_owner uuid) retu
       raise exception 'This person is a listener of the course. Remove them first.' using errcode = '23514';
     end if;
     update courses set created_by = new_owner where id = course;
+  end $$;
+
+-- Meeting functions (same bodies as 0019): "not (owns_course(..) or my_role() = 'teacher')" was null, not true, for an
+-- account without a role (my_role() is null), which skipped the permission check. Now a waiting account gets the
+-- permission error (ARU-43 QA).
+create or replace function set_meeting_status(meeting uuid, new_status meeting_status) returns void
+  language plpgsql security definer set search_path = public
+  as $$
+  declare
+    m course_meetings%rowtype;
+  begin
+    select * into m from course_meetings where id = meeting for update;
+    if not found or course_hidden_from_me(m.course_id) then
+      raise exception 'Meeting not found.' using errcode = 'P0002';
+    end if;
+    if not (owns_course(m.course_id) or coalesce(my_role() = 'teacher', false)) then
+      raise exception 'Only the course owner or the teacher can change a meeting''s status.' using errcode = '42501';
+    end if;
+    if new_status = m.status and new_status <> 'scheduled' then
+      return; -- already done: safe retry
+    end if;
+    if m.status <> 'scheduled' then
+      raise exception 'This meeting is already %; its status can''t change.', m.status using errcode = '23514';
+    end if;
+    if new_status = 'scheduled' then
+      raise exception 'A meeting can only be marked completed or canceled.' using errcode = '22023';
+    end if;
+    if new_status = 'completed' and m.starts_at > now() then
+      raise exception 'A meeting can be marked completed only after it has started.' using errcode = '23514';
+    end if;
+    update course_meetings
+      set status = new_status, status_changed_by = auth.uid(), status_changed_at = now()
+      where id = meeting;
+  end $$;
+
+create or replace function update_meeting(meeting uuid, new_starts_at timestamptz, new_topic text, new_location text)
+  returns void
+  language plpgsql security definer set search_path = public
+  as $$
+  declare
+    m course_meetings%rowtype;
+    moved boolean;
+  begin
+    select * into m from course_meetings where id = meeting for update;
+    if not found or course_hidden_from_me(m.course_id) then
+      raise exception 'Meeting not found.' using errcode = 'P0002';
+    end if;
+    if not (owns_course(m.course_id) or coalesce(my_role() = 'teacher', false)) then
+      raise exception 'Only the course owner or the teacher can edit a meeting.' using errcode = '42501';
+    end if;
+    if m.status <> 'scheduled' then
+      raise exception 'This meeting is already %; it can''t be edited.', m.status using errcode = '23514';
+    end if;
+    if new_starts_at is null then
+      raise exception 'Pick a date and start time.' using errcode = '22023';
+    end if;
+    moved := new_starts_at is distinct from m.starts_at;
+    if moved and new_starts_at <= now() then
+      raise exception 'Pick a time in the future.' using errcode = '23514';
+    end if;
+    update course_meetings set
+      starts_at = new_starts_at,
+      topic = coalesce(nullif(trim(new_topic), ''), 'Meeting'),
+      location = nullif(trim(new_location), ''),
+      rescheduled_at = case when moved then now() else m.rescheduled_at end
+    where id = meeting;
+  end $$;
+
+create or replace function set_meeting_notes(meeting uuid, new_notes text) returns void
+  language plpgsql security definer set search_path = public
+  as $$
+  declare
+    m course_meetings%rowtype;
+    -- Trims spaces, tabs and line breaks (trim() alone removes only spaces).
+    cleaned text := nullif(regexp_replace(new_notes, '^\s+|\s+$', '', 'g'), '');
+  begin
+    select * into m from course_meetings where id = meeting for update;
+    if not found or course_hidden_from_me(m.course_id) then
+      raise exception 'Meeting not found.' using errcode = 'P0002';
+    end if;
+    if not (owns_course(m.course_id) or coalesce(my_role() = 'teacher', false)) then
+      raise exception 'Only the course owner or the teacher can edit notes.' using errcode = '42501';
+    end if;
+    if m.status <> 'completed' then
+      raise exception 'Notes can be added only to completed meetings.' using errcode = '23514';
+    end if;
+    if char_length(cleaned) > 10000 then
+      raise exception 'Notes can be at most 10,000 characters.' using errcode = '22001';
+    end if;
+    update course_meetings set
+      notes = cleaned,
+      notes_updated_by = auth.uid(),
+      notes_updated_at = now()
+    where id = meeting;
   end $$;
