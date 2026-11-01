@@ -7,10 +7,11 @@ import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
 
 export default function ProfileScreen() {
-  const { currentUser, session, courses, courseMembers, getUser, signOut } = useStore();
+  const { currentUser, session, courses, courseMembers, getUser, signOut, accessRequests } = useStore();
   const { busy, error, run } = useAction();
   if (!currentUser) return null;
 
+  const pending = accessRequests.filter((r) => r.status === 'pending').length;
   const openCourse = (id: string) => router.push({ pathname: '/courses/[id]', params: { id } });
 
   // Courses I attend; their owner is my mentor there (ARU-7). Teachers are never listeners.
@@ -72,7 +73,12 @@ export default function ProfileScreen() {
 
       <View style={{ gap: 10, marginTop: 8 }}>
         {canManageRoles(currentUser.role) && (
-          <Button title="Manage roles" variant="secondary" onPress={() => router.push('/roles')} />
+          <Button
+            // Accounts waiting for approval (ARU-43), e.g. "Manage roles (2)"; no count when there are none.
+            title={pending > 0 ? `Manage roles (${pending})` : 'Manage roles'}
+            variant="secondary"
+            onPress={() => router.push('/roles')}
+          />
         )}
         <ErrorText error={error} />
         {/* The root screen redirects to sign-in once the session is gone. */}

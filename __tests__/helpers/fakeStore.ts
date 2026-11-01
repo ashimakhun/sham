@@ -89,6 +89,8 @@ export function fakeStore(who: keyof typeof users | null, over: Partial<Store> =
     unmarkAttendance: jest.fn(async () => {}),
     subscribeToMessages: jest.fn(() => () => {}),
     setUserRole: jest.fn(async () => {}),
+    accessRequests: [],
+    setAccessStatus: jest.fn(async () => {}),
     unreadCount: () => 0,
     markChatRead: jest.fn(async () => {}),
     setActiveChat: jest.fn(),

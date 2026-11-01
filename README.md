@@ -39,7 +39,10 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `0019_hidden_courses.sql` (ARU-40: hidden courses; adds a column (existing courses stay visible), three helper
    functions and restrictive policies, and updates the course functions to check visibility; deletes nothing),
    `0020_course_only_material_files.sql` (ARU-42: course-only Knowledge base PDFs; adds a column (existing items stay
-   visible to everyone) and a function, replaces the two read policies, deletes nothing).
+   visible to everyone) and a function, replaces the two read policies, deletes nothing),
+   `0021_account_approval.sql` (ARU-43: new accounts wait for the teacher's approval; adds an access status (every
+   existing account is approved), two functions and a trigger, and adds the approval check to the helper functions
+   and open read policies; deletes nothing).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 
@@ -69,7 +72,10 @@ Restart `npm start` after changing `.env.local`.
 
 ## Users and roles
 
-Everyone who creates an account in the app starts as a **student**. Make the first teacher once with the query in
+Everyone who creates an account in the app starts as a **student** whose request to join **waits for the teacher**:
+until the teacher accepts it (**Profile → Manage roles → Requests**), the account sees only a "Waiting for approval"
+screen and the database returns nothing but its own profile. A declined account sees "Request declined"; the teacher
+can still accept it later from the Declined section. Make the first teacher once with the query in
 [`supabase/manage-roles.sql`](supabase/manage-roles.sql); there is exactly one teacher, and after that the database
 rejects any change to or from teacher. The teacher then switches users between student and mentor in the app
 (**Profile → Manage roles**). A mentor who owns courses can't be made a student until their courses are given a
@@ -147,6 +153,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Make a course-linked PDF course-only | | ✓ (own)       | ✓ (own) |
 | See a course-only Knowledge base PDF | if in its course | if in its course, or its author | ✓ |
 | Switch student ↔ mentor    |           |                    | ✓       |
+| Accept or reject new accounts |        |                    | ✓       |
 | Become / stop being teacher |          |                    | (nobody) |
 
 ## Development workflow
