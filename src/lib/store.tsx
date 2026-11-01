@@ -2,6 +2,7 @@ import type { Session } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 
+import { fileFieldsError, isAllowedPdf, PDF_MAX_BYTES, PDF_RULE } from './files';
 import { NOTES_MAX } from './markdown';
 import { supabase } from './supabase';
 import type {
@@ -11,6 +12,8 @@ import type {
   Homework,
   HomeworkAssignment,
   Material,
+  MaterialFile,
+  MaterialFileEdit,
   Meeting,
   MeetingAttendance,
   MeetingEdit,
@@ -19,6 +22,7 @@ import type {
   NewAssignment,
   NewHomework,
   NewMaterial,
+  NewMaterialFile,
   NewMeeting,
   User,
 } from './types';
@@ -33,6 +37,8 @@ type Store = {
   currentUser: User | null;
   users: User[];
   materials: Material[];
+  /** Knowledge base PDFs (ARU-30), newest first: everyone signed in sees all. */
+  materialFiles: MaterialFile[];
   /** All courses, newest first. */
   courses: Course[];
   /** Listeners the current user may see: all for teachers and mentors, own courses' for students. */
@@ -74,6 +80,16 @@ type Store = {
   /** Teachers and mentors only. Deletes the listener's homework for the course (and photos), then the membership. */
   removeListener: (courseId: string, userId: string) => Promise<void>;
   deleteMaterial: (id: string) => Promise<void>;
+  /** Teachers and mentors (ARU-30): uploads the PDF, then saves the item. A retry with the same `id` reuses both.
+   *  When `isCancelled()` is true after the upload (the user left the screen), nothing is saved and the file is
+   *  removed again. */
+  addMaterialFile: (input: NewMaterialFile, options?: { isCancelled?: () => boolean }) => Promise<void>;
+  /** The author only, while a teacher or mentor: name, description and course. */
+  updateMaterialFile: (id: string, input: MaterialFileEdit) => Promise<void>;
+  /** The author only: removes the PDF first, then the item, so tapping Delete again finishes a half-done delete. */
+  deleteMaterialFile: (id: string) => Promise<void>;
+  /** A signed link to a Knowledge base PDF, valid for 60 seconds; created when the user taps Open PDF. */
+  getMaterialFileUrl: (storagePath: string) => Promise<string>;
   /** Course owner or teacher (also enforced by RLS). `id` is generated once per form, so a retry saves once. */
   addMeeting: (input: NewMeeting) => Promise<void>;
   /** Course owner or teacher: Scheduled -> completed (after the start) or canceled. Final; a retry is a no-op. */
@@ -162,6 +178,17 @@ type MeetingRow = {
 type AttendanceRow = { meeting_id: string; user_id: string; marked_at: string };
 type MessageRow = { id: string; course_id: string; author_id: string; body: string; created_at: string };
 type UnreadRow = { course_id: string; unread: number | string };
+type MaterialFileRow = {
+  id: string;
+  author_id: string;
+  name: string;
+  description: string;
+  course_id: string | null;
+  storage_path: string;
+  size_bytes: number | string;
+  created_at: string;
+  updated_at: string;
+};
 type MaterialRow = {
   id: string;
   teacher_id: string;
@@ -258,6 +285,19 @@ const toMaterial = (r: MaterialRow): Material => ({
   createdAt: r.created_at,
 });
 
+const toMaterialFile = (r: MaterialFileRow): MaterialFile => ({
+  id: r.id,
+  authorId: r.author_id,
+  name: r.name,
+  description: r.description,
+  courseId: r.course_id ?? undefined,
+  storagePath: r.storage_path,
+  // bigint may arrive as a string.
+  sizeBytes: Number(r.size_bytes),
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+});
+
 type ListenerHomeworkRow = { id: string; photo_path: string | null };
 
 type Result = { error: { message: string; code?: string } | null };
@@ -300,6 +340,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [users, setUsers] = useState<User[]>([]);
   const [homework, setHomework] = useState<Homework[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
+  const [materialFiles, setMaterialFiles] = useState<MaterialFile[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [courseMembers, setCourseMembers] = useState<CourseMember[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
@@ -324,6 +365,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setUsers([]);
         setHomework([]);
         setMaterials([]);
+        setMaterialFiles([]);
         setCourses([]);
         setCourseMembers([]);
         setMeetings([]);
@@ -355,7 +397,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const load = useCallback(async () => {
     if (!userId) return;
     try {
-      const [profiles, hw, mats, crs, members, mtgs, asgs, att] = await Promise.all([
+      const [profiles, hw, mats, crs, members, mtgs, asgs, att, files] = await Promise.all([
         supabase.from('profiles').select('id, full_name, role').order('full_name'),
         supabase.from('homework').select('*').order('created_at', { ascending: false }),
         supabase.from('materials').select('*').order('created_at', { ascending: false }),
@@ -364,6 +406,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         supabase.from('course_meetings').select('*').order('starts_at'),
         supabase.from('homework_assignments').select('*').order('created_at', { ascending: false }),
         supabase.from('meeting_attendance').select('*'),
+        supabase.from('material_files').select('*').order('created_at', { ascending: false }),
       ]);
       setUsers(rows<ProfileRow>(profiles).map(toUser));
       setHomework(await withSignedPhotoUrls(rows<HomeworkRow>(hw).map(toHomework)));
@@ -373,6 +416,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setMeetings(rows<MeetingRow>(mtgs).map(toMeeting));
       setAssignments(rows<AssignmentRow>(asgs).map(toAssignment));
       setAttendance(rows<AttendanceRow>(att).map(toAttendance));
+      setMaterialFiles(rows<MaterialFileRow>(files).map(toMaterialFile));
       await loadUnread().catch(() => {});
     } finally {
       setLoadedFor(userId);
@@ -398,6 +442,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       .channel('sham-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'homework' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'materials' }, () => load().catch(() => {}))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'material_files' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'courses' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'course_members' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'course_meetings' }, () => load().catch(() => {}))
@@ -433,6 +478,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const sortedCourses = useMemo(
     () => [...courses].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     [courses],
+  );
+  const sortedMaterialFiles = useMemo(
+    () => [...materialFiles].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id)),
+    [materialFiles],
   );
   const getCourse = useCallback((id: string | undefined) => courses.find((c) => c.id === id), [courses]);
   const visibleHomework = useMemo(
@@ -473,6 +522,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     currentUser,
     users,
     materials,
+    materialFiles: sortedMaterialFiles,
     courses: sortedCourses,
     courseMembers,
     visibleHomework,
@@ -654,6 +704,77 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         throw new Error('You can no longer delete this material.');
       }
       await load();
+    },
+    addMaterialFile: async (input, { isCancelled = () => false } = {}) => {
+      const author = requireRole('teacher', 'mentor');
+      const fieldsError = fileFieldsError(input);
+      if (fieldsError) throw new Error(fieldsError);
+      if (!isAllowedPdf(input.file)) throw new Error(PDF_RULE);
+      // A row with this id is an earlier attempt that already saved: done.
+      if (rows<{ id: string }>(await supabase.from('material_files').select('id').eq('id', input.id)).length) {
+        await load();
+        return;
+      }
+      const file = await fetch(input.file.uri).then((r) => r.arrayBuffer());
+      // The picker may not know the size: check what was actually read.
+      if (!file.byteLength || file.byteLength > PDF_MAX_BYTES) throw new Error(PDF_RULE);
+      // Named after the item id, so a retry finds the file it already uploaded.
+      const path = `${author.id}/${input.id}.pdf`;
+      const bucket = supabase.storage.from('materials');
+      const upload = await bucket.upload(path, file, { contentType: 'application/pdf' });
+      if (upload.error && !/already exists|duplicate/i.test(upload.error.message)) throw new Error(upload.error.message);
+      const discard = async () => {
+        await supabase.from('material_files').delete().eq('id', input.id);
+        await bucket.remove([path]);
+      };
+      if (isCancelled()) {
+        await discard();
+        return;
+      }
+      checkInsert(
+        await supabase.from('material_files').insert({
+          id: input.id,
+          author_id: author.id,
+          name: input.name.trim(),
+          description: input.description.trim(),
+          course_id: input.courseId ?? null,
+          storage_path: path,
+          size_bytes: file.byteLength,
+        }),
+      );
+      // Left while the row was being saved: take it back out.
+      if (isCancelled()) await discard();
+      await load();
+    },
+    updateMaterialFile: async (id, input) => {
+      requireRole('teacher', 'mentor');
+      const fieldsError = fileFieldsError(input);
+      if (fieldsError) throw new Error(fieldsError);
+      // RLS turns a forbidden update into "0 rows, no error": ask for the row back and treat none as a refusal.
+      const updated = rows<{ id: string }>(
+        await supabase
+          .from('material_files')
+          .update({ name: input.name.trim(), description: input.description.trim(), course_id: input.courseId ?? null })
+          .eq('id', id)
+          .select('id'),
+      );
+      await load();
+      if (!updated.length) throw new Error('You can no longer edit this file.');
+    },
+    deleteMaterialFile: async (id) => {
+      requireRole('teacher', 'mentor');
+      const item = materialFiles.find((f) => f.id === id);
+      if (!item) throw new Error('Material not found');
+      // PDF first (removing a file that is already gone is not an error), then the row.
+      check(await supabase.storage.from('materials').remove([item.storagePath]));
+      const deleted = rows<{ id: string }>(await supabase.from('material_files').delete().eq('id', id).select('id'));
+      await load();
+      if (!deleted.length) throw new Error('You can no longer delete this file.');
+    },
+    getMaterialFileUrl: async (storagePath) => {
+      const { data, error } = await supabase.storage.from('materials').createSignedUrl(storagePath, 60);
+      if (error || !data?.signedUrl) throw new Error(error?.message ?? 'No file link.');
+      return data.signedUrl;
     },
     addMeeting: async (input) => {
       const owner = requireRole('teacher', 'mentor');

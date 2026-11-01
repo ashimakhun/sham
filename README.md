@@ -33,7 +33,9 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `0016_chat_read_positions.sql` (ARU-31: new message counts; adds a table and functions and sets everyone already in
    a chat to "read up to now"),
    `0017_meeting_attendance.sql` (ARU-33: listeners mark attendance of completed meetings; adds a table and two
-   functions, deletes nothing).
+   functions, deletes nothing),
+   `0018_material_files.sql` (ARU-30: Knowledge base PDFs; adds a table, a trigger, the private `materials` storage
+   bucket (PDF only, 25 MB) and its policies, deletes nothing).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 
@@ -99,6 +101,7 @@ src/app/                  screens (Expo Router — every file is a route)
   roles.tsx               teacher switches users between student and mentor
   materials/new.tsx       teacher or mentor shares a material
   materials/[id].tsx      material details
+  materials/files/        Knowledge base PDFs: new.tsx upload, [id].tsx details and Open PDF, [id]/edit.tsx edit
 src/components/           shared UI
 src/lib/supabase.ts       Supabase client
 src/lib/store.tsx         data loading, actions, live updates
@@ -132,6 +135,9 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | See who attended a meeting | own marks only | ✓ (own courses and courses they don't listen to; own marks only where a listener) | ✓ |
 | See materials              | ✓         | ✓                  | ✓       |
 | Share / delete materials   |           | ✓ (own materials)  | ✓ (own) |
+| See Knowledge base, open PDFs | ✓      | ✓                  | ✓       |
+| Upload PDFs (25 MB at most) |          | ✓                  | ✓       |
+| Edit name / description / course, delete PDFs | | ✓ (own)   | ✓ (own) |
 | Switch student ↔ mentor    |           |                    | ✓       |
 | Become / stop being teacher |          |                    | (nobody) |
 

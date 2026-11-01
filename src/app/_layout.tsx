@@ -35,6 +35,9 @@ export default function RootLayout() {
         />
         <Stack.Screen name="materials/new" options={{ title: 'New material', presentation: 'modal' }} />
         <Stack.Screen name="materials/[id]" options={{ title: 'Material' }} />
+        <Stack.Screen name="materials/files/new" options={{ title: 'Upload PDF', presentation: 'modal' }} />
+        <Stack.Screen name="materials/files/[id]" options={{ title: 'File' }} />
+        <Stack.Screen name="materials/files/[id]/edit" options={{ title: 'Edit file', presentation: 'modal' }} />
         <Stack.Screen name="roles" options={{ title: 'Manage roles' }} />
       </Stack>
     </StoreProvider>
