@@ -1,9 +1,22 @@
 export type Role = 'teacher' | 'mentor' | 'student';
 
+/** ARU-43: only approved accounts can use the app. Missing means approved (before the migration). */
+export type AccessStatus = 'pending' | 'approved' | 'rejected';
+
 export type User = {
   id: string;
   name: string;
   role: Role;
+  accessStatus?: AccessStatus;
+};
+
+/** A new account waiting for the teacher, or one the teacher declined (ARU-43). Teacher only. */
+export type AccessRequest = {
+  id: string;
+  name: string;
+  email: string;
+  createdAt: string;
+  status: Exclude<AccessStatus, 'approved'>;
 };
 
 export type HomeworkStatus = 'submitted' | 'checked';

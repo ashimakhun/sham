@@ -102,6 +102,8 @@ begin
     (t.id('S1'), 's1@x.test', '{"full_name":"Student Sam"}'),
     (t.id('S2'), 's2@x.test', '{"full_name":"Student Sue"}'),
     (t.id('S3'), 's3@x.test', '{"full_name":"Student Sid"}');
+  -- New accounts start Pending (ARU-43); the fixture's people are all accepted.
+  update profiles set access_status = 'approved';
   update profiles set role = 'teacher' where id = t.id('T');
   update profiles set role = 'mentor' where id in (t.id('M'), t.id('N'), t.id('M2'));
   update profiles set mentor_id = t.id('M') where id = t.id('S1');

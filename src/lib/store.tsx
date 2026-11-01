@@ -6,6 +6,7 @@ import { fileFieldsError, isAllowedPdf, PDF_MAX_BYTES, PDF_RULE } from './files'
 import { NOTES_MAX } from './markdown';
 import { supabase } from './supabase';
 import type {
+  AccessRequest,
   Course,
   CourseMember,
   CourseMessage,
@@ -108,6 +109,10 @@ type Store = {
   sendMessage: (input: { id: string; courseId: string; body: string }) => Promise<void>;
   /** Live inserts for one course's chat (its own channel, not the global refetch). Returns an unsubscribe. */
   subscribeToMessages: (courseId: string, onMessage: (m: CourseMessage) => void) => () => void;
+  /** Teacher only (ARU-43): accounts waiting for approval and declined ones, oldest first. Empty for others. */
+  accessRequests: AccessRequest[];
+  /** Teacher only (ARU-43): accept (approved) or decline (rejected) an account, then refetch. A retry is a no-op. */
+  setAccessStatus: (userId: string, status: 'approved' | 'rejected') => Promise<void>;
   /** Teacher only (ARU-13): switches a user between student and mentor via set_user_role(), then refetches. */
   setUserRole: (userId: string, role: 'student' | 'mentor') => Promise<void>;
   /** New messages from others per course chat since the user last read it (ARU-31). 0 while that chat is open. */
@@ -126,7 +131,8 @@ export const MESSAGES_PAGE = 50;
 
 const StoreContext = createContext<Store | null>(null);
 
-type ProfileRow = { id: string; full_name: string; role: User['role'] };
+type ProfileRow = { id: string; full_name: string; role: User['role']; access_status?: User['accessStatus'] | null };
+type AccessRequestRow = { id: string; full_name: string; email: string | null; created_at: string; access_status: AccessRequest['status'] };
 type HomeworkRow = {
   id: string;
   student_id: string;
@@ -204,6 +210,16 @@ const toUser = (r: ProfileRow): User => ({
   id: r.id,
   name: r.full_name,
   role: r.role,
+  // No column yet (migration 0021 not run): everyone counts as approved.
+  accessStatus: r.access_status ?? 'approved',
+});
+
+const toAccessRequest = (r: AccessRequestRow): AccessRequest => ({
+  id: r.id,
+  name: r.full_name,
+  email: r.email ?? '',
+  createdAt: r.created_at,
+  status: r.access_status,
 });
 
 const toHomework = (r: HomeworkRow): Homework => ({
@@ -342,7 +358,9 @@ async function withSignedPhotoUrls(items: Homework[]) {
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
-  const [users, setUsers] = useState<User[]>([]);
+  // Every profile the database returns: approved accounts, plus all accounts for the teacher and the own row (ARU-43).
+  const [profiles, setProfiles] = useState<User[]>([]);
+  const [accessRequests, setAccessRequests] = useState<AccessRequest[]>([]);
   const [homework, setHomework] = useState<Homework[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [materialFiles, setMaterialFiles] = useState<MaterialFile[]>([]);
@@ -367,7 +385,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setSession(s);
       if (!s) {
         // Signed out: drop the previous user's data.
-        setUsers([]);
+        setProfiles([]);
+        setAccessRequests([]);
         setHomework([]);
         setMaterials([]);
         setMaterialFiles([]);
@@ -402,8 +421,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const load = useCallback(async () => {
     if (!userId) return;
     try {
-      const [profiles, hw, mats, crs, members, mtgs, asgs, att, files] = await Promise.all([
-        supabase.from('profiles').select('id, full_name, role').order('full_name'),
+      // RLS returns nothing but the own profile to an account that isn't approved (ARU-43), so these all succeed
+      // (empty) for it and the app shows the waiting screen.
+      const [profileRows, hw, mats, crs, members, mtgs, asgs, att, files] = await Promise.all([
+        // '*' so the app keeps working if the access_status column (0021) isn't there yet.
+        supabase.from('profiles').select('*').order('full_name'),
         supabase.from('homework').select('*').order('created_at', { ascending: false }),
         supabase.from('materials').select('*').order('created_at', { ascending: false }),
         supabase.from('courses').select('*').order('created_at', { ascending: false }),
@@ -413,7 +435,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         supabase.from('meeting_attendance').select('*'),
         supabase.from('material_files').select('*').order('created_at', { ascending: false }),
       ]);
-      setUsers(rows<ProfileRow>(profiles).map(toUser));
+      const all = rows<ProfileRow>(profileRows).map(toUser);
+      const me = all.find((u) => u.id === userId);
+      setProfiles(all);
       setHomework(await withSignedPhotoUrls(rows<HomeworkRow>(hw).map(toHomework)));
       setMaterials(rows<MaterialRow>(mats).map(toMaterial));
       setCourses(rows<CourseRow>(crs).map(toCourse));
@@ -422,6 +446,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setAssignments(rows<AssignmentRow>(asgs).map(toAssignment));
       setAttendance(rows<AttendanceRow>(att).map(toAttendance));
       setMaterialFiles(rows<MaterialFileRow>(files).map(toMaterialFile));
+      if (me?.accessStatus !== 'approved') {
+        setAccessRequests([]);
+        setUnread({});
+        return;
+      }
+      // Requests for the teacher's Manage roles screen. Not live: they refresh with every load.
+      if (me.role === 'teacher') {
+        const req = await supabase.rpc('access_requests');
+        setAccessRequests(req.error ? [] : ((req.data as AccessRequestRow[] | null) ?? []).map(toAccessRequest));
+      } else {
+        setAccessRequests([]);
+      }
       await loadUnread().catch(() => {});
     } finally {
       setLoadedFor(userId);
@@ -438,9 +474,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [load]);
 
+  // Not approved yet (ARU-43): nothing to listen to.
+  const waiting = profiles.some((u) => u.id === userId && u.accessStatus !== 'approved');
+
   useEffect(() => {
     if (!userId) return;
     load().catch(() => {});
+  }, [userId, load]);
+
+  // Live updates start once the first load has said whether the account is approved.
+  const firstLoadDone = !!userId && loadedFor === userId;
+  useEffect(() => {
+    if (!userId || !firstLoadDone || waiting) return;
     let unreadTimer: ReturnType<typeof setTimeout> | null = null;
     // Live updates: refetch when someone submits, checks or shares something.
     const channel = supabase
@@ -476,9 +521,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       appState.remove();
       supabase.removeChannel(channel);
     };
-  }, [userId, load, loadUnread]);
+  }, [userId, firstLoadDone, waiting, load, loadUnread]);
 
-  const currentUser = users.find((u) => u.id === userId) ?? null;
+  const currentUser = profiles.find((u) => u.id === userId) ?? null;
+  // Only approved accounts are users of the app: pickers and lists never offer people still waiting (ARU-43).
+  const users = useMemo(() => profiles.filter((u) => u.accessStatus === 'approved'), [profiles]);
   const getUser = useCallback((id: string | undefined) => users.find((u) => u.id === id), [users]);
   const sortedCourses = useMemo(
     () => [...courses].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
@@ -876,6 +923,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       requireRole('teacher');
       check(await supabase.rpc('set_user_role', { target: userId, new_role: role }));
       // profiles is not in realtime: refetch so the user moves to their new section.
+      await load();
+    },
+    accessRequests,
+    setAccessStatus: async (target, status) => {
+      requireRole('teacher');
+      check(await supabase.rpc('set_access_status', { target, new_status: status }));
       await load();
     },
     unreadCount: (courseId) => (courseId === activeChat ? 0 : (unread[courseId] ?? 0)),
