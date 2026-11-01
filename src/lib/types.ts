@@ -169,3 +169,8 @@ export type NewMaterialFile = {
   courseOnly?: boolean;
 };
 export type MaterialFileEdit = { name: string; description: string; courseId?: string; courseOnly?: boolean };
+
+/** Telegram notification types (ARU-48); each one has its own on/off switch. */
+export type TelegramKind = 'meeting_started' | 'new_homework' | 'homework_reviewed' | 'chat_message';
+/** The signed-in user's link to the Sham Telegram bot (ARU-48). */
+export type TelegramLink = { linkedAt: string; switches: Record<TelegramKind, boolean> };

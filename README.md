@@ -42,7 +42,9 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    visible to everyone) and a function, replaces the two read policies, deletes nothing),
    `0021_account_approval.sql` (ARU-43: new accounts wait for the teacher's approval; adds an access status (every
    existing account is approved), two functions and a trigger, and adds the approval check to the helper functions
-   and open read policies; deletes nothing).
+   and open read policies; deletes nothing),
+   `0023_telegram_links.sql` (ARU-48: Telegram notifications setup; adds two tables and five functions, changes
+   nothing else; see [Telegram notifications](#telegram-notifications)).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 
@@ -59,6 +61,32 @@ There can be only one teacher. If your database already has two or more, `0009_r
 "More than one teacher exists: …; make all but one a mentor first". Run
 `update profiles set role = 'mentor' where id = (select id from auth.users where email = '…');` for each extra
 teacher in the SQL Editor, then run the migration again.
+
+### Telegram notifications
+
+Notifications go through the Sham Telegram bot (ARU-48). Each user connects on **Profile → Telegram notifications**
+and chooses which types they get. Until the steps below are done the card stays hidden and nothing else changes.
+
+1. In Telegram, message **@BotFather**, send `/newbot` and keep the **token** it gives you secret.
+2. Set the Edge Function secrets (dashboard → Edge Functions → Secrets, or the CLI). `TELEGRAM_WEBHOOK_SECRET` is
+   any random string of letters, digits, `_` and `-`:
+   ```bash
+   npx supabase secrets set TELEGRAM_BOT_TOKEN=<token> TELEGRAM_WEBHOOK_SECRET=<random string>
+   ```
+3. Deploy the bot's webhook (Telegram sends no Supabase JWT; the secret header protects it):
+   ```bash
+   npx supabase functions deploy telegram-webhook --no-verify-jwt
+   ```
+4. Point the bot at it once:
+   ```bash
+   curl "https://api.telegram.org/bot<token>/setWebhook" \
+     -d url=https://<project-ref>.supabase.co/functions/v1/telegram-webhook \
+     -d secret_token=<the same random string> -d 'allowed_updates=["message"]'
+   ```
+5. Put the bot's username (without `@`) in `.env.local` as `EXPO_PUBLIC_TELEGRAM_BOT_USERNAME` and restart `npm start`.
+
+The bot only answers `/start <code>` (from the app's Connect button) and `/stop`, in private chats. Notifications
+themselves are sent by `supabase/functions/_shared/telegram.ts` from the notification stories' functions.
 
 ## Run it
 
@@ -154,6 +182,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | See a course-only Knowledge base PDF | if in its course | if in its course, or its author | ✓ |
 | Switch student ↔ mentor    |           |                    | ✓       |
 | Accept or reject new accounts |        |                    | ✓       |
+| Connect Telegram and choose own notifications | ✓ (own) | ✓ (own) | ✓ (own) |
 | Become / stop being teacher |          |                    | (nobody) |
 
 ## Development workflow

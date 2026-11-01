@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { ScrollView, Text, View } from 'react-native';
 
+import { TelegramCard } from '@/components/TelegramCard';
 import { Button, Card, ErrorText, RoleBadge, styles } from '@/components/ui';
 import { canManageRoles } from '@/lib/roles';
 import { useStore } from '@/lib/store';
@@ -70,6 +71,8 @@ export default function ProfileScreen() {
           )}
         </Card>
       )}
+
+      <TelegramCard />
 
       <View style={{ gap: 10, marginTop: 8 }}>
         {canManageRoles(currentUser.role) && (
