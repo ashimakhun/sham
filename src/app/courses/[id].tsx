@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { FlatList, RefreshControl, ScrollView, Text, View } from 'react-native';
 
+import { CourseMaterialsSection } from '@/components/CourseMaterialsSection';
 import { HomeworkCard } from '@/components/HomeworkCard';
 import { ListenersSection } from '@/components/ListenersSection';
 import { MeetingsSection } from '@/components/MeetingsSection';
@@ -71,6 +72,7 @@ export default function CourseDetailScreen() {
           )}
           <MeetingsSection course={course} />
           <ListenersSection course={course} />
+          <CourseMaterialsSection course={course} />
           <Text style={styles.label}>HOMEWORK</Text>
         </View>
       }
