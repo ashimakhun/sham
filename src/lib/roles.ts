@@ -1,3 +1,4 @@
+import { isOpenForAttendance } from './meetings';
 import type { Course, CourseMember, Homework, Meeting, Role, User } from './types';
 
 /** Mirrors the "teachers and mentors create courses" RLS policy (supabase/migrations/0003_courses.sql). */
@@ -56,15 +57,16 @@ export function canManageRoles(role: Role | undefined) {
   return role === 'teacher';
 }
 
-/** Mirrors mark_attendance() / unmark_attendance() (supabase/migrations/0017_meeting_attendance.sql): a current
- *  listener of the course marks their own attendance, for Completed meetings only (ARU-33). */
+/** Mirrors mark_attendance() / unmark_attendance() (0017, 0022): a current listener of the course marks their own
+ *  attendance (ARU-33) of a meeting that has started and isn't canceled (ARU-45). */
 export function canMarkAttendance(
   user: User | null | undefined,
   course: Course,
   members: CourseMember[],
   meeting: Meeting,
+  now: number = Date.now(),
 ) {
-  return meeting.status === 'completed' && isCourseListener(user, course, members);
+  return isOpenForAttendance(meeting, now) && isCourseListener(user, course, members);
 }
 
 /** ARU-33: who sees who attended (the count and the Attendance screen): the course's current owner, the teacher, or

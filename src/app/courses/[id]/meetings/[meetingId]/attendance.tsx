@@ -3,16 +3,19 @@ import { RefreshControl, ScrollView, Text, View } from 'react-native';
 
 import { Card, EmptyState, RoleBadge, styles } from '@/components/ui';
 import { meetingAttendance } from '@/lib/attendance';
+import { isOpenForAttendance } from '@/lib/meetings';
 import { canSeeAttendance, canSeeMeetings } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { formatDateTime } from '@/lib/theme';
 import type { User } from '@/lib/types';
+import { useNow } from '@/lib/useNow';
 
-/** Who attended a Completed meeting (ARU-33): for the course owner, the teacher and mentors who don't listen to the
+/** Who attended a meeting (ARU-33), from its start time unless canceled (ARU-45): for the course owner, the teacher and mentors who don't listen to the
  *  course. Every current listener is under Attended or Not marked; it follows live store updates. */
 export default function MeetingAttendanceScreen() {
   const { id: courseId, meetingId } = useLocalSearchParams<{ id: string; meetingId: string }>();
   const { currentUser, courseMembers, getCourse, getUser, meetings, attendance, loading, refresh } = useStore();
+  const now = useNow();
 
   const course = getCourse(courseId);
   const meeting = meetings.find((m) => m.id === meetingId && m.courseId === courseId);
@@ -41,12 +44,18 @@ export default function MeetingAttendanceScreen() {
     </View>
   );
 
-  if (meeting.status !== 'completed') {
+  if (!isOpenForAttendance(meeting, now)) {
     return (
       <ScrollView style={styles.screen} contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic">
         {title}
         {header}
-        <EmptyState title="Attendance is available only for completed meetings." />
+        <EmptyState
+          title={
+            meeting.status === 'canceled'
+              ? 'This meeting was canceled.'
+              : 'Attendance is available once the meeting has started.'
+          }
+        />
       </ScrollView>
     );
   }

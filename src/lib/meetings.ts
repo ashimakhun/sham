@@ -14,6 +14,13 @@ export function hasStarted(meeting: Pick<Meeting, 'startsAt'>, now: number = Dat
   return new Date(meeting.startsAt).getTime() <= now;
 }
 
+/** ARU-45: attendance can be marked (and seen) once the meeting has started, until it is canceled. Mirrors
+ *  mark_attendance() / unmark_attendance() (supabase/migrations/0022_attendance_from_start.sql), which use the
+ *  database clock: a device clock that is ahead can show the button a little early, and the error then says so. */
+export function isOpenForAttendance(meeting: Pick<Meeting, 'status' | 'startsAt'>, now: number = Date.now()) {
+  return meeting.status !== 'canceled' && hasStarted(meeting, now);
+}
+
 /** A location that is a web link opens in the browser; anything else is a place. */
 export function isLink(location: string | undefined): location is string {
   return !!location && /^https?:\/\/\S+$/i.test(location.trim());

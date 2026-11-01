@@ -52,10 +52,11 @@ beforeEach(() => {
 });
 
 describe('roles helpers', () => {
-  it('only current listeners mark, only on completed meetings', () => {
+  // ARU-45: open from the start time (ST, started but still Scheduled) unless canceled.
+  it('only current listeners mark, only on started meetings that are not canceled', () => {
     for (const who of ['S1', 'M2'] as const) {
-      expect(canMarkAttendance(users[who], courseA, members, C)).toBe(true);
-      for (const m of [S, ST, X]) expect(canMarkAttendance(users[who], courseA, members, m)).toBe(false);
+      for (const m of [C, ST]) expect(canMarkAttendance(users[who], courseA, members, m)).toBe(true);
+      for (const m of [S, X]) expect(canMarkAttendance(users[who], courseA, members, m)).toBe(false);
     }
     for (const who of ['S2', 'N', 'M', 'T'] as const) expect(canMarkAttendance(users[who], courseA, members, C)).toBe(false);
   });
@@ -73,11 +74,11 @@ describe('roles helpers', () => {
 });
 
 describe('listener marks attendance (AC1–AC5)', () => {
-  it.each(['S1', 'M2'] as const)('AC1: %s sees "I attended" on the completed meeting only', async (who) => {
+  it.each(['S1', 'M2'] as const)('AC1: %s sees "I attended" on the completed and started meetings only (ARU-45)', async (who) => {
     setStore(store(who));
     await render(<CourseDetailScreen />);
-    expect(inMeeting('C').getByRole('button', { name: 'I attended' })).toBeTruthy();
-    for (const id of ['S', 'ST', 'X']) expect(inMeeting(id).queryByRole('button', { name: 'I attended' })).toBeNull();
+    for (const id of ['C', 'ST']) expect(inMeeting(id).getByRole('button', { name: 'I attended' })).toBeTruthy();
+    for (const id of ['S', 'X']) expect(inMeeting(id).queryByRole('button', { name: 'I attended' })).toBeNull();
     expect(screen.queryByText(/Attended: /)).toBeNull();
   });
 
@@ -157,12 +158,13 @@ describe('listener marks attendance (AC1–AC5)', () => {
 });
 
 describe('owner, teacher and mentors see attendance (AC6, AC8)', () => {
-  it.each(['M', 'T', 'N'] as const)('AC6: %s sees "Attended: X of Y" on the completed meeting only', async (who) => {
+  it.each(['M', 'T', 'N'] as const)('AC6: %s sees "Attended: X of Y" on the completed and started meetings only (ARU-45)', async (who) => {
     setStore(store(who, { attendance: [mark('C', 'S1')] }));
     await render(<CourseDetailScreen />);
     expect(inMeeting('C').getByText('Attended: 1 of 3')).toBeTruthy();
     expect(inMeeting('C').getByRole('link', { name: 'Attended 1 of 3' })).toBeTruthy();
-    for (const id of ['S', 'ST', 'X']) expect(inMeeting(id).queryByText(/Attended/)).toBeNull();
+    expect(inMeeting('ST').getByText('Attended: 0 of 3')).toBeTruthy();
+    for (const id of ['S', 'X']) expect(inMeeting(id).queryByText(/Attended/)).toBeNull();
   });
 
   it('AC6: tapping the count opens the Attendance screen', async () => {
@@ -236,10 +238,10 @@ describe('Attendance screen (AC6, AC8, AC9)', () => {
     expect(screen.getByText('Meeting not found')).toBeTruthy();
   });
 
-  it('a scheduled or canceled meeting shows that attendance is for completed meetings', async () => {
+  it('a canceled meeting says so (ARU-45)', async () => {
     params.meetingId = 'X';
     setStore(store('M'));
     await render(<MeetingAttendanceScreen />);
-    expect(screen.getByText('Attendance is available only for completed meetings.')).toBeTruthy();
+    expect(screen.getByText('This meeting was canceled.')).toBeTruthy();
   });
 });
