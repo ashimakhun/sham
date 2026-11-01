@@ -3,9 +3,15 @@
 An educational mobile app where teachers, mentors and students work together:
 
 - **Teachers and mentors** create courses and add students and mentors to them as listeners.
-- **Students** send homework (text + optional photo) for a course to their mentor.
-- **Mentors** see their students' homework, leave a comment and mark it as checked.
-- **Teachers and mentors** share learning materials (lessons, notes, links) with the class; teachers see all homework.
+- **The course owner** (or the teacher) schedules meetings; after a completed meeting they add notes and assign
+  homework, and listeners mark that they attended.
+- **Listeners** send homework (text + optional photo) for an assignment from the **New** list on the Homework tab.
+- **Mentors and the teacher** see all homework, leave a comment and mark it as checked (never their own).
+- **Each course** has a chat with a new-message counter for its owner, listeners and the teacher.
+- **Teachers and mentors** share formatted posts (lessons, notes, links) with everyone on the Materials tab's
+  **Blog**, filterable by author; a **Knowledge base** tab for PDF books is coming.
+
+How each feature behaves today is described in the Linear project document **Sham: product documentation**.
 
 Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Router and [Supabase](https://supabase.com) (auth, Postgres, storage, realtime).
 
@@ -108,7 +114,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | See homework assignments   | courses they're in | ✓ (all courses) | ✓    |
 | Assign homework to a completed meeting | | own courses        | any course |
 | Send homework (for an assignment) | courses they're in | courses they're in |  |
-| Mark homework checked      |           | any (not their own) | any    |
+| Mark homework checked      |           | any (not their own) | any (not their own) |
 | See courses                | all (title and description only unless they're in it) | all | all |
 | Create courses             |           | ✓                  | ✓       |
 | Change course owner        |           | ✓ (any course)     | ✓       |
@@ -135,7 +141,18 @@ New work goes through three Claude agents (requirements → dev → QA) coordina
 reviewed and merged by a person. See [`docs/agent-pipeline.md`](docs/agent-pipeline.md); the agents'
 instructions are in [`.claude/skills/`](.claude/skills/).
 
+Two rules are enforced in the app only: a student sees only the title and description of courses they are not in
+(course titles stay readable so they can be listed), and a mentor who is a listener of a course doesn't see the
+others' attendance there. Also, the homework update rule doesn't check the status, so the database would let a
+mentor or the teacher change homework that is already checked; the app never offers it.
+
+## Work in progress
+
+- **Knowledge base of PDF files, each optionally linked to a course** (ARU-30): ready for development. The
+  Knowledge base tab shows a placeholder until then.
+- **Linked PDFs on the course screen** (ARU-39): after ARU-30.
+
 ## Next steps
 
-1. Push notifications (new homework for mentors, feedback for students).
-2. Chat between teacher, mentors and students.
+1. Push notifications (new homework for mentors, feedback for students, new chat messages).
+2. Private (one-to-one) chat between teacher, mentors and students; each course already has a group chat.
