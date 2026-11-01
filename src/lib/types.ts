@@ -58,6 +58,8 @@ export type MaterialFile = {
   name: string;
   description: string;
   courseId?: string;
+  /** Only people in the linked course (its owner and listeners), the author and the teacher see it (ARU-42). */
+  courseOnly?: boolean;
   storagePath: string;
   sizeBytes: number;
   createdAt: string;
@@ -145,5 +147,12 @@ export type MeetingEdit = { startsAt: string; topic: string; location: string };
 /** A PDF picked on the device, before upload (ARU-30). `size` and `mimeType` may be missing on some platforms. */
 export type PickedFile = { uri: string; name: string; size?: number; mimeType?: string };
 /** `id` is generated once per upload screen, so a retry finds the file and row it already saved. */
-export type NewMaterialFile = { id: string; file: PickedFile; name: string; description: string; courseId?: string };
-export type MaterialFileEdit = { name: string; description: string; courseId?: string };
+export type NewMaterialFile = {
+  id: string;
+  file: PickedFile;
+  name: string;
+  description: string;
+  courseId?: string;
+  courseOnly?: boolean;
+};
+export type MaterialFileEdit = { name: string; description: string; courseId?: string; courseOnly?: boolean };

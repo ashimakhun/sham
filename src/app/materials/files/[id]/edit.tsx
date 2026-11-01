@@ -27,11 +27,14 @@ function EditForm({ item }: { item: MaterialFile }) {
   const [name, setName] = useState(item.name);
   const [description, setDescription] = useState(item.description);
   const [courseId, setCourseId] = useState(item.courseId);
+  // Kept when the course changes; saved as Everyone with "No course" (ARU-42).
+  const [courseOnly, setCourseOnly] = useState(!!item.courseOnly);
 
   function save() {
     if (busy) return;
     run(async () => {
-      await updateMaterialFile(item.id, { name, description, courseId });
+      // Without courseOnly the store saves Everyone, so switching back to Everyone or to "No course" clears it.
+      await updateMaterialFile(item.id, { name, description, courseId, ...(courseId && courseOnly ? { courseOnly: true } : {}) });
       if (router.canGoBack()) router.back();
       else router.replace({ pathname: '/materials/files/[id]', params: { id: item.id } });
     });
@@ -50,6 +53,8 @@ function EditForm({ item }: { item: MaterialFile }) {
           onDescription={setDescription}
           courseId={courseId}
           onCourse={setCourseId}
+          courseOnly={courseOnly}
+          onCourseOnly={setCourseOnly}
         />
         <ErrorText error={error} />
         <Button title={busy ? 'Saving…' : 'Save'} onPress={save} disabled={busy || !name.trim()} />

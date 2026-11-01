@@ -37,7 +37,9 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `0018_material_files.sql` (ARU-30: Knowledge base PDFs; adds a table, a trigger, the private `materials` storage
    bucket (PDF only, 25 MB) and its policies, deletes nothing),
    `0019_hidden_courses.sql` (ARU-40: hidden courses; adds a column (existing courses stay visible), three helper
-   functions and restrictive policies, and updates the course functions to check visibility; deletes nothing).
+   functions and restrictive policies, and updates the course functions to check visibility; deletes nothing),
+   `0020_course_only_material_files.sql` (ARU-42: course-only Knowledge base PDFs; adds a column (existing items stay
+   visible to everyone) and a function, replaces the two read policies, deletes nothing).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 
@@ -142,6 +144,8 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | See Knowledge base, open PDFs | ✓      | ✓                  | ✓       |
 | Upload PDFs (25 MB at most) |          | ✓                  | ✓       |
 | Edit name / description / course, delete PDFs | | ✓ (own)   | ✓ (own) |
+| Make a course-linked PDF course-only | | ✓ (own)       | ✓ (own) |
+| See a course-only Knowledge base PDF | if in its course | if in its course, or its author | ✓ |
 | Switch student ↔ mentor    |           |                    | ✓       |
 | Become / stop being teacher |          |                    | (nobody) |
 
