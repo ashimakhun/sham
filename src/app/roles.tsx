@@ -5,8 +5,8 @@ import { Button, EmptyState, ErrorText, RoleBadge, styles } from '@/components/u
 import { confirmDestructive } from '@/lib/confirm';
 import { canManageRoles } from '@/lib/roles';
 import { useStore } from '@/lib/store';
-import { colors } from '@/lib/theme';
-import type { Role, User } from '@/lib/types';
+import { colors, formatDate } from '@/lib/theme';
+import type { AccessRequest, Role, User } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
 
 const SECTIONS: { role: Role; title: string }[] = [
@@ -15,9 +15,15 @@ const SECTIONS: { role: Role; title: string }[] = [
   { role: 'student', title: 'Students' },
 ];
 
-/** The teacher switches users between student and mentor (ARU-13). set_user_role() enforces every rule. */
+type Row = { kind: 'user'; user: User } | { kind: 'request'; request: AccessRequest };
+
+/**
+ * The teacher accepts or declines new accounts (ARU-43: Requests first, Declined last) and switches users between
+ * student and mentor (ARU-13). set_access_status() and set_user_role() enforce every rule.
+ */
 export default function RolesScreen() {
-  const { currentUser, users, courses, dataLoaded, loading, refresh, setUserRole } = useStore();
+  const { currentUser, users, courses, dataLoaded, loading, refresh, setUserRole, accessRequests, setAccessStatus } =
+    useStore();
   const [query, setQuery] = useState('');
   const { busy, error, run } = useAction();
 
@@ -34,12 +40,34 @@ export default function RolesScreen() {
   }
 
   const q = query.trim().toLowerCase();
-  const sections = SECTIONS.map((s) => ({
-    title: s.title,
-    data: users
-      .filter((u) => u.role === s.role && u.name.toLowerCase().includes(q))
-      .sort((a, b) => a.name.localeCompare(b.name)),
-  })).filter((s) => s.data.length > 0); // a section with no users is hidden
+  // Requests and Declined come oldest first from access_requests(); the search filters them by name too.
+  const requests = (status: AccessRequest['status']) =>
+    accessRequests
+      .filter((r) => r.status === status && r.name.toLowerCase().includes(q))
+      .map((request): Row => ({ kind: 'request', request }));
+  const sections = [
+    { title: 'Requests', data: requests('pending') },
+    ...SECTIONS.map((s) => ({
+      title: s.title,
+      data: users
+        .filter((u) => u.role === s.role && u.name.toLowerCase().includes(q))
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((user): Row => ({ kind: 'user', user })),
+    })),
+    { title: 'Declined', data: requests('rejected') },
+  ].filter((s) => s.data.length > 0); // a section with no rows is hidden
+
+  // At once, without a confirmation (ARU-43 AC 6); a retry is a no-op in the database.
+  function accept(r: AccessRequest) {
+    run(() => setAccessStatus(r.id, 'approved'));
+  }
+
+  function decline(r: AccessRequest) {
+    run(async () => {
+      const ok = await confirmDestructive('Reject request', `Reject ${r.name}? They won't be able to use Sham.`, 'Reject');
+      if (ok) await setAccessStatus(r.id, 'rejected');
+    });
+  }
 
   function makeMentor(user: User) {
     run(async () => {
@@ -81,7 +109,7 @@ export default function RolesScreen() {
       initialNumToRender={30}
       refreshing={loading}
       onRefresh={() => refresh().catch(() => {})}
-      keyExtractor={(u) => u.id}
+      keyExtractor={(row) => (row.kind === 'user' ? row.user.id : `request-${row.request.id}`)}
       stickySectionHeadersEnabled={false}
       ListHeaderComponent={
         <View style={{ gap: 8 }}>
@@ -102,23 +130,48 @@ export default function RolesScreen() {
       renderSectionHeader={({ section }) => (
         <Text style={[styles.label, { marginTop: 8 }]}>{section.title.toUpperCase()}</Text>
       )}
-      renderItem={({ item }) => (
-        <View testID={`user-${item.id}`} style={[styles.input, { flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
-          <View style={{ flex: 1, gap: 4, alignItems: 'flex-start' }}>
-            <Text style={styles.body} numberOfLines={2}>
-              {item.name}
-            </Text>
-            <RoleBadge role={item.role} />
+      renderItem={({ item: row }) => {
+        if (row.kind === 'request') {
+          const r = row.request;
+          return (
+            <View testID={`request-${r.id}`} style={[styles.input, { flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={styles.body} numberOfLines={2}>
+                  {r.name}
+                </Text>
+                <Text style={styles.muted} numberOfLines={1}>
+                  {r.email}
+                </Text>
+                <Text style={styles.muted}>Signed up {formatDate(r.createdAt)}</Text>
+              </View>
+              <View style={{ gap: 6 }}>
+                <Button title="Accept" disabled={busy} onPress={() => accept(r)} />
+                {r.status === 'pending' && (
+                  <Button title="Reject" variant="danger" disabled={busy} onPress={() => decline(r)} />
+                )}
+              </View>
+            </View>
+          );
+        }
+        const item = row.user;
+        return (
+          <View testID={`user-${item.id}`} style={[styles.input, { flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
+            <View style={{ flex: 1, gap: 4, alignItems: 'flex-start' }}>
+              <Text style={styles.body} numberOfLines={2}>
+                {item.name}
+              </Text>
+              <RoleBadge role={item.role} />
+            </View>
+            {/* The teacher's row has no action: nothing in the app makes anyone a teacher. */}
+            {item.role === 'student' && (
+              <Button title="Make mentor" variant="secondary" disabled={busy} onPress={() => makeMentor(item)} />
+            )}
+            {item.role === 'mentor' && (
+              <Button title="Make student" variant="secondary" disabled={busy} onPress={() => makeStudent(item)} />
+            )}
           </View>
-          {/* The teacher's row has no action: nothing in the app makes anyone a teacher. */}
-          {item.role === 'student' && (
-            <Button title="Make mentor" variant="secondary" disabled={busy} onPress={() => makeMentor(item)} />
-          )}
-          {item.role === 'mentor' && (
-            <Button title="Make student" variant="secondary" disabled={busy} onPress={() => makeStudent(item)} />
-          )}
-        </View>
-      )}
+        );
+      }}
       ListEmptyComponent={
         q ? <EmptyState title={`No users match '${query.trim()}'`} /> : <EmptyState title="No users yet" />
       }
