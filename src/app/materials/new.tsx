@@ -1,7 +1,8 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 
+import { MarkdownEditor } from '@/components/MarkdownEditor';
 import { Button, ErrorText, Field, styles } from '@/components/ui';
 import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
@@ -26,13 +27,19 @@ export default function NewMaterialScreen() {
       <ScrollView contentContainerStyle={[styles.content, { gap: 16 }]} keyboardShouldPersistTaps="handled"
         contentInsetAdjustmentBehavior="automatic">
         <Field label="Title" placeholder="e.g. Lesson 3: Decimals" value={title} onChangeText={setTitle} />
-        <Field
-          label="Content"
-          placeholder="Explanation, instructions, what to read…"
-          value={body}
-          onChangeText={setBody}
-          multiline
-        />
+        {/* Formatted blog post (ARU-38): stored as Markdown in materials.body, 10,000 characters at most. */}
+        <View style={{ gap: 6 }}>
+          <Text style={styles.label}>
+            Content
+          </Text>
+          <MarkdownEditor
+            value={body}
+            onChange={setBody}
+            placeholder="Explanation, instructions, what to read…"
+            accessibilityLabel="Content"
+            limitMessage="Content can be at most 10,000 characters."
+          />
+        </View>
         <Field
           label="Link (optional)"
           placeholder="https://…"

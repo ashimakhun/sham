@@ -152,10 +152,14 @@ export function Segmented<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <View style={styles.segmented}>
+    <View style={styles.segmented} accessibilityRole="tablist">
       {options.map((o) => (
         <Pressable
           key={o.value}
+          // Announced with its selected state by VoiceOver / TalkBack (ARU-38).
+          accessibilityRole="tab"
+          accessibilityLabel={o.label}
+          accessibilityState={{ selected: value === o.value }}
           onPress={() => onChange(o.value)}
           style={[styles.segment, value === o.value && styles.segmentActive]}>
           <Text style={[styles.segmentText, value === o.value && { color: colors.text }]}>{o.label}</Text>

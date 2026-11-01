@@ -10,6 +10,10 @@ type Props = {
   onChange: (text: string) => void;
   placeholder?: string;
   maxLength?: number;
+  /** What the screen reader calls the text field (ARU-38: "Content" on Share material). */
+  accessibilityLabel?: string;
+  /** Shown when an edit would go past `maxLength`; defaults to the meeting-notes wording. */
+  limitMessage?: string;
 };
 
 const TOOLS = [
@@ -27,7 +31,15 @@ type Tool = (typeof TOOLS)[number]['key'];
  * Link asks for an http/https URL in an inline field (works on iOS, Android and web). Typing past `maxLength` is
  * blocked, and a counter shows near the limit.
  */
-export function MarkdownEditor({ value, onChange, placeholder, maxLength = NOTES_MAX }: Props) {
+export function MarkdownEditor({
+  value,
+  onChange,
+  placeholder,
+  maxLength = NOTES_MAX,
+  accessibilityLabel = 'Notes',
+  limitMessage,
+}: Props) {
+  const tooLong = limitMessage ?? `Notes can be at most ${maxLength.toLocaleString('en-US')} characters.`;
   const selection = useRef<Selection>({ start: value.length, end: value.length });
   // Set only right after a toolbar edit, so the cursor lands where the edit put it; cleared on the next change.
   const [forced, setForced] = useState<Selection>();
@@ -38,7 +50,7 @@ export function MarkdownEditor({ value, onChange, placeholder, maxLength = NOTES
 
   function apply(edit: Edit) {
     if (edit.text.length > maxLength) {
-      setError(`Notes can be at most ${maxLength.toLocaleString('en-US')} characters.`);
+      setError(tooLong);
       return;
     }
     setError(null);
@@ -136,7 +148,7 @@ export function MarkdownEditor({ value, onChange, placeholder, maxLength = NOTES
 
       <TextInput
         ref={input}
-        accessibilityLabel="Notes"
+        accessibilityLabel={accessibilityLabel}
         multiline
         value={value}
         placeholder={placeholder}
@@ -149,8 +161,11 @@ export function MarkdownEditor({ value, onChange, placeholder, maxLength = NOTES
         }}
         onChangeText={(text) => {
           if (forced) setForced(undefined);
-          setError(null);
-          onChange(text);
+          // Typing or pasting past the limit: keep what fits and say why the rest was not added (ARU-38). The native
+          // maxLength already cuts on iOS / Android; this also covers web and reaching the limit exactly.
+          const hitLimit = text.length > maxLength || (text.length === maxLength && text.length > value.length);
+          setError(hitLimit ? tooLong : null);
+          onChange(text.length > maxLength ? text.slice(0, maxLength) : text);
         }}
         scrollEnabled
         textAlignVertical="top"
