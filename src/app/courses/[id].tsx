@@ -4,7 +4,7 @@ import { FlatList, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { HomeworkCard } from '@/components/HomeworkCard';
 import { ListenersSection } from '@/components/ListenersSection';
 import { MeetingsSection } from '@/components/MeetingsSection';
-import { Button, Card, EmptyState, OwnerLine, styles } from '@/components/ui';
+import { Button, Card, EmptyState, HiddenBadge, OwnerLine, styles } from '@/components/ui';
 import { canChangeOwner, inCourseChat, seesOnlyCourseSummary } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { formatDate } from '@/lib/theme';
@@ -50,7 +50,14 @@ export default function CourseDetailScreen() {
       ListHeaderComponent={
         <View style={{ gap: 12 }}>
           <Card>
-            <Text style={styles.h1}>{course.title}</Text>
+            {course.hidden ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <Text style={[styles.h1, { flexShrink: 1 }]}>{course.title}</Text>
+                <HiddenBadge />
+              </View>
+            ) : (
+              <Text style={styles.h1}>{course.title}</Text>
+            )}
             <OwnerLine name={getUser(course.createdById)?.name ?? 'Unknown'} date={formatDate(course.createdAt)} />
             {course.description ? <Text style={styles.body}>{course.description}</Text> : null}
           </Card>
