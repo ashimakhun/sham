@@ -51,6 +51,19 @@ export type Material = {
   createdAt: string;
 };
 
+/** A Knowledge base PDF (ARU-30). */
+export type MaterialFile = {
+  id: string;
+  authorId: string;
+  name: string;
+  description: string;
+  courseId?: string;
+  storagePath: string;
+  sizeBytes: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type Course = {
   id: string;
   title: string;
@@ -127,3 +140,8 @@ export type NewMaterial = Pick<Material, 'title' | 'body' | 'link'>;
 export type NewMeeting = { id: string; courseId: string; startsAt: string; topic: string; location: string };
 /** `startsAt` is sent back exactly as loaded when the time wasn't changed, so it doesn't count as a reschedule. */
 export type MeetingEdit = { startsAt: string; topic: string; location: string };
+/** A PDF picked on the device, before upload (ARU-30). `size` and `mimeType` may be missing on some platforms. */
+export type PickedFile = { uri: string; name: string; size?: number; mimeType?: string };
+/** `id` is generated once per upload screen, so a retry finds the file and row it already saved. */
+export type NewMaterialFile = { id: string; file: PickedFile; name: string; description: string; courseId?: string };
+export type MaterialFileEdit = { name: string; description: string; courseId?: string };

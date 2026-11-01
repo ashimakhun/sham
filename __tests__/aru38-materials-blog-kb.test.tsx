@@ -16,7 +16,8 @@ jest.mock('@/lib/store', () => require('./helpers/mocks').store);
 
 const SHARE = '+ Share material';
 const KB_TITLE = 'No books or files yet';
-const KB_HINT = 'PDF books will appear here.';
+// ARU-30 replaced the placeholder hint with the teacher/mentor upload hint.
+const KB_HINT = 'Upload a PDF for your class.';
 const LIMIT = 'Content can be at most 10,000 characters.';
 
 const mat = (id: string, teacherId: string, body = 'Body', createdAt = '2026-10-20T10:00:00.000Z'): Material => ({
