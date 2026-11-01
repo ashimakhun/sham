@@ -184,6 +184,7 @@ type MaterialFileRow = {
   name: string;
   description: string;
   course_id: string | null;
+  course_only?: boolean | null;
   storage_path: string;
   size_bytes: number | string;
   created_at: string;
@@ -291,6 +292,8 @@ const toMaterialFile = (r: MaterialFileRow): MaterialFile => ({
   name: r.name,
   description: r.description,
   courseId: r.course_id ?? undefined,
+  // Without a course an item is visible to everyone (ARU-42).
+  courseOnly: !!r.course_only && !!r.course_id,
   storagePath: r.storage_path,
   // bigint may arrive as a string.
   sizeBytes: Number(r.size_bytes),
@@ -738,6 +741,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           name: input.name.trim(),
           description: input.description.trim(),
           course_id: input.courseId ?? null,
+          // "No course" is always Everyone (ARU-42).
+          course_only: !!input.courseId && !!input.courseOnly,
           storage_path: path,
           size_bytes: file.byteLength,
         }),
@@ -754,7 +759,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const updated = rows<{ id: string }>(
         await supabase
           .from('material_files')
-          .update({ name: input.name.trim(), description: input.description.trim(), course_id: input.courseId ?? null })
+          .update({
+            name: input.name.trim(),
+            description: input.description.trim(),
+            course_id: input.courseId ?? null,
+            course_only: !!input.courseId && !!input.courseOnly,
+          })
           .eq('id', id)
           .select('id'),
       );

@@ -7,7 +7,7 @@ import { Button, Card, EmptyState, ErrorText, FilterChips, Segmented, styles } f
 import { formatSize, isAllowedPdf, PDF_RULE } from '@/lib/files';
 import { markdownToPlainText } from '@/lib/markdown';
 import { useStore } from '@/lib/store';
-import { formatDate } from '@/lib/theme';
+import { colors, formatDate } from '@/lib/theme';
 
 const ALL = 'all';
 
@@ -99,6 +99,11 @@ export default function MaterialsScreen() {
           const course = item.courseId ? getCourse(item.courseId) : undefined;
           return (
             <Card onPress={() => router.push({ pathname: '/materials/files/[id]', params: { id: item.id } })}>
+              {item.courseOnly && (
+                <View style={[styles.badge, { backgroundColor: '#F3F4F6' }]}>
+                  <Text style={[styles.badgeText, { color: colors.muted }]}>Course only</Text>
+                </View>
+              )}
               <Text style={styles.title} numberOfLines={2}>
                 {item.name}
               </Text>

@@ -11,10 +11,18 @@ type Props = {
   onDescription: (v: string) => void;
   courseId: string | undefined;
   onCourse: (id: string | undefined) => void;
+  courseOnly: boolean;
+  onCourseOnly: (v: boolean) => void;
 };
 
-/** Name, Description (optional) and Course (optional) of a Knowledge base PDF (ARU-30): upload and edit screens. */
-export function MaterialFileFields({ name, onName, description, onDescription, courseId, onCourse }: Props) {
+export const VISIBILITY_HINT = 'People in the course are its owner and listeners. The teacher always sees it.';
+
+/**
+ * Name, Description (optional), Course (optional) and, once a course is picked, Who can see it (ARU-42) of a
+ * Knowledge base PDF (ARU-30): upload and edit screens.
+ */
+export function MaterialFileFields(props: Props) {
+  const { name, onName, description, onDescription, courseId, onCourse, courseOnly, onCourseOnly } = props;
   return (
     <>
       <Field label="Name" accessibilityLabel="Name" placeholder="e.g. Algebra workbook" value={name} onChangeText={onName} />
@@ -27,34 +35,80 @@ export function MaterialFileFields({ name, onName, description, onDescription, c
         multiline
       />
       <CoursePicker value={courseId} onChange={onCourse} />
+      {/* Only with a course: "No course" is always Everyone (the store saves it so). */}
+      {courseId !== undefined && (
+        <RadioGroup
+          label="Who can see it"
+          hint={VISIBILITY_HINT}
+          options={[
+            { value: 'everyone', label: 'Everyone' },
+            { value: 'course', label: 'Only people in the course' },
+          ]}
+          value={courseOnly ? 'course' : 'everyone'}
+          onChange={(v) => onCourseOnly(v === 'course')}
+        />
+      )}
     </>
   );
 }
 
-/** One course or none: "No course" first, then every course by title (all signed-in users see course titles). */
+const NONE = '__none__';
+const CURRENT = '__current__';
+
+/**
+ * One course or none: "No course" first, then every course by title. A linked course that isn't in the list (a hidden
+ * course the author can't see, ARU-40) shows as "Current course" and stays linked unless another option is picked.
+ */
 export function CoursePicker({ value, onChange }: { value: string | undefined; onChange: (id: string | undefined) => void }) {
   const { courses } = useStore();
+  const listed = value === undefined || courses.some((c) => c.id === value);
   const options = [
-    { id: undefined as string | undefined, label: 'No course' },
+    { value: NONE, label: 'No course' },
+    ...(listed ? [] : [{ value: CURRENT, label: 'Current course' }]),
     ...[...courses]
       .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }) || a.id.localeCompare(b.id))
-      .map((c) => ({ id: c.id as string | undefined, label: c.title })),
+      .map((c) => ({ value: c.id, label: c.title })),
   ];
-  // A linked course that is no longer listed counts as none.
-  const selected = options.some((o) => o.id === value) ? value : undefined;
+  const selected = value === undefined ? NONE : listed ? value : CURRENT;
+  return (
+    <RadioGroup
+      label="Course (optional)"
+      options={options}
+      value={selected}
+      onChange={(v) => {
+        if (v === CURRENT) return;
+        onChange(v === NONE ? undefined : v);
+      }}
+    />
+  );
+}
+
+function RadioGroup<T extends string>({
+  label,
+  hint,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
+}) {
   return (
     <View style={{ gap: 6 }}>
-      <Text style={styles.label}>Course (optional)</Text>
-      <View accessibilityRole="radiogroup" accessibilityLabel="Course (optional)" style={pickerStyle.box}>
+      <Text style={styles.label}>{label}</Text>
+      <View accessibilityRole="radiogroup" accessibilityLabel={label} style={pickerStyle.box}>
         {options.map((o, i) => {
-          const checked = o.id === selected;
+          const checked = o.value === value;
           return (
             <Pressable
-              key={o.id ?? 'none'}
+              key={o.value}
               accessibilityRole="radio"
               accessibilityLabel={o.label}
               accessibilityState={{ checked }}
-              onPress={() => onChange(o.id)}
+              onPress={() => onChange(o.value)}
               style={[pickerStyle.row, i > 0 && pickerStyle.divider]}>
               <View style={[pickerStyle.dot, checked && pickerStyle.dotOn]} />
               <Text numberOfLines={1} style={[styles.body, { flex: 1 }]}>
@@ -64,6 +118,7 @@ export function CoursePicker({ value, onChange }: { value: string | undefined; o
           );
         })}
       </View>
+      {hint ? <Text style={styles.muted}>{hint}</Text> : null}
     </View>
   );
 }

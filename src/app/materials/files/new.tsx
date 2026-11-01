@@ -22,6 +22,8 @@ export default function UploadMaterialFileScreen() {
   const [name, setName] = useState(() => nameFromFile(params.name));
   const [description, setDescription] = useState('');
   const [courseId, setCourseId] = useState<string | undefined>();
+  // Who can see it (ARU-42): Everyone by default; only sent with a course.
+  const [courseOnly, setCourseOnly] = useState(false);
   const size = params.size ? Number(params.size) : undefined;
 
   // Set when the user leaves mid-upload and confirms: the upload's result is ignored and its file removed.
@@ -52,7 +54,8 @@ export default function UploadMaterialFileScreen() {
     if (busy) return;
     run(async () => {
       await addMaterialFile(
-        { id, file, name, description, courseId },
+        // courseOnly only when chosen with a course; the store saves everything else as Everyone.
+        { id, file, name, description, courseId, ...(courseId && courseOnly ? { courseOnly: true } : {}) },
         { isCancelled: () => cancelled.current },
       );
       if (cancelled.current) return;
@@ -81,6 +84,8 @@ export default function UploadMaterialFileScreen() {
           onDescription={setDescription}
           courseId={courseId}
           onCourse={setCourseId}
+          courseOnly={courseOnly}
+          onCourseOnly={setCourseOnly}
         />
         <ErrorText error={error} />
         <Button title={busy ? 'Uploading…' : 'Upload'} onPress={upload} disabled={busy || !name.trim()} />

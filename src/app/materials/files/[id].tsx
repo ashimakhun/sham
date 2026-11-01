@@ -69,6 +69,8 @@ export default function MaterialFileScreen() {
             <Text style={[styles.body, { color: colors.primary, fontWeight: '600' }]}>Course: {course.title}</Text>
           </Pressable>
         )}
+        {/* ARU-42: everyone who can open a course-only item is in its course, its author or the teacher. */}
+        {item.courseOnly && <Text style={styles.muted}>Only people in the course</Text>}
         {!!item.description && <Text style={styles.body}>{item.description}</Text>}
       </Card>
       <Button title={opening ? 'Opening…' : 'Open PDF'} onPress={openPdf} disabled={opening} />
