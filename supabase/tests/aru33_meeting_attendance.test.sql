@@ -28,14 +28,16 @@ select t.lives($$select mark_attendance('00000000-0000-0000-0000-0000000a0001')$
 -- AC 4: only completed meetings; unknown ids are "not found".
 reset role; select t.login('S1');
 select t.throws($$select mark_attendance('00000000-0000-0000-0000-0000000a0002')$$, '23514', 'AC4 upcoming scheduled meeting is rejected');
-select t.throws($$select mark_attendance('00000000-0000-0000-0000-0000000a0003')$$, '23514', 'AC4 started but not completed meeting is rejected');
+-- ARU-45 changed this rule: a started Scheduled meeting is open for attendance (mark, then undo to keep the counts below).
+select t.lives($$select mark_attendance('00000000-0000-0000-0000-0000000a0003')$$, 'ARU-45 started Scheduled meeting can be marked');
+select t.lives($$select unmark_attendance('00000000-0000-0000-0000-0000000a0003')$$, 'ARU-45 and undone');
 select t.throws($$select mark_attendance('00000000-0000-0000-0000-0000000a0004')$$, '23514', 'AC4 canceled meeting is rejected');
 select t.throws($$select mark_attendance('00000000-0000-0000-0000-0000000000ff')$$, 'P0002', 'AC4 unknown meeting is "not found"');
 select t.throws($$select unmark_attendance('00000000-0000-0000-0000-0000000000ff')$$, 'P0002', 'AC4 unknown meeting on undo is "not found"');
 do $$ begin
   perform mark_attendance('00000000-0000-0000-0000-0000000a0004');
 exception when others then
-  perform t.eq(sqlerrm, 'Attendance can be marked only for completed meetings.', 'AC4 exact completed-only message');
+  perform t.eq(sqlerrm, 'Attendance can''t be changed for a canceled meeting.', 'AC4 exact canceled message (ARU-45)');
 end $$;
 
 -- AC 5: non-listeners (student, mentor, owner, teacher) get the listener error, even on a scheduled meeting.

@@ -5,7 +5,7 @@ import { Linking, Pressable, Text, View } from 'react-native';
 import { Button, Card, ErrorText, styles } from '@/components/ui';
 import { meetingAttendance } from '@/lib/attendance';
 import { confirmAction } from '@/lib/confirm';
-import { hasStarted, isLink, sortMeetings } from '@/lib/meetings';
+import { hasStarted, isLink, isOpenForAttendance, sortMeetings } from '@/lib/meetings';
 import { canManageMeetings, canMarkAttendance, canSeeAttendance, canSeeMeetings } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors, formatDateTime } from '@/lib/theme';
@@ -84,7 +84,7 @@ export function MeetingsSection({ course }: { course: Course }) {
     });
   }
 
-  // Attendance (ARU-33): a listener marks or undoes their own attendance of a Completed meeting.
+  // Attendance (ARU-33): a listener marks or undoes their own attendance once a meeting has started (ARU-45).
   function markAttended(meeting: Meeting) {
     run(async () => {
       setChanging(meeting.id);
@@ -170,10 +170,13 @@ export function MeetingsSection({ course }: { course: Course }) {
     const assignment = assignments.find((a) => a.meetingId === m.id);
     const canAssign = canManage && m.status === 'completed' && !assignment;
     // Attendance (ARU-33): listeners mark their own; the owner, the teacher and non-listener mentors see the count.
-    const canMark = canMarkAttendance(currentUser, course, courseMembers, m);
+    // From the start time until the meeting is canceled (ARU-45); `now` ticks, so it appears without a refresh.
+    const canMark = canMarkAttendance(currentUser, course, courseMembers, m, now);
     const attended = canMark && attendance.some((a) => a.meetingId === m.id && a.userId === currentUser?.id);
     const counts =
-      seesAttendance && m.status === 'completed' ? meetingAttendance(m.id, course.id, courseMembers, attendance) : null;
+      seesAttendance && isOpenForAttendance(m, now)
+        ? meetingAttendance(m.id, course.id, courseMembers, attendance)
+        : null;
     const attendanceItems = [
       ...(canMark && !attended
         ? [
