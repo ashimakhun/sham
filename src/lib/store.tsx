@@ -2,6 +2,7 @@ import type { Session } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 
+import { FEEDBACK_MAX } from './feedback';
 import { fileFieldsError, isAllowedPdf, PDF_MAX_BYTES, PDF_RULE } from './files';
 import { NOTES_MAX } from './markdown';
 import { supabase } from './supabase';
@@ -16,6 +17,7 @@ import type {
   MaterialFile,
   MaterialFileEdit,
   Meeting,
+  CourseFeedback,
   MeetingAttendance,
   MeetingEdit,
   MeetingStatus,
@@ -52,6 +54,8 @@ type Store = {
   assignments: HomeworkAssignment[];
   /** Attendance marks (ARU-33): own marks for students, all for mentors and the teacher. */
   attendance: MeetingAttendance[];
+  /** Course feedback (ARU-53), newest first: every approved user sees it for the courses they can see. */
+  courseFeedback: CourseFeedback[];
   loading: boolean;
   /** True once data has been fetched (successfully or not) for the signed-in user. */
   dataLoaded: boolean;
@@ -103,6 +107,10 @@ type Store = {
   markAttendance: (meetingId: string) => Promise<void>;
   /** A listener removes their own attendance mark (ARU-33). */
   unmarkAttendance: (meetingId: string) => Promise<void>;
+  /** A listener adds (no `id`) or edits (`id`) their feedback on a started course (ARU-53). Text is trimmed. */
+  saveFeedback: (input: { id?: string; courseId: string; rating: number; body: string }) => Promise<void>;
+  /** The author deletes their own feedback (ARU-53). Already gone counts as done. */
+  deleteFeedback: (id: string) => Promise<void>;
   /** Course chat (ARU-8): a page of messages, newest first, older than `before` when given. */
   loadMessages: (courseId: string, before?: CourseMessage) => Promise<{ messages: CourseMessage[]; hasMore: boolean }>;
   /** Posts as the current user. `id` is generated once per message so a retry cannot post twice. */
@@ -183,6 +191,15 @@ type MeetingRow = {
   notes_updated_at?: string | null;
 };
 type AttendanceRow = { meeting_id: string; user_id: string; marked_at: string };
+type FeedbackRow = {
+  id: string;
+  course_id: string;
+  user_id: string;
+  rating: number;
+  body: string;
+  created_at: string;
+  updated_at: string;
+};
 type MessageRow = { id: string; course_id: string; author_id: string; body: string; created_at: string };
 type UnreadRow = { course_id: string; unread: number | string };
 type MaterialFileRow = {
@@ -287,6 +304,16 @@ const toAttendance = (r: AttendanceRow): MeetingAttendance => ({
   markedAt: r.marked_at,
 });
 
+const toFeedback = (r: FeedbackRow): CourseFeedback => ({
+  id: r.id,
+  courseId: r.course_id,
+  userId: r.user_id,
+  rating: r.rating,
+  body: r.body,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+});
+
 const toMessage = (r: MessageRow): CourseMessage => ({
   id: r.id,
   courseId: r.course_id,
@@ -333,6 +360,15 @@ function checkInsert(res: Result) {
   check(res);
 }
 
+const NO_LONGER_LISTENER = "You're no longer a listener of this course.";
+
+/** Course feedback writes refused by RLS mean the user isn't a listener (any more), or the course hasn't started. */
+function checkFeedback(res: Result) {
+  if (res.error?.code === '42501') throw new Error(NO_LONGER_LISTENER);
+  if (res.error?.code === '23505') throw new Error('You have already left feedback on this course.');
+  check(res);
+}
+
 const ALREADY_SENT = 'You have already sent homework for this assignment.';
 const DEADLINE_PAST = 'The deadline must be in the future.';
 
@@ -369,6 +405,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [assignments, setAssignments] = useState<HomeworkAssignment[]>([]);
   const [attendance, setAttendance] = useState<MeetingAttendance[]>([]);
+  const [courseFeedback, setCourseFeedback] = useState<CourseFeedback[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [unread, setUnread] = useState<Record<string, number>>({});
@@ -395,6 +432,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setMeetings([]);
         setAssignments([]);
         setAttendance([]);
+        setCourseFeedback([]);
         setUnread({});
         setActiveChat(null);
         setLoadedFor(null);
@@ -423,7 +461,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     try {
       // RLS returns nothing but the own profile to an account that isn't approved (ARU-43), so these all succeed
       // (empty) for it and the app shows the waiting screen.
-      const [profileRows, hw, mats, crs, members, mtgs, asgs, att, files] = await Promise.all([
+      const [profileRows, hw, mats, crs, members, mtgs, asgs, att, files, fb] = await Promise.all([
         // '*' so the app keeps working if the access_status column (0021) isn't there yet.
         supabase.from('profiles').select('*').order('full_name'),
         supabase.from('homework').select('*').order('created_at', { ascending: false }),
@@ -434,6 +472,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         supabase.from('homework_assignments').select('*').order('created_at', { ascending: false }),
         supabase.from('meeting_attendance').select('*'),
         supabase.from('material_files').select('*').order('created_at', { ascending: false }),
+        supabase.from('course_feedback').select('*').order('created_at', { ascending: false }),
       ]);
       const all = rows<ProfileRow>(profileRows).map(toUser);
       const me = all.find((u) => u.id === userId);
@@ -446,6 +485,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setAssignments(rows<AssignmentRow>(asgs).map(toAssignment));
       setAttendance(rows<AttendanceRow>(att).map(toAttendance));
       setMaterialFiles(rows<MaterialFileRow>(files).map(toMaterialFile));
+      setCourseFeedback(rows<FeedbackRow>(fb).map(toFeedback));
       if (me?.accessStatus !== 'approved') {
         setAccessRequests([]);
         setUnread({});
@@ -493,6 +533,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'homework' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'materials' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'material_files' }, () => load().catch(() => {}))
+      // Feedback (ARU-53): the list, the average and the course cards update on every open device.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'course_feedback' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'courses' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'course_members' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'course_meetings' }, () => load().catch(() => {}))
@@ -581,6 +623,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     meetings,
     assignments,
     attendance,
+    courseFeedback,
     loading,
     dataLoaded: !!userId && loadedFor === userId,
     refresh,
@@ -881,6 +924,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     unmarkAttendance: async (meetingId) => {
       check(await supabase.rpc('unmark_attendance', { meeting: meetingId }));
+      await load();
+    },
+    saveFeedback: async ({ id, courseId, rating, body }) => {
+      const text = body.trim();
+      if (!Number.isInteger(rating) || rating < 1 || rating > 5) throw new Error('Choose 1 to 5 stars.');
+      if (!text) throw new Error('Write a few words about the course.');
+      if (text.length > FEEDBACK_MAX) throw new Error('Feedback can be at most 1,000 characters.');
+      if (id) {
+        // An edit that matches no row: the user was removed as a listener (or deleted it on another device).
+        const res = await supabase.from('course_feedback').update({ rating, body: text }).eq('id', id).select('id');
+        checkFeedback(res);
+        if (!res.data?.length) {
+          await load().catch(() => {});
+          throw new Error(NO_LONGER_LISTENER);
+        }
+      } else {
+        // user_id defaults to the caller.
+        checkFeedback(await supabase.from('course_feedback').insert({ course_id: courseId, rating, body: text }));
+      }
+      await load();
+    },
+    deleteFeedback: async (id) => {
+      const res = await supabase.from('course_feedback').delete().eq('id', id).select('id');
+      check(res);
+      // Nothing deleted: either already gone (fine), or it is still there and the user can't delete it any more.
+      if (!res.data?.length) {
+        const still = await supabase.from('course_feedback').select('id').eq('id', id);
+        if (still.data?.length) {
+          await load().catch(() => {});
+          throw new Error(NO_LONGER_LISTENER);
+        }
+      }
       await load();
     },
     loadMessages: async (courseId, before) => {

@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { FlatList, RefreshControl, ScrollView, Text, View } from 'react-native';
 
 import { CourseMaterialsSection } from '@/components/CourseMaterialsSection';
+import { FeedbackSection } from '@/components/FeedbackSection';
 import { HomeworkCard } from '@/components/HomeworkCard';
 import { ListenersSection } from '@/components/ListenersSection';
 import { MeetingsSection } from '@/components/MeetingsSection';
@@ -30,6 +31,8 @@ export default function CourseDetailScreen() {
           <Text style={styles.h1}>{course.title}</Text>
           {course.description ? <Text style={styles.body}>{course.description}</Text> : null}
         </Card>
+        {/* ARU-53: everyone who sees the course reads its feedback. */}
+        <FeedbackSection course={course} />
         <EmptyState title="You are not in this course" hint="Ask your teacher or mentor to add you." />
       </ScrollView>
     );
@@ -80,6 +83,7 @@ export default function CourseDetailScreen() {
           <MeetingsSection course={course} />
           <ListenersSection course={course} />
           <CourseMaterialsSection course={course} />
+          <FeedbackSection course={course} />
           <Text style={styles.label}>HOMEWORK</Text>
         </View>
       }

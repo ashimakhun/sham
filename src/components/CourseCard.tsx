@@ -4,6 +4,7 @@ import { useRef } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { Card, HiddenBadge, OwnerLine, UnreadBadge, styles } from '@/components/ui';
+import { feedbackFor, ratingSummary, ratingSummaryLabel } from '@/lib/feedback';
 import { inCourseChat, seesOnlyCourseSummary } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
@@ -22,13 +23,16 @@ type Props = {
 const TAP_GUARD_MS = 800;
 
 export function CourseCard({ course, tag, onOpen }: Props) {
-  const { getUser, currentUser, courseMembers, unreadCount } = useStore();
+  const { getUser, currentUser, courseMembers, unreadCount, courseFeedback } = useStore();
   // A student who is not a listener sees only the title and description (ARU-24).
   const summaryOnly = seesOnlyCourseSummary(currentUser, course, courseMembers);
   // The chat icon shows only to people in the course chat; it follows live store updates (ARU-25).
   const showChat = inCourseChat(currentUser, course, courseMembers);
   // New messages from others since the user last read this chat (ARU-31); only for people in the chat.
   const unread = showChat ? unreadCount(course.id) : 0;
+  // Average rating and count (ARU-53); nothing when the course has no feedback.
+  const feedback = feedbackFor(courseFeedback, course.id);
+  const rating = ratingSummary(feedback);
   const lastTap = useRef(0);
 
   const open = (pathname: '/courses/[id]' | '/courses/[id]/chat') => {
@@ -68,6 +72,11 @@ export function CourseCard({ course, tag, onOpen }: Props) {
       {!summaryOnly && (
         <OwnerLine name={getUser(course.createdById)?.name ?? 'Unknown'} date={formatDate(course.createdAt)} />
       )}
+      {rating ? (
+        <Text style={styles.muted} accessibilityLabel={ratingSummaryLabel(feedback)}>
+          {rating}
+        </Text>
+      ) : null}
     </>
   );
 
