@@ -8,7 +8,8 @@ An educational mobile app where teachers, mentors and students work together:
 - **Listeners** send homework (text + optional photo) for an assignment from the **New** list on the Homework tab.
 - **Mentors and the teacher** see all homework, leave a comment and mark it as checked (never their own).
 - **Each course** has a chat with a new-message counter for its owner, listeners and the teacher.
-- **Teachers and mentors** share learning materials (lessons, notes, links) with everyone, filterable by author.
+- **Teachers and mentors** share formatted posts (lessons, notes, links) with everyone on the Materials tab's
+  **Blog**, filterable by author; a **Knowledge base** tab for PDF books is coming.
 
 How each feature behaves today is described in the Linear project document **Sham: product documentation**.
 
@@ -147,8 +148,9 @@ mentor or the teacher change homework that is already checked; the app never off
 
 ## Work in progress
 
-- **Materials: Blog and Knowledge base tabs** (ARU-38): built on PR #38, not merged yet.
-- **Knowledge base of PDF files linked to courses** (ARU-30, ARU-39): waiting for product decisions.
+- **Knowledge base of PDF files, each optionally linked to a course** (ARU-30): ready for development. The
+  Knowledge base tab shows a placeholder until then.
+- **Linked PDFs on the course screen** (ARU-39): after ARU-30.
 
 ## Next steps
 
