@@ -108,35 +108,38 @@ describe('markdown helpers', () => {
   });
 });
 
-describe('AC1/AC2: Upcoming and History', () => {
-  it('groups upcoming (soonest first) and everything else (newest first) under headings; count stays the total', async () => {
+// ARU-60 replaced ARU-28's Upcoming / History groups: the top card has In progress, Upcoming and Awaiting homework
+// check; canceled (and checked) meetings are in MEETING HISTORY at the bottom.
+describe('AC1/AC2 (as changed by ARU-60): meeting groups', () => {
+  it('groups in progress, upcoming (soonest first) and awaiting check (newest first); canceled goes to history', async () => {
     setStore(fakeStore('S1', { courseMembers: members, meetings: [C, F1, X, P, F2, CN] }));
     await render(<CourseDetailScreen />);
-    expect(screen.getByText('MEETINGS (6)')).toBeTruthy();
-    const headers = screen.getAllByRole('header').map((h) => h.props.children);
-    expect(headers).toEqual(expect.arrayContaining(['Upcoming', 'History']));
-    const order = screen.getAllByTestId(/^meeting-/).map((n) => n.props.testID);
-    expect(order).toEqual(['meeting-F2', 'meeting-F1', 'meeting-P', 'meeting-X', 'meeting-C', 'meeting-CN']);
+    expect(screen.getByText('MEETINGS (5)')).toBeTruthy();
+    const headers = screen.getAllByRole('header').map((h) => [h.props.children].flat().join(''));
+    expect(headers).toEqual(['In progress', 'Upcoming', 'Awaiting homework check', 'MEETING HISTORY (1)']);
+    const order = screen.getAllByTestId(/^meeting-[A-Z0-9]+$/).map((n) => n.props.testID);
+    expect(order).toEqual(['meeting-P', 'meeting-F2', 'meeting-F1', 'meeting-C', 'meeting-CN', 'meeting-X']);
   });
 
   it('hides an empty group; "No meetings scheduled yet" without meetings', async () => {
     setStore(fakeStore('S1', { courseMembers: members, meetings: [C] }));
     const { rerender } = await render(<CourseDetailScreen />);
-    expect(screen.getByText('History')).toBeTruthy();
+    expect(screen.getByText('Awaiting homework check')).toBeTruthy();
     expect(screen.queryByText('Upcoming')).toBeNull();
     setStore(fakeStore('S1', { courseMembers: members, meetings: [] }));
     await rerender(<CourseDetailScreen />);
     expect(screen.getByText('No meetings scheduled yet')).toBeTruthy();
-    expect(screen.queryByText('History')).toBeNull();
+    expect(screen.queryByText('Awaiting homework check')).toBeNull();
   });
 });
 
-describe('AC3/AC7/AC9/AC10: notes actions in History', () => {
+describe('AC3/AC7/AC9/AC10: notes actions on completed meetings', () => {
   it.each(['M', 'T'] as const)('%s sees Add notes / Edit notes on completed meetings only', async (who) => {
     setStore(fakeStore(who, { courseMembers: members, meetings: [F1, P, C, CN, X] }));
     await render(<CourseDetailScreen />);
-    expect(labels('C')).toEqual(['Add notes', 'Assign homework', 'Attended 0 of 1']); // + ARU-32, + ARU-33
-    expect(labels('CN')).toEqual(['Notes', 'Edit notes', 'Assign homework', 'Attended 0 of 1']);
+    // + ARU-32, + ARU-33, + ARU-60
+    expect(labels('C')).toEqual(['Add notes', 'Assign homework', 'Attended 0 of 1', 'Mark homework checked']);
+    expect(labels('CN')).toEqual(['Notes', 'Edit notes', 'Assign homework', 'Attended 0 of 1', 'Mark homework checked']);
     expect(labels('X')).toEqual([]);
     expect(labels('F1')).not.toContain('Add notes');
     expect(labels('P')).not.toContain('Add notes');
@@ -148,14 +151,15 @@ describe('AC3/AC7/AC9/AC10: notes actions in History', () => {
   });
 
   // ARU-33: N (a mentor who isn't a listener) also sees the attendance count; S1 (a listener) "I attended".
+  // ARU-60: N may also mark the homework checked; S1 may not.
   it.each([
-    ['N', 'Attended 0 of 1'],
-    ['S1', 'I attended'],
-  ] as const)('%s reads notes but has no Add/Edit notes', async (who, attendance) => {
+    ['N', ['Attended 0 of 1', 'Mark homework checked']],
+    ['S1', ['I attended']],
+  ] as const)('%s reads notes but has no Add/Edit notes', async (who, others) => {
     setStore(fakeStore(who, { courseMembers: members, meetings: [C, CN] }));
     await render(<CourseDetailScreen />);
-    expect(labels('C')).toEqual([attendance]);
-    expect(labels('CN')).toEqual(['Notes', attendance]);
+    expect(labels('C')).toEqual([...others]);
+    expect(labels('CN')).toEqual(['Notes', ...others]);
     await fireEvent.press(inMeeting('CN').getByRole('link', { name: 'Notes' }));
     expect(router.push).toHaveBeenLastCalledWith({
       pathname: '/courses/[id]/meetings/[meetingId]/notes',

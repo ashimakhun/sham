@@ -5,10 +5,16 @@ import { Linking, Pressable, Text, View } from 'react-native';
 import { Button, Card, ErrorText, styles } from '@/components/ui';
 import { meetingAttendance } from '@/lib/attendance';
 import { confirmAction } from '@/lib/confirm';
-import { hasStarted, isLink, isOpenForAttendance, sortMeetings } from '@/lib/meetings';
-import { canManageMeetings, canMarkAttendance, canSeeAttendance, canSeeMeetings } from '@/lib/roles';
+import { groupMeetings, hasStarted, isLink, isOpenForAttendance } from '@/lib/meetings';
+import {
+  canCheckMeetingHomework,
+  canManageMeetings,
+  canMarkAttendance,
+  canSeeAttendance,
+  canSeeMeetings,
+} from '@/lib/roles';
 import { useStore } from '@/lib/store';
-import { colors, formatDateTime } from '@/lib/theme';
+import { colors, formatDate, formatDateTime } from '@/lib/theme';
 import type { Course, Meeting, MeetingStatus } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
 import { useNow } from '@/lib/useNow';
@@ -35,15 +41,20 @@ export function MeetingBadge({ status }: { status: MeetingStatus }) {
 type Target = Exclude<MeetingStatus, 'scheduled'>;
 
 /** Meetings of a course (ARU-10): visible to the teacher, mentors and the course's listeners; the owner and the
- *  teacher schedule meetings and mark them completed or canceled. */
-export function MeetingsSection({ course }: { course: Course }) {
+ *  teacher schedule meetings and mark them completed or canceled.
+ *  ARU-60: `part="current"` is the MEETINGS card under Chat (In progress, Upcoming, Awaiting homework check);
+ *  `part="history"` is MEETING HISTORY at the bottom of the page (checked and canceled meetings), hidden when empty.
+ *  Each part has its own error text. */
+export function MeetingsSection({ course, part = 'current' }: { course: Course; part?: 'current' | 'history' }) {
   const {
     currentUser,
     courseMembers,
     meetings,
     assignments,
     attendance,
+    getUser,
     setMeetingStatus,
+    setMeetingHomeworkChecked,
     markAttendance,
     unmarkAttendance,
   } = useStore();
@@ -54,11 +65,12 @@ export function MeetingsSection({ course }: { course: Course }) {
   if (!canSeeMeetings(currentUser, course, courseMembers)) return null;
   const canManage = canManageMeetings(currentUser, course);
   const seesAttendance = canSeeAttendance(currentUser, course, courseMembers);
-  const { upcoming, past } = sortMeetings(
+  const canCheck = canCheckMeetingHomework(currentUser, course, courseMembers);
+  const { inProgress, upcoming, awaitingCheck, history } = groupMeetings(
     meetings.filter((m) => m.courseId === course.id),
     now,
   );
-  const list = [...upcoming, ...past];
+  const current = [...inProgress, ...upcoming, ...awaitingCheck];
   const openNotes = (m: Meeting, edit: boolean) =>
     router.push({
       pathname: '/courses/[id]/meetings/[meetingId]/notes',
@@ -78,6 +90,28 @@ export function MeetingsSection({ course }: { course: Course }) {
       setChanging(meeting.id);
       try {
         await setMeetingStatus(meeting.id, status);
+      } finally {
+        setChanging(undefined);
+      }
+    });
+  }
+
+  // ARU-60: mark a Completed meeting's homework checked (moves it to MEETING HISTORY), or undo that.
+  function setChecked(meeting: Meeting, checked: boolean) {
+    run(async () => {
+      const when = formatDateTime(meeting.startsAt);
+      const confirmed = await confirmAction(
+        checked ? 'Mark homework checked' : 'Undo check',
+        checked
+          ? `Mark homework for ${meeting.topic} on ${when} as checked?`
+          : `Move ${meeting.topic} on ${when} back to Awaiting homework check?`,
+        checked ? 'Mark checked' : 'Undo check',
+        { cancelText: 'Not now' },
+      );
+      if (!confirmed) return;
+      setChanging(meeting.id);
+      try {
+        await setMeetingHomeworkChecked(meeting.id, checked);
       } finally {
         setChanging(undefined);
       }
@@ -114,15 +148,31 @@ export function MeetingsSection({ course }: { course: Course }) {
     });
   }
 
+  if (part === 'history') {
+    if (history.length === 0) return null;
+    return (
+      <View testID="meeting-history" style={{ paddingTop: 12 }}>
+        <Card style={{ gap: 12 }}>
+          <Text accessibilityRole="header" style={styles.label}>
+            MEETING HISTORY ({history.length})
+          </Text>
+          {history.map((m) => renderMeeting(m))}
+          <ErrorText error={error} />
+        </Card>
+      </View>
+    );
+  }
+
   return (
     <Card style={{ gap: 12 }}>
-      <Text style={styles.label}>MEETINGS ({list.length})</Text>
-      {list.length === 0 ? (
-        <Text style={styles.muted}>No meetings scheduled yet</Text>
+      <Text style={styles.label}>MEETINGS ({current.length})</Text>
+      {current.length === 0 ? (
+        <Text style={styles.muted}>{history.length > 0 ? 'No current meetings' : 'No meetings scheduled yet'}</Text>
       ) : (
         [
+          inProgress.length > 0 && { heading: 'In progress', items: inProgress },
           upcoming.length > 0 && { heading: 'Upcoming', items: upcoming },
-          past.length > 0 && { heading: 'History', items: past },
+          awaitingCheck.length > 0 && { heading: 'Awaiting homework check', items: awaitingCheck },
         ].map(
           (group) =>
             group && (
@@ -173,6 +223,17 @@ export function MeetingsSection({ course }: { course: Course }) {
     // From the start time until the meeting is canceled (ARU-45); `now` ticks, so it appears without a refresh.
     const canMark = canMarkAttendance(currentUser, course, courseMembers, m, now);
     const attended = canMark && attendance.some((a) => a.meetingId === m.id && a.userId === currentUser?.id);
+    // ARU-60: completed meetings only; the line shows who marked it once it's in MEETING HISTORY.
+    const checkAction =
+      canCheck && m.status === 'completed'
+        ? m.homeworkCheckedAt
+          ? { title: 'Undo check', checked: false }
+          : { title: 'Mark homework checked', checked: true }
+        : null;
+    const checkedLine =
+      m.status === 'completed' && m.homeworkCheckedAt
+        ? `Homework checked by ${(m.homeworkCheckedById && getUser(m.homeworkCheckedById)?.name) || 'Unknown'} · ${formatDate(m.homeworkCheckedAt)}`
+        : null;
     const counts =
       seesAttendance && isOpenForAttendance(m, now)
         ? meetingAttendance(m.id, course.id, courseMembers, attendance)
@@ -263,7 +324,17 @@ export function MeetingsSection({ course }: { course: Course }) {
             {assignment.dueAt ? `Due ${formatDateTime(assignment.dueAt)}` : 'No deadline'}
           </Text>
         ) : null}
-        {(actions.length > 0 || canEdit || notesActions.length > 0 || canAssign || attendanceItems.length > 0) && (
+        {checkedLine ? (
+          <Text style={styles.muted} testID={`checked-${m.id}`}>
+            {checkedLine}
+          </Text>
+        ) : null}
+        {(actions.length > 0 ||
+          canEdit ||
+          notesActions.length > 0 ||
+          canAssign ||
+          attendanceItems.length > 0 ||
+          checkAction) && (
           <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap', paddingTop: 2 }}>
             {changing === m.id ? (
               <Text style={styles.muted}>Saving…</Text>
@@ -316,6 +387,22 @@ export function MeetingsSection({ course }: { course: Course }) {
                     ]
                   : []),
                 ...attendanceItems,
+                ...(checkAction
+                  ? [
+                      <Pressable
+                        key="check"
+                        accessibilityRole="button"
+                        accessibilityLabel={checkAction.title}
+                        accessibilityState={{ disabled: busy }}
+                        disabled={busy}
+                        hitSlop={8}
+                        onPress={() => setChecked(m, checkAction.checked)}>
+                        <Text style={{ color: colors.primary, fontWeight: '600', opacity: busy ? 0.4 : 1 }}>
+                          {checkAction.title}
+                        </Text>
+                      </Pressable>,
+                    ]
+                  : []),
                 ...actions.map((a) => (
                   <Pressable
                     key={a.title}

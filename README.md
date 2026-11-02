@@ -56,8 +56,11 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    nothing; it doesn't depend on 0023 or 0024),
    `0026_profile_name_not_blank.sql` (ARU-55: an edited name can't be blank; adds a trigger),
    `0027_profile_name_unicode_blank.sql` (ARU-56: Unicode spaces count as blank too; replaces that trigger's function),
+   `0028_meeting_homework_checked.sql` (ARU-60: mark a completed meeting's homework checked, which moves it to the
+   course's MEETING HISTORY; adds two nullable columns and a function, deletes nothing; existing meetings start
+   unchecked),
    `0029_general_chat.sql` (ARU-61: the general chat; adds a table with policies and puts it in realtime, deletes
-   nothing; 0028 is ARU-60's, and 0029 doesn't depend on it),
+   nothing; it doesn't depend on 0028),
    `0030_chat_server_time.sql` (ARU-67: the server sets every chat message's time, in the general and course chats;
    changes insert grants only).
    Each migration has its own number; `npm run test:db` fails if two files share one.
@@ -163,6 +166,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Edit / reschedule a scheduled meeting | | own courses           | any course |
 | Read meeting notes         | courses they're in | ✓ (all courses)  | ✓       |
 | Add / edit / clear notes on a completed meeting | | own courses | any course |
+| Mark a completed meeting's homework checked / undo | | any course they can see, not one they're a listener of | any course |
 | Mark / undo own attendance of a started meeting | courses they're in | courses they're in |  |
 | See who attended a meeting | own marks only | ✓ (own courses and courses they don't listen to; own marks only where a listener) | ✓ |
 | See materials              | ✓         | ✓                  | ✓       |

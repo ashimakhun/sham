@@ -111,6 +111,9 @@ export type Store = {
   updateMeeting: (id: string, input: MeetingEdit) => Promise<void>;
   /** Course owner or teacher, Completed meetings only (ARU-28). Blank text removes the notes. */
   setMeetingNotes: (id: string, notes: string) => Promise<void>;
+  /** ARU-60: the teacher or a non-listener mentor marks a Completed meeting's homework checked (or undoes it). Marking
+   *  a checked meeting or undoing an unchecked one is a no-op, so a retry is safe. */
+  setMeetingHomeworkChecked: (id: string, checked: boolean) => Promise<void>;
   /** A listener marks their own attendance of a Completed meeting (ARU-33). Marking again is a no-op. */
   markAttendance: (meetingId: string) => Promise<void>;
   /** A listener removes their own attendance mark (ARU-33). */
@@ -207,6 +210,8 @@ type MeetingRow = {
   notes?: string | null;
   notes_updated_by?: string | null;
   notes_updated_at?: string | null;
+  homework_checked_at?: string | null;
+  homework_checked_by?: string | null;
 };
 type AttendanceRow = { meeting_id: string; user_id: string; marked_at: string };
 type MaterialLikeRow = { material_id: string; user_id: string; created_at: string };
@@ -316,6 +321,8 @@ const toMeeting = (r: MeetingRow): Meeting => ({
   notes: r.notes ?? undefined,
   notesUpdatedById: r.notes_updated_by ?? undefined,
   notesUpdatedAt: r.notes_updated_at ?? undefined,
+  homeworkCheckedAt: r.homework_checked_at ?? undefined,
+  homeworkCheckedById: r.homework_checked_by ?? undefined,
 });
 
 const toAttendance = (r: AttendanceRow): MeetingAttendance => ({
@@ -971,6 +978,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       requireRole('teacher', 'mentor');
       if (notes.length > NOTES_MAX) throw new Error('Notes can be at most 10,000 characters.');
       check(await supabase.rpc('set_meeting_notes', { meeting: id, new_notes: notes }));
+      await load();
+    },
+    setMeetingHomeworkChecked: async (id, checked) => {
+      requireRole('teacher', 'mentor');
+      check(await supabase.rpc('set_meeting_homework_checked', { meeting: id, checked }));
       await load();
     },
     markAttendance: async (meetingId) => {

@@ -45,23 +45,25 @@ beforeEach(() => {
   params.edit = undefined;
 });
 
+// ARU-60 replaced the Upcoming / History groups (a started meeting is In progress, a completed one Awaiting homework
+// check); updated with the product owner's approval, keeping what this checks: the move needs no new data.
 describe('AC1: Upcoming and History while the screen is open', () => {
   afterEach(() => jest.useRealTimers());
 
-  it('a meeting moves from Upcoming to History once it starts, without new data', async () => {
+  it('a meeting moves from Upcoming to In progress (ARU-60) once it starts, without new data', async () => {
     jest.useFakeTimers({ now: new Date('2026-10-30T10:00:00.000Z') });
     const soon = meeting({ id: 'S', startsAt: '2026-10-30T10:00:20.000Z', topic: 'Starts soon' });
     setStore(fakeStore('S1', { courseMembers: members, meetings: [soon, C] }));
     await render(<CourseDetailScreen />);
-    expect(headings()).toEqual(['Upcoming', 'History']);
+    expect(headings()).toEqual(['Upcoming', 'Awaiting homework check']);
     const upcomingCard = () => within(screen.getByText('Upcoming').parent!.parent!);
     expect(upcomingCard().getByText('Starts soon')).toBeTruthy();
     await act(async () => {
       jest.advanceTimersByTime(31_000);
     });
-    // Nothing is upcoming any more: the heading is hidden and both meetings are in History.
-    expect(headings()).toEqual(['History']);
-    expect(screen.getByText('Starts soon')).toBeTruthy();
+    // Nothing is upcoming any more: the heading is hidden and the meeting is In progress.
+    expect(headings()).toEqual(['In progress', 'Awaiting homework check']);
+    expect(within(screen.getByText('In progress').parent!.parent!).getByText('Starts soon')).toBeTruthy();
   });
 });
 
