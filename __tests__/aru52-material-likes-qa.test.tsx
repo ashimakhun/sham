@@ -92,6 +92,7 @@ describe('regression: Blog list', () => {
   it('the author filter keeps each card\'s count', async () => {
     setStore(store('S1', [like('A', 'S1'), like('B', 'T'), like('B', 'M', 1)]));
     await render(<MaterialsScreen />);
+    await fireEvent.press(screen.getByRole('button', { name: /^Filter by author/ })); // ARU-62: authors open from one Filter button
     await fireEvent.press(screen.getByRole('button', { name: /Mentor Max/ }));
     expect(screen.queryByText('Post A')).toBeNull();
     expect(screen.getByLabelText('2 likes')).toBeTruthy();

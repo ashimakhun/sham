@@ -74,9 +74,13 @@ describe('Blog | Knowledge base switch (AC 1–4)', () => {
   it('back to Blog keeps the chosen author chip (minor note 1)', async () => {
     setStore(fakeStore('S1', { materials: [mat('t1', 'T'), mat('m1', 'M', 'Body', '2026-10-21T10:00:00.000Z')] }));
     await render(<MaterialsScreen />);
+    // ARU-62: the author list opens from one Filter button instead of a chip row.
+    await fireEvent.press(screen.getByRole('button', { name: 'Filter by author, All' }));
     await fireEvent.press(screen.getByRole('button', { name: 'Mentor Max' }));
     await fireEvent.press(tab('Knowledge base'));
     await fireEvent.press(tab('Blog'));
+    expect(screen.getByRole('button', { name: 'Filter by author, Mentor Max' })).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Filter by author, Mentor Max' }));
     expect(screen.getByRole('button', { name: 'Mentor Max' }).props.accessibilityState).toEqual({ selected: true });
     expect(titles()).toEqual(['Material m1']);
   });
