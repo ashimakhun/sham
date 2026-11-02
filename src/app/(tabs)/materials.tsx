@@ -3,8 +3,9 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 
+import { AuthorFilter } from '@/components/AuthorFilter';
 import { MarkdownText } from '@/components/MarkdownText';
-import { Button, Card, EmptyState, ErrorText, FilterChips, Segmented, styles } from '@/components/ui';
+import { Button, Card, EmptyState, ErrorText, Segmented, styles } from '@/components/ui';
 import { formatSize, isAllowedPdf, PDF_RULE } from '@/lib/files';
 import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
@@ -57,7 +58,7 @@ export default function MaterialsScreen() {
   }
 
   const authorName = (id: string) => getUser(id)?.name ?? 'Unknown';
-  // One chip per author of a currently loaded material, by name (case-insensitive); by id, so same names stay apart.
+  // One entry per author of a currently loaded material, by name (case-insensitive); by id, so same names stay apart.
   const authors = [...new Set(materials.map((m) => m.teacherId))]
     .map((id) => ({ value: id, label: authorName(id) }))
     .sort(
@@ -83,8 +84,9 @@ export default function MaterialsScreen() {
     <View style={{ gap: 12 }}>
       <Segmented<Section> options={SECTIONS} value={section} onChange={setSection} />
       {blog && canShare && <Button title="+ Share material" onPress={() => router.push('/materials/new')} />}
+      {/* ARU-62: one Filter button that opens the author list, in place of the ARU-29 chip row. */}
       {blog && materials.length > 0 && (
-        <FilterChips options={[{ value: ALL, label: 'All' }, ...authors]} value={filter} onChange={setSelected} />
+        <AuthorFilter options={[{ value: ALL, label: 'All' }, ...authors]} value={filter} onChange={setSelected} />
       )}
       {!blog && canShare && <Button title="+ Upload PDF" onPress={uploadPdf} />}
       {!blog && <ErrorText error={pickError} />}

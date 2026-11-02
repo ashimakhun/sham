@@ -2,7 +2,7 @@
 // a lowercase name, the user's own new material while another author is selected (AC 10), a mentor demoted to
 // student keeping their chip (edge), chip taps making no network call (data check), students filtering without a
 // Share button, and Delete still only on the user's own materials under a filter (regression).
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, within } from '@testing-library/react-native';
 
 import MaterialsScreen from '@/app/(tabs)/materials';
 import type { Material, User } from '@/lib/types';
@@ -24,8 +24,13 @@ const t1 = mat('t1', 'T', '2026-10-20T10:00:00.000Z');
 const m1 = mat('m1', 'M', '2026-10-21T10:00:00.000Z');
 const n1 = mat('n1', 'N', '2026-10-22T10:00:00.000Z');
 
+// ARU-62: the chip row became one "Filter: <name>" button that opens the author list; these helpers open it first.
+const openList = async () => {
+  if (!screen.queryByTestId('author-filter-list'))
+    await fireEvent.press(screen.getByRole('button', { name: /^Filter by author, / }));
+};
 const chipLabels = () =>
-  screen
+  within(screen.getByTestId('author-filter-list'))
     .getAllByRole('button')
     .filter((b) => b.props.accessibilityState && 'selected' in b.props.accessibilityState && b.props.accessibilityLabel)
     .map((b) => b.props.accessibilityLabel as string);
@@ -36,6 +41,11 @@ const selectedChip = () =>
     .map((b) => b.props.accessibilityLabel as string);
 const titles = () => screen.queryAllByText(/^Material /).map((n) => n.props.children);
 const chip = (name: string) => screen.getByRole('button', { name });
+/** Opens the list and taps an entry (the list then closes). */
+const pick = async (name: string) => {
+  await openList();
+  await fireEvent.press(chip(name));
+};
 
 /** fakeStore with extra users, so names can differ in letter case. */
 const storeWith = (who: keyof typeof users, extra: User[], materials: Material[]) => {
@@ -52,6 +62,7 @@ it('AC1: the order ignores letter case ("anna" before "Boris" before "Mentor Max
     storeWith('S1', [anna, boris], [m1, mat('b1', 'B1', '2026-10-23T10:00:00.000Z'), mat('a1', 'A1', '2026-10-24T10:00:00.000Z')]),
   );
   await render(<MaterialsScreen />);
+  await openList();
   expect(chipLabels()).toEqual(['All', 'anna', 'Boris', 'Mentor Max']);
 });
 
@@ -59,16 +70,18 @@ it('AC10: sharing my first material while another author is selected keeps that 
   setStore(fakeStore('M2', { materials: [t1, m1] }));
   const view = await render(<MaterialsScreen />);
   expect(screen.getByRole('button', { name: '+ Share material' })).toBeTruthy();
-  await fireEvent.press(chip('Teacher Tess'));
+  await pick('Teacher Tess');
   // Back from the Share screen: the store now has M2's new material (the tab stayed mounted).
   setStore(fakeStore('M2', { materials: [t1, m1, mat('mo1', 'M2', '2026-10-29T10:00:00.000Z')] }));
   await view.rerender(<MaterialsScreen />);
+  await openList();
   expect(selectedChip()).toEqual(['Teacher Tess']);
   expect(titles()).toEqual(['Material t1']);
+  await openList();
   expect(chipLabels()).toEqual(['All', 'Mentor Max', 'Mentor Mo', 'Teacher Tess']);
-  await fireEvent.press(chip('Mentor Mo'));
+  await pick('Mentor Mo');
   expect(titles()).toEqual(['Material mo1']);
-  await fireEvent.press(chip('All'));
+  await pick('All');
   expect(titles()).toEqual(['Material mo1', 'Material m1', 'Material t1']);
 });
 
@@ -77,8 +90,9 @@ it('edge: a mentor made student keeps their chip and their materials stay filter
   const all = Object.values(demoted);
   setStore(fakeStore('S1', { users: all, getUser: (id) => all.find((u) => u.id === id), materials: [t1, m1] }));
   await render(<MaterialsScreen />);
+  await openList();
   expect(chipLabels()).toEqual(['All', 'Mentor Max', 'Teacher Tess']);
-  await fireEvent.press(chip('Mentor Max'));
+  await pick('Mentor Max');
   expect(titles()).toEqual(['Material m1']);
 });
 
@@ -86,9 +100,9 @@ it('data: tapping chips makes no network call (no refresh, no store action)', as
   const store = fakeStore('S1', { materials: [t1, m1, n1] });
   setStore(store);
   await render(<MaterialsScreen />);
-  await fireEvent.press(chip('Mentor Nina'));
-  await fireEvent.press(chip('All'));
-  await fireEvent.press(chip('Teacher Tess'));
+  await pick('Mentor Nina');
+  await pick('All');
+  await pick('Teacher Tess');
   expect(store.refresh).not.toHaveBeenCalled();
   expect(store.deleteMaterial).not.toHaveBeenCalled();
   expect(store.addMaterial).not.toHaveBeenCalled();
@@ -98,8 +112,9 @@ it('roles: a student gets the chip row but no "+ Share material"; filtering work
   setStore(fakeStore('S1', { materials: [t1, m1] }));
   await render(<MaterialsScreen />);
   expect(screen.queryByRole('button', { name: '+ Share material' })).toBeNull();
-  await fireEvent.press(chip('Mentor Max'));
+  await pick('Mentor Max');
   expect(titles()).toEqual(['Material m1']);
+  await openList();
   expect(selectedChip()).toEqual(['Mentor Max']);
 });
 

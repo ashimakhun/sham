@@ -1,5 +1,5 @@
 // ARU-29: filter the Materials list by author with a chip row (All + one chip per author). App-only, no data change.
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
 import MaterialsScreen from '@/app/(tabs)/materials';
@@ -24,8 +24,13 @@ const m1 = mat('m1', 'M', '2026-10-21T10:00:00.000Z');
 const s3 = mat('s3', 'S3', '2026-10-19T10:00:00.000Z'); // "Abby Student": sorts first
 const all = [t1, m1, t2, s3];
 
+// ARU-62: the chip row became one "Filter: <name>" button that opens the author list; these helpers open it first.
+const openList = async () => {
+  if (!screen.queryByTestId('author-filter-list'))
+    await fireEvent.press(screen.getByRole('button', { name: /^Filter by author, / }));
+};
 const chips = () =>
-  screen
+  within(screen.getByTestId('author-filter-list'))
     .getAllByRole('button')
     .filter((b) => b.props.accessibilityState && 'selected' in b.props.accessibilityState)
     .map((b) => ({ label: b.props.accessibilityLabel as string, selected: !!b.props.accessibilityState.selected }));
@@ -35,6 +40,11 @@ const selectedChip = () =>
     .map((c) => c.label);
 const titles = () => screen.queryAllByText(/^Material /).map((n) => n.props.children);
 const chip = (name: string) => screen.getByRole('button', { name });
+/** Opens the list and taps an entry (the list then closes). */
+const pick = async (name: string) => {
+  await openList();
+  await fireEvent.press(chip(name));
+};
 
 beforeEach(() => jest.clearAllMocks());
 
@@ -48,7 +58,9 @@ describe('AC1/AC2: chip row', () => {
       getUser: (id) => [...Object.values(users), lower].find((u) => u.id === id),
     });
     await render(<MaterialsScreen />);
+    await openList();
     expect(chips().map((c) => c.label)).toEqual(['All', 'aaron lower', 'Abby Student', 'Mentor Max', 'Teacher Tess']);
+    await openList();
     expect(selectedChip()).toEqual(['All']);
     expect(titles()).toEqual(['Material t2', 'Material m1', 'Material t1', 'Material s3', 'Material l1']);
   });
@@ -63,7 +75,7 @@ describe('AC1/AC2: chip row', () => {
   it('unknown author shows as "Unknown" and still filters', async () => {
     setStore(fakeStore('S1', { materials: [t1, mat('x1', 'GONE', '2026-10-25T10:00:00.000Z')] }));
     await render(<MaterialsScreen />);
-    await fireEvent.press(chip('Unknown'));
+    await pick('Unknown');
     expect(titles()).toEqual(['Material x1']);
   });
 
@@ -72,6 +84,7 @@ describe('AC1/AC2: chip row', () => {
     const store = fakeStore('S1', { materials: [m1, mat('x9', 'M9', '2026-10-25T10:00:00.000Z')] });
     setStore({ ...store, getUser: (id) => [...Object.values(users), twin].find((u) => u.id === id) });
     await render(<MaterialsScreen />);
+    await openList();
     expect(chips().filter((c) => c.label === 'Mentor Max')).toHaveLength(2);
   });
 });
@@ -80,13 +93,16 @@ describe('AC3-AC5: selecting', () => {
   it('an author chip shows only their materials, newest first; All restores; tapping again changes nothing', async () => {
     setStore(fakeStore('M', { materials: all }));
     await render(<MaterialsScreen />);
-    await fireEvent.press(chip('Teacher Tess'));
+    await pick('Teacher Tess');
+    await openList();
     expect(selectedChip()).toEqual(['Teacher Tess']);
     expect(titles()).toEqual(['Material t2', 'Material t1']);
-    await fireEvent.press(chip('Teacher Tess'));
+    await pick('Teacher Tess');
+    await openList();
     expect(selectedChip()).toEqual(['Teacher Tess']);
     expect(titles()).toEqual(['Material t2', 'Material t1']);
-    await fireEvent.press(chip('All'));
+    await pick('All');
+    await openList();
     expect(selectedChip()).toEqual(['All']);
     expect(titles()).toHaveLength(4);
   });
@@ -94,6 +110,7 @@ describe('AC3-AC5: selecting', () => {
   it('AC12: chips are buttons labelled with their text and expose the selected state', async () => {
     setStore(fakeStore('S1', { materials: all }));
     await render(<MaterialsScreen />);
+    await openList();
     expect(chip('Mentor Max').props.accessibilityState).toMatchObject({ selected: false });
     expect(chip('All').props.accessibilityState).toMatchObject({ selected: true });
   });
@@ -103,31 +120,36 @@ describe('AC6-AC8/AC10/AC11: live changes keep the selection', () => {
   it('a refresh or live update keeps the author and shows their current materials', async () => {
     setStore(fakeStore('S1', { materials: all }));
     const { rerender } = await render(<MaterialsScreen />);
-    await fireEvent.press(chip('Teacher Tess'));
+    await pick('Teacher Tess');
     setStore(
       fakeStore('S1', {
         materials: [...all, mat('t3', 'T', '2026-10-28T10:00:00.000Z'), mat('n1', 'N', '2026-10-29T10:00:00.000Z')],
       }),
     );
     await rerender(<MaterialsScreen />);
+    await openList();
     expect(selectedChip()).toEqual(['Teacher Tess']);
     expect(titles()).toEqual(['Material t3', 'Material t2', 'Material t1']);
     // AC 8: the new author's chip appears in alphabetical order.
+    await openList();
     expect(chips().map((c) => c.label)).toEqual(['All', 'Abby Student', 'Mentor Max', 'Mentor Nina', 'Teacher Tess']);
   });
 
   it("AC7: when the author's last material is gone, their chip disappears and All is selected, and stays so", async () => {
     setStore(fakeStore('M', { materials: all }));
     const { rerender } = await render(<MaterialsScreen />);
-    await fireEvent.press(chip('Mentor Max'));
+    await pick('Mentor Max');
     setStore(fakeStore('M', { materials: [t1, t2, s3] }));
     await rerender(<MaterialsScreen />);
+    await openList();
     expect(screen.queryByRole('button', { name: 'Mentor Max' })).toBeNull();
+    await openList();
     expect(selectedChip()).toEqual(['All']);
     expect(titles()).toHaveLength(3);
     // Max shares again later: the filter stays on All.
     setStore(fakeStore('M', { materials: all }));
     await rerender(<MaterialsScreen />);
+    await openList();
     expect(selectedChip()).toEqual(['All']);
   });
 
@@ -135,10 +157,11 @@ describe('AC6-AC8/AC10/AC11: live changes keep the selection', () => {
     setStore(fakeStore('T', { materials: all }));
     await render(<MaterialsScreen />);
     const buttons = screen.getAllByRole('button').map((b) => b.props.accessibilityLabel ?? 'share');
-    expect(buttons.indexOf('share')).toBeLessThan(buttons.indexOf('All'));
-    await fireEvent.press(chip('Mentor Max'));
+    expect(buttons.indexOf('share')).toBeLessThan(buttons.indexOf('Filter by author, All'));
+    await pick('Mentor Max');
     await fireEvent.press(screen.getByText('Material m1'));
     expect(router.push).toHaveBeenLastCalledWith({ pathname: '/materials/[id]', params: { id: 'm1' } });
+    await openList();
     expect(selectedChip()).toEqual(['Mentor Max']);
   });
 });

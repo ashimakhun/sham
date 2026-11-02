@@ -107,6 +107,7 @@ it('AC7: each card gets its own body, newest first, and the author filter still 
   expect(bodies).toHaveLength(2);
   expect(within(bodies[0]).getByText('B')).toBeTruthy();
   expect(within(bodies[1]).getByText('Body of A')).toBeTruthy();
+  await fireEvent.press(screen.getByRole('button', { name: /^Filter by author/ })); // ARU-62: authors open from one Filter button
   await fireEvent.press(screen.getByRole('button', { name: /Mentor Max/ }));
   expect(screen.getAllByTestId('markdown')).toHaveLength(1);
   expect(screen.queryByText('Body of A')).toBeNull();
