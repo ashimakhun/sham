@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react';
-import { Pressable, Text, TextInput, type TextInputInstance, useWindowDimensions, View } from 'react-native';
+import { Keyboard, Pressable, Text, TextInput, type TextInputInstance, useWindowDimensions, View } from 'react-native';
 
 import { ErrorText, styles } from '@/components/ui';
 import { type Edit, insertLink, NOTES_MAX, notesCounter, type Selection, toggleList, toggleWrap } from '@/lib/markdown';
 import { colors } from '@/lib/theme';
+import { useKeyboardHeight } from '@/lib/useKeyboardHeight';
 
 type Props = {
   value: string;
@@ -24,6 +25,13 @@ const TOOLS = [
   { key: 'link', label: 'Link', glyph: 'Link', glyphStyle: { textDecorationLine: 'underline' as const } },
 ] as const;
 type Tool = (typeof TOOLS)[number]['key'];
+
+/** Room for everything but the field with the keyboard open: header, topic line, toolbar, gaps and padding, Save. */
+const OTHER_CONTENT = 300;
+/** The inline Link URL field and its Add link / Cancel row. */
+const LINK_ROW = 90;
+/** The field never gets shorter than about four lines. */
+const MIN_OPEN = 96;
 
 /**
  * Multi-line text editor with a formatting toolbar above it (ARU-28; reusable for ARU-30): Bold, Italic, Bulleted
@@ -47,9 +55,18 @@ export function MarkdownEditor({
   const [url, setUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
   const input = useRef<TextInputInstance>(null);
-  // Bounded, so the field never pushes Save off screen; longer text scrolls inside it (ARU-58).
+  // Bounded, so the field never pushes Save off screen; longer text scrolls inside it (ARU-58). While the keyboard is
+  // open, the field only takes the room left above it after the header, toolbar, link row and Save, so a 4-line note
+  // on an iPhone still leaves Save and some form to drag (which closes the keyboard) above the keyboard.
   const { height: windowHeight } = useWindowDimensions();
-  const maxHeight = Math.max(160, Math.round(windowHeight * 0.4));
+  const keyboardHeight = useKeyboardHeight();
+  const closedMax = Math.round(windowHeight * 0.4);
+  const reserved = OTHER_CONTENT + (linkFor ? LINK_ROW : 0);
+  const maxHeight =
+    keyboardHeight > 0
+      ? Math.min(closedMax, Math.max(MIN_OPEN, windowHeight - keyboardHeight - reserved))
+      : Math.max(160, closedMax);
+  const minHeight = Math.min(160, maxHeight);
 
   function apply(edit: Edit) {
     if (edit.text.length > maxLength) {
@@ -114,6 +131,24 @@ export function MarkdownEditor({
             <Text style={[{ fontSize: 16, color: colors.text }, t.glyphStyle]}>{t.glyph}</Text>
           </Pressable>
         ))}
+        {/* Return adds a line in a multiline field, so this is the explicit way out while typing (ARU-58). */}
+        {keyboardHeight > 0 && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Hide keyboard"
+            onPress={() => Keyboard.dismiss()}
+            style={({ pressed }) => ({
+              height: 44,
+              paddingHorizontal: 12,
+              borderRadius: 10,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginLeft: 'auto',
+              backgroundColor: pressed ? colors.primarySoft : 'transparent',
+            })}>
+            <Text style={{ fontSize: 16, color: colors.primary, fontWeight: '600' }}>Done</Text>
+          </Pressable>
+        )}
       </View>
 
       {linkFor && (
@@ -172,7 +207,7 @@ export function MarkdownEditor({
         }}
         scrollEnabled
         textAlignVertical="top"
-        style={[styles.input, { minHeight: 160, maxHeight }]}
+        style={[styles.input, { minHeight, maxHeight }]}
       />
       {counter && (
         <Text
