@@ -129,6 +129,9 @@ export type Meeting = {
   notes?: string;
   notesUpdatedById?: string;
   notesUpdatedAt?: string;
+  /** ARU-60: a Completed meeting's homework was marked checked (moves it to MEETING HISTORY); undefined = not yet. */
+  homeworkCheckedAt?: string;
+  homeworkCheckedById?: string;
 };
 
 /** A listener's self-reported attendance of a Completed meeting (ARU-33). */
