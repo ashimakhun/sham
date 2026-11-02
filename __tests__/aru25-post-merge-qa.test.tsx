@@ -21,7 +21,6 @@ jest.mock('expo-router/react-navigation', () => ({ useHeaderHeight: () => 0 }));
 
 const longTitle = 'A very long course title that certainly needs more than two lines on a small phone screen';
 const chatA = { name: 'Open chat for Algebra' };
-const showAll = () => fireEvent.press(screen.getByRole('tab', { name: 'All courses' }));
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -66,7 +65,8 @@ describe('AC6: live access changes in both directions', () => {
   it('being added as a listener shows the icon without reopening the tab', async () => {
     setStore(fakeStore('S2', { courses: [courseB, courseA], courseMembers: [] }));
     const view = await render(<CoursesScreen />);
-    await showAll();
+    // ARU-63: no "All courses" tab; A has no discipline, so it is listed under "No discipline" on the Courses view.
+    expect(screen.getByText('NO DISCIPLINE')).toBeTruthy();
     expect(screen.queryByRole('button', chatA)).toBeNull();
     setStore(fakeStore('S2', { courses: [courseB, courseA], courseMembers: [member('A', 'S2')] }));
     await view.rerender(<CoursesScreen />);

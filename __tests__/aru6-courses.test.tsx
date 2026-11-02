@@ -20,7 +20,7 @@ jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn() }));
 
 const button = (name: string | RegExp) => screen.getByRole('button', { name });
 // Since ARU-12 the Courses tab opens on "My courses"; ARU-6's list is the "All courses" view.
-const showAll = () => fireEvent.press(screen.getByRole('tab', { name: 'All courses' }));
+const showAll = () => fireEvent.press(screen.getByRole('tab', { name: 'Courses' }));
 
 beforeEach(() => jest.clearAllMocks());
 
@@ -61,17 +61,18 @@ describe('Courses tab', () => {
     expect(router.push).toHaveBeenCalledWith({ pathname: '/courses/[id]', params: { id: 'A' } });
   });
 
+  // ARU-63 AC 8: with nothing at all, the role-based empty state of the Courses view shows.
   it('edge: empty state with a hint per role', async () => {
     setStore(fakeStore('M', { courses: [] }));
     const { unmount } = await render(<CoursesScreen />);
     await showAll();
-    expect(screen.getByText('No courses yet')).toBeTruthy();
-    expect(screen.getByText('Tap "+ New course" to create the first one.')).toBeTruthy();
+    expect(screen.getByText("You don't own or attend any course yet")).toBeTruthy();
+    expect(screen.getByText('Create one with "+ New course" or ask to be added.')).toBeTruthy();
     await unmount();
     setStore(fakeStore('S1', { courses: [] }));
     await render(<CoursesScreen />);
     await showAll();
-    expect(screen.getByText('Your teacher or mentor has not created any courses yet.')).toBeTruthy();
+    expect(screen.getByText('Ask your teacher or mentor to add you.')).toBeTruthy();
   });
 
   it('edge: pull to refresh reloads', async () => {

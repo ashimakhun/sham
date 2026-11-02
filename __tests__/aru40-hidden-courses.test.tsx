@@ -77,7 +77,7 @@ describe('Hidden label (AC 2)', () => {
   it('the card of a hidden course shows "Hidden" next to the title; visible courses don\'t', async () => {
     setStore(fakeStore('S1', { courses: [hiddenH, courseB, courseA], courseMembers: [member('H', 'S1')] }));
     await render(<CoursesScreen />);
-    await fireEvent.press(screen.getByRole('tab', { name: 'All courses' }));
+    await fireEvent.press(screen.getByRole('tab', { name: 'Courses' }));
     expect(screen.getAllByText('Hidden')).toHaveLength(1);
     expect(screen.getByText('Secret')).toBeTruthy();
   });
@@ -109,7 +109,7 @@ describe('Without access (AC 3, 8, 10)', () => {
   it('a non-participant has no trace of it in Courses', async () => {
     setStore(fakeStore('S2', { courses: [courseB, courseA] }));
     await render(<CoursesScreen />);
-    await fireEvent.press(screen.getByRole('tab', { name: 'All courses' }));
+    await fireEvent.press(screen.getByRole('tab', { name: 'Courses' }));
     expect(screen.queryByText('Secret')).toBeNull();
     expect(screen.queryByText('Hidden')).toBeNull();
   });

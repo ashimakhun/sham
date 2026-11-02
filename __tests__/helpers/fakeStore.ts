@@ -43,6 +43,7 @@ export const hw = (over: Partial<Homework> & { id: string }): Homework => ({
 export function fakeStore(who: keyof typeof users | null, over: Partial<Store> = {}): Store {
   const all = Object.values(users);
   const courses = over.courses ?? [courseB, courseA];
+  const disciplines = over.disciplines ?? [];
   return {
     ready: true,
     session: null,
@@ -86,6 +87,11 @@ export function fakeStore(who: keyof typeof users | null, over: Partial<Store> =
     setMeetingStatus: jest.fn(async () => {}),
     updateMeeting: jest.fn(async () => {}),
     setMeetingNotes: jest.fn(async () => {}),
+    disciplines,
+    getDiscipline: (id) => (id ? disciplines.find((d) => d.id === id) : undefined),
+    addDiscipline: jest.fn(async () => {}),
+    setDisciplineHidden: jest.fn(async () => {}),
+    setCourseDiscipline: jest.fn(async () => {}),
     setMeetingHomeworkChecked: jest.fn(async () => {}),
     loadMessages: jest.fn(async () => ({ messages: [], hasMore: false })),
     sendMessage: jest.fn(async () => {}),

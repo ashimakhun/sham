@@ -12,6 +12,7 @@ import type {
   Course,
   CourseMember,
   CourseMessage,
+  Discipline,
   GeneralMessage,
   Homework,
   HomeworkAssignment,
@@ -61,6 +62,16 @@ export type Store = {
   materialLikes: MaterialLike[];
   /** Course feedback (ARU-53), newest first: every approved user sees it for the courses they can see. */
   courseFeedback: CourseFeedback[];
+  /** ARU-63: disciplines the user can see, A-Z (hidden ones only for the teacher). */
+  disciplines: Discipline[];
+  /** A discipline the user can see, or undefined (unknown, or hidden from them). */
+  getDiscipline: (id: string | undefined) => Discipline | undefined;
+  /** Teacher only (ARU-63). The name is trimmed; a name that already exists (any case) is refused. */
+  addDiscipline: (input: { id: string; name: string; hidden: boolean }) => Promise<void>;
+  /** Teacher only (ARU-63): hide or unhide a discipline. */
+  setDisciplineHidden: (id: string, hidden: boolean) => Promise<void>;
+  /** The course's current owner (ARU-63): set, change or clear (null) its discipline. */
+  setCourseDiscipline: (courseId: string, disciplineId: string | null) => Promise<void>;
   loading: boolean;
   /** True once data has been fetched (successfully or not) for the signed-in user. */
   dataLoaded: boolean;
@@ -193,7 +204,9 @@ type CourseRow = {
   created_by: string;
   created_at: string;
   hidden?: boolean | null;
+  discipline_id?: string | null;
 };
+type DisciplineRow = { id: string; name: string; hidden: boolean; created_by: string; created_at: string };
 type CourseMemberRow = { course_id: string; user_id: string; added_by: string; added_at: string };
 type MeetingRow = {
   id: string;
@@ -297,7 +310,19 @@ const toCourse = (r: CourseRow): Course => ({
   createdById: r.created_by,
   createdAt: r.created_at,
   hidden: !!r.hidden,
+  disciplineId: r.discipline_id ?? undefined,
 });
+
+const toDiscipline = (r: DisciplineRow): Discipline => ({
+  id: r.id,
+  name: r.name,
+  hidden: !!r.hidden,
+  createdById: r.created_by,
+  createdAt: r.created_at,
+});
+
+export const DISCIPLINE_NAME_MAX = 100;
+const DUPLICATE_DISCIPLINE = 'A discipline with this name already exists.';
 
 const toCourseMember = (r: CourseMemberRow): CourseMember => ({
   courseId: r.course_id,
@@ -447,6 +472,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [attendance, setAttendance] = useState<MeetingAttendance[]>([]);
   const [materialLikes, setMaterialLikes] = useState<MaterialLike[]>([]);
   const [courseFeedback, setCourseFeedback] = useState<CourseFeedback[]>([]);
+  const [disciplines, setDisciplines] = useState<Discipline[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [unread, setUnread] = useState<Record<string, number>>({});
@@ -503,7 +529,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     try {
       // RLS returns nothing but the own profile to an account that isn't approved (ARU-43), so these all succeed
       // (empty) for it and the app shows the waiting screen.
-      const [profileRows, hw, mats, crs, members, mtgs, asgs, att, files, likes, fb] = await Promise.all([
+      const [profileRows, hw, mats, crs, members, mtgs, asgs, att, files, likes, fb, discs] = await Promise.all([
         // '*' so the app keeps working if the access_status column (0021) isn't there yet.
         supabase.from('profiles').select('*').order('full_name'),
         supabase.from('homework').select('*').order('created_at', { ascending: false }),
@@ -516,6 +542,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         supabase.from('material_files').select('*').order('created_at', { ascending: false }),
         supabase.from('material_likes').select('*').order('created_at', { ascending: false }),
         supabase.from('course_feedback').select('*').order('created_at', { ascending: false }),
+        supabase.from('disciplines').select('*').order('name'),
       ]);
       const all = rows<ProfileRow>(profileRows).map(toUser);
       const me = all.find((u) => u.id === userId);
@@ -530,6 +557,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setMaterialFiles(rows<MaterialFileRow>(files).map(toMaterialFile));
       setMaterialLikes(rows<MaterialLikeRow>(likes).map(toMaterialLike));
       setCourseFeedback(rows<FeedbackRow>(fb).map(toFeedback));
+      // Before 0031_disciplines.sql runs there is no table: no disciplines, and the rest of the app keeps working.
+      setDisciplines(discs.error ? [] : ((discs.data as DisciplineRow[] | null) ?? []).map(toDiscipline));
       if (me?.accessStatus !== 'approved') {
         setAccessRequests([]);
         setUnread({});
@@ -582,6 +611,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // Feedback (ARU-53): the list, the average and the course cards update on every open device.
       .on('postgres_changes', { event: '*', schema: 'public', table: 'course_feedback' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'courses' }, () => load().catch(() => {}))
+      // ARU-63: created and unhidden disciplines reach everyone; hiding reaches only the teacher (RLS).
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'disciplines' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'course_members' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'course_meetings' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'homework_assignments' }, () =>
@@ -624,6 +655,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [materialFiles],
   );
   const getCourse = useCallback((id: string | undefined) => courses.find((c) => c.id === id), [courses]);
+  const sortedDisciplines = useMemo(
+    () => [...disciplines].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+    [disciplines],
+  );
+  const getDiscipline = useCallback(
+    (id: string | undefined) => (id ? disciplines.find((d) => d.id === id) : undefined),
+    [disciplines],
+  );
   const visibleHomework = useMemo(
     () => [...homework].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     [homework],
@@ -671,6 +710,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     attendance,
     materialLikes,
     courseFeedback,
+    disciplines: sortedDisciplines,
+    getDiscipline,
     loading,
     dataLoaded: !!userId && loadedFor === userId,
     refresh,
@@ -811,8 +852,35 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           created_by: creator.id,
           // Hidden courses (ARU-40): RLS shows them only to the owner, listeners and the teacher.
           hidden: !!input.hidden,
+          // ARU-63: only sent when chosen, so creating a course works before 0031 runs.
+          ...(input.disciplineId ? { discipline_id: input.disciplineId } : {}),
         }),
       );
+      await load();
+    },
+    addDiscipline: async ({ id, name, hidden }) => {
+      requireRole('teacher');
+      const trimmed = name.trim();
+      if (!trimmed) throw new Error('Enter a name for the discipline.');
+      if (trimmed.length > DISCIPLINE_NAME_MAX) {
+        throw new Error(`A discipline name can be at most ${DISCIPLINE_NAME_MAX} characters.`);
+      }
+      const res = await supabase.from('disciplines').insert({ id, name: trimmed, hidden });
+      // The unique name index answers both "already exists" and a retry of a create that went through (AC 1).
+      if (res.error?.code === '23505') throw new Error(DUPLICATE_DISCIPLINE);
+      check(res);
+      await load();
+    },
+    setDisciplineHidden: async (id, hidden) => {
+      requireRole('teacher');
+      const res = await supabase.from('disciplines').update({ hidden }).eq('id', id).select('id');
+      check(res);
+      if (!res.data?.length) throw new Error('Discipline not found.');
+      await load();
+    },
+    setCourseDiscipline: async (courseId, disciplineId) => {
+      requireRole('teacher', 'mentor');
+      check(await supabase.rpc('set_course_discipline', { course: courseId, discipline: disciplineId }));
       await load();
     },
     changeCourseOwner: async (courseId, userId) => {

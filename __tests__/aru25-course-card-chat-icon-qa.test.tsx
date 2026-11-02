@@ -18,7 +18,6 @@ jest.mock('@/lib/store', () => require('./helpers/mocks').store);
 const courses = [courseB, courseA];
 const members = [member('A', 'S1'), member('A', 'M2')];
 const chatA = { name: 'Open chat for Algebra' };
-const showAll = () => fireEvent.press(screen.getByRole('tab', { name: 'All courses' }));
 
 beforeEach(() => jest.clearAllMocks());
 
@@ -66,7 +65,7 @@ describe('AC2 with ARU-24: limited cards stay icon-free and unchanged', () => {
 });
 
 describe('AC1: owner view', () => {
-  it('the owner sees the icon on A under "Courses I own" in My courses', async () => {
+  it('the owner sees the icon on A under "Courses I own" in Courses', async () => {
     setStore(fakeStore('M', { courses, courseMembers: members }));
     await render(<CoursesScreen />);
     expect(screen.getByText(/COURSES I OWN/)).toBeTruthy();
@@ -80,7 +79,7 @@ describe('AC3/AC5: tap guard', () => {
     try {
       setStore(fakeStore('S1', { courses, courseMembers: members }));
       await render(<CoursesScreen />);
-      await showAll();
+      // ARU-63: no "All courses" tab; A (no discipline) is on the Courses view.
       now.mockReturnValue(10_000);
       await fireEvent.press(screen.getByRole('button', chatA));
       now.mockReturnValue(11_000);

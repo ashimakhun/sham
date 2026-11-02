@@ -88,6 +88,17 @@ export type Course = {
   createdAt: string;
   /** Hidden course (ARU-40): only its owner, its listeners and the teacher can see it. DB: hidden. */
   hidden?: boolean;
+  /** ARU-63: the course's discipline, if any. An id the viewer can't resolve is a discipline hidden from them. */
+  disciplineId?: string;
+};
+
+/** ARU-63: a group of courses, created by the teacher. Hidden ones are visible only to the teacher. */
+export type Discipline = {
+  id: string;
+  name: string;
+  hidden: boolean;
+  createdById: string;
+  createdAt: string;
 };
 
 /** A listener of a course (students and mentors; never the course owner or the teacher). */
@@ -175,7 +186,7 @@ export type NewAssignment = {
   description: string;
   dueAt?: string;
 };
-export type NewCourse = { id: string; title: string; description: string; hidden?: boolean };
+export type NewCourse = { id: string; title: string; description: string; hidden?: boolean; disciplineId?: string };
 export type NewMaterial = Pick<Material, 'title' | 'body' | 'link'>;
 export type NewMeeting = { id: string; courseId: string; startsAt: string; topic: string; location: string };
 /** `startsAt` is sent back exactly as loaded when the time wasn't changed, so it doesn't count as a reschedule. */

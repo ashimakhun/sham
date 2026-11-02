@@ -14,6 +14,8 @@ An educational mobile app where teachers, mentors and students work together:
   optionally visible only to that course's participants.
 - **Listeners** rate a course once it has started (1–5 stars and a review); everyone who sees the course reads it.
 - **Hidden courses** are seen only by their owner, their listeners and the teacher.
+- **Disciplines** (ARU-63): the teacher groups courses into disciplines; the Courses tab shows **Courses** (your courses,
+  then those with no discipline) and **Disciplines** (each with the rating and reviews of its courses).
 - **New accounts** wait for the teacher's approval before they can use the app.
 
 How each feature behaves today is described in the Linear project document **Sham: product documentation**.
@@ -62,7 +64,10 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `0029_general_chat.sql` (ARU-61: the general chat; adds a table with policies and puts it in realtime, deletes
    nothing; it doesn't depend on 0028),
    `0030_chat_server_time.sql` (ARU-67: the server sets every chat message's time, in the general and course chats;
-   changes insert grants only).
+   changes insert grants only),
+   `0031_disciplines.sql` (ARU-63: disciplines; adds a table, a nullable `courses.discipline_id` and two functions,
+   deletes nothing; existing courses get no discipline; it doesn't
+   depend on 0028-0030).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 
@@ -150,15 +155,19 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Assign homework to a completed meeting | | own courses        | any course |
 | Send homework (for an assignment) | courses they're in | courses they're in |  |
 | Mark homework checked      |           | any (not their own) | any (not their own) |
-| See courses                | all except hidden ones they're not in (title and description only unless they're in it) | all except hidden ones they don't own or attend | all |
+| See courses (database)     | all except hidden ones they're not in (title and description only unless they're in it) | all except hidden ones they don't own or attend | all |
+| Courses list (Courses tab, ARU-63) | courses they're in + courses with no discipline | own and attended courses + courses with no discipline | own courses + courses with no discipline (hidden ones too); every course through a discipline card |
+| See disciplines, their rating and reviews | visible ones | visible ones | ✓ (hidden ones too) |
+| Create a discipline, hide / unhide it |   |                    | ✓       |
+| Set / change / clear a course's discipline | | own courses   | own courses |
 | Create courses             |           | ✓                  | ✓       |
 | Create a hidden course     |           | ✓                  | ✓       |
 | See a hidden course and its content | (listeners only) | owner and listeners only | ✓ (all) |
-| Change course owner        |           | ✓ (any course)     | ✓       |
+| Change course owner        |           | ✓ (any course they can reach¹) | ✓       |
 | Own a course               | never     | ✓ (not if a listener) | ✓    |
 | Be a course listener       | ✓         | ✓ (not own course) |         |
 | See course listeners       | own courses | ✓                | ✓       |
-| Add / remove listeners     |           | ✓ (any course)     | ✓       |
+| Add / remove listeners     |           | ✓ (any course they can reach¹) | ✓       |
 | Course chat (read / post)  | courses they're in | own courses + courses they're in | all |
 | General chat (read / post; no edit or delete) | ✓ | ✓ | ✓ |
 | See course meetings        | courses they're in | ✓ (all courses)  | ✓       |
@@ -182,6 +191,10 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Switch student ↔ mentor    |           |                    | ✓       |
 | Accept or reject new accounts |        |                    | ✓       |
 | Become / stop being teacher |          |                    | (nobody) |
+
+¹ Since ARU-63 a mentor reaches a course through the Courses list (courses they own or attend, and courses with no
+discipline), the Profile tab or a Knowledge base PDF's course link. Courses in a discipline that they neither own nor
+attend aren't listed; database access to them is unchanged.
 
 ## Development workflow
 

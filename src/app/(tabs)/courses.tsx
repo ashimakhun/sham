@@ -1,15 +1,18 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { Pressable, SectionList, Text, View } from 'react-native';
+import { FlatList, Pressable, SectionList, Text, View } from 'react-native';
 
 import { CourseCard } from '@/components/CourseCard';
+import { DisciplineCard } from '@/components/Disciplines';
 import { Button, EmptyState, styles } from '@/components/ui';
+import { canManageDisciplines } from '@/lib/disciplines';
 import { canCreateCourse } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import type { Course } from '@/lib/types';
 
-type CoursesView = 'mine' | 'all';
+/** ARU-63: "Courses" (was "My courses", plus courses with no discipline) and "Disciplines" (replaces "All courses"). */
+type CoursesView = 'courses' | 'disciplines';
 
 const myEmpty: Record<string, { title: string; hint: string }> = {
   student: { title: 'You are not in any course yet', hint: 'Ask your teacher or mentor to add you.' },
@@ -20,14 +23,14 @@ const myEmpty: Record<string, { title: string; hint: string }> = {
 type Section = { key: string; title?: string; tag?: string; data: Course[] };
 
 export default function CoursesScreen() {
-  const { currentUser, courseMembers, loading, refresh, courses } = useStore();
+  const { currentUser, courseMembers, loading, refresh, courses, disciplines } = useStore();
   const role = currentUser?.role ?? 'student';
   const me = currentUser?.id;
   const canCreate = canCreateCourse(currentUser?.role);
-  const [view, setView] = useState<CoursesView>('mine');
+  const [view, setView] = useState<CoursesView>('courses');
 
-  // "My courses" is selected each time the tab is opened, but not when coming back from a course or
-  // "+ New course" opened from here.
+  // "Courses" is selected each time the tab is opened, but not when coming back from a course, a discipline or
+  // "+ New course" / "+ New discipline" opened from here.
   const openedFromHere = useRef(false);
   const openFromHere = () => {
     openedFromHere.current = true;
@@ -35,7 +38,7 @@ export default function CoursesScreen() {
   useFocusEffect(
     useCallback(() => {
       if (openedFromHere.current) openedFromHere.current = false;
-      else setView('mine');
+      else setView('courses');
     }, []),
   );
 
@@ -45,25 +48,65 @@ export default function CoursesScreen() {
     (c) => c.createdById !== me && courseMembers.some((m) => m.courseId === c.id && m.userId === me),
   );
 
-  const sections: Section[] = (
-    view === 'all'
-      ? [{ key: 'all', data: courses }]
-      : [
-          { key: 'in', title: "Courses I'm in", tag: 'Listener', data: listening },
-          // A student can't own a course, so the section is only for teachers and mentors.
-          ...(canCreate ? [{ key: 'own', title: 'Courses I own', tag: 'Owner', data: owned }] : []),
-        ]
-  ).filter((s) => s.data.length > 0); // no empty headings; with no sections the empty state shows
+  // ARU-63 AC 8: then every other course the user can read that has no discipline, newest first (as "All courses"
+  // was). Courses with a discipline that the user neither owns nor attends aren't listed. Hidden courses are already
+  // limited by RLS (ARU-40).
+  const mine = new Set([...owned, ...listening].map((c) => c.id));
+  const noDiscipline = courses.filter((c) => !mine.has(c.id) && !c.disciplineId);
 
-  const empty =
-    view === 'all' ? (
-      <EmptyState
-        title="No courses yet"
-        hint={canCreate ? 'Tap "+ New course" to create the first one.' : 'Your teacher or mentor has not created any courses yet.'}
+  const sections: Section[] = [
+    { key: 'in', title: "Courses I'm in", tag: 'Listener', data: listening },
+    // A student can't own a course, so the section is only for teachers and mentors.
+    ...(canCreate ? [{ key: 'own', title: 'Courses I own', tag: 'Owner', data: owned }] : []),
+    { key: 'none', title: 'No discipline', data: noDiscipline },
+  ].filter((s) => s.data.length > 0); // no empty headings; with no sections the empty state shows
+
+  const header = (
+    <View style={{ gap: 12 }}>
+      <ViewSwitch value={view} onChange={setView} />
+      {view === 'courses' && canCreate && (
+        <Button
+          title="+ New course"
+          onPress={() => {
+            openFromHere();
+            router.push('/courses/new');
+          }}
+        />
+      )}
+      {view === 'disciplines' && canManageDisciplines(currentUser) && (
+        <Button
+          title="+ New discipline"
+          onPress={() => {
+            openFromHere();
+            router.push('/disciplines/new');
+          }}
+        />
+      )}
+    </View>
+  );
+
+  if (view === 'disciplines') {
+    return (
+      <FlatList
+        style={styles.screen}
+        contentContainerStyle={[styles.content, { gap: 12 }]}
+        data={disciplines}
+        keyExtractor={(d) => d.id}
+        // Also how students and mentors pick up a discipline the teacher hid (ARU-63 AC 12).
+        refreshing={loading}
+        onRefresh={() => refresh().catch(() => {})}
+        ListHeaderComponent={header}
+        renderItem={({ item }) => <DisciplineCard discipline={item} onOpen={openFromHere} />}
+        ListEmptyComponent={
+          canManageDisciplines(currentUser) ? (
+            <EmptyState title="No disciplines yet" hint={'Tap "+ New discipline" to create the first one.'} />
+          ) : (
+            <EmptyState title="No disciplines yet" />
+          )
+        }
       />
-    ) : (
-      <EmptyState {...myEmpty[role]} />
     );
+  }
 
   return (
     <SectionList
@@ -74,34 +117,21 @@ export default function CoursesScreen() {
       onRefresh={() => refresh().catch(() => {})}
       keyExtractor={(c) => c.id}
       stickySectionHeadersEnabled={false}
-      ListHeaderComponent={
-        <View style={{ gap: 12 }}>
-          <ViewSwitch value={view} onChange={setView} />
-          {canCreate && (
-            <Button
-              title="+ New course"
-              onPress={() => {
-                openFromHere();
-                router.push('/courses/new');
-              }}
-            />
-          )}
-        </View>
-      }
+      ListHeaderComponent={header}
       renderSectionHeader={({ section }) =>
         section.title ? <Text style={[styles.label, { marginTop: 8 }]}>{section.title.toUpperCase()}</Text> : null
       }
       renderItem={({ item, section }) => <CourseCard course={item} tag={section.tag} onOpen={openFromHere} />}
-      ListEmptyComponent={empty}
+      ListEmptyComponent={<EmptyState {...myEmpty[role]} />}
     />
   );
 }
 
-/** "My courses" / "All courses" switch: two tabs built from existing styles (no new package). */
+/** "Courses" / "Disciplines" switch (ARU-63): two tabs built from existing styles (no new package). */
 function ViewSwitch({ value, onChange }: { value: CoursesView; onChange: (v: CoursesView) => void }) {
   const options: { value: CoursesView; label: string }[] = [
-    { value: 'mine', label: 'My courses' },
-    { value: 'all', label: 'All courses' },
+    { value: 'courses', label: 'Courses' },
+    { value: 'disciplines', label: 'Disciplines' },
   ];
   return (
     <View style={styles.segmented} accessibilityRole="tablist">
