@@ -88,6 +88,8 @@ export default function CourseDetailScreen() {
         </View>
       }
       ListEmptyComponent={<EmptyState title="No homework for this course yet" />}
+      // ARU-60: checked and canceled meetings, at the very bottom (after the homework list or its empty state).
+      ListFooterComponent={<MeetingsSection course={course} part="history" />}
     />
   );
 }
