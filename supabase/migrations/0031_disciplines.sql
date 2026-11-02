@@ -1,7 +1,7 @@
 -- ARU-63: disciplines. The teacher creates disciplines and can hide them; a course's current owner puts the course
 -- into one (or none). Adds a table, a course column and two functions; deletes nothing. Existing courses get no
 -- discipline, so they all show under "No discipline" on release.
--- Numbered 0031: 0028 is ARU-60's and 0029-0030 are ARU-61/ARU-67's (open PR); this file doesn't depend on them.
+-- Numbered 0031: 0028 is ARU-60's and 0029-0030 are ARU-61/ARU-67's; this file doesn't depend on them.
 -- Read access to courses doesn't change (0019/0021); only what the app's Courses list shows does.
 
 create table disciplines (

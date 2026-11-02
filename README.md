@@ -8,6 +8,7 @@ An educational mobile app where teachers, mentors and students work together:
 - **Listeners** send homework (text + optional photo) for an assignment from the **New** list on the Homework tab.
 - **Mentors and the teacher** see all homework, leave a comment and mark it as checked (never their own).
 - **Each course** has a chat with a new-message counter for its owner, listeners and the teacher.
+- **General chat** for every accepted account, any role, opened from the Profile tab.
 - **Teachers and mentors** share formatted posts (lessons, notes, links) on the Materials tab's **Blog**, filterable
   by author, which everyone can like; and PDF books in the **Knowledge base**, optionally linked to a course and
   optionally visible only to that course's participants.
@@ -60,9 +61,13 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `0028_meeting_homework_checked.sql` (ARU-60: mark a completed meeting's homework checked, which moves it to the
    course's MEETING HISTORY; adds two nullable columns and a function, deletes nothing; existing meetings start
    unchecked),
+   `0029_general_chat.sql` (ARU-61: the general chat; adds a table with policies and puts it in realtime, deletes
+   nothing; it doesn't depend on 0028),
+   `0030_chat_server_time.sql` (ARU-67: the server sets every chat message's time, in the general and course chats;
+   changes insert grants only),
    `0031_disciplines.sql` (ARU-63: disciplines; adds a table, a nullable `courses.discipline_id` and two functions,
-   deletes nothing; existing courses get no discipline; 0029-0030 belong to the open general chat PR, and 0031
-   doesn't depend on them).
+   deletes nothing; existing courses get no discipline; it doesn't
+   depend on 0028-0030).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 
@@ -126,6 +131,7 @@ src/app/                  screens (Expo Router — every file is a route)
   courses/[id]/feedback.tsx  a listener adds or edits their feedback (stars + review)
   courses/[id]/listeners.tsx  teacher or mentor adds listeners
   courses/[id]/chat.tsx   course chat (owner, listeners and the teacher)
+  general-chat.tsx        general chat for every accepted account (from Profile)
   courses/[id]/owner.tsx  teacher or mentor changes the course owner
   courses/[id]/meetings/  schedule / edit a meeting; [meetingId]/notes.tsx notes; [meetingId]/assign-homework.tsx;
                           [meetingId]/attendance.tsx who attended
@@ -163,6 +169,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | See course listeners       | own courses | ✓                | ✓       |
 | Add / remove listeners     |           | ✓ (any course they can reach¹) | ✓       |
 | Course chat (read / post)  | courses they're in | own courses + courses they're in | all |
+| General chat (read / post; no edit or delete) | ✓ | ✓ | ✓ |
 | See course meetings        | courses they're in | ✓ (all courses)  | ✓       |
 | Schedule meetings, mark completed / canceled | | own courses    | any course |
 | Edit / reschedule a scheduled meeting | | own courses           | any course |
