@@ -99,13 +99,18 @@ export type CourseMember = {
 };
 
 /** A message in a course's group chat (ARU-8). */
-export type CourseMessage = {
+/** A message in any chat: the course chat (ARU-8) or the general chat (ARU-61). */
+export type ChatMessage = {
   id: string;
-  courseId: string;
   authorId: string;
   body: string;
   createdAt: string;
 };
+
+export type CourseMessage = ChatMessage & { courseId: string };
+
+/** ARU-61: a message in the general chat for every approved user. */
+export type GeneralMessage = ChatMessage;
 
 export type MeetingStatus = 'scheduled' | 'completed' | 'canceled';
 

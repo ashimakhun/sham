@@ -53,6 +53,11 @@ export function canChangeOwner(role: Role | undefined) {
 }
 
 /** Mirrors set_user_role() (supabase/migrations/0009_roles_screen.sql): only the teacher manages roles. */
+/** ARU-61: every approved account, any role, reads and posts in the general chat (mirrors is_approved(), 0021). */
+export function canUseGeneralChat(user: User | null | undefined) {
+  return !!user && (user.accessStatus ?? 'approved') === 'approved';
+}
+
 export function canManageRoles(role: Role | undefined) {
   return role === 'teacher';
 }

@@ -3,7 +3,7 @@ import { ScrollView, Text, View } from 'react-native';
 
 import { ProfileNameCard } from '@/components/ProfileNameCard';
 import { Button, Card, ErrorText, styles } from '@/components/ui';
-import { canManageRoles } from '@/lib/roles';
+import { canManageRoles, canUseGeneralChat } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
 
@@ -69,6 +69,10 @@ export default function ProfileScreen() {
       )}
 
       <View style={{ gap: 10, marginTop: 8 }}>
+        {/* ARU-61: first in this group, so the order is the same for every role. */}
+        {canUseGeneralChat(currentUser) && (
+          <Button title="General chat" variant="secondary" onPress={() => router.push('/general-chat')} />
+        )}
         {canManageRoles(currentUser.role) && (
           <Button
             // Accounts waiting for approval (ARU-43), e.g. "Manage roles (2)"; no count when there are none.

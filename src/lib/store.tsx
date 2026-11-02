@@ -12,6 +12,7 @@ import type {
   Course,
   CourseMember,
   CourseMessage,
+  GeneralMessage,
   Homework,
   HomeworkAssignment,
   Material,
@@ -36,7 +37,7 @@ import type {
 // (supabase/migrations) decides what each role can read and change; the role
 // checks here only keep the UI honest.
 
-type Store = {
+export type Store = {
   ready: boolean;
   session: Session | null;
   currentUser: User | null;
@@ -128,6 +129,12 @@ type Store = {
   sendMessage: (input: { id: string; courseId: string; body: string }) => Promise<void>;
   /** Live inserts for one course's chat (its own channel, not the global refetch). Returns an unsubscribe. */
   subscribeToMessages: (courseId: string, onMessage: (m: CourseMessage) => void) => () => void;
+  /** General chat (ARU-61), for every approved user: a page of messages, newest first, older than `before`. */
+  loadGeneralMessages: (before?: GeneralMessage) => Promise<{ messages: GeneralMessage[]; hasMore: boolean }>;
+  /** Posts to the general chat as the current user; `id` is kept across retries so a retry cannot post twice. */
+  sendGeneralMessage: (input: { id: string; body: string }) => Promise<void>;
+  /** Live inserts in the general chat, on its own channel (not the store's refetch or ARU-31 counters). */
+  subscribeToGeneralMessages: (onMessage: (m: GeneralMessage) => void) => () => void;
   /** Teacher only (ARU-43): accounts waiting for approval and declined ones, oldest first. Empty for others. */
   accessRequests: AccessRequest[];
   /** Teacher only (ARU-43): accept (approved) or decline (rejected) an account, then refetch. A retry is a no-op. */
@@ -213,6 +220,7 @@ type FeedbackRow = {
   updated_at: string;
 };
 type MessageRow = { id: string; course_id: string; author_id: string; body: string; created_at: string };
+type GeneralMessageRow = { id: string; author_id: string; body: string; created_at: string };
 type UnreadRow = { course_id: string; unread: number | string };
 type MaterialFileRow = {
   id: string;
@@ -330,6 +338,13 @@ const toFeedback = (r: FeedbackRow): CourseFeedback => ({
   body: r.body,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
+});
+
+const toGeneralMessage = (r: GeneralMessageRow): GeneralMessage => ({
+  id: r.id,
+  authorId: r.author_id,
+  body: r.body,
+  createdAt: r.created_at,
 });
 
 const toMessage = (r: MessageRow): CourseMessage => ({
@@ -1039,6 +1054,37 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'course_messages', filter: `course_id=eq.${courseId}` },
           (payload) => onMessage(toMessage(payload.new as MessageRow)),
+        )
+        .subscribe();
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    },
+    loadGeneralMessages: async (before) => {
+      let query = supabase
+        .from('general_messages')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(MESSAGES_PAGE + 1);
+      if (before) {
+        // Same stable cursor as the course chat: older timestamp, or the same timestamp with a smaller id.
+        query = query.or(
+          `created_at.lt."${before.createdAt}",and(created_at.eq."${before.createdAt}",id.lt.${before.id})`,
+        );
+      }
+      const list = rows<GeneralMessageRow>(await query).map(toGeneralMessage);
+      return { messages: list.slice(0, MESSAGES_PAGE), hasMore: list.length > MESSAGES_PAGE };
+    },
+    sendGeneralMessage: async ({ id, body }) => {
+      if (!currentUser) throw new Error('Please sign in again.');
+      checkInsert(await supabase.from('general_messages').insert({ id, author_id: currentUser.id, body: body.trim() }));
+    },
+    subscribeToGeneralMessages: (onMessage) => {
+      const channel = supabase
+        .channel(`general-chat-${Math.random().toString(36).slice(2)}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'general_messages' }, (payload) =>
+          onMessage(toGeneralMessage(payload.new as GeneralMessageRow)),
         )
         .subscribe();
       return () => {
