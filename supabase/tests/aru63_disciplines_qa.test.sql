@@ -72,3 +72,18 @@ select t.lives(format('select set_course_discipline(%L, %L)', '00000000-0000-000
 reset role;
 select t.eq((select discipline_id from courses where id = '00000000-0000-0000-0000-0000000063c9'),
   '00000000-0000-0000-0000-0000000063e1'::uuid, 'the teacher''s course is in Math');
+
+-- ARU-68 fix: other Unicode spaces, mixed padding is trimmed on store, duplicates ignore that padding, and spaces
+-- inside a name are kept.
+select t.login('T');
+select t.throws($$insert into disciplines (name) values (chr(12288) || chr(65279) || chr(8239))$$, '23514',
+  'ARU-68 ideographic, zero-width no-break and narrow no-break spaces only: refused');
+select t.lives($$insert into disciplines (id, name) values ('00000000-0000-0000-0000-0000000063e7', chr(160) || E'\tFine  Arts\n' || chr(12288))$$,
+  'ARU-68 a padded name is accepted');
+reset role;
+select t.eq((select name from disciplines where id = '00000000-0000-0000-0000-0000000063e7'), 'Fine  Arts',
+  'ARU-68 stored trimmed, inner spaces kept');
+select t.login('T');
+select t.throws($$insert into disciplines (name) values (E'\t fine  arts' || chr(160))$$, '23505',
+  'ARU-68 the same name with other padding and case is a duplicate');
+reset role;
