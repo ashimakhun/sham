@@ -8,8 +8,12 @@ An educational mobile app where teachers, mentors and students work together:
 - **Listeners** send homework (text + optional photo) for an assignment from the **New** list on the Homework tab.
 - **Mentors and the teacher** see all homework, leave a comment and mark it as checked (never their own).
 - **Each course** has a chat with a new-message counter for its owner, listeners and the teacher.
-- **Teachers and mentors** share formatted posts (lessons, notes, links) with everyone on the Materials tab's
-  **Blog**, filterable by author; a **Knowledge base** tab for PDF books is coming.
+- **Teachers and mentors** share formatted posts (lessons, notes, links) on the Materials tab's **Blog**, filterable
+  by author, which everyone can like; and PDF books in the **Knowledge base**, optionally linked to a course and
+  optionally visible only to that course's participants.
+- **Listeners** rate a course once it has started (1–5 stars and a review); everyone who sees the course reads it.
+- **Hidden courses** are seen only by their owner, their listeners and the teacher.
+- **New accounts** wait for the teacher's approval before they can use the app.
 
 How each feature behaves today is described in the Linear project document **Sham: product documentation**.
 
@@ -107,18 +111,19 @@ src/app/                  screens (Expo Router — every file is a route)
   (tabs)/                 Homework · Courses (My courses / All courses) · Materials · Profile tabs
   homework/new.tsx        a listener sends homework for an assignment (opened from New)
   homework/[id].tsx       homework details; mentor marks it checked
-  courses/new.tsx         teacher or mentor creates a course
-  courses/[id].tsx        course details, listeners, linked Knowledge base PDFs and the course's homework
+  courses/new.tsx         teacher or mentor creates a course (visible or hidden)
+  courses/[id].tsx        course details, meetings, listeners, linked Knowledge base PDFs, feedback and homework
+  courses/[id]/feedback.tsx  a listener adds or edits their feedback (stars + review)
   courses/[id]/listeners.tsx  teacher or mentor adds listeners
   courses/[id]/chat.tsx   course chat (owner, listeners and the teacher)
   courses/[id]/owner.tsx  teacher or mentor changes the course owner
   courses/[id]/meetings/  schedule / edit a meeting; [meetingId]/notes.tsx notes; [meetingId]/assign-homework.tsx;
                           [meetingId]/attendance.tsx who attended
-  roles.tsx               teacher switches users between student and mentor
-  materials/new.tsx       teacher or mentor shares a material
-  materials/[id].tsx      material details
+  roles.tsx               teacher accepts / rejects new accounts and switches users between student and mentor
+  materials/new.tsx       teacher or mentor shares a Blog post
+  materials/[id].tsx      Blog post details and likes
   materials/files/        Knowledge base PDFs: new.tsx upload, [id].tsx details and Open PDF, [id]/edit.tsx edit
-src/components/           shared UI
+src/components/           shared UI (AccessGate.tsx: the only screen a waiting or declined account sees)
 src/lib/supabase.ts       Supabase client
 src/lib/store.tsx         data loading, actions, live updates
 supabase/migrations/      database schema + row-level security (the real access rules)
@@ -134,7 +139,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Assign homework to a completed meeting | | own courses        | any course |
 | Send homework (for an assignment) | courses they're in | courses they're in |  |
 | Mark homework checked      |           | any (not their own) | any (not their own) |
-| See courses                | all (title and description only unless they're in it) | all | all |
+| See courses                | all except hidden ones they're not in (title and description only unless they're in it) | all except hidden ones they don't own or attend | all |
 | Create courses             |           | ✓                  | ✓       |
 | Create a hidden course     |           | ✓                  | ✓       |
 | See a hidden course and its content | (listeners only) | owner and listeners only | ✓ (all) |
@@ -178,11 +183,12 @@ mentor or the teacher change homework that is already checked; the app never off
 
 ## Work in progress
 
-- **Knowledge base of PDF files, each optionally linked to a course** (ARU-30): ready for development. The
-  Knowledge base tab shows a placeholder until then.
-- **Linked PDFs on the course screen** (ARU-39): after ARU-30.
+- **Telegram notifications** (instead of push notifications, which were canceled): linking a Sham account to the
+  Sham Telegram bot (ARU-48, in QA, PR #46; it uses migration 0023), then notifications for new chat messages
+  (ARU-44), checked homework (ARU-49), new homework assignments (ARU-50) and meetings starting (ARU-41). The
+  product owner starts this work; the dev agent skips it until then.
+- **Full formatted posts on Blog cards** (ARU-54): in development.
 
 ## Next steps
 
-1. Push notifications (new homework for mentors, feedback for students, new chat messages).
-2. Private (one-to-one) chat between teacher, mentors and students; each course already has a group chat.
+1. Private (one-to-one) chat between teacher, mentors and students; each course already has a group chat.
