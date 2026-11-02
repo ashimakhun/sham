@@ -79,3 +79,12 @@ select t.lives($$update profiles set role = 'mentor' where id = t.id('S2')$$, 'r
 select t.login('S3');
 select t.lives($$update profiles set full_name = 'Student Sid' where id = t.id('S3')$$, 'saving the same name again is allowed');
 reset role;
+
+-- ARU-56: the database counts the same characters as blank as the app's trim() (Unicode spaces included).
+select t.login('S1');
+select t.throws($$update profiles set full_name = chr(160) where id = auth.uid()$$, '23514', 'ARU-56 a non-breaking space only is rejected');
+select t.throws($$update profiles set full_name = chr(8195) || chr(12288) || chr(65279) where id = auth.uid()$$, '23514', 'ARU-56 em space, ideographic space and BOM only are rejected');
+select t.throws($$update profiles set full_name = chr(8232) || ' ' || chr(8239) where id = auth.uid()$$, '23514', 'ARU-56 line separator and narrow no-break space only are rejected');
+select t.lives($$update profiles set full_name = 'Dana' || chr(160) || 'S.' where id = auth.uid()$$, 'ARU-56 a name with a non-breaking space inside is allowed');
+select t.lives($$update profiles set full_name = chr(8203) || 'Dana' where id = auth.uid()$$, 'ARU-56 a zero-width space is not trimmed by the app either, so a name with it is allowed');
+reset role;
