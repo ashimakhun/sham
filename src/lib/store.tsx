@@ -5,6 +5,7 @@ import { AppState } from 'react-native';
 import { FEEDBACK_MAX } from './feedback';
 import { fileFieldsError, isAllowedPdf, PDF_MAX_BYTES, PDF_RULE } from './files';
 import { NOTES_MAX } from './markdown';
+import { nameProblem } from './profileName';
 import { supabase } from './supabase';
 import type {
   AccessRequest,
@@ -68,6 +69,9 @@ type Store = {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  /** Approved users change their own name (ARU-55): trimmed, not blank, at most NAME_MAX characters. The database
+   *  allows only the own row and refuses blank names; the store's profiles are updated right after the save. */
+  updateMyName: (name: string) => Promise<void>;
   /** A listener sends homework for an assignment of their course (ARU-32): one per assignment. */
   addHomework: (input: NewHomework) => Promise<void>;
   /** Course owner or teacher, Completed meetings only, one per meeting (ARU-32). `id` makes a retry safe. */
@@ -664,6 +668,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     signOut: async () => {
       check(await supabase.auth.signOut());
+    },
+    updateMyName: async (name) => {
+      if (!currentUser || (currentUser.accessStatus && currentUser.accessStatus !== 'approved')) {
+        throw new Error('Your account is waiting for the teacher\'s approval.');
+      }
+      const problem = nameProblem(name);
+      if (problem) throw new Error(problem);
+      const fullName = name.trim();
+      const me = currentUser.id;
+      const res = await supabase.from('profiles').update({ full_name: fullName }).eq('id', me).select('id');
+      check(res);
+      if (!res.data?.length) throw new Error('Your name could not be saved. Please try again.');
+      // Every name on this device comes from profiles: show the new one right away, then refetch.
+      setProfiles((all) => all.map((u) => (u.id === me ? { ...u, name: fullName } : u)));
+      load().catch(() => {});
     },
     addHomework: async (input) => {
       // Students and mentors submit, only to courses they are a listener of, for an assignment of that course, once

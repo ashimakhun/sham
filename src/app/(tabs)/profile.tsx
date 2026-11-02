@@ -1,13 +1,14 @@
 import { router } from 'expo-router';
 import { ScrollView, Text, View } from 'react-native';
 
-import { Button, Card, ErrorText, RoleBadge, styles } from '@/components/ui';
+import { ProfileNameCard } from '@/components/ProfileNameCard';
+import { Button, Card, ErrorText, styles } from '@/components/ui';
 import { canManageRoles } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
 
 export default function ProfileScreen() {
-  const { currentUser, session, courses, courseMembers, getUser, signOut, accessRequests } = useStore();
+  const { currentUser, courses, courseMembers, getUser, signOut, accessRequests } = useStore();
   const { busy, error, run } = useAction();
   if (!currentUser) return null;
 
@@ -22,12 +23,8 @@ export default function ProfileScreen() {
   const isStaff = currentUser.role === 'teacher' || currentUser.role === 'mentor';
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Card>
-        <Text style={styles.h1}>{currentUser.name}</Text>
-        <Text style={styles.muted}>{session?.user.email}</Text>
-        <RoleBadge role={currentUser.role} />
-      </Card>
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ProfileNameCard />
 
       {(currentUser.role === 'student' || listening.length > 0) && (
         <Card>
