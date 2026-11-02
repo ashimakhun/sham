@@ -25,22 +25,23 @@ const members = [member('A', 'S1')];
 const ownerA = `Mentor Max · ${formatDate(courseA.createdAt)}`;
 const ownerB = `Mentor Nina · ${formatDate(courseB.createdAt)}`;
 const ownerC = `Mentor Nina · ${formatDate(courseC.createdAt)}`;
-const showAll = () => fireEvent.press(screen.getByRole('tab', { name: 'All courses' }));
+const showAll = () => fireEvent.press(screen.getByRole('tab', { name: 'Courses' }));
 
 beforeEach(() => {
   jest.clearAllMocks();
   params.id = 'B';
 });
 
-describe('All courses list', () => {
-  it('AC1/AC2/AC3: S1 sees every course newest first; owner line only on the course they are in', async () => {
+// ARU-63 replaced "All courses": the Courses view lists the user's courses, then those with no discipline.
+describe('Courses list', () => {
+  it('AC1/AC2/AC3: S1 sees their course, then every other one (no discipline) newest first; owner line only on theirs', async () => {
     setStore(fakeStore('S1', { courses, courseMembers: members }));
     await render(<CoursesScreen />);
     await showAll();
     expect(screen.getAllByText(/^(Algebra|Biology|Chemistry)$/).map((t) => t.props.children)).toEqual([
+      'Algebra',
       'Chemistry',
       'Biology',
-      'Algebra',
     ]);
     expect(screen.getByText(ownerA)).toBeTruthy();
     expect(screen.queryByText(ownerB)).toBeNull();
@@ -58,8 +59,9 @@ describe('All courses list', () => {
     expect(router.push).toHaveBeenCalledWith({ pathname: '/courses/[id]', params: { id: 'B' } });
   });
 
-  it('AC4: My courses is unchanged (only A, tagged Listener, full card)', async () => {
-    setStore(fakeStore('S1', { courses, courseMembers: members }));
+  it('AC4: courses in a discipline the student isn\'t in aren\'t listed (only A, tagged Listener, full card)', async () => {
+    const inDiscipline = courses.map((c) => ({ ...c, disciplineId: 'D' }));
+    setStore(fakeStore('S1', { courses: inDiscipline, courseMembers: members }));
     await render(<CoursesScreen />);
     expect(screen.getByText('Listener')).toBeTruthy();
     expect(screen.getByText('Algebra')).toBeTruthy();

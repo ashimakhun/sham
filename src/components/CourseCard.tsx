@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useRef } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { DisciplineLabel } from '@/components/Disciplines';
 import { Card, HiddenBadge, OwnerLine, UnreadBadge, styles } from '@/components/ui';
 import { feedbackFor, ratingSummary, ratingSummaryLabel } from '@/lib/feedback';
 import { inCourseChat, seesOnlyCourseSummary } from '@/lib/roles';
@@ -64,6 +65,8 @@ export function CourseCard({ course, tag, onOpen }: Props) {
           {course.title}
         </Text>
       )}
+      {/* ARU-63 AC 6: only a discipline the viewer can see. */}
+      <DisciplineLabel course={course} />
       {course.description ? (
         <Text style={styles.body} numberOfLines={2}>
           {course.description}

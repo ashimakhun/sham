@@ -22,7 +22,7 @@ const members = [member('A', 'S1'), member('A', 'M2')];
 const counts = (c: Record<string, number>) => (id: string) => c[id] ?? 0;
 // The badge is hidden from screen readers (its count is in the button's label), so queries must include it.
 const hidden = { includeHiddenElements: true };
-const showAll = () => fireEvent.press(screen.getByRole('tab', { name: 'All courses' }));
+const showAll = () => fireEvent.press(screen.getByRole('tab', { name: 'Courses' }));
 const msg = (id: string, authorId: string, minute: number): CourseMessage => ({
   id,
   courseId: 'A',

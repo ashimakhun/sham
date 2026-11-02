@@ -15,7 +15,7 @@ const courses = [courseB, courseA];
 const members = [member('A', 'S1'), member('A', 'M2')];
 const chatA = { name: 'Open chat for Algebra' };
 const chatB = { name: 'Open chat for Biology' };
-const showAll = () => fireEvent.press(screen.getByRole('tab', { name: 'All courses' }));
+const showAll = () => fireEvent.press(screen.getByRole('tab', { name: 'Courses' }));
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -58,7 +58,7 @@ describe('AC3/AC4/AC5: taps', () => {
     expect(router.push).toHaveBeenCalledTimes(1);
     expect(router.push).toHaveBeenCalledWith({ pathname: '/courses/[id]/chat', params: { id: 'A' } });
     await refocus();
-    expect(screen.getByRole('tab', { name: 'All courses', selected: true })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Courses', selected: true })).toBeTruthy();
   });
 
   it('a quick double tap on the icon opens only one chat', async () => {
