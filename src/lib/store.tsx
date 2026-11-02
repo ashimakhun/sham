@@ -17,6 +17,7 @@ import type {
   MaterialFile,
   MaterialFileEdit,
   Meeting,
+  MaterialLike,
   CourseFeedback,
   MeetingAttendance,
   MeetingEdit,
@@ -54,6 +55,8 @@ type Store = {
   assignments: HomeworkAssignment[];
   /** Attendance marks (ARU-33): own marks for students, all for mentors and the teacher. */
   attendance: MeetingAttendance[];
+  /** Likes on Blog posts (ARU-52), newest first: every approved user sees all. */
+  materialLikes: MaterialLike[];
   /** Course feedback (ARU-53), newest first: every approved user sees it for the courses they can see. */
   courseFeedback: CourseFeedback[];
   loading: boolean;
@@ -107,6 +110,10 @@ type Store = {
   markAttendance: (meetingId: string) => Promise<void>;
   /** A listener removes their own attendance mark (ARU-33). */
   unmarkAttendance: (meetingId: string) => Promise<void>;
+  /** Likes a Blog post as the current user (ARU-52). Liking again is a no-op. */
+  likeMaterial: (materialId: string) => Promise<void>;
+  /** Removes the current user's like (ARU-52). Removing a like that is already gone is a no-op. */
+  unlikeMaterial: (materialId: string) => Promise<void>;
   /** A listener adds (no `id`) or edits (`id`) their feedback on a started course (ARU-53). Text is trimmed. */
   saveFeedback: (input: { id?: string; courseId: string; rating: number; body: string }) => Promise<void>;
   /** The author deletes their own feedback (ARU-53). Already gone counts as done. */
@@ -191,6 +198,7 @@ type MeetingRow = {
   notes_updated_at?: string | null;
 };
 type AttendanceRow = { meeting_id: string; user_id: string; marked_at: string };
+type MaterialLikeRow = { material_id: string; user_id: string; created_at: string };
 type FeedbackRow = {
   id: string;
   course_id: string;
@@ -304,6 +312,12 @@ const toAttendance = (r: AttendanceRow): MeetingAttendance => ({
   markedAt: r.marked_at,
 });
 
+const toMaterialLike = (r: MaterialLikeRow): MaterialLike => ({
+  materialId: r.material_id,
+  userId: r.user_id,
+  createdAt: r.created_at,
+});
+
 const toFeedback = (r: FeedbackRow): CourseFeedback => ({
   id: r.id,
   courseId: r.course_id,
@@ -405,6 +419,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [assignments, setAssignments] = useState<HomeworkAssignment[]>([]);
   const [attendance, setAttendance] = useState<MeetingAttendance[]>([]);
+  const [materialLikes, setMaterialLikes] = useState<MaterialLike[]>([]);
   const [courseFeedback, setCourseFeedback] = useState<CourseFeedback[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
@@ -432,6 +447,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setMeetings([]);
         setAssignments([]);
         setAttendance([]);
+        setMaterialLikes([]);
         setCourseFeedback([]);
         setUnread({});
         setActiveChat(null);
@@ -461,7 +477,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     try {
       // RLS returns nothing but the own profile to an account that isn't approved (ARU-43), so these all succeed
       // (empty) for it and the app shows the waiting screen.
-      const [profileRows, hw, mats, crs, members, mtgs, asgs, att, files, fb] = await Promise.all([
+      const [profileRows, hw, mats, crs, members, mtgs, asgs, att, files, likes, fb] = await Promise.all([
         // '*' so the app keeps working if the access_status column (0021) isn't there yet.
         supabase.from('profiles').select('*').order('full_name'),
         supabase.from('homework').select('*').order('created_at', { ascending: false }),
@@ -472,6 +488,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         supabase.from('homework_assignments').select('*').order('created_at', { ascending: false }),
         supabase.from('meeting_attendance').select('*'),
         supabase.from('material_files').select('*').order('created_at', { ascending: false }),
+        supabase.from('material_likes').select('*').order('created_at', { ascending: false }),
         supabase.from('course_feedback').select('*').order('created_at', { ascending: false }),
       ]);
       const all = rows<ProfileRow>(profileRows).map(toUser);
@@ -485,6 +502,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setAssignments(rows<AssignmentRow>(asgs).map(toAssignment));
       setAttendance(rows<AttendanceRow>(att).map(toAttendance));
       setMaterialFiles(rows<MaterialFileRow>(files).map(toMaterialFile));
+      setMaterialLikes(rows<MaterialLikeRow>(likes).map(toMaterialLike));
       setCourseFeedback(rows<FeedbackRow>(fb).map(toFeedback));
       if (me?.accessStatus !== 'approved') {
         setAccessRequests([]);
@@ -533,6 +551,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'homework' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'materials' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'material_files' }, () => load().catch(() => {}))
+      // Likes (ARU-52): counts and "Liked by" update on every open device.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'material_likes' }, () => load().catch(() => {}))
       // Feedback (ARU-53): the list, the average and the course cards update on every open device.
       .on('postgres_changes', { event: '*', schema: 'public', table: 'course_feedback' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'courses' }, () => load().catch(() => {}))
@@ -623,6 +643,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     meetings,
     assignments,
     attendance,
+    materialLikes,
     courseFeedback,
     loading,
     dataLoaded: !!userId && loadedFor === userId,
@@ -924,6 +945,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     unmarkAttendance: async (meetingId) => {
       check(await supabase.rpc('unmark_attendance', { meeting: meetingId }));
+      await load();
+    },
+    likeMaterial: async (materialId) => {
+      // user_id defaults to the caller; a duplicate key means an earlier tap already saved it.
+      checkInsert(await supabase.from('material_likes').insert({ material_id: materialId }));
+      await load();
+    },
+    unlikeMaterial: async (materialId) => {
+      if (!userId) throw new Error('Please sign in again.');
+      // Deleting nothing (already removed elsewhere) is fine.
+      check(await supabase.from('material_likes').delete().eq('material_id', materialId).eq('user_id', userId));
       await load();
     },
     saveFeedback: async ({ id, courseId, rating, body }) => {

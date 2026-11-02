@@ -45,8 +45,10 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    and open read policies; deletes nothing),
    `0022_attendance_from_start.sql` (ARU-45: attendance can be marked once a meeting has started, not only when it is
    completed, and never on a canceled meeting; replaces two functions, deletes nothing),
+   `0024_material_likes.sql` (ARU-52: likes on Blog posts; adds a table, deletes nothing; 0023 is reserved for the
+   open Telegram branch, ARU-48, and 0024 doesn't depend on it),
    `0025_course_feedback.sql` (ARU-53: listeners rate a started course; adds a table, a helper and a trigger, deletes
-   nothing; 0023 and 0024 are reserved for the open ARU-48 and ARU-52 branches, and 0025 depends on neither).
+   nothing; it doesn't depend on 0023 or 0024).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 
@@ -151,6 +153,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | See who attended a meeting | own marks only | ✓ (own courses and courses they don't listen to; own marks only where a listener) | ✓ |
 | See materials              | ✓         | ✓                  | ✓       |
 | Share / delete materials   |           | ✓ (own materials)  | ✓ (own) |
+| Like Blog posts, see who liked them | ✓ | ✓                | ✓       |
 | Add / edit / delete own course feedback | if a listener and the course started | if a listener and the course started | |
 | Read course feedback and average | courses they can see (hidden: only if in it) | same | ✓ (all) |
 | See Knowledge base, open PDFs | ✓      | ✓                  | ✓       |

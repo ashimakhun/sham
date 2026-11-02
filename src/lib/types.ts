@@ -134,6 +134,8 @@ export type Meeting = {
 /** A listener's self-reported attendance of a Completed meeting (ARU-33). */
 export type MeetingAttendance = { meetingId: string; userId: string; markedAt: string };
 
+/** A like on a Blog post (ARU-52): one per user and post. */
+export type MaterialLike = { materialId: string; userId: string; createdAt: string };
 /** A listener's rating and review of a started course (ARU-53): one per listener and course. */
 export type CourseFeedback = {
   id: string;
