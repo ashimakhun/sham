@@ -68,21 +68,28 @@ describe('AC 1 / edge case iOS-Android: the switch', () => {
 describe('AC 2: who sees it where, with the label', () => {
   const label = (name: RegExp) => screen.getAllByRole('button', { name }).filter((b) => !/^Open chat/.test(b.props.accessibilityLabel ?? ''));
 
-  it('a student listener sees it under Courses I\'m in and in All courses; the label is in the card\'s spoken text', async () => {
+  // Updated for ARU-63: "All courses" is gone; courses with no discipline are listed under "No discipline" (AC 8).
+  it('a student listener sees it once, under Courses I\'m in (not again under No discipline); the label is spoken', async () => {
     setStore(fakeStore('S1', { courses: [H, courseA], courseMembers: [member('H', 'S1')] }));
     await render(<CoursesScreen />);
     expect(screen.getByText(/COURSES I'M IN/)).toBeTruthy();
-    expect(label(/Secret.*Hidden/s).length).toBe(1);
-    await fireEvent.press(screen.getByRole('tab', { name: 'All courses' }));
+    expect(screen.getByText('NO DISCIPLINE')).toBeTruthy(); // Algebra
     expect(label(/Secret.*Hidden/s).length).toBe(1);
   });
 
-  it('the teacher sees it in All courses with the label, and not under My courses', async () => {
+  it('the teacher sees it under No discipline with the label, and not under Courses I own', async () => {
     setStore(fakeStore('T', { courses: [H, courseA], courseMembers: [] }));
     await render(<CoursesScreen />);
-    expect(screen.queryByText('Secret')).toBeNull();
-    await fireEvent.press(screen.getByRole('tab', { name: 'All courses' }));
+    expect(screen.queryByText(/COURSES I OWN/)).toBeNull();
+    expect(screen.getByText('NO DISCIPLINE')).toBeTruthy();
     expect(label(/Secret.*Hidden/s).length).toBe(1);
+  });
+
+  it('ARU-63: once it has a discipline, the teacher (not owner or listener) no longer finds it on the Courses view', async () => {
+    setStore(fakeStore('T', { courses: [{ ...H, disciplineId: 'D1' }, courseA], courseMembers: [] }));
+    await render(<CoursesScreen />);
+    expect(screen.queryByText('Secret')).toBeNull();
+    expect(screen.getByText('Algebra')).toBeTruthy();
   });
 
   it('a mentor listener sees it under Courses I\'m in with the label', async () => {
@@ -104,11 +111,10 @@ describe('AC 2: who sees it where, with the label', () => {
 describe('AC 3 / edge case: empty states', () => {
   it.each([
     ['S2', 'You are not in any course yet'],
-    ['N', 'No courses yet'],
+    ['N', "You don't own or attend any course yet"], // ARU-63: the Courses view's mentor empty state
   ] as const)('%s whose only course is hidden (not returned by the database) sees today\'s empty state', async (who, empty) => {
     setStore(fakeStore(who, { courses: [], courseMembers: [] }));
     await render(<CoursesScreen />);
-    if (who === 'N') await fireEvent.press(screen.getByRole('tab', { name: 'All courses' }));
     expect(screen.getByText(empty)).toBeTruthy();
   });
 });
