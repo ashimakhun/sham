@@ -44,7 +44,9 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    existing account is approved), two functions and a trigger, and adds the approval check to the helper functions
    and open read policies; deletes nothing),
    `0022_attendance_from_start.sql` (ARU-45: attendance can be marked once a meeting has started, not only when it is
-   completed, and never on a canceled meeting; replaces two functions, deletes nothing).
+   completed, and never on a canceled meeting; replaces two functions, deletes nothing),
+   `0024_material_likes.sql` (ARU-52: likes on Blog posts; adds a table, deletes nothing; 0023 is reserved for the
+   open Telegram branch, ARU-48, and 0024 doesn't depend on it).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 
@@ -149,6 +151,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | See who attended a meeting | own marks only | ✓ (own courses and courses they don't listen to; own marks only where a listener) | ✓ |
 | See materials              | ✓         | ✓                  | ✓       |
 | Share / delete materials   |           | ✓ (own materials)  | ✓ (own) |
+| Like Blog posts, see who liked them | ✓ | ✓                | ✓       |
 | See Knowledge base, open PDFs | ✓      | ✓                  | ✓       |
 | Upload PDFs (25 MB at most) |          | ✓                  | ✓       |
 | Edit name / description / course, delete PDFs | | ✓ (own)   | ✓ (own) |

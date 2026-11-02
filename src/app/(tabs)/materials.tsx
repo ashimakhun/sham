@@ -18,7 +18,7 @@ const SECTIONS: { value: Section; label: string }[] = [
 ];
 
 export default function MaterialsScreen() {
-  const { currentUser, loading, refresh, materials, materialFiles, getUser, getCourse } = useStore();
+  const { currentUser, loading, refresh, materials, materialFiles, materialLikes, getUser, getCourse } = useStore();
   // Teachers and mentors share materials (ARU-26); students only read.
   const canShare = currentUser?.role === 'teacher' || currentUser?.role === 'mentor';
   // Author filter (ARU-29): kept while the tab stays mounted (tab switches, opening a material, sharing one);
@@ -68,6 +68,12 @@ export default function MaterialsScreen() {
   // ...and stays on All, even if that author shares again later.
   // (Adjusting state while rendering, as React recommends instead of an effect.)
   if (filter !== selected) setSelected(ALL);
+
+  // Like counts per post (ARU-52), counting only likers whose profile loads, as the post screen does.
+  const likeCounts = new Map<string, number>();
+  for (const l of materialLikes) {
+    if (getUser(l.userId)) likeCounts.set(l.materialId, (likeCounts.get(l.materialId) ?? 0) + 1);
+  }
 
   const sorted = materials
     .filter((m) => filter === ALL || m.teacherId === filter)
@@ -139,18 +145,25 @@ export default function MaterialsScreen() {
       onRefresh={() => refresh().catch(() => {})}
       keyExtractor={(m) => m.id}
       ListHeaderComponent={header}
-      renderItem={({ item }) => (
-        <Card onPress={() => router.push({ pathname: '/materials/[id]', params: { id: item.id } })}>
-          <Text style={styles.title}>{item.title}</Text>
-          <Text style={styles.body} numberOfLines={2}>
-            {markdownToPlainText(item.body)}
-          </Text>
-          <Text style={styles.muted}>
-            {getUser(item.teacherId)?.name} · {formatDate(item.createdAt)}
-            {item.link ? ' · 🔗 link' : ''}
-          </Text>
-        </Card>
-      )}
+      renderItem={({ item }) => {
+        const likes = likeCounts.get(item.id) ?? 0;
+        return (
+          <Card onPress={() => router.push({ pathname: '/materials/[id]', params: { id: item.id } })}>
+            <Text style={styles.title}>{item.title}</Text>
+            <Text style={styles.body} numberOfLines={2}>
+              {markdownToPlainText(item.body)}
+            </Text>
+            <Text style={styles.muted}>
+              {getUser(item.teacherId)?.name} · {formatDate(item.createdAt)}
+              {item.link ? ' · 🔗 link' : ''}
+              {/* Hidden when no one liked it; read as "N likes" by screen readers. */}
+              {likes > 0 && (
+                <Text accessibilityLabel={`${likes} ${likes === 1 ? 'like' : 'likes'}`}>{` · ♥ ${likes}`}</Text>
+              )}
+            </Text>
+          </Card>
+        );
+      }}
       ListEmptyComponent={
         <EmptyState
           title="No materials yet"
