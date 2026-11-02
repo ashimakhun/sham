@@ -92,4 +92,22 @@ select t.lives(pg_temp.post('00000000-0000-0000-0000-0000000061f8', t.id('S2')::
 reset role;
 
 -- The course chat is unaffected.
-select t.eq((select count(*) from course_messages), 0::bigint, 'course_messages untouched');
+select t.eq((select count(*) from course_messages), 0::bigint, 'course_messages untouched by the general chat');
+
+-- ARU-67 (0030): the server sets the time in both chats; naming created_at is refused, normal posts still work.
+insert into course_members (course_id, user_id, added_by) values (t.id('A'), t.id('S1'), t.id('M'));
+select t.login('S1');
+select t.throws($$insert into general_messages (author_id, body, created_at) values (auth.uid(), 'pinned', '2099-01-01')$$, '42501',
+  'ARU-67 general chat: a client-chosen time is refused');
+select t.throws($$insert into general_messages (author_id, body, created_at) values (auth.uid(), 'hidden', '2000-01-01')$$, '42501',
+  'ARU-67 general chat: a backdated time is refused');
+select t.lives(pg_temp.post('00000000-0000-0000-0000-0000000061f9', t.id('S1')::text, 'Normal post'), 'ARU-67 general chat: a normal post still works');
+select t.throws(format('insert into course_messages (course_id, author_id, body, created_at) values (%L, auth.uid(), %L, %L)',
+  t.id('A'), 'pinned', '2099-01-01'), '42501', 'ARU-67 course chat: a client-chosen time is refused');
+select t.lives(format('insert into course_messages (id, course_id, author_id, body) values (%L, %L, auth.uid(), %L)',
+  '00000000-0000-0000-0000-0000000061fa', t.id('A'), 'Course post'), 'ARU-67 course chat: a normal post still works');
+reset role;
+select t.ok(not exists (select 1 from general_messages where created_at > now() + interval '1 minute' or created_at < now() - interval '1 day'),
+  'ARU-67 every general message carries the server time');
+select t.ok((select created_at > now() - interval '1 minute' from course_messages where id = '00000000-0000-0000-0000-0000000061fa'),
+  'ARU-67 the course message carries the server time');

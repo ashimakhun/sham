@@ -57,7 +57,9 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `0026_profile_name_not_blank.sql` (ARU-55: an edited name can't be blank; adds a trigger),
    `0027_profile_name_unicode_blank.sql` (ARU-56: Unicode spaces count as blank too; replaces that trigger's function),
    `0029_general_chat.sql` (ARU-61: the general chat; adds a table with policies and puts it in realtime, deletes
-   nothing; 0028 is ARU-60's, and 0029 doesn't depend on it).
+   nothing; 0028 is ARU-60's, and 0029 doesn't depend on it),
+   `0030_chat_server_time.sql` (ARU-67: the server sets every chat message's time, in the general and course chats;
+   changes insert grants only).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 
