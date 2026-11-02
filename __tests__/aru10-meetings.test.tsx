@@ -59,7 +59,8 @@ describe('Meetings section', () => {
   it('AC1: shows date/time in the device format, topic, link/place and the status badge', async () => {
     setStore(fakeStore('S1', { courseMembers: members, meetings: all }));
     await render(<CourseDetailScreen />);
-    expect(screen.getByText('MEETINGS (5)')).toBeTruthy();
+    // ARU-60: the canceled meeting moved to MEETING HISTORY, so the top card counts 4.
+    expect(screen.getByText('MEETINGS (4)')).toBeTruthy();
     const f = inMeeting('F');
     expect(f.getByText(formatDateTime(future.startsAt))).toBeTruthy();
     expect(f.getByText('Future')).toBeTruthy();
@@ -78,17 +79,17 @@ describe('Meetings section', () => {
     expect(screen.queryByRole('link', { name: 'Room 12' })).toBeNull();
   });
 
-  it('AC2: upcoming soonest first, then past (any status) newest first', async () => {
+  it('AC2 (ARU-60): in progress, upcoming soonest first, awaiting check; then MEETING HISTORY at the bottom', async () => {
     setStore(fakeStore('T', { courseMembers: members, meetings: all }));
     await render(<CourseDetailScreen />);
-    const order = screen.getAllByTestId(/^meeting-/).map((v) => v.props.testID);
-    expect(order).toEqual(['meeting-S', 'meeting-F', 'meeting-P', 'meeting-X', 'meeting-C']);
+    const order = screen.getAllByTestId(/^meeting-[A-Z]$/).map((v) => v.props.testID);
+    expect(order).toEqual(['meeting-P', 'meeting-S', 'meeting-F', 'meeting-C', 'meeting-X']);
   });
 
   it.each(['T', 'M', 'N'] as const)('AC1: %s (teacher, owner, unrelated mentor) sees the section', async (who) => {
     setStore(fakeStore(who, { courseMembers: members, meetings: all }));
     await render(<CourseDetailScreen />);
-    expect(screen.getByText('MEETINGS (5)')).toBeTruthy();
+    expect(screen.getByText('MEETINGS (4)')).toBeTruthy(); // ARU-60: the canceled one is in MEETING HISTORY
   });
 
   it('AC3: a student who is not a listener does not see the section', async () => {
@@ -139,8 +140,13 @@ describe('Who manages meetings', () => {
     // AC 10: future → only Cancel meeting.
     expect(inMeeting('F').getByRole('button', { name: 'Cancel meeting' })).toBeTruthy();
     expect(inMeeting('F').queryByRole('button', { name: 'Mark completed' })).toBeNull();
-    // AC 12: completed and canceled → no status actions. ARU-28 adds "Add notes" and ARU-32 "Assign homework" to completed ones.
-    expect(inMeeting('C').queryAllByRole('button').map((b) => b.props.accessibilityLabel)).toEqual(['Add notes', 'Assign homework']);
+    // AC 12: completed and canceled → no status actions. ARU-28 adds "Add notes", ARU-32 "Assign homework" and
+    // ARU-60 "Mark homework checked" to completed ones.
+    expect(inMeeting('C').queryAllByRole('button').map((b) => b.props.accessibilityLabel)).toEqual([
+      'Add notes',
+      'Assign homework',
+      'Mark homework checked',
+    ]);
     expect(inMeeting('X').queryAllByRole('button')).toHaveLength(0);
   });
 
@@ -148,7 +154,8 @@ describe('Who manages meetings', () => {
     setStore(fakeStore(who, { courseMembers: members, meetings: all }));
     await render(<CourseDetailScreen />);
     expect(screen.queryByRole('button', { name: '+ Schedule meeting' })).toBeNull();
-    expect(screen.queryByRole('button', { name: /Mark|Cancel meeting/ })).toBeNull();
+    // ARU-60's "Mark homework checked" is for any non-listener mentor, so only status actions are checked here.
+    expect(screen.queryByRole('button', { name: /Mark completed|Mark canceled|Cancel meeting/ })).toBeNull();
   });
 
   it('AC13: after the owner changes M → N, N manages and M does not', async () => {
@@ -160,7 +167,8 @@ describe('Who manages meetings', () => {
     setStore(fakeStore('M', { courses: [moved], courseMembers: members, meetings: all }));
     await view.rerender(<CourseDetailScreen />);
     expect(screen.queryByRole('button', { name: '+ Schedule meeting' })).toBeNull();
-    expect(screen.queryByRole('button', { name: /Mark|Cancel meeting/ })).toBeNull();
+    // ARU-60's "Mark homework checked" is for any non-listener mentor, so only status actions are checked here.
+    expect(screen.queryByRole('button', { name: /Mark completed|Mark canceled|Cancel meeting/ })).toBeNull();
   });
 });
 

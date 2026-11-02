@@ -86,6 +86,14 @@ export function canSeeAttendance(user: User | null | undefined, course: Course, 
   );
 }
 
+/** ARU-60: who marks a Completed meeting's homework checked or undoes it. Mirrors set_meeting_homework_checked()
+ *  (supabase/migrations/0028_meeting_homework_checked.sql): the teacher, or a mentor who isn't a listener of the course
+ *  (the owner included). */
+export function canCheckMeetingHomework(user: User | null | undefined, course: Course, members: CourseMember[]) {
+  if (!user) return false;
+  return user.role === 'teacher' || (user.role === 'mentor' && !isCourseListener(user, course, members));
+}
+
 /** Mirrors is_member() (supabase/migrations/0004_course_members.sql): the user is a listener of the course. */
 export function isCourseListener(user: User | null | undefined, course: Course, members: CourseMember[]) {
   return !!user && members.some((m) => m.courseId === course.id && m.userId === user.id);
