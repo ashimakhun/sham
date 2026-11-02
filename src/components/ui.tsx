@@ -66,8 +66,9 @@ export function Button({ title, onPress, variant = 'primary', disabled, unread =
 }
 
 /** A new-message count bubble (ARU-31), the same on the course card's chat icon and the course's Chat button. Part
- *  of its button's label, so screen readers don't read it on its own. */
-export function UnreadBadge({ count, style }: { count: number; style?: ViewStyle }) {
+ *  of its button's label, so screen readers don't read it on its own. In the button colour (ARU-57). `ring` adds a
+ *  thin card-coloured ring for when it sits over the chat icon, so the icon's outline breaks around it (ARU-57). */
+export function UnreadBadge({ count, style, ring }: { count: number; style?: ViewStyle; ring?: boolean }) {
   if (count <= 0) return null;
   return (
     <View
@@ -76,7 +77,7 @@ export function UnreadBadge({ count, style }: { count: number; style?: ViewStyle
       importantForAccessibility="no-hide-descendants"
       accessibilityElementsHidden
       pointerEvents="none"
-      style={[styles.unread, style]}>
+      style={[styles.unread, ring && styles.unreadRing, style]}>
       <Text style={styles.unreadText} numberOfLines={1}>
         {formatUnread(count)}
       </Text>
@@ -259,8 +260,10 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 5,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.danger,
+    backgroundColor: colors.primary,
   },
+  // Grows by the ring's width so the number keeps the same room inside it (ARU-57).
+  unreadRing: { minWidth: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: colors.card },
   unreadText: { fontSize: 11, fontWeight: '700', color: '#fff' },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   empty: { alignItems: 'center', paddingVertical: 48, gap: 6 },
