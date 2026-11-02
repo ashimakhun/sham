@@ -112,8 +112,10 @@ export function CourseCard({ course, tag, onOpen }: Props) {
           backgroundColor: pressed ? colors.primarySoft : 'transparent',
         })}>
         <Ionicons name="chatbubble-outline" size={24} color={colors.primary} />
-        {/* Drawn over the icon's corner, so the 44×44 target and the content column keep their size. */}
-        <UnreadBadge count={unread} style={{ position: 'absolute', top: -2, right: -6 }} />
+        {/* Centred on the 24 pt icon's top-right corner (it spans 10–34 in the 44×44 target), so it covers part of the
+            bubble's outline (ARU-57). Anchored by `right`, so a wider "99+" pill grows inwards over the icon and stays
+            inside the target and the content column keeps its size. */}
+        <UnreadBadge count={unread} ring style={{ position: 'absolute', top: 0, right: 0 }} />
       </Pressable>
     </Card>
   );
