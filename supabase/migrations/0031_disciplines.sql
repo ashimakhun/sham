@@ -4,24 +4,37 @@
 -- Numbered 0031: 0028 is ARU-60's and 0029-0030 are ARU-61/ARU-67's; this file doesn't depend on them.
 -- Read access to courses doesn't change (0019/0021); only what the app's Courses list shows does.
 
+-- ARU-68: trims the same characters as JavaScript's trim() (the app's), not only the ASCII space btrim() strips:
+-- ASCII whitespace, U+00A0, U+1680, U+2000-U+200A, U+2028, U+2029, U+202F, U+205F, U+3000 and U+FEFF (as 0027).
+-- Immutable, so the check constraint and the unique index can use it.
+create function trim_spaces(value text) returns text
+  language sql immutable parallel safe set search_path = public
+  as $$
+    select btrim(value, E' \t\n\v\f\r' || chr(160) || chr(5760)
+      || chr(8192) || chr(8193) || chr(8194) || chr(8195) || chr(8196) || chr(8197)
+      || chr(8198) || chr(8199) || chr(8200) || chr(8201) || chr(8202)
+      || chr(8232) || chr(8233) || chr(8239) || chr(8287) || chr(12288) || chr(65279))
+  $$;
+
 create table disciplines (
   id uuid primary key default gen_random_uuid(),
-  -- Stored trimmed (trigger below); 1-100 characters after trimming.
-  name text not null check (char_length(name) between 1 and 100 and name = btrim(name)),
+  -- Stored trimmed (trigger below); 1-100 characters after trimming, so a name of only spaces, tabs, line breaks or
+  -- Unicode spaces is refused (23514).
+  name text not null check (char_length(name) between 1 and 100 and name = trim_spaces(name)),
   hidden boolean not null default false,
   created_by uuid not null default auth.uid() references profiles (id),
   created_at timestamptz not null default now()
 );
 
 -- One discipline per name, ignoring case and surrounding spaces. A retry of a create that went through hits this.
-create unique index disciplines_name_key on disciplines (lower(btrim(name)));
+create unique index disciplines_name_key on disciplines (lower(trim_spaces(name)));
 
--- Trim the name before the checks run, so "  Math " is stored as "Math" (and "   " fails the length check).
+-- Trim the name before the checks run, so "  Math " is stored as "Math" (and "\t\t" fails the length check).
 create function disciplines_trim_name() returns trigger
   language plpgsql set search_path = public
   as $$
   begin
-    new.name := btrim(new.name);
+    new.name := trim_spaces(new.name);
     return new;
   end $$;
 create trigger disciplines_trim_name before insert on disciplines
