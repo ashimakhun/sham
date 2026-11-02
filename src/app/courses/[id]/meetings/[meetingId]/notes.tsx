@@ -1,7 +1,8 @@
 import { router, Stack, useLocalSearchParams, usePreventRemove } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
+import { KeyboardForm } from '@/components/KeyboardForm';
 import { MarkdownEditor } from '@/components/MarkdownEditor';
 import { MarkdownText } from '@/components/MarkdownText';
 import { Button, Card, EmptyState, ErrorText, styles } from '@/components/ui';
@@ -120,16 +121,15 @@ function NotesEditor({ course, meeting }: { course: Course; meeting: Meeting }) 
   }
 
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    // Scrolls above the keyboard and closes it on drag or a tap outside the field; Save is always reachable (ARU-58).
+    <KeyboardForm contentContainerStyle={styles.content}>
       <Stack.Screen options={{ title: meeting.notes ? 'Edit notes' : 'Add notes' }} />
-      <View style={[styles.content, { flex: 1 }]}>
-        <Text style={styles.muted} numberOfLines={1}>
-          {meeting.topic} · {formatDateTime(meeting.startsAt)}
-        </Text>
-        <MarkdownEditor value={draft} onChange={setDraft} placeholder="What was covered in this meeting?" />
-        <ErrorText error={error} />
-        <Button title={busy ? 'Saving…' : 'Save'} onPress={save} disabled={busy} />
-      </View>
-    </KeyboardAvoidingView>
+      <Text style={styles.muted} numberOfLines={1}>
+        {meeting.topic} · {formatDateTime(meeting.startsAt)}
+      </Text>
+      <MarkdownEditor value={draft} onChange={setDraft} placeholder="What was covered in this meeting?" />
+      <ErrorText error={error} />
+      <Button title={busy ? 'Saving…' : 'Save'} onPress={save} disabled={busy} />
+    </KeyboardForm>
   );
 }

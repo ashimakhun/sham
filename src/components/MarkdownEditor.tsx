@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Pressable, Text, TextInput, type TextInputInstance, View } from 'react-native';
+import { Pressable, Text, TextInput, type TextInputInstance, useWindowDimensions, View } from 'react-native';
 
 import { ErrorText, styles } from '@/components/ui';
 import { type Edit, insertLink, NOTES_MAX, notesCounter, type Selection, toggleList, toggleWrap } from '@/lib/markdown';
@@ -47,6 +47,9 @@ export function MarkdownEditor({
   const [url, setUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
   const input = useRef<TextInputInstance>(null);
+  // Bounded, so the field never pushes Save off screen; longer text scrolls inside it (ARU-58).
+  const { height: windowHeight } = useWindowDimensions();
+  const maxHeight = Math.max(160, Math.round(windowHeight * 0.4));
 
   function apply(edit: Edit) {
     if (edit.text.length > maxLength) {
@@ -86,7 +89,7 @@ export function MarkdownEditor({
   const counter = notesCounter(value.length);
 
   return (
-    <View style={{ gap: 8, flex: 1 }}>
+    <View style={{ gap: 8 }}>
       <View
         accessibilityRole="toolbar"
         accessibilityLabel="Formatting"
@@ -169,7 +172,7 @@ export function MarkdownEditor({
         }}
         scrollEnabled
         textAlignVertical="top"
-        style={[styles.input, { flex: 1, minHeight: 200 }]}
+        style={[styles.input, { minHeight: 160, maxHeight }]}
       />
       {counter && (
         <Text

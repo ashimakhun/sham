@@ -1,9 +1,10 @@
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
 
 import { dueText } from '@/components/AssignmentCard';
+import { KeyboardForm } from '@/components/KeyboardForm';
 import { Button, EmptyState, ErrorText, Field, styles } from '@/components/ui';
 import { newId } from '@/lib/id';
 import { useStore } from '@/lib/store';
@@ -46,45 +47,42 @@ export default function NewHomeworkScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={[styles.content, { gap: 16 }]} keyboardShouldPersistTaps="handled"
-        contentInsetAdjustmentBehavior="automatic">
-        <View style={{ gap: 6 }}>
-          <Text style={styles.label}>Course</Text>
-          <Text style={styles.body}>{course.title}</Text>
-        </View>
-        <View style={{ gap: 6 }}>
-          <Text style={styles.label}>Assignment</Text>
-          <Text style={styles.body}>{assignment.title}</Text>
-          <Text style={styles.muted}>
-            {meeting ? `Meeting ${formatDateTime(meeting.startsAt)} · ` : ''}
-            {dueText(assignment)}
-          </Text>
-        </View>
-        <Field label="Title" placeholder="e.g. Fractions — exercises 1–10" value={title} onChangeText={setTitle} />
-        <Field
-          label="Description"
-          placeholder="What did you do? Any questions for your mentor?"
-          value={description}
-          onChangeText={setDescription}
-          multiline
-        />
-        <View style={{ gap: 8 }}>
-          <Text style={styles.label}>Photo (optional)</Text>
-          {photoUri && <Image source={{ uri: photoUri }} style={{ width: '100%', height: 220, borderRadius: 10 }} />}
-          <Button title={photoUri ? 'Change photo' : 'Attach a photo'} variant="secondary" onPress={pickPhoto} />
-        </View>
-        <ErrorText error={error} />
-        <Button
-          title={busy ? 'Sending…' : 'Send to mentor'}
-          onPress={submit}
-          disabled={!title.trim() || busy}
-        />
-        <Text style={[styles.muted, { textAlign: 'center' }]}>
-          {/* The course owner is its mentor; any mentor or the teacher may check (ARU-14), so no "will check it". */}
-          {owner ? `Mentor: ${owner.name}` : null}
+    <KeyboardForm>
+      <View style={{ gap: 6 }}>
+        <Text style={styles.label}>Course</Text>
+        <Text style={styles.body}>{course.title}</Text>
+      </View>
+      <View style={{ gap: 6 }}>
+        <Text style={styles.label}>Assignment</Text>
+        <Text style={styles.body}>{assignment.title}</Text>
+        <Text style={styles.muted}>
+          {meeting ? `Meeting ${formatDateTime(meeting.startsAt)} · ` : ''}
+          {dueText(assignment)}
         </Text>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </View>
+      <Field label="Title" placeholder="e.g. Fractions — exercises 1–10" value={title} onChangeText={setTitle} />
+      <Field
+        label="Description"
+        placeholder="What did you do? Any questions for your mentor?"
+        value={description}
+        onChangeText={setDescription}
+        multiline
+      />
+      <View style={{ gap: 8 }}>
+        <Text style={styles.label}>Photo (optional)</Text>
+        {photoUri && <Image source={{ uri: photoUri }} style={{ width: '100%', height: 220, borderRadius: 10 }} />}
+        <Button title={photoUri ? 'Change photo' : 'Attach a photo'} variant="secondary" onPress={pickPhoto} />
+      </View>
+      <ErrorText error={error} />
+      <Button
+        title={busy ? 'Sending…' : 'Send to mentor'}
+        onPress={submit}
+        disabled={!title.trim() || busy}
+      />
+      <Text style={[styles.muted, { textAlign: 'center' }]}>
+        {/* The course owner is its mentor; any mentor or the teacher may check (ARU-14), so no "will check it". */}
+        {owner ? `Mentor: ${owner.name}` : null}
+      </Text>
+    </KeyboardForm>
   );
 }

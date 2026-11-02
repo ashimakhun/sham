@@ -1,8 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text } from 'react-native';
+import { Text } from 'react-native';
 
 import { DateTimeField } from '@/components/DateTimeField';
+import { KeyboardForm } from '@/components/KeyboardForm';
 import { nextFullHour } from '@/components/MeetingForm';
 import { Button, EmptyState, ErrorText, Field, styles } from '@/components/ui';
 import { newId } from '@/lib/id';
@@ -66,44 +67,39 @@ export default function AssignHomeworkScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView
-        contentContainerStyle={[styles.content, { gap: 16 }]}
-        keyboardShouldPersistTaps="handled"
-        contentInsetAdjustmentBehavior="automatic">
-        <Text style={styles.muted} numberOfLines={2}>
-          {course.title} · {meeting.topic} · {formatDateTime(meeting.startsAt)}
-        </Text>
-        <Field
-          label="Title"
-          placeholder="e.g. Exercises 1–10"
-          value={title}
-          onChangeText={setTitle}
-          maxLength={TITLE_MAX}
+    <KeyboardForm>
+      <Text style={styles.muted} numberOfLines={2}>
+        {course.title} · {meeting.topic} · {formatDateTime(meeting.startsAt)}
+      </Text>
+      <Field
+        label="Title"
+        placeholder="e.g. Exercises 1–10"
+        value={title}
+        onChangeText={setTitle}
+        maxLength={TITLE_MAX}
+      />
+      <Field
+        label="Description (optional)"
+        placeholder="What should listeners do?"
+        value={description}
+        onChangeText={setDescription}
+        multiline
+      />
+      {dueAt ? (
+        <>
+          <DateTimeField label="Deadline" value={dueAt} onChange={setDueAt} />
+          {!dueOk && <Text style={{ color: colors.warning, fontSize: 14 }}>The deadline must be in the future.</Text>}
+          <Button title="Remove deadline" variant="secondary" onPress={() => setDueAt(undefined)} />
+        </>
+      ) : (
+        <Button
+          title="Add deadline"
+          variant="secondary" // Default: tomorrow, on the next full hour.
+          onPress={() => setDueAt(new Date(nextFullHour(new Date(now)).getTime() + 24 * 60 * 60 * 1000))}
         />
-        <Field
-          label="Description (optional)"
-          placeholder="What should listeners do?"
-          value={description}
-          onChangeText={setDescription}
-          multiline
-        />
-        {dueAt ? (
-          <>
-            <DateTimeField label="Deadline" value={dueAt} onChange={setDueAt} />
-            {!dueOk && <Text style={{ color: colors.warning, fontSize: 14 }}>The deadline must be in the future.</Text>}
-            <Button title="Remove deadline" variant="secondary" onPress={() => setDueAt(undefined)} />
-          </>
-        ) : (
-          <Button
-            title="Add deadline"
-            variant="secondary" // Default: tomorrow, on the next full hour.
-            onPress={() => setDueAt(new Date(nextFullHour(new Date(now)).getTime() + 24 * 60 * 60 * 1000))}
-          />
-        )}
-        <ErrorText error={error} />
-        <Button title={busy ? 'Saving…' : 'Save'} onPress={save} disabled={!titleOk || !dueOk || busy} />
-      </ScrollView>
-    </KeyboardAvoidingView>
+      )}
+      <ErrorText error={error} />
+      <Button title={busy ? 'Saving…' : 'Save'} onPress={save} disabled={!titleOk || !dueOk || busy} />
+    </KeyboardForm>
   );
 }

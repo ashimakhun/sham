@@ -1,7 +1,8 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Switch, Text, View } from 'react-native';
+import { Switch, Text, View } from 'react-native';
 
+import { KeyboardForm } from '@/components/KeyboardForm';
 import { Button, EmptyState, ErrorText, Field, styles } from '@/components/ui';
 import { newId } from '@/lib/id';
 import { canCreateCourse } from '@/lib/roles';
@@ -32,33 +33,30 @@ export default function NewCourseScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={[styles.content, { gap: 16 }]} keyboardShouldPersistTaps="handled"
-        contentInsetAdjustmentBehavior="automatic">
-        <Field label="Title" placeholder="e.g. Algebra — Grade 7" value={title} onChangeText={setTitle} />
-        <Field
-          label="Description (optional)"
-          placeholder="What is this course about?"
-          value={description}
-          onChangeText={setDescription}
-          multiline
-        />
-        <View style={[styles.row, { alignItems: 'flex-start' }]}>
-          <View style={{ flex: 1, gap: 4 }}>
-            <Text style={styles.body}>Hidden course</Text>
-            <Text style={styles.muted}>Only the owner, listeners and the teacher will see this course.</Text>
-          </View>
-          <Switch
-            accessibilityLabel="Hidden course"
-            accessibilityHint="Only the owner, listeners and the teacher will see this course."
-            value={hidden}
-            onValueChange={setHidden}
-            disabled={busy}
-          />
+    <KeyboardForm>
+      <Field label="Title" placeholder="e.g. Algebra — Grade 7" value={title} onChangeText={setTitle} />
+      <Field
+        label="Description (optional)"
+        placeholder="What is this course about?"
+        value={description}
+        onChangeText={setDescription}
+        multiline
+      />
+      <View style={[styles.row, { alignItems: 'flex-start' }]}>
+        <View style={{ flex: 1, gap: 4 }}>
+          <Text style={styles.body}>Hidden course</Text>
+          <Text style={styles.muted}>Only the owner, listeners and the teacher will see this course.</Text>
         </View>
-        <ErrorText error={error} />
-        <Button title={busy ? 'Creating…' : 'Create course'} onPress={submit} disabled={!title.trim() || busy} />
-      </ScrollView>
-    </KeyboardAvoidingView>
+        <Switch
+          accessibilityLabel="Hidden course"
+          accessibilityHint="Only the owner, listeners and the teacher will see this course."
+          value={hidden}
+          onValueChange={setHidden}
+          disabled={busy}
+        />
+      </View>
+      <ErrorText error={error} />
+      <Button title={busy ? 'Creating…' : 'Create course'} onPress={submit} disabled={!title.trim() || busy} />
+    </KeyboardForm>
   );
 }

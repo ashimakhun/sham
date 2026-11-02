@@ -92,7 +92,8 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
       <TextInput
         placeholderTextColor={colors.muted}
         {...props}
-        style={[styles.input, props.multiline && { minHeight: 110, textAlignVertical: 'top' }]}
+        // Multiline fields grow up to a cap, then scroll inside, so the form's buttons stay reachable (ARU-59).
+        style={[styles.input, props.multiline && { minHeight: 110, maxHeight: 200, textAlignVertical: 'top' }]}
       />
     </View>
   );
