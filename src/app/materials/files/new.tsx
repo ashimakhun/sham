@@ -1,7 +1,8 @@
 import { router, useLocalSearchParams, usePreventRemove } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text } from 'react-native';
+import { Text } from 'react-native';
 
+import { KeyboardForm } from '@/components/KeyboardForm';
 import { MaterialFileFields } from '@/components/MaterialFileFields';
 import { Button, Card, EmptyState, ErrorText, styles } from '@/components/ui';
 import { confirmAction } from '@/lib/confirm';
@@ -68,28 +69,23 @@ export default function UploadMaterialFileScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView
-        contentContainerStyle={[styles.content, { gap: 16 }]}
-        keyboardShouldPersistTaps="handled"
-        contentInsetAdjustmentBehavior="automatic">
-        <Card>
-          <Text style={styles.title}>{params.name || 'Untitled'}</Text>
-          <Text style={styles.muted}>PDF · {formatSize(size)}</Text>
-        </Card>
-        <MaterialFileFields
-          name={name}
-          onName={setName}
-          description={description}
-          onDescription={setDescription}
-          courseId={courseId}
-          onCourse={setCourseId}
-          courseOnly={courseOnly}
-          onCourseOnly={setCourseOnly}
-        />
-        <ErrorText error={error} />
-        <Button title={busy ? 'Uploading…' : 'Upload'} onPress={upload} disabled={busy || !name.trim()} />
-      </ScrollView>
-    </KeyboardAvoidingView>
+    <KeyboardForm>
+      <Card>
+        <Text style={styles.title}>{params.name || 'Untitled'}</Text>
+        <Text style={styles.muted}>PDF · {formatSize(size)}</Text>
+      </Card>
+      <MaterialFileFields
+        name={name}
+        onName={setName}
+        description={description}
+        onDescription={setDescription}
+        courseId={courseId}
+        onCourse={setCourseId}
+        courseOnly={courseOnly}
+        onCourseOnly={setCourseOnly}
+      />
+      <ErrorText error={error} />
+      <Button title={busy ? 'Uploading…' : 'Upload'} onPress={upload} disabled={busy || !name.trim()} />
+    </KeyboardForm>
   );
 }

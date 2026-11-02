@@ -1,9 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 
+import { KeyboardForm } from '@/components/KeyboardForm';
 import { MaterialFileFields } from '@/components/MaterialFileFields';
-import { Button, EmptyState, ErrorText, styles } from '@/components/ui';
+import { Button, EmptyState, ErrorText } from '@/components/ui';
 import { useStore } from '@/lib/store';
 import type { MaterialFile } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
@@ -41,24 +41,19 @@ function EditForm({ item }: { item: MaterialFile }) {
   }
 
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView
-        contentContainerStyle={[styles.content, { gap: 16 }]}
-        keyboardShouldPersistTaps="handled"
-        contentInsetAdjustmentBehavior="automatic">
-        <MaterialFileFields
-          name={name}
-          onName={setName}
-          description={description}
-          onDescription={setDescription}
-          courseId={courseId}
-          onCourse={setCourseId}
-          courseOnly={courseOnly}
-          onCourseOnly={setCourseOnly}
-        />
-        <ErrorText error={error} />
-        <Button title={busy ? 'Saving…' : 'Save'} onPress={save} disabled={busy || !name.trim()} />
-      </ScrollView>
-    </KeyboardAvoidingView>
+    <KeyboardForm>
+      <MaterialFileFields
+        name={name}
+        onName={setName}
+        description={description}
+        onDescription={setDescription}
+        courseId={courseId}
+        onCourse={setCourseId}
+        courseOnly={courseOnly}
+        onCourseOnly={setCourseOnly}
+      />
+      <ErrorText error={error} />
+      <Button title={busy ? 'Saving…' : 'Save'} onPress={save} disabled={busy || !name.trim()} />
+    </KeyboardForm>
   );
 }

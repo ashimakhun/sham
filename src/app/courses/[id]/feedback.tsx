@@ -1,7 +1,8 @@
 import { router, useLocalSearchParams, usePreventRemove } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Pressable, Text, TextInput, View } from 'react-native';
 
+import { KeyboardForm } from '@/components/KeyboardForm';
 import { Button, EmptyState, ErrorText, styles } from '@/components/ui';
 import { confirmAction } from '@/lib/confirm';
 import { courseStarted, FEEDBACK_MAX, starsLabel } from '@/lib/feedback';
@@ -75,48 +76,43 @@ function FeedbackForm({ course, mine }: { course: Course; mine?: CourseFeedback 
   }
 
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView
-        contentContainerStyle={[styles.content, { gap: 16 }]}
-        keyboardShouldPersistTaps="handled"
-        contentInsetAdjustmentBehavior="automatic">
-        <Text style={styles.title}>{course.title}</Text>
-        <View style={{ gap: 6 }}>
-          <Text style={styles.label}>Rating</Text>
-          <View style={{ flexDirection: 'row', gap: 4 }} accessibilityRole="radiogroup">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <Pressable
-                key={n}
-                accessibilityRole="radio"
-                accessibilityLabel={starsLabel(n)}
-                accessibilityState={{ selected: rating === n, checked: rating === n }}
-                onPress={() => setRating(n)}
-                hitSlop={4}
-                style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontSize: 30, color: n <= rating ? '#F59E0B' : colors.border }}>★</Text>
-              </Pressable>
-            ))}
-          </View>
+    <KeyboardForm>
+      <Text style={styles.title}>{course.title}</Text>
+      <View style={{ gap: 6 }}>
+        <Text style={styles.label}>Rating</Text>
+        <View style={{ flexDirection: 'row', gap: 4 }} accessibilityRole="radiogroup">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <Pressable
+              key={n}
+              accessibilityRole="radio"
+              accessibilityLabel={starsLabel(n)}
+              accessibilityState={{ selected: rating === n, checked: rating === n }}
+              onPress={() => setRating(n)}
+              hitSlop={4}
+              style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 30, color: n <= rating ? '#F59E0B' : colors.border }}>★</Text>
+            </Pressable>
+          ))}
         </View>
-        <View style={{ gap: 6 }}>
-          <Text style={styles.label}>Feedback</Text>
-          <TextInput
-            accessibilityLabel="Feedback"
-            placeholder="What went well, what could be better…"
-            placeholderTextColor={colors.muted}
-            value={body}
-            onChangeText={setBody}
-            multiline
-            maxLength={FEEDBACK_MAX}
-            style={[styles.input, { minHeight: 110, textAlignVertical: 'top' }]}
-          />
-          <Text style={[styles.muted, { alignSelf: 'flex-end' }]}>
-            {body.trim().length}/{FEEDBACK_MAX}
-          </Text>
-        </View>
-        <ErrorText error={error} />
-        <Button title={busy ? 'Saving…' : 'Save'} onPress={save} disabled={!canSave} />
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </View>
+      <View style={{ gap: 6 }}>
+        <Text style={styles.label}>Feedback</Text>
+        <TextInput
+          accessibilityLabel="Feedback"
+          placeholder="What went well, what could be better…"
+          placeholderTextColor={colors.muted}
+          value={body}
+          onChangeText={setBody}
+          multiline
+          maxLength={FEEDBACK_MAX}
+          style={[styles.input, { minHeight: 110, textAlignVertical: 'top' }]}
+        />
+        <Text style={[styles.muted, { alignSelf: 'flex-end' }]}>
+          {body.trim().length}/{FEEDBACK_MAX}
+        </Text>
+      </View>
+      <ErrorText error={error} />
+      <Button title={busy ? 'Saving…' : 'Save'} onPress={save} disabled={!canSave} />
+    </KeyboardForm>
   );
 }
