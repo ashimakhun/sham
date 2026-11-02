@@ -92,10 +92,14 @@ describe('Blog | Knowledge base switch (AC 1–4)', () => {
     expect(titles()).toEqual(['Material t2', 'Material t1']);
   });
 
-  it('Blog card preview has no Markdown symbols (AC 9)', async () => {
+  // ARU-54 replaced the 2-line plain-text preview: the card shows the whole body formatted, without Markdown symbols.
+  it('Blog card shows the body formatted, with no Markdown symbols (AC 9, ARU-54)', async () => {
     setStore(fakeStore('S1', { materials: [mat('x', 'T', '**Read** _this_:\n- [chapter 2](https://a.b)\n1. notes')] }));
     await render(<MaterialsScreen />);
-    expect(screen.getByText('Read this: chapter 2 notes')).toBeTruthy();
+    expect(screen.getByText('Read')).toBeTruthy();
+    expect(screen.getByText('chapter 2')).toBeTruthy();
+    expect(screen.getByText('notes')).toBeTruthy();
+    expect(screen.queryByText(/\*\*|\]\(/)).toBeNull();
   });
 });
 

@@ -1,11 +1,11 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Text, View } from 'react-native';
+import { FlatList, Pressable, Text, View } from 'react-native';
 
+import { MarkdownText } from '@/components/MarkdownText';
 import { Button, Card, EmptyState, ErrorText, FilterChips, Segmented, styles } from '@/components/ui';
 import { formatSize, isAllowedPdf, PDF_RULE } from '@/lib/files';
-import { markdownToPlainText } from '@/lib/markdown';
 import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
 
@@ -147,12 +147,16 @@ export default function MaterialsScreen() {
       ListHeaderComponent={header}
       renderItem={({ item }) => {
         const likes = likeCounts.get(item.id) ?? 0;
+        const open = () => router.push({ pathname: '/materials/[id]', params: { id: item.id } });
         return (
-          <Card onPress={() => router.push({ pathname: '/materials/[id]', params: { id: item.id } })}>
-            <Text style={styles.title}>{item.title}</Text>
-            <Text style={styles.body} numberOfLines={2}>
-              {markdownToPlainText(item.body)}
-            </Text>
+          // ARU-54: the whole post, formatted as on the post screen. The card doesn't group its content for screen
+          // readers (as in ARU-27), so each link in the body is its own element; the title is the button that opens
+          // the post. A tap anywhere else that isn't a link opens it too (the card's own onPress).
+          <Card onPress={open} accessible={false}>
+            <Pressable accessibilityRole="button" onPress={open}>
+              <Text style={styles.title}>{item.title}</Text>
+            </Pressable>
+            <MarkdownText source={item.body} />
             <Text style={styles.muted}>
               {getUser(item.teacherId)?.name} · {formatDate(item.createdAt)}
               {item.link ? ' · 🔗 link' : ''}
