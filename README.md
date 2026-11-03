@@ -16,6 +16,8 @@ An educational mobile app where teachers, mentors and students work together:
 - **Hidden courses** are seen only by their owner, their listeners and the teacher.
 - **Disciplines** (ARU-63): the teacher groups courses into disciplines; the Courses tab shows **Courses** (your courses,
   then those with no discipline) and **Disciplines** (each with the rating and reviews of its courses).
+- **Accountants** (ARU-65): the teacher turns Accountant on for mentors; accountants pick the paid courses and give
+  each a monthly payment period (Profile tab).
 - **New accounts** wait for the teacher's approval before they can use the app.
 
 How each feature behaves today is described in the Linear project document **Sham: product documentation**.
@@ -68,9 +70,11 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `0031_disciplines.sql` (ARU-63: disciplines; adds a table, a nullable `courses.discipline_id` and two functions,
    deletes nothing; existing courses get no discipline; it doesn't
    depend on 0028-0030),
+   `0032_accountant.sql` (ARU-65: the teacher turns Accountant on for mentors, who pick paid courses with a monthly
+   payment period; adds `profiles.is_accountant`, the `course_billing` table and `set_accountant()`, and replaces
+   `set_user_role()` so a mentor who becomes a student stops being an accountant; deletes nothing),
    `0033_teacher_sets_any_course_discipline.sql` (ARU-70: the teacher sets the discipline of any course; replaces
-   `set_course_discipline`, no table or data changes; 0032 is reserved for the open ARU-65 branch and 0033 doesn't
-   depend on it).
+   `set_course_discipline`, no table or data changes; it doesn't depend on 0032).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 
@@ -193,6 +197,9 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | See a course-only Knowledge base PDF | if in its course | if in its course, or its author | ✓ |
 | Switch student ↔ mentor    |           |                    | ✓       |
 | Accept or reject new accounts |        |                    | ✓       |
+| Turn Accountant on / off for a mentor (ARU-65) | |         | ✓       |
+| Select / unselect paid courses |         | accountants (any course they can see) |  |
+| See paid courses, change their payment period | | accountants (all they can see) | ✓ (all) |
 | Become / stop being teacher |          |                    | (nobody) |
 
 ¹ Since ARU-63 a mentor reaches a course through the Courses list (courses they own or attend, and courses with no

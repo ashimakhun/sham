@@ -30,16 +30,14 @@ describe('AC1: General chat button on Profile', () => {
   it.each(['S1', 'M', 'T'] as const)('%s sees "General chat" first in the bottom group and it opens the chat', async (who) => {
     setStore(fakeStore(who));
     await render(<ProfileScreen />);
-    // Button names in screen order (a Button's name is its text).
-    type Json = { children?: (Json | string)[] | null } | string | null;
-    const texts = (n: Json): string[] =>
-      !n ? [] : typeof n === 'string' ? [n] : (n.children ?? []).flatMap((c) => texts(c));
-    const labels = texts(screen.toJSON() as Json);
-    const chat = labels.indexOf('General chat');
+    // Buttons in screen order; ARU-69 made the General chat button an icon labelled "Open general chat".
+    const buttons = screen.getAllByRole('button');
+    const at = (name: string) => buttons.indexOf(screen.getByRole('button', { name }));
+    const chat = at('Open general chat');
     expect(chat).toBeGreaterThan(-1);
-    expect(chat).toBeLessThan(labels.indexOf('Sign out'));
-    if (who === 'T') expect(chat).toBeLessThan(labels.findIndex((l) => l.startsWith('Manage roles')));
-    await fireEvent.press(button('General chat'));
+    expect(chat).toBeLessThan(at('Sign out'));
+    if (who === 'T') expect(chat).toBeLessThan(buttons.indexOf(screen.getByRole('button', { name: /^Manage roles/ })));
+    await fireEvent.press(button('Open general chat'));
     expect(router.push).toHaveBeenCalledWith('/general-chat');
   });
 });

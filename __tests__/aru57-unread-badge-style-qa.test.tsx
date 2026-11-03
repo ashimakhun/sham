@@ -68,11 +68,14 @@ it('edge: a hidden course card for its owner keeps the title, the Hidden label a
   expect(screen.getByText('42', hidden)).toBeTruthy();
 });
 
-it('AC 4 regression: the Chat button stays a secondary button (soft background, primary text)', async () => {
+// Updated for ARU-69: the button shows the chat icon (primary colour) instead of the word "Chat", and is labelled
+// like the course card's icon.
+it('AC 4 regression: the chat button stays a secondary button (soft background, primary-coloured icon)', async () => {
   setStore(fakeStore('S1', { courseMembers: members, unreadCount: counts({ A: 3 }) }));
   await render(<CourseDetailScreen />);
-  const btn = screen.getByRole('button', { name: 'Chat, 3 new messages' });
+  const btn = screen.getByRole('button', { name: 'Open chat for Algebra, 3 new messages' });
   const bg = StyleSheet.flatten(typeof btn.props.style === 'function' ? btn.props.style({ pressed: false }) : btn.props.style);
   expect(bg.backgroundColor).toBe(colors.primarySoft);
-  expect(StyleSheet.flatten(screen.getByText('Chat').props.style).color).toBe(colors.primary);
+  expect(within(btn).getByTestId('icon-chatbubble-outline', hidden).props.color).toBe(colors.primary);
+  expect(within(btn).getByTestId('unread-badge', hidden)).toBeTruthy();
 });

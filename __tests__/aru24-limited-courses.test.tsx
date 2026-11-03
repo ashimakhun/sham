@@ -106,7 +106,7 @@ describe('Course details', () => {
     await render(<CourseDetailScreen />);
     expect(screen.getByText(ownerA)).toBeTruthy();
     expect(screen.getByText('HOMEWORK')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Chat' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Open chat for Algebra' })).toBeTruthy(); // ARU-69: the chat icon
     expect(screen.queryByText('You are not in this course')).toBeNull();
   });
 

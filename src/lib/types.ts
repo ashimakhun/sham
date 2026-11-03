@@ -8,6 +8,17 @@ export type User = {
   name: string;
   role: Role;
   accessStatus?: AccessStatus;
+  /** ARU-65: a mentor whom the teacher made an accountant. */
+  isAccountant?: boolean;
+};
+
+/** ARU-65: a paid course and its monthly payment period (days 1-28, start <= end; the deadline is endDay). */
+export type CourseBilling = {
+  courseId: string;
+  startDay: number;
+  endDay: number;
+  selectedById: string;
+  selectedAt: string;
 };
 
 /** A new account waiting for the teacher, or one the teacher declined (ARU-43). Teacher only. */

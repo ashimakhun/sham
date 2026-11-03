@@ -1,7 +1,7 @@
 -- ARU-70: the teacher sets, changes or clears the discipline of any course (hidden courses too), not only the ones
 -- they own. Mentors still change only the courses they currently own. Replaces set_course_discipline (0031); no table,
 -- policy or data changes, deletes nothing.
--- Numbered 0033: 0032 is reserved for the open ARU-65 branch (accountant); this file doesn't depend on it.
+-- Numbered 0033, after 0032 (ARU-65, accountant); this file doesn't depend on it.
 
 create or replace function set_course_discipline(course uuid, discipline uuid) returns void
   language plpgsql security definer set search_path = public

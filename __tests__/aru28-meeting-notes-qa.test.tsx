@@ -122,16 +122,14 @@ describe('AC4: links accept only http/https', () => {
     });
   });
 
-  it('the UI rejects ftp: and keeps the text', async () => {
+  it('the editor offers no Link tool or Link URL field (ARU-64)', async () => {
     Object.assign(params, { meetingId: 'C', edit: '1' });
     setStore(fakeStore('M', { courseMembers: members, meetings: [C] }));
     await render(<MeetingNotesScreen />);
     await fireEvent.changeText(notes(), 'files');
     await select(0, 5);
-    await tool('Link');
-    await fireEvent.changeText(screen.getByLabelText('Link URL'), 'ftp://files.example.com');
-    await tool('Add link');
-    expect(screen.getByText(/starting with http:\/\/ or https:\/\//)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Link' })).toBeNull();
+    expect(screen.queryByLabelText('Link URL')).toBeNull();
     expect(notes().props.value).toBe('files');
   });
 });

@@ -73,7 +73,9 @@ export default function CourseDetailScreen() {
           <CourseDisciplineSection course={course} />
           {inCourseChat(currentUser, course, courseMembers) && (
             <Button
-              title="Chat"
+              // ARU-69: the chat icon; screen readers hear the same label as the course card's icon.
+              title={`Open chat for ${course.title}`}
+              icon="chatbubble-outline"
               variant="secondary"
               unread={unreadCount(course.id)}
               onPress={() => router.push({ pathname: '/courses/[id]/chat', params: { id: course.id } })}

@@ -112,8 +112,10 @@ describe('Share material with the Markdown editor (AC 5–6)', () => {
     const store = fakeStore('M');
     setStore(store);
     await render(<NewMaterialScreen />);
-    for (const name of ['Bold', 'Italic', 'Bulleted list', 'Numbered list', 'Link'])
+    for (const name of ['Bold', 'Italic', 'Bulleted list', 'Numbered list'])
       expect(screen.getByRole('button', { name })).toBeTruthy();
+    // ARU-64: the toolbar no longer has a Link button.
+    expect(screen.queryByRole('button', { name: 'Link' })).toBeNull();
     expect(screen.getByText('Content')).toBeTruthy();
     await fireEvent.changeText(screen.getByPlaceholderText('e.g. Lesson 3: Decimals'), 'Lesson');
     await fireEvent.changeText(screen.getByLabelText('Content'), '**Read** chapter 2');
