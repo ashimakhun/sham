@@ -38,9 +38,14 @@ type ButtonProps = {
   unread?: number;
   /** ARU-69: show this icon instead of the title text. The title is then the button's screen reader label. */
   icon?: ComponentProps<typeof Ionicons>['name'];
+  /**
+   * ARU-78: with an `icon`, draw the unread badge with its ring over the icon's top-right corner, as on the course
+   * card's chat icon (ARU-57), instead of at the button's right. Opt-in, so other buttons keep the badge at the right.
+   */
+  badgeOnIcon?: boolean;
 };
 
-export function Button({ title, onPress, variant = 'primary', disabled, unread = 0, icon }: ButtonProps) {
+export function Button({ title, onPress, variant = 'primary', disabled, unread = 0, icon, badgeOnIcon }: ButtonProps) {
   const textColor = variant === 'primary' ? '#fff' : variant === 'danger' ? colors.danger : colors.primary;
   return (
     <Pressable
@@ -56,13 +61,21 @@ export function Button({ title, onPress, variant = 'primary', disabled, unread =
         variant === 'danger' && { backgroundColor: '#FEF2F2' },
         (pressed || disabled) && { opacity: disabled ? 0.4 : 0.8 },
       ]}>
-      {icon ? (
+      {icon && badgeOnIcon ? (
+        // ARU-78: a box the size of the glyph, so the badge can sit on the icon's corner while the icon stays centred.
+        <View testID="button-icon-box" style={styles.buttonIconBox}>
+          <Ionicons name={icon} size={24} color={textColor} accessibilityElementsHidden importantForAccessibility="no" />
+          {/* Same offset from the icon as on the course card (ARU-57): centred on the top-right corner, anchored by
+              `right` so a wider "99+" grows inwards over the icon. Absolute, so the icon and button height don't move. */}
+          <UnreadBadge count={unread} ring style={{ position: 'absolute', top: -10, right: -10 }} />
+        </View>
+      ) : icon ? (
         // Same size as the course card's chat icon (ARU-25); the button keeps its full-width, 46 pt target.
         <Ionicons name={icon} size={24} color={textColor} style={{ marginVertical: -3 }} accessibilityElementsHidden importantForAccessibility="no" />
       ) : (
         <Text style={[styles.buttonText, { color: textColor }]}>{title}</Text>
       )}
-      {unread > 0 && <UnreadBadge count={unread} style={{ position: 'absolute', right: 12, top: 11 }} />}
+      {unread > 0 && !(icon && badgeOnIcon) && <UnreadBadge count={unread} style={{ position: 'absolute', right: 12, top: 11 }} />}
     </Pressable>
   );
 }
@@ -211,6 +224,8 @@ export const styles = StyleSheet.create({
   // Side padding keeps the label inside the background when the button sits in a row and sizes to its text (ARU-22).
   button: { borderRadius: 10, paddingVertical: 13, paddingHorizontal: 16, alignItems: 'center' },
   buttonText: { fontSize: 15, fontWeight: '600' },
+  // ARU-78: same 18 pt layout height as the plain icon (24 pt glyph, -3 margins), so the button height is unchanged.
+  buttonIconBox: { width: 24, height: 24, marginVertical: -3 },
   badge: { alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
   badgeText: { fontSize: 12, fontWeight: '600' },
   unread: {
