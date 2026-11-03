@@ -16,9 +16,17 @@ export const TELEGRAM_SWITCHES: { kind: TelegramKind; label: string }[] = [
   { kind: 'new_homework', label: 'New homework' },
   { kind: 'homework_reviewed', label: 'Homework reviewed' },
   { kind: 'chat_message', label: 'Chat messages' },
+  // ARU-84: only the teacher accepts accounts, so only the teacher sees it (right after Chat messages).
+  { kind: 'new_account', label: 'New accounts' },
 ];
 
-/** The teacher is never a listener and never sends homework, so they only get chat messages. */
+/** Kinds only the teacher gets. */
+const TEACHER_ONLY: TelegramKind[] = ['new_account'];
+/** Kinds the teacher gets: never a listener and never sends homework, so chat messages and new accounts (ARU-84). */
+const TEACHER_KINDS: TelegramKind[] = ['chat_message', 'new_account'];
+
 export function telegramSwitchesFor(role: Role) {
-  return role === 'teacher' ? TELEGRAM_SWITCHES.filter((s) => s.kind === 'chat_message') : TELEGRAM_SWITCHES;
+  return role === 'teacher'
+    ? TELEGRAM_SWITCHES.filter((s) => TEACHER_KINDS.includes(s.kind))
+    : TELEGRAM_SWITCHES.filter((s) => !TEACHER_ONLY.includes(s.kind));
 }

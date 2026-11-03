@@ -100,7 +100,12 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    month or are exempt; adds the `course_payments` and `course_payment_exemptions` tables with RLS (accountants and
    the teacher, current listeners of paid courses only, hidden courses as in 0019), `can_manage_payment()` and
    `my_payment_dues(today)` (a listener's own due courses for their device-local date), and puts both tables in the
-   realtime publication; changes and deletes no existing data; needs 0032).
+   realtime publication; changes and deletes no existing data; needs 0032),
+   `0044_new_account_notifications.sql` (ARU-84: Telegram message to the teacher when a new account waits for
+   approval; adds `telegram_links.notify_new_account` (default true, existing links get true), the kind `new_account`
+   in `set_telegram_notification()`, `new_account_notification()` and an after-insert trigger on `profiles` (pending
+   sign-ups only), turns on `pg_net` if the server offers it; no policy changes, deletes nothing. Sign-up never fails
+   because of it; see [Telegram notifications](#telegram-notifications) → New accounts).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 
@@ -265,6 +270,38 @@ message is dropped (never resent later).
 
 To change a Vault value later: `select vault.update_secret((select id from vault.secrets where name = 'new_homework_notify_secret'), '<new>');`.
 
+#### New accounts (ARU-84)
+
+When someone creates an account (a new profile waiting for approval), the teacher gets "New account waiting for your
+approval: <name>. Open Sham → Manage roles to accept or decline." within seconds, if they connected Telegram and left
+**New accounts** on (a switch only the teacher sees). An after-insert trigger on `profiles` (only rows inserted as
+`pending`) queues one `pg_net` POST `{"user_id": "<id>"}` with `Authorization: Bearer <secret>` to the Edge Function
+`new-account-notifications`, which asks `new_account_notification()` (service role only) whether the account is still
+waiting and who the teacher is, then sends. Accepting, declining, role or name changes send nothing; an account
+accepted, declined or deleted before the call is processed sends nothing. Sign-up never fails because of this (the
+trigger runs inside the Auth sign-up and only logs a warning); a failed send is dropped, never retried.
+
+1. Dashboard → **Database → Extensions**: make sure **pg_net** is on.
+2. Run `supabase/migrations/0044_new_account_notifications.sql`.
+3. Make a random secret (`openssl rand -hex 24`) and set it as the function's secret:
+   ```bash
+   npx supabase secrets set NEW_ACCOUNT_NOTIFY_SECRET=<secret>
+   ```
+4. Deploy the function (the trigger sends `Authorization: Bearer <secret>`, not a Supabase JWT):
+   ```bash
+   npx supabase functions deploy new-account-notifications --no-verify-jwt
+   ```
+5. Store the URL and the same secret in Vault (SQL Editor). Until both exist the trigger sends nothing:
+   ```sql
+   select vault.create_secret('https://<project-ref>.supabase.co/functions/v1/new-account-notifications', 'new_account_notify_url');
+   select vault.create_secret('<secret>', 'new_account_notify_secret');
+   ```
+6. Check: create an account, then `select status_code, content from net._http_response order by created desc limit 5;`
+   shows `200` with `{"recipients":1,"sent":1,…}` (`skipped` is 1 when the teacher hasn't connected Telegram or turned
+   **New accounts** off). A `401` means the two secrets differ.
+
+To change a Vault value later: `select vault.update_secret((select id from vault.secrets where name = 'new_account_notify_secret'), '<new>');`.
+
 ## Run it
 
 ```bash
@@ -377,6 +414,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Get a Telegram message for new course chat messages (ARU-44; linked, **Chat messages** on) | courses they're in | own courses + courses they're in | all courses |
 | Get "Your homework … was reviewed" in Telegram (ARU-49) | own homework, when checked | own homework (sent as a listener), when checked | (never sends homework) |
 | Get "New homework" Telegram messages (ARU-50) | courses they're in | courses they're in (not their own) |  |
+| Get "New account waiting for your approval" in Telegram (ARU-84; linked, **New accounts** on) |  |  | ✓ (every new sign-up) |
 | Turn Accountant on / off for a mentor (ARU-65) | |         | ✓       |
 | Select / unselect paid courses |         | accountants (any course they can see) |  |
 | See paid courses, change their payment period | | accountants (all they can see) | ✓ (all) |
