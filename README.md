@@ -24,6 +24,9 @@ An educational mobile app where teachers, mentors and students work together:
   listener Paid for the month, undo it, or set them Exempt; "Unpaid this month" lists who still owes during the
   payment period. An unpaid listener's course card on the Courses tab gets a red border and "Payment due by <date>".
 - **New accounts** wait for the teacher's approval before they can use the app.
+- **Delete account** (ARU-75): students and mentors (and waiting or declined accounts) delete their own account after
+  re-entering their password. Personal data is removed; chat messages and work done for others stay, shown as
+  **Deleted account**. A mentor who owns courses must hand them over first; the teacher can't delete their account.
 - **Change password** (ARU-76): any approved user changes their own password from the Profile tab, with the current
   password checked first.
 - **Forgot password?** (ARU-77): on the sign-in screen, anyone resets their password with a code sent by email (needs
@@ -106,7 +109,15 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    month or are exempt; adds the `course_payments` and `course_payment_exemptions` tables with RLS (accountants and
    the teacher, current listeners of paid courses only, hidden courses as in 0019), `can_manage_payment()` and
    `my_payment_dues(today)` (a listener's own due courses for their device-local date), and puts both tables in the
-   realtime publication; changes and deletes no existing data; needs 0032).
+   realtime publication; changes and deletes no existing data; needs 0032),
+   `0040_delete_account.sql` (ARU-75: deleting your own account; makes the non-cascading references to `profiles`
+   nullable with `on delete set null` (chat authors, homework checker, listener adder, meeting creator / status /
+   notes editor, assignment creator, paid-course selector, discipline creator, `profiles.mentor_id`) and, if 0039 is
+   applied, cascades ARU-66's payment marks / exemptions of a listener and nulls their marker; adds a before-delete
+   trigger on `profiles` that refuses the teacher and course owners, the service-role-only functions
+   `account_deletion_problem()` and `account_storage_objects()`, and null-safe comparisons in the unread counters and
+   the chat / new-homework notification recipient functions. Existing rows don't change; `courses.created_by` still
+   blocks. Then deploy the `delete-account` Edge Function, see [Delete account](#delete-account-aru-75)).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
@@ -301,6 +312,25 @@ message is dropped (never resent later).
 
 To change a Vault value later: `select vault.update_secret((select id from vault.secrets where name = 'new_homework_notify_secret'), '<new>');`.
 
+### Delete account (ARU-75)
+
+The Delete account screen calls the Edge Function `delete-account` with the user's access token and password. It
+only ever deletes the caller: it checks the password (a sign-in on a throwaway client), refuses the teacher and
+course owners (`account_deletion_problem()`), removes the caller's Storage files (`account_storage_objects()`:
+`homework/<id>/…`, `materials/<id>/…` and anything they own) and then deletes the Auth user, which removes the profile
+and every personal row and clears the shared references in one transaction. If a step fails, the account stays and
+tapping again continues. Other devices sign out with "Your account was deleted" when the app starts or comes back to
+the foreground (it asks Auth whether the user still exists).
+
+1. Run `supabase/migrations/0040_delete_account.sql`.
+2. Deploy the function, keeping JWT verification on (only signed-in users may call it). It needs no secrets of its
+   own: `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are provided by Supabase.
+   ```bash
+   npx supabase functions deploy delete-account
+   ```
+3. Check: sign in as a test student and delete the account from Profile → **Delete account**; the user disappears
+   from **Authentication → Users** and from `profiles`, and its files from the `homework` bucket.
+
 ## Run it
 
 ```bash
@@ -423,6 +453,8 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Change own password (Supabase Auth, current password required, ARU-76) | own | own | own |
 | Reset a forgotten password with an emailed code (signed out, any approval state, ARU-77) | own | own | own |
 | Become / stop being teacher |          |                    | (nobody) |
+| Delete own account (ARU-75; password again; also waiting / declined accounts) | ✓ | ✓ (not while owning a course) | (never) |
+| Delete someone else's account |         |                    | (nobody) |
 
 ¹ Since ARU-63 a mentor reaches a course through the Courses list (courses they own or attend, and courses with no
 discipline), the Profile tab or a Knowledge base PDF's course link. Courses in a discipline that they neither own nor

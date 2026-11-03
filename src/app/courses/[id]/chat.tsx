@@ -69,7 +69,8 @@ function Chat({ course }: { course: Course }) {
       emptyText="No messages yet — start the discussion"
       unknownAuthor="Former member"
       badges={(message: CourseMessage) =>
-        message.authorId === course.createdById ? (
+        // A deleted author (null, ARU-75) is never the owner.
+        message.authorId != null && message.authorId === course.createdById ? (
           <View style={[styles.badge, { backgroundColor: colors.primarySoft }]}>
             <Text style={[styles.badgeText, { color: colors.primary }]}>Owner</Text>
           </View>

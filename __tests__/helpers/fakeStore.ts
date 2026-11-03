@@ -67,6 +67,8 @@ export function fakeStore(who: keyof typeof users | null, over: Partial<Store> =
     signIn: jest.fn(),
     signUp: jest.fn(),
     signOut: jest.fn(),
+    deleteAccount: jest.fn(async () => {}),
+    accountNotice: null,
     changePassword: jest.fn(async () => {}),
     requestPasswordReset: jest.fn(async () => {}),
     resetPasswordWithCode: jest.fn(async () => {}),
