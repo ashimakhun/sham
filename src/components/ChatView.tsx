@@ -13,6 +13,7 @@ import {
 
 import { Button, EmptyState, ErrorText, RoleBadge, styles } from '@/components/ui';
 import { newId } from '@/lib/id';
+import { personName } from '@/lib/deleteAccount';
 import { useStore } from '@/lib/store';
 import { colors, formatDateTime } from '@/lib/theme';
 import type { ChatMessage } from '@/lib/types';
@@ -33,7 +34,8 @@ type ChatState<M extends ChatMessage> = {
  * The chat screen body shared by the course chat (ARU-8) and the general chat (ARU-61): an inverted message list
  * (newest at the bottom, older pages on scroll up) and a composer that stays above the keyboard.
  * - `emptyText`: shown when the chat has no messages yet.
- * - `unknownAuthor`: the name shown when the author's profile can't be read.
+ * - `unknownAuthor`: the name shown when the author's profile can't be read. An author who deleted their account
+ *   (no author any more, ARU-75) shows as "Deleted account", without a role badge.
  * - `badges`: extra badges after the role badge (the course chat's "Owner").
  */
 export function ChatView<M extends ChatMessage>({
@@ -80,7 +82,7 @@ export function ChatView<M extends ChatMessage>({
         renderItem={({ item }) => (
           <Bubble
             message={item}
-            mine={item.authorId === currentUser?.id}
+            mine={item.authorId != null && item.authorId === currentUser?.id}
             unknownAuthor={unknownAuthor}
             badges={badges?.(item)}
           />
@@ -133,12 +135,12 @@ function Bubble({
   badges?: ReactNode;
 }) {
   const { getUser } = useStore();
-  const author = getUser(message.authorId);
+  const author = message.authorId == null ? undefined : getUser(message.authorId);
   return (
     <View style={[chatStyles.bubble, mine ? chatStyles.mine : chatStyles.theirs]}>
       <View style={chatStyles.meta}>
         <Text style={[styles.label, { flexShrink: 1 }]} numberOfLines={1}>
-          {author?.name ?? unknownAuthor}
+          {personName(message.authorId, author, unknownAuthor)}
         </Text>
         {author && <RoleBadge role={author.role} />}
         {badges}

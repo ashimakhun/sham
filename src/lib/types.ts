@@ -17,7 +17,8 @@ export type CourseBilling = {
   courseId: string;
   startDay: number;
   endDay: number;
-  selectedById: string;
+  /** Null when the accountant who selected it deleted their account (ARU-75). */
+  selectedById: string | null;
   selectedAt: string;
 };
 
@@ -62,7 +63,8 @@ export type HomeworkAssignment = {
   description: string;
   /** ISO timestamp; undefined = no deadline. Late homework is still accepted. */
   dueAt?: string;
-  createdById: string;
+  /** Null when the creator deleted their account (ARU-75). */
+  createdById: string | null;
   createdAt: string;
 };
 
@@ -108,7 +110,8 @@ export type Discipline = {
   id: string;
   name: string;
   hidden: boolean;
-  createdById: string;
+  /** Null when the creator deleted their account (ARU-75). */
+  createdById: string | null;
   createdAt: string;
 };
 
@@ -116,7 +119,8 @@ export type Discipline = {
 export type CourseMember = {
   courseId: string;
   userId: string;
-  addedById: string;
+  /** Null when the person who added the listener deleted their account (ARU-75). */
+  addedById: string | null;
   addedAt: string;
 };
 
@@ -124,7 +128,8 @@ export type CourseMember = {
 /** A message in any chat: the course chat (ARU-8) or the general chat (ARU-61). */
 export type ChatMessage = {
   id: string;
-  authorId: string;
+  /** Null when the author deleted their account (ARU-75): shown as "Deleted account". */
+  authorId: string | null;
   body: string;
   createdAt: string;
 };
@@ -146,7 +151,8 @@ export type Meeting = {
   /** Free text: a link (http/https opens in the browser) or a place. */
   location?: string;
   status: MeetingStatus;
-  createdById: string;
+  /** Null when the creator deleted their account (ARU-75). */
+  createdById: string | null;
   createdAt: string;
   statusChangedById?: string;
   statusChangedAt?: string;
