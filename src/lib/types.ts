@@ -22,6 +22,28 @@ export type CourseBilling = {
   selectedAt: string;
 };
 
+/** ARU-66: a listener marked Paid for a month (`month` is the first day, YYYY-MM-01). Accountants and the teacher. */
+export type CoursePayment = {
+  courseId: string;
+  userId: string;
+  month: string;
+  /** Null when the person who marked it deleted their account (ARU-75). */
+  markedById: string | null;
+  markedAt: string;
+};
+
+/** ARU-66: a listener who doesn't pay for a course until cleared. Accountants and the teacher. */
+export type PaymentExemption = {
+  courseId: string;
+  userId: string;
+};
+
+/** ARU-66: one of the signed-in listener's own due courses (from my_payment_dues). `deadline` is YYYY-MM-DD. */
+export type PaymentDue = {
+  courseId: string;
+  deadline: string;
+};
+
 /** A new account waiting for the teacher, or one the teacher declined (ARU-43). Teacher only. */
 export type AccessRequest = {
   id: string;

@@ -18,6 +18,9 @@ An educational mobile app where teachers, mentors and students work together:
   then those with no discipline) and **Disciplines** (each with the rating and reviews of its courses).
 - **Accountants** (ARU-65): the teacher turns Accountant on for mentors; accountants pick the paid courses and give
   each a monthly payment period (Profile tab).
+- **Payments** (ARU-66): accountants and the teacher open a paid course from the Accountant section and mark each
+  listener Paid for the month, undo it, or set them Exempt; "Unpaid this month" lists who still owes during the
+  payment period. An unpaid listener's course card on the Courses tab gets a red border and "Payment due by <date>".
 - **New accounts** wait for the teacher's approval before they can use the app.
 - **Delete account** (ARU-75): students and mentors (and waiting or declined accounts) delete their own account after
   re-entering their password. Personal data is removed; chat messages and work done for others stay, shown as
@@ -96,6 +99,11 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    assigned; adds `new_homework_recipients()` and an after-insert trigger on `homework_assignments`, turns on `pg_net`
    if the server offers it; no table, column or policy changes, deletes nothing. Works without the Vault secrets (it
    then sends nothing), see [Telegram notifications](#telegram-notifications)),
+   `0039_accountant_payments.sql` (ARU-66: accountants and the teacher mark which listeners of a paid course paid each
+   month or are exempt; adds the `course_payments` and `course_payment_exemptions` tables with RLS (accountants and
+   the teacher, current listeners of paid courses only, hidden courses as in 0019), `can_manage_payment()` and
+   `my_payment_dues(today)` (a listener's own due courses for their device-local date), and puts both tables in the
+   realtime publication; changes and deletes no existing data; needs 0032),
    `0040_delete_account.sql` (ARU-75: deleting your own account; makes the non-cascading references to `profiles`
    nullable with `on delete set null` (chat authors, homework checker, listener adder, meeting creator / status /
    notes editor, assignment creator, paid-course selector, discipline creator, `profiles.mentor_id`) and, if 0039 is
@@ -338,6 +346,8 @@ src/app/                  screens (Expo Router — every file is a route)
   courses/[id]/meetings/  schedule / edit a meeting; [meetingId]/notes.tsx notes; [meetingId]/assign-homework.tsx;
                           [meetingId]/attendance.tsx who attended
   roles.tsx               teacher accepts / rejects new accounts and switches users between student and mentor
+  accountant/courses.tsx  an accountant selects / unselects paid courses
+  accountant/[id].tsx     a paid course's listeners: Paid / Unpaid / Exempt this month (accountants and the teacher)
   materials/new.tsx       teacher or mentor shares a Blog post
   materials/[id].tsx      Blog post details and likes
   materials/files/        Knowledge base PDFs: new.tsx upload, [id].tsx details and Open PDF, [id]/edit.tsx edit
@@ -400,6 +410,8 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Turn Accountant on / off for a mentor (ARU-65) | |         | ✓       |
 | Select / unselect paid courses |         | accountants (any course they can see) |  |
 | See paid courses, change their payment period | | accountants (all they can see) | ✓ (all) |
+| See / set / undo Paid marks and exemptions, see "Unpaid this month" (ARU-66) | | accountants (paid courses they can see) | ✓ (all paid courses) |
+| See own payment deadline on a course card (`my_payment_dues`, ARU-66) | as a listener | as a listener |  |
 | Become / stop being teacher |          |                    | (nobody) |
 | Delete own account (ARU-75; password again; also waiting / declined accounts) | ✓ | ✓ (not while owning a course) | (never) |
 | Delete someone else's account |         |                    | (nobody) |

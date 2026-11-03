@@ -3,12 +3,21 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { Button, Card, ErrorText, styles } from '@/components/ui';
-import { BILLING_DAY_MAX, BILLING_DAY_MIN, canSeeBilling, isAccountant, periodProblem, periodText } from '@/lib/billing';
+import {
+  BILLING_DAY_MAX,
+  BILLING_DAY_MIN,
+  canSeeBilling,
+  isAccountant,
+  periodProblem,
+  periodText,
+  unpaidThisMonth,
+} from '@/lib/billing';
 import { confirmAction } from '@/lib/confirm';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import type { CourseBilling } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
+import { useNow } from '@/lib/useNow';
 
 /** One day of the month, 1-28, with − / + buttons (works with screen readers; no free text). */
 function DayStepper({ label, value, onChange, disabled }: {
@@ -110,6 +119,7 @@ export function PeriodEditor({
 /** ARU-65 AC 2 / AC 6 / AC 7: the Accountant section on the Profile tab (accountants and the teacher). */
 export function AccountantSection() {
   const { currentUser, courseBilling, getCourse } = useStore();
+  const now = useNow();
   if (!canSeeBilling(currentUser)) return null;
   const accountant = isAccountant(currentUser);
   // A billing row whose course the user can't read isn't listed (RLS already hides those, ARU-40).
@@ -123,6 +133,7 @@ export function AccountantSection() {
       <Text style={styles.label} accessibilityRole="header">
         ACCOUNTANT
       </Text>
+      <UnpaidThisMonth now={now} />
       {paid.length === 0 ? (
         <View style={{ gap: 2 }}>
           <Text style={styles.muted}>No paid courses yet</Text>
@@ -137,6 +148,41 @@ export function AccountantSection() {
   );
 }
 
+/**
+ * ARU-66 AC 3 / AC 6: courses in their payment period today (device-local) with unpaid listeners, sorted by title,
+ * names sorted. "Everyone has paid" when some course is in its period but nobody owes; nothing when none is.
+ */
+function UnpaidThisMonth({ now }: { now: number }) {
+  const { courseBilling, getCourse, courseMembers, getUser, coursePayments, paymentExemptions } = useStore();
+  const unpaid = unpaidThisMonth({
+    billing: courseBilling,
+    getCourse,
+    members: courseMembers,
+    getUser,
+    payments: coursePayments,
+    exemptions: paymentExemptions,
+    now,
+  });
+  if (!unpaid) return null;
+  return (
+    <View testID="unpaid-this-month" style={{ gap: 6, paddingBottom: 4 }}>
+      <Text style={[styles.title, { fontSize: 15 }]} accessibilityRole="header">
+        Unpaid this month
+      </Text>
+      {unpaid.length === 0 ? (
+        <Text style={{ color: colors.success, fontWeight: '600' }}>Everyone has paid</Text>
+      ) : (
+        unpaid.map((c) => (
+          <View key={c.courseId} testID={`unpaid-${c.courseId}`} style={{ gap: 2 }}>
+            <Text style={{ fontWeight: '600', color: colors.text }}>{c.title}</Text>
+            <Text style={{ color: colors.danger }}>{c.names.join(', ')}</Text>
+          </View>
+        ))
+      )}
+    </View>
+  );
+}
+
 function PaidCourseRow({ billing, title }: { billing: CourseBilling; title: string }) {
   const { currentUser, setBillingPeriod, unselectPaidCourse } = useStore();
   const [editing, setEditing] = useState(false);
@@ -144,7 +190,17 @@ function PaidCourseRow({ billing, title }: { billing: CourseBilling; title: stri
   const accountant = isAccountant(currentUser);
   return (
     <View style={{ gap: 4, paddingTop: 4 }} testID={`paid-${billing.courseId}`}>
-      <Text style={[styles.title, { fontSize: 15 }]}>{title}</Text>
+      {/* ARU-66 AC 1 / AC 6: opens the course's listeners with their payments this month. */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Payments for ${title}`}
+        accessibilityHint="Opens the listeners and who has paid this month"
+        hitSlop={4}
+        onPress={() => router.push({ pathname: '/accountant/[id]', params: { id: billing.courseId } })}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <Text style={[styles.title, { fontSize: 15, flexShrink: 1 }]}>{title}</Text>
+        <Text style={{ color: colors.primary, fontWeight: '600' }}>›</Text>
+      </Pressable>
       <Text style={styles.muted}>{periodText(billing)}</Text>
       {editing ? (
         <PeriodEditor

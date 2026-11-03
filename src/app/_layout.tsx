@@ -45,6 +45,7 @@ export default function RootLayout() {
           <Stack.Screen name="roles" options={{ title: 'Manage roles' }} />
           <Stack.Screen name="delete-account" options={{ title: 'Delete account' }} />
           <Stack.Screen name="accountant/courses" options={{ title: 'Select courses' }} />
+          <Stack.Screen name="accountant/[id]" options={{ title: 'Payments' }} />
           <Stack.Screen name="general-chat" options={{ title: 'General chat' }} />
           <Stack.Screen name="disciplines/new" options={{ title: 'New discipline', presentation: 'modal' }} />
           <Stack.Screen name="disciplines/[id]" options={{ title: 'Discipline' }} />
