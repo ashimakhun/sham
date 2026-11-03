@@ -67,7 +67,10 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    changes insert grants only),
    `0031_disciplines.sql` (ARU-63: disciplines; adds a table, a nullable `courses.discipline_id` and two functions,
    deletes nothing; existing courses get no discipline; it doesn't
-   depend on 0028-0030).
+   depend on 0028-0030),
+   `0033_teacher_sets_any_course_discipline.sql` (ARU-70: the teacher sets the discipline of any course; replaces
+   `set_course_discipline`, no table or data changes; 0032 is reserved for the open ARU-65 branch and 0033 doesn't
+   depend on it).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 
@@ -159,7 +162,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Courses list (Courses tab, ARU-63) | courses they're in + courses with no discipline | own and attended courses + courses with no discipline | own courses + courses with no discipline (hidden ones too); every course through a discipline card |
 | See disciplines, their rating and reviews | visible ones | visible ones | ✓ (hidden ones too) |
 | Create a discipline, hide / unhide it |   |                    | ✓       |
-| Set / change / clear a course's discipline | | own courses   | own courses |
+| Set / change / clear a course's discipline (ARU-70) | | own courses   | any course |
 | Create courses             |           | ✓                  | ✓       |
 | Create a hidden course     |           | ✓                  | ✓       |
 | See a hidden course and its content | (listeners only) | owner and listeners only | ✓ (all) |

@@ -17,5 +17,8 @@ export function useAction() {
     }
   }
 
-  return { busy, error, run };
+  /** Forget the last error (e.g. when the form it belongs to closes). */
+  const clearError = () => setError(null);
+
+  return { busy, error, run, clearError };
 }
