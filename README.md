@@ -77,7 +77,11 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `0033_teacher_sets_any_course_discipline.sql` (ARU-70: the teacher sets the discipline of any course; replaces
    `set_course_discipline`, no table or data changes; it doesn't depend on 0032),
    `0034_general_chat_reads.sql` (ARU-72: new message count for the general chat; adds the `general_chat_reads` table
-   with policies, a trigger and functions, deletes nothing; accounts already approved start with everything read).
+   with policies, a trigger and functions, deletes nothing; accounts already approved start with everything read),
+   `0037_homework_reviewed_notifications.sql` (ARU-49: Telegram message to a homework's sender when it is checked;
+   adds `homework_reviewed_recipient()` and an `after update` trigger on `homework`, turns on `pg_net` where the
+   server offers it; no table, column, policy or data changes. See
+   [Telegram notifications](#telegram-notifications) → Homework reviewed).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 
@@ -120,6 +124,40 @@ and chooses which types they get. Until the steps below are done the card stays 
 
 The bot only answers `/start <code>` (from the app's Connect button) and `/stop`, in private chats. Notifications
 themselves are sent by `supabase/functions/_shared/telegram.ts` from the notification stories' functions.
+
+#### Homework reviewed (ARU-49)
+
+When a mentor or the teacher marks homework as checked (status `submitted` → `checked`), its sender gets "Your
+homework for <course title> was reviewed", if they are still Approved, can still see the course, connected Telegram
+and left **Homework reviewed** on. An `after update` trigger on `homework` (migration 0037) reads the URL and secret
+from Vault and queues one `pg_net` POST `{"homework_id": "<id>"}` with `Authorization: Bearer <secret>` to the Edge
+Function `homework-reviewed-notifications`, which asks `homework_reviewed_recipient()` (service role only) who gets
+it and sends. Checking never fails because of this: with `pg_net` off, a Vault value missing or the call failing,
+the trigger only logs a warning and nothing is sent. A failed send is logged and dropped, never retried.
+
+1. Dashboard → **Database → Extensions**: make sure **pg_net** is on (the migration turns it on when it can).
+2. Run `supabase/migrations/0037_homework_reviewed_notifications.sql`.
+3. Make a random secret (`openssl rand -hex 24`) and set it as the function's secret (`TELEGRAM_BOT_TOKEN` is
+   already set for ARU-48):
+   ```bash
+   npx supabase secrets set HOMEWORK_REVIEWED_NOTIFY_SECRET=<secret>
+   ```
+4. Deploy the function (the trigger sends the shared secret, not a Supabase JWT):
+   ```bash
+   npx supabase functions deploy homework-reviewed-notifications --no-verify-jwt
+   ```
+5. Store the URL and the same secret in Vault (SQL Editor):
+   ```sql
+   select vault.create_secret('https://<project-ref>.supabase.co/functions/v1/homework-reviewed-notifications', 'homework_reviewed_notify_url');
+   select vault.create_secret('<secret>', 'homework_reviewed_notify_secret');
+   ```
+6. Check: mark a homework checked, then
+   `select status_code, content from net._http_response order by created desc limit 5;` shows `200` with
+   `{"recipients":1,"sent":1,…}` (`recipients` is 0 when the sender isn't Approved or can't see the course;
+   `skipped` is 1 when they haven't connected Telegram or turned the switch off). A `401` means the two secrets
+   differ; the function's logs (dashboard → Edge Functions → homework-reviewed-notifications → Logs) show each call.
+
+To change a Vault value later: `select vault.update_secret((select id from vault.secrets where name = 'homework_reviewed_notify_secret'), '<new>');`.
 
 ## Run it
 
@@ -228,6 +266,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Switch student ↔ mentor    |           |                    | ✓       |
 | Accept or reject new accounts |        |                    | ✓       |
 | Connect Telegram and choose own notifications | ✓ (own) | ✓ (own) | ✓ (own) |
+| Get "Your homework … was reviewed" in Telegram (ARU-49) | own homework, when checked | own homework (sent as a listener), when checked | (never sends homework) |
 | Turn Accountant on / off for a mentor (ARU-65) | |         | ✓       |
 | Select / unselect paid courses |         | accountants (any course they can see) |  |
 | See paid courses, change their payment period | | accountants (all they can see) | ✓ (all) |
