@@ -78,6 +78,13 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `set_course_discipline`, no table or data changes; it doesn't depend on 0032),
    `0034_general_chat_reads.sql` (ARU-72: new message count for the general chat; adds the `general_chat_reads` table
    with policies, a trigger and functions, deletes nothing; accounts already approved start with everything read),
+   `0035_meeting_start_notifications.sql` (ARU-41: Telegram message when a meeting starts; adds
+   `course_meetings.start_notified_at`, `claim_started_meetings()` and a `pg_cron` job, and replaces `update_meeting()`;
+   deletes nothing. Turn on **pg_cron** and **pg_net** first, see [Telegram notifications](#telegram-notifications)),
+   `0036_chat_message_notifications.sql` (ARU-44: Telegram message for new course chat messages; adds the
+   `chat_message_recipients()` function and an after-insert trigger on `course_messages`, turns on `pg_net` where the
+   server offers it; no table, column or policy changes, deletes nothing; needs 0023; until the Vault secrets below
+   are stored the trigger does nothing; see [Telegram notifications](#telegram-notifications)),
    `0038_new_homework_notifications.sql` (ARU-50: Telegram message to a course's listeners when new homework is
    assigned; adds `new_homework_recipients()` and an after-insert trigger on `homework_assignments`, turns on `pg_net`
    if the server offers it; no table, column or policy changes, deletes nothing. Works without the Vault secrets (it
@@ -124,6 +131,64 @@ and chooses which types they get. Until the steps below are done the card stays 
 
 The bot only answers `/start <code>` (from the app's Connect button) and `/stop`, in private chats. Notifications
 themselves are sent by `supabase/functions/_shared/telegram.ts` from the notification stories' functions.
+
+#### Meeting started (ARU-41)
+
+Listeners get "<course title> meeting has started" within 2 minutes of a Scheduled meeting's start, if they connected
+Telegram and left **Meeting started** on. A `pg_cron` job calls the Edge Function `meeting-start-notifications` every
+minute; the function claims the meetings that just started (`claim_started_meetings()`, at most once each) and sends.
+
+1. Dashboard → **Database → Extensions**: turn on **pg_cron** and **pg_net**.
+2. Run `supabase/migrations/0035_meeting_start_notifications.sql` (it stops with a message if step 1 is missing).
+3. Make a random secret (`openssl rand -hex 24`) and set it as the function's secret:
+   ```bash
+   npx supabase secrets set MEETING_NOTIFY_SECRET=<secret>
+   ```
+4. Deploy the function (the cron job sends the secret in `x-cron-secret`, not a Supabase JWT):
+   ```bash
+   npx supabase functions deploy meeting-start-notifications --no-verify-jwt
+   ```
+5. Store the URL and the same secret in Vault (SQL Editor). The job reads both on every run, so neither is in
+   `cron.job`:
+   ```sql
+   select vault.create_secret('https://<project-ref>.supabase.co/functions/v1/meeting-start-notifications', 'meeting_notify_url');
+   select vault.create_secret('<secret>', 'meeting_notify_secret');
+   ```
+6. Check: `select * from cron.job_run_details order by start_time desc limit 5;` shows a run every minute, and
+   `select status_code, content from net._http_response order by created desc limit 5;` shows `200` with
+   `{"meetings":0,"sent":0,…}`. A `401` means the two secrets differ.
+
+To change a Vault value later: `select vault.update_secret((select id from vault.secrets where name = 'meeting_notify_secret'), '<new>');`.
+
+#### New chat messages (ARU-44)
+
+When someone posts in a course chat, the other people in that chat (owner, listeners, every teacher; Approved only)
+get "New message in the <course title> chat" if they linked Telegram and have **Chat messages** on. One message per
+batch: only for the oldest message from others they haven't read yet, so after opening the chat the next post
+notifies them again. An after-insert trigger on `course_messages` (migration 0036) queues one `pg_net` call to the
+Edge Function `chat-message-notifications`, which asks `chat_message_recipients()` (service role only) who gets it.
+Failures are logged and dropped, never retried, and never stop a message from being posted.
+
+1. **Database → Extensions**: turn on `pg_net` (then run migration 0036 if it isn't applied yet).
+2. Pick a random secret (e.g. `openssl rand -hex 32`) and set it, with the bot token from above, as function secrets:
+   ```bash
+   npx supabase secrets set CHAT_NOTIFY_SECRET=<random secret>
+   ```
+3. Deploy the function (the trigger sends the secret, not a Supabase JWT):
+   ```bash
+   npx supabase functions deploy chat-message-notifications --no-verify-jwt
+   ```
+4. In the SQL Editor, store the function's URL and the same secret in Vault:
+   ```sql
+   select vault.create_secret('https://<project-ref>.supabase.co/functions/v1/chat-message-notifications', 'chat_notify_url');
+   select vault.create_secret('<the same random secret>', 'chat_notify_secret');
+   ```
+   To change one later: `select vault.update_secret((select id from vault.secrets where name = 'chat_notify_secret'), '<new>');`
+   (and set `CHAT_NOTIFY_SECRET` to the same value).
+
+Check a post: `select status_code, content from net._http_response order by created desc limit 5;` shows the
+function's answer (`{"message_id": …, "recipients": n, "sent": …, "skipped": …, "failed": […]}`); the function's
+log (dashboard → Edge Functions → chat-message-notifications → Logs) has one line per post.
 
 #### New homework (ARU-50)
 
@@ -261,6 +326,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Switch student ↔ mentor    |           |                    | ✓       |
 | Accept or reject new accounts |        |                    | ✓       |
 | Connect Telegram and choose own notifications | ✓ (own) | ✓ (own) | ✓ (own) |
+| Get a Telegram message for new course chat messages (ARU-44; linked, **Chat messages** on) | courses they're in | own courses + courses they're in | all courses |
 | Get "New homework" Telegram messages (ARU-50) | courses they're in | courses they're in (not their own) |  |
 | Turn Accountant on / off for a mentor (ARU-65) | |         | ✓       |
 | Select / unselect paid courses |         | accountants (any course they can see) |  |
