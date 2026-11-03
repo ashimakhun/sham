@@ -69,7 +69,7 @@ export default function CourseDetailScreen() {
             <DisciplineLabel course={course} />
             {course.description ? <Text style={styles.body}>{course.description}</Text> : null}
           </Card>
-          {/* ARU-63 AC 5: the current owner changes the discipline here. */}
+          {/* ARU-63 AC 5 / ARU-70: the teacher (any course) or the current owner changes the discipline here. */}
           <CourseDisciplineSection course={course} />
           {inCourseChat(currentUser, course, courseMembers) && (
             <Button

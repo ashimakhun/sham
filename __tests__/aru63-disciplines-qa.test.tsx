@@ -153,9 +153,12 @@ it('edge ARU-9: an owner who loses the course loses the picker on the next updat
   params.id = 'A';
   setStore(fakeStore('M', { courses: [A], disciplines: [math] }));
   const view = await render(<CourseDetailScreen />);
+  // ARU-70: the list opens from the pencil.
+  await fireEvent.press(screen.getByRole('button', { name: 'Change discipline' }));
   expect(screen.getByRole('radio', { name: 'Math', checked: true })).toBeTruthy();
   setStore(fakeStore('M', { courses: [{ ...A, createdById: 'N' }], disciplines: [math] }));
   await view.rerender(<CourseDetailScreen />);
   expect(screen.queryByRole('radio', { name: 'Math' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Change discipline' })).toBeNull();
   expect(screen.getByText('Discipline: Math')).toBeTruthy();
 });

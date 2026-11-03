@@ -73,6 +73,8 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `0032_accountant.sql` (ARU-65: the teacher turns Accountant on for mentors, who pick paid courses with a monthly
    payment period; adds `profiles.is_accountant`, the `course_billing` table and `set_accountant()`, and replaces
    `set_user_role()` so a mentor who becomes a student stops being an accountant; deletes nothing),
+   `0033_teacher_sets_any_course_discipline.sql` (ARU-70: the teacher sets the discipline of any course; replaces
+   `set_course_discipline`, no table or data changes; it doesn't depend on 0032),
    `0034_general_chat_reads.sql` (ARU-72: new message count for the general chat; adds the `general_chat_reads` table
    with policies, a trigger and functions, deletes nothing; accounts already approved start with everything read).
    Each migration has its own number; `npm run test:db` fails if two files share one.
@@ -166,7 +168,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Courses list (Courses tab, ARU-63) | courses they're in + courses with no discipline | own and attended courses + courses with no discipline | own courses + courses with no discipline (hidden ones too); every course through a discipline card |
 | See disciplines, their rating and reviews | visible ones | visible ones | ✓ (hidden ones too) |
 | Create a discipline, hide / unhide it |   |                    | ✓       |
-| Set / change / clear a course's discipline | | own courses   | own courses |
+| Set / change / clear a course's discipline (ARU-70) | | own courses   | any course |
 | Create courses             |           | ✓                  | ✓       |
 | Create a hidden course     |           | ✓                  | ✓       |
 | See a hidden course and its content | (listeners only) | owner and listeners only | ✓ (all) |
