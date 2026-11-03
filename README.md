@@ -127,7 +127,9 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `0042_delete_discipline.sql` (ARU-83: the teacher deletes a discipline with every course in it; adds
    `discipline_homework_photos(discipline)` and `delete_discipline(discipline)`, which calls 0041's `delete_course()`
    for each course (hidden ones too) and then deletes the discipline, in one transaction; teacher only; changes no
-   existing data; needs 0041).
+   existing data; needs 0041),
+   `0043_teacher_deletes_any_material_file.sql` (ARU-86: the teacher deletes any Knowledge base PDF, row and file in
+   the `materials` bucket; adds two delete policies, keeps the authors' own; changes no data).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
@@ -448,7 +450,8 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Read course feedback and average | courses they can see (hidden: only if in it) | same | ✓ (all) |
 | See Knowledge base, open PDFs | ✓      | ✓                  | ✓       |
 | Upload PDFs (25 MB at most) |          | ✓                  | ✓       |
-| Edit name / description / course, delete PDFs | | ✓ (own)   | ✓ (own) |
+| Edit name / description / course of PDFs | | ✓ (own)   | ✓ (own) |
+| Delete Knowledge base PDFs (ARU-86) |      | ✓ (own)   | ✓ (any) |
 | Make a course-linked PDF course-only | | ✓ (own)       | ✓ (own) |
 | See a course-only Knowledge base PDF | if in its course | if in its course, or its author | ✓ |
 | Switch student ↔ mentor    |           |                    | ✓       |

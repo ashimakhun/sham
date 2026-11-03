@@ -20,11 +20,10 @@ select t.eq((select count(*) from material_files where id = md5('aru85qa-pdf')::
   'before: a course-only PDF is hidden from a non-listener');
 reset role;
 
--- Null id, and the teacher's homework policy doesn't reach other buckets.
+-- Null id. (Until ARU-86, 0043, the teacher couldn't delete materials files; since 0043 the teacher can delete any
+-- PDF's file, so the materials check moved to aru86_teacher_deletes_any_pdf_qa.)
 select t.login('T');
 select t.throws($$select delete_course(null)$$, 'P0002', 'a null course id: Course not found');
-select t.eq(t.affected($$delete from storage.objects where bucket_id = 'materials'$$), 0::bigint,
-  'the teacher''s new Storage policy is for homework only: no materials file can be deleted through it');
 select t.lives($$select delete_course(t.id('A'))$$, 'the teacher deletes A');
 reset role;
 
