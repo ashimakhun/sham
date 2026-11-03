@@ -105,7 +105,7 @@ describe('Course details', () => {
     setStore(fakeStore('S1', { courses, courseMembers: members, visibleHomework: [hw({ id: 'h1', courseId: 'A' })] }));
     await render(<CourseDetailScreen />);
     expect(screen.getByText(ownerA)).toBeTruthy();
-    expect(screen.getByText('HOMEWORK')).toBeTruthy();
+    expect(screen.queryByText('HOMEWORK')).toBeNull(); // ARU-80: no homework list on course details
     expect(screen.getByRole('button', { name: 'Open chat for Algebra' })).toBeTruthy(); // ARU-69: the chat icon
     expect(screen.queryByText('You are not in this course')).toBeNull();
   });
@@ -139,7 +139,7 @@ describe('Course details', () => {
     setStore(fakeStore(who, { courses, courseMembers: members }));
     await render(<CourseDetailScreen />);
     expect(screen.getByText(/Owner:/)).toBeTruthy();
-    expect(screen.getByText('HOMEWORK')).toBeTruthy();
+    expect(screen.getByText(/^MEETINGS/)).toBeTruthy(); // ARU-80: HOMEWORK is gone; meetings mark the full screen
     expect(screen.queryByText('You are not in this course')).toBeNull();
   });
 
