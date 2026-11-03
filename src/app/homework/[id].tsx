@@ -7,6 +7,8 @@ import { KeyboardForm } from '@/components/KeyboardForm';
 import { PhotoPreview } from '@/components/PhotoPreview';
 
 import { Button, Card, EmptyState, ErrorText, Field, StatusBadge, styles } from '@/components/ui';
+import { DELETED_ACCOUNT } from '@/lib/deleteAccount';
+import { PHOTO_UNAVAILABLE } from '@/lib/photo';
 import { canCheckHomework } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
@@ -17,6 +19,8 @@ export default function HomeworkDetailScreen() {
   const { visibleHomework, currentUser, getUser, getCourse, checkHomework, assignments, meetings } = useStore();
   const [comment, setComment] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
+  // The photo's file is gone (or its link couldn't be made): show "Photo unavailable" instead of an empty box.
+  const [photoFailed, setPhotoFailed] = useState(false);
   const { busy, error, run } = useAction();
 
   const item = visibleHomework.find((h) => h.id === id);
@@ -50,12 +54,28 @@ export default function HomeworkDetailScreen() {
           {item.photoPath && (
             // The whole photo, letterboxed (ARU-18 AC 1); tap for the full-screen preview.
             <Pressable accessibilityRole="imagebutton" accessibilityLabel="Open photo" onPress={() => setPreviewOpen(true)}>
-              <Image
-                testID="homework-photo"
-                source={{ uri: item.photoUrl }}
-                resizeMode="contain"
-                style={{ width: '100%', height: 260, borderRadius: 10, backgroundColor: colors.border }}
-              />
+              {item.photoUrl && !photoFailed ? (
+                <Image
+                  testID="homework-photo"
+                  source={{ uri: item.photoUrl }}
+                  resizeMode="contain"
+                  style={{ width: '100%', height: 260, borderRadius: 10, backgroundColor: colors.border }}
+                  onError={() => setPhotoFailed(true)}
+                />
+              ) : (
+                <View
+                  testID="homework-photo-unavailable"
+                  style={{
+                    width: '100%',
+                    height: 120,
+                    borderRadius: 10,
+                    backgroundColor: colors.border,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                  <Text style={styles.muted}>{PHOTO_UNAVAILABLE}</Text>
+                </View>
+              )}
             </Pressable>
           )}
         </Card>
@@ -65,7 +85,8 @@ export default function HomeworkDetailScreen() {
             <Text style={styles.label}>MENTOR FEEDBACK</Text>
             <Text style={styles.body}>{item.mentorComment ?? 'Checked without a comment.'}</Text>
             <Text style={styles.muted}>
-              {checker?.name}
+              {/* ARU-75: a checker who deleted their account shows as "Deleted account". */}
+              {item.checkedById ? checker?.name : DELETED_ACCOUNT}
               {item.checkedAt ? ` · ${formatDate(item.checkedAt)}` : ''}
             </Text>
           </Card>

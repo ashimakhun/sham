@@ -327,7 +327,8 @@ describe('Details (AC 5, 7, 8)', () => {
     expect(screen.getByText(OPEN_FAILED)).toBeTruthy();
   });
 
-  it.each(['S1', 'N', 'T'] as const)('%s (not the author) sees no Edit or Delete', async (who) => {
+  // ARU-86: the teacher now deletes anyone's PDF (but still edits only their own): aru86-teacher-deletes-any-pdf.
+  it.each(['S1', 'N'] as const)('%s (not the author) sees no Edit or Delete', async (who) => {
     params.id = 'x';
     setStore(fakeStore(who, { materialFiles: [item] }));
     await render(<MaterialFileScreen />);

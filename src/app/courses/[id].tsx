@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { FlatList, RefreshControl, ScrollView, Text, View } from 'react-native';
 
 import { CourseMaterialsSection } from '@/components/CourseMaterialsSection';
+import { DeleteCourseButton } from '@/components/DeleteCourseButton';
 import { CourseDisciplineSection, DisciplineLabel } from '@/components/Disciplines';
 import { FeedbackSection } from '@/components/FeedbackSection';
 import { HomeworkCard } from '@/components/HomeworkCard';
@@ -96,8 +97,14 @@ export default function CourseDetailScreen() {
         </View>
       }
       ListEmptyComponent={<EmptyState title="No homework for this course yet" />}
-      // ARU-60: checked and canceled meetings, at the very bottom (after the homework list or its empty state).
-      ListFooterComponent={<MeetingsSection course={course} part="history" />}
+      // ARU-60: checked and canceled meetings, after the homework list or its empty state. ARU-85: the teacher's
+      // "Delete course" below everything else.
+      ListFooterComponent={
+        <View>
+          <MeetingsSection course={course} part="history" />
+          <DeleteCourseButton course={course} />
+        </View>
+      }
     />
   );
 }

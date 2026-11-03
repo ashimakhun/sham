@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { DeleteAccountForm } from '@/components/DeleteAccountForm';
 import { Button, ErrorText, styles } from '@/components/ui';
 import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
@@ -25,6 +26,15 @@ export function AccessGate({ children }: { children: ReactNode }) {
 function AccessScreen({ declined }: { declined: boolean }) {
   const { loading, refresh, signOut } = useStore();
   const { busy, error, run } = useAction();
+  // ARU-75 AC 10: the same Delete account screen, in place (this screen replaces every route).
+  const [deleting, setDeleting] = useState(false);
+  if (deleting) {
+    return (
+      <SafeAreaView style={styles.screen}>
+        <DeleteAccountForm showTitle onCancel={() => setDeleting(false)} />
+      </SafeAreaView>
+    );
+  }
   return (
     <SafeAreaView style={styles.screen}>
       <ScrollView
@@ -42,6 +52,7 @@ function AccessScreen({ declined }: { declined: boolean }) {
         <ErrorText error={error} />
         {!declined && <Button title={busy ? 'Checking…' : 'Check again'} onPress={() => run(refresh)} disabled={busy} />}
         <Button title="Sign out" variant="secondary" onPress={() => run(signOut)} disabled={busy} />
+        <Button title="Delete account" variant="danger" onPress={() => setDeleting(true)} disabled={busy} />
       </ScrollView>
     </SafeAreaView>
   );
