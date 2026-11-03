@@ -106,7 +106,11 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `delete_course(course)` (the course's homework, then the course, in one transaction; its other rows cascade and
    Knowledge base PDFs keep "No course"), plus Storage policies that let the teacher read and delete every photo in
    the `homework` bucket; changes and deletes no existing data. The app removes the photos through the Storage API
-   before calling `delete_course`, so no Edge Function or extra setup is needed).
+   before calling `delete_course`, so no Edge Function or extra setup is needed),
+   `0042_delete_discipline.sql` (ARU-83: the teacher deletes a discipline with every course in it; adds
+   `discipline_homework_photos(discipline)` and `delete_discipline(discipline)`, which calls 0041's `delete_course()`
+   for each course (hidden ones too) and then deletes the discipline, in one transaction; teacher only; changes no
+   existing data; needs 0041).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 
@@ -347,6 +351,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Courses list (Courses tab, ARU-63) | courses they're in + courses with no discipline | own and attended courses + courses with no discipline | own courses + courses with no discipline (hidden ones too); every course through a discipline card |
 | See disciplines, their rating and reviews | visible ones | visible ones | ✓ (hidden ones too) |
 | Create a discipline, hide / unhide it |   |                    | ✓       |
+| Delete a discipline and every course in it (ARU-83) | |         | ✓ (visible and hidden disciplines) |
 | Set / change / clear a course's discipline (ARU-70) | | own courses   | any course |
 | Create courses             |           | ✓                  | ✓       |
 | Delete a course and everything in it (ARU-85) | |          | ✓ (any course, hidden ones too) |

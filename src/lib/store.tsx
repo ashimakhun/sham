@@ -115,6 +115,9 @@ export type Store = {
    *  deleted, so a retry finishes a half-done delete. Doesn't wait for the refetch, so the caller can navigate away
    *  before the course screen turns into "Course not found". */
   deleteCourse: (courseId: string) => Promise<void>;
+  /** Teacher only (ARU-83): deletes the discipline and every course in it (hidden ones too), each with everything in
+   *  it, the same way as deleteCourse(). Already gone counts as deleted. Doesn't wait for the refetch. */
+  deleteDiscipline: (disciplineId: string) => Promise<void>;
   deleteMaterial: (id: string) => Promise<void>;
   /** Teachers and mentors (ARU-30): uploads the PDF, then saves the item. A retry with the same `id` reuses both.
    *  When `isCancelled()` is true after the upload (the user left the screen), nothing is saved and the file is
@@ -526,9 +529,38 @@ function checkInsert(res: Result) {
   check(res);
 }
 
-/** Postgres "no data found": the course doesn't exist (any more) or is hidden from the caller. */
-const COURSE_NOT_FOUND = 'P0002';
-const PHOTOS_NOT_REMOVED = "Some homework photos couldn't be deleted, so the course wasn't deleted. Try again.";
+/** Postgres "no data found": the course or discipline doesn't exist (any more). */
+const NOT_FOUND = 'P0002';
+
+/**
+ * ARU-85 / ARU-83: deletes a course or a discipline with everything in it. 1. Homework photos first (SQL can't
+ * delete Storage files); if this fails, nothing else has changed. remove() silently skips objects it may not
+ * delete, so the photos are listed again and any left over is an error. 2. The rows, in one transaction. "Not
+ * found" (P0002) at either step means an earlier attempt already deleted it: done.
+ */
+async function deleteWithHomeworkPhotos(
+  photosRpc: 'course_homework_photos' | 'discipline_homework_photos',
+  deleteRpc: 'delete_course' | 'delete_discipline',
+  args: Record<string, string>,
+  what: 'course' | 'discipline',
+) {
+  // Photos still in Storage; null when it is already gone.
+  const listPhotos = async () => {
+    const res = await supabase.rpc(photosRpc, args);
+    if (res.error?.code === NOT_FOUND) return null;
+    return rows<{ photo_path: string }>(res).map((r) => r.photo_path);
+  };
+  const paths = await listPhotos();
+  if (paths === null) return;
+  if (paths.length) {
+    check(await supabase.storage.from('homework').remove(paths));
+    const left = await listPhotos();
+    if (left === null) return;
+    if (left.length) throw new Error(`Some homework photos couldn't be deleted, so the ${what} wasn't deleted. Try again.`);
+  }
+  const res = await supabase.rpc(deleteRpc, args);
+  if (res.error?.code !== NOT_FOUND) check(res);
+}
 
 const NO_LONGER_LISTENER = "You're no longer a listener of this course.";
 
@@ -1119,29 +1151,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     deleteCourse: async (courseId) => {
       requireRole('teacher');
-      // Photos of the course still in Storage; null when the course is already gone (a retry after a delete).
-      const listPhotos = async () => {
-        const res = await supabase.rpc('course_homework_photos', { course: courseId });
-        if (res.error?.code === COURSE_NOT_FOUND) return null;
-        return rows<{ photo_path: string }>(res).map((r) => r.photo_path);
-      };
-      const done = () => {
-        load().catch(() => {});
-      };
-      // 1. Photos first (SQL can't delete Storage files). If this fails, nothing else has changed.
-      const paths = await listPhotos();
-      if (paths === null) return done();
-      if (paths.length) {
-        check(await supabase.storage.from('homework').remove(paths));
-        // remove() silently skips objects it may not delete, so check that none is left.
-        const left = await listPhotos();
-        if (left === null) return done();
-        if (left.length) throw new Error(PHOTOS_NOT_REMOVED);
-      }
-      // 2. The course and everything in it, in one transaction. Already gone (P0002) counts as done.
-      const res = await supabase.rpc('delete_course', { course: courseId });
-      if (res.error?.code !== COURSE_NOT_FOUND) check(res);
-      done();
+      await deleteWithHomeworkPhotos('course_homework_photos', 'delete_course', { course: courseId }, 'course');
+      // Not awaited, so the caller can navigate away before the screen turns into "Course not found".
+      load().catch(() => {});
+    },
+    deleteDiscipline: async (disciplineId) => {
+      requireRole('teacher');
+      await deleteWithHomeworkPhotos(
+        'discipline_homework_photos',
+        'delete_discipline',
+        { discipline: disciplineId },
+        'discipline',
+      );
+      load().catch(() => {});
     },
     deleteMaterial: async (id) => {
       requireRole('teacher', 'mentor');
