@@ -116,7 +116,8 @@ describe('AC1/AC2 (as changed by ARU-60): meeting groups', () => {
     await render(<CourseDetailScreen />);
     expect(screen.getByText('MEETINGS (5)')).toBeTruthy();
     const headers = screen.getAllByRole('header').map((h) => [h.props.children].flat().join(''));
-    expect(headers).toEqual(['In progress', 'Upcoming', 'Awaiting homework check', 'MEETING HISTORY (1)']);
+    // ARU-88: uppercase headings with the group's count.
+    expect(headers).toEqual(['IN PROGRESS (1)', 'UPCOMING (2)', 'AWAITING HOMEWORK CHECK (2)', 'MEETING HISTORY (1)']);
     const order = screen.getAllByTestId(/^meeting-[A-Z0-9]+$/).map((n) => n.props.testID);
     expect(order).toEqual(['meeting-P', 'meeting-F2', 'meeting-F1', 'meeting-C', 'meeting-CN', 'meeting-X']);
   });
@@ -124,12 +125,12 @@ describe('AC1/AC2 (as changed by ARU-60): meeting groups', () => {
   it('hides an empty group; "No meetings scheduled yet" without meetings', async () => {
     setStore(fakeStore('S1', { courseMembers: members, meetings: [C] }));
     const { rerender } = await render(<CourseDetailScreen />);
-    expect(screen.getByText('Awaiting homework check')).toBeTruthy();
-    expect(screen.queryByText('Upcoming')).toBeNull();
+    expect(screen.getByText('AWAITING HOMEWORK CHECK (1)')).toBeTruthy();
+    expect(screen.queryByText(/^UPCOMING/)).toBeNull();
     setStore(fakeStore('S1', { courseMembers: members, meetings: [] }));
     await rerender(<CourseDetailScreen />);
     expect(screen.getByText('No meetings scheduled yet')).toBeTruthy();
-    expect(screen.queryByText('Awaiting homework check')).toBeNull();
+    expect(screen.queryByText(/^AWAITING HOMEWORK CHECK/)).toBeNull();
   });
 });
 

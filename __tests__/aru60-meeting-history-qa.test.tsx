@@ -53,7 +53,8 @@ it('edge a11y: group headings and MEETING HISTORY are headers; the actions are b
   setStore(fakeStore('T', { courseMembers: members, meetings: [C, F, { ...K, id: 'K' }] }));
   await render(<CourseDetailScreen />);
   const headers = screen.getAllByRole('header').map((h) => [h.props.children].flat().join(''));
-  expect(headers).toEqual(expect.arrayContaining(['Upcoming', 'Awaiting homework check', 'MEETING HISTORY (1)']));
+  // ARU-88: group headings are uppercase with their count.
+  expect(headers).toEqual(expect.arrayContaining(['UPCOMING (1)', 'AWAITING HOMEWORK CHECK (1)', 'MEETING HISTORY (1)']));
   expect(screen.getByRole('button', { name: 'Mark homework checked' })).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Undo check' })).toBeTruthy();
 });
@@ -71,6 +72,6 @@ it('AC7: a live undo moves the meeting back from history to Awaiting homework ch
   setStore(fakeStore('S1', { courseMembers: members, meetings: [C] }));
   await view.rerender(<CourseDetailScreen />);
   expect(screen.queryByTestId('meeting-history')).toBeNull();
-  expect(screen.getByText('Awaiting homework check')).toBeTruthy();
+  expect(screen.getByText('AWAITING HOMEWORK CHECK (1)')).toBeTruthy();
   expect(screen.queryByText(/Homework checked by/)).toBeNull();
 });

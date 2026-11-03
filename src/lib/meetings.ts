@@ -1,3 +1,4 @@
+import { colors } from './theme';
 import type { Meeting } from './types';
 
 /** Upcoming (Scheduled, start still in the future) soonest first, then everything else newest first (ARU-10 AC 2).
@@ -45,3 +46,25 @@ export function isOpenForAttendance(meeting: Pick<Meeting, 'status' | 'startsAt'
 export function isLink(location: string | undefined): location is string {
   return !!location && /^https?:\/\/\S+$/i.test(location.trim());
 }
+
+export type MeetingBadgeInfo = { label: 'In progress' | 'Scheduled' | 'Completed' | 'Canceled'; bg: string; fg: string };
+
+/** ARU-88: the badge a meeting shows. A Scheduled meeting whose start has passed reads "In progress" (display only;
+ *  its status stays `scheduled`). `now` ticks on the course page, so the label switches without a refresh. */
+export function meetingBadge(meeting: Pick<Meeting, 'status' | 'startsAt'>, now: number = Date.now()): MeetingBadgeInfo {
+  if (meeting.status === 'completed') return { label: 'Completed', bg: colors.successSoft, fg: colors.success };
+  if (meeting.status === 'canceled') return { label: 'Canceled', bg: '#F3F4F6', fg: colors.muted };
+  return hasStarted(meeting, now)
+    ? { label: 'In progress', bg: colors.successSoft, fg: colors.success }
+    : { label: 'Scheduled', bg: colors.primarySoft, fg: colors.primary };
+}
+
+/** ARU-88: the colour of a meeting tile's left bar follows its group, not its badge (Awaiting homework check is amber
+ *  although its badge says Completed); every MEETING HISTORY tile is grey. */
+export const meetingAccent = {
+  inProgress: colors.success,
+  upcoming: colors.primary,
+  awaitingCheck: colors.warning,
+  history: colors.border,
+} as const;
+export type MeetingGroup = keyof typeof meetingAccent;
