@@ -1,10 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { FlatList, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, Text, View } from 'react-native';
 
 import { CourseMaterialsSection } from '@/components/CourseMaterialsSection';
 import { CourseDisciplineSection, DisciplineLabel } from '@/components/Disciplines';
 import { FeedbackSection } from '@/components/FeedbackSection';
-import { HomeworkCard } from '@/components/HomeworkCard';
 import { ListenersSection } from '@/components/ListenersSection';
 import { MeetingsSection } from '@/components/MeetingsSection';
 import { Button, Card, EmptyState, HiddenBadge, OwnerLine, styles } from '@/components/ui';
@@ -14,7 +13,7 @@ import { formatDate } from '@/lib/theme';
 
 export default function CourseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getCourse, getUser, visibleHomework, loading, refresh, currentUser, courseMembers, unreadCount } = useStore();
+  const { getCourse, getUser, loading, refresh, currentUser, courseMembers, unreadCount } = useStore();
 
   const course = getCourse(id);
   if (!course) return <EmptyState title="Course not found" />;
@@ -40,20 +39,13 @@ export default function CourseDetailScreen() {
     );
   }
 
-  // visibleHomework is already limited by RLS: own homework for students, all for mentors and the teacher (ARU-14).
-  const homework = visibleHomework.filter((h) => h.courseId === course.id);
-
+  // ARU-80: no homework list here any more (it lives on the Homework tab, with a course filter on Checked).
   return (
-    <FlatList
+    <ScrollView
       style={styles.screen}
       contentContainerStyle={styles.content}
       contentInsetAdjustmentBehavior="automatic"
-      data={homework}
-      refreshing={loading}
-      onRefresh={() => refresh().catch(() => {})}
-      keyExtractor={(h) => h.id}
-      renderItem={({ item }) => <HomeworkCard item={item} />}
-      ListHeaderComponent={
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={() => refresh().catch(() => {})} />}>
         <View style={{ gap: 12 }}>
           <Card>
             {course.hidden ? (
@@ -92,12 +84,9 @@ export default function CourseDetailScreen() {
           <ListenersSection course={course} />
           <CourseMaterialsSection course={course} />
           <FeedbackSection course={course} />
-          <Text style={styles.label}>HOMEWORK</Text>
         </View>
-      }
-      ListEmptyComponent={<EmptyState title="No homework for this course yet" />}
-      // ARU-60: checked and canceled meetings, at the very bottom (after the homework list or its empty state).
-      ListFooterComponent={<MeetingsSection course={course} part="history" />}
-    />
+      {/* ARU-60: checked and canceled meetings, at the very bottom. */}
+      <MeetingsSection course={course} part="history" />
+    </ScrollView>
   );
 }

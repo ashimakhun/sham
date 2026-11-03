@@ -130,7 +130,8 @@ describe('New course screen', () => {
 });
 
 describe('Course details', () => {
-  it('AC7: shows title, description, creator and only this course\'s visible homework', async () => {
+  // ARU-80: course details no longer lists homework (it moved to the Homework tab's Checked course filter).
+  it('AC7: shows title, description and creator, and no homework list (ARU-80)', async () => {
     params.id = 'A';
     setStore(
       fakeStore('M', {
@@ -138,20 +139,22 @@ describe('Course details', () => {
       }),
     );
     await render(<CourseDetailScreen />);
-    // Once as the course title, once as the course label on the homework card.
-    expect(screen.getAllByText('Algebra')).toHaveLength(2);
+    // Only the course title: no homework card repeats it (ARU-80).
+    expect(screen.getAllByText('Algebra')).toHaveLength(1);
     expect(screen.getByText('Equations and more')).toBeTruthy();
     expect(screen.getByText(`Mentor Max · ${formatDate(courseA.createdAt)}`)).toBeTruthy();
-    expect(screen.getByText('Fractions')).toBeTruthy();
+    expect(screen.queryByText('Fractions')).toBeNull();
     expect(screen.queryByText('Cells')).toBeNull();
   });
 
-  it('edge: a course with no visible homework says so', async () => {
+  it('edge (ARU-80): a course with no visible homework shows no homework empty state', async () => {
     params.id = 'B';
     // Since ARU-24 a student who is not in the course gets the limited screen (no HOMEWORK section), so S2 is a listener here.
     setStore(fakeStore('S2', { courseMembers: [member('B', 'S2')] }));
     await render(<CourseDetailScreen />);
-    expect(screen.getByText('No homework for this course yet')).toBeTruthy();
+    expect(screen.getByText('Biology')).toBeTruthy();
+    expect(screen.queryByText('No homework for this course yet')).toBeNull();
+    expect(screen.queryByText('HOMEWORK')).toBeNull();
   });
 
   it('edge: an unknown course shows "Course not found"', async () => {
