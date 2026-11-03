@@ -47,6 +47,7 @@ beforeEach(() => {
 
 // ARU-60 replaced the Upcoming / History groups (a started meeting is In progress, a completed one Awaiting homework
 // check); updated with the product owner's approval, keeping what this checks: the move needs no new data.
+// ARU-88: headings are uppercase with the group's count, and the group View is the heading's direct parent.
 describe('AC1: Upcoming and History while the screen is open', () => {
   afterEach(() => jest.useRealTimers());
 
@@ -55,15 +56,17 @@ describe('AC1: Upcoming and History while the screen is open', () => {
     const soon = meeting({ id: 'S', startsAt: '2026-10-30T10:00:20.000Z', topic: 'Starts soon' });
     setStore(fakeStore('S1', { courseMembers: members, meetings: [soon, C] }));
     await render(<CourseDetailScreen />);
-    expect(headings()).toEqual(['Upcoming', 'Awaiting homework check']);
-    const upcomingCard = () => within(screen.getByText('Upcoming').parent!.parent!);
+    expect(headings()).toEqual(['UPCOMING (1)', 'AWAITING HOMEWORK CHECK (1)']);
+    const upcomingCard = () => within(screen.getByText('UPCOMING (1)').parent!);
     expect(upcomingCard().getByText('Starts soon')).toBeTruthy();
     await act(async () => {
       jest.advanceTimersByTime(31_000);
     });
     // Nothing is upcoming any more: the heading is hidden and the meeting is In progress.
-    expect(headings()).toEqual(['In progress', 'Awaiting homework check']);
-    expect(within(screen.getByText('In progress').parent!.parent!).getByText('Starts soon')).toBeTruthy();
+    expect(headings()).toEqual(['IN PROGRESS (1)', 'AWAITING HOMEWORK CHECK (1)']);
+    expect(within(screen.getByText('IN PROGRESS (1)').parent!).getByText('Starts soon')).toBeTruthy();
+    // ARU-88 AC 3: the started meeting's badge says In progress.
+    expect(within(screen.getByTestId('meeting-S')).getByText('In progress')).toBeTruthy();
   });
 });
 
