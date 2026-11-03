@@ -55,11 +55,12 @@ describe('Materials card (AC 1, 2, 3, 7)', () => {
     expect(screen.getByText('Book new').props.numberOfLines).toBe(2);
   });
 
-  it('sits between the Listeners section and the HOMEWORK heading', async () => {
+  // ARU-80: the HOMEWORK heading is gone; Materials still follows Listeners and comes before Feedback.
+  it('sits after the Listeners section, and there is no HOMEWORK heading', async () => {
     setStore(fakeStore('T', { materialFiles: files, courseMembers: members }));
     await render(<CourseDetailScreen />);
     const order = screen.getAllByText(/^(LISTENERS \(\d+\)|MATERIALS \(\d+\)|HOMEWORK)$/).map((n) => n.props.children);
-    expect(order.map((c) => (Array.isArray(c) ? c.join('') : c))).toEqual(['LISTENERS (1)', 'MATERIALS (3)', 'HOMEWORK']);
+    expect(order.map((c) => (Array.isArray(c) ? c.join('') : c))).toEqual(['LISTENERS (1)', 'MATERIALS (3)']);
   });
 
   it('no card when nothing is linked to the course', async () => {
@@ -68,7 +69,7 @@ describe('Materials card (AC 1, 2, 3, 7)', () => {
     await render(<CourseDetailScreen />);
     expect(screen.queryByText(/^MATERIALS/)).toBeNull();
     expect(rows()).toEqual([]);
-    expect(screen.getByText('HOMEWORK')).toBeTruthy();
+    expect(screen.queryByText('HOMEWORK')).toBeNull(); // ARU-80
   });
 
   it('a student who is not a listener sees the limited view, without the card (ARU-24)', async () => {
@@ -117,8 +118,9 @@ describe('Live updates (AC 5)', () => {
     const store = fakeStore('T', { materialFiles: [file('old')] });
     setStore(store);
     const { container } = await render(<CourseDetailScreen />);
-    const list = container.queryAll((n) => typeof n.props.onRefresh === 'function')[0];
-    await list.props.onRefresh();
+    // ARU-80: course details is a ScrollView now, with a RefreshControl instead of FlatList's onRefresh.
+    const list = container.queryAll((n) => typeof n.props.refreshControl?.props.onRefresh === 'function')[0];
+    await list.props.refreshControl.props.onRefresh();
     expect(store.refresh).toHaveBeenCalled();
   });
 });
