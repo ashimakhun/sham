@@ -3,10 +3,11 @@ import { FlatList, Pressable, Text, View } from 'react-native';
 
 import { AssignmentCard } from '@/components/AssignmentCard';
 import { HomeworkCard } from '@/components/HomeworkCard';
-import { EmptyState, Segmented, styles } from '@/components/ui';
+import { EmptyState, Segmented, styles, UnreadBadge } from '@/components/ui';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import type { Homework, HomeworkAssignment, HomeworkStatus } from '@/lib/types';
+import { listenerTabLabel } from '@/lib/unread';
 import { useNow } from '@/lib/useNow';
 
 /** Listener views (ARU-32): New (assignments not sent yet) · Waiting · Checked. Checkers: To check · Checked. */
@@ -114,7 +115,7 @@ export default function HomeworkScreen() {
       }
       ListHeaderComponent={
         <View style={{ gap: 12 }}>
-          {showSwitcher && <TabSwitch value={tab} onChange={switchTab} />}
+          {showSwitcher && <TabSwitch value={tab} onChange={switchTab} newCount={fresh.length} />}
           <Segmented<Filter> value={shown} onChange={setFilter} options={options} />
         </View>
       }
@@ -123,11 +124,15 @@ export default function HomeworkScreen() {
   );
 }
 
-/** "Owner" / "Listener" switch for mentors (ARU-23), styled like the Courses tab's view switch. */
-function TabSwitch({ value, onChange }: { value: Tab; onChange: (v: Tab) => void }) {
-  const options: { value: Tab; label: string }[] = [
-    { value: 'owner', label: 'Owner' },
-    { value: 'listener', label: 'Listener' },
+/**
+ * "Owner" / "Listener" switch for mentors (ARU-23), styled like the Courses tab's view switch. ARU-73: Listener shows
+ * the New (N) count as a badge right after its label, on both tabs; none at 0. Inline (not absolute), so it never
+ * overlaps the label or gets clipped by the segment's corners.
+ */
+function TabSwitch({ value, onChange, newCount }: { value: Tab; onChange: (v: Tab) => void; newCount: number }) {
+  const options: { value: Tab; label: string; badge: number; a11y: string }[] = [
+    { value: 'owner', label: 'Owner', badge: 0, a11y: 'Owner' },
+    { value: 'listener', label: 'Listener', badge: newCount, a11y: listenerTabLabel(newCount) },
   ];
   return (
     <View style={styles.segmented} accessibilityRole="tablist">
@@ -137,13 +142,19 @@ function TabSwitch({ value, onChange }: { value: Tab; onChange: (v: Tab) => void
           <Pressable
             key={o.value}
             accessibilityRole="tab"
-            accessibilityLabel={o.label}
+            accessibilityLabel={o.a11y}
             accessibilityState={{ selected }}
             onPress={() => onChange(o.value)}
-            style={[styles.segment, selected && styles.segmentActive]}>
-            <Text style={[styles.segmentText, selected && { color: colors.text }]} numberOfLines={1}>
+            style={[
+              styles.segment,
+              { flexDirection: 'row', justifyContent: 'center', gap: 6, paddingHorizontal: 6 },
+              selected && styles.segmentActive,
+            ]}>
+            <Text style={[styles.segmentText, { flexShrink: 1 }, selected && { color: colors.text }]} numberOfLines={1}>
               {o.label}
             </Text>
+            {/* Negative margin: the 20 pt badge doesn't make the segment taller than its neighbour. */}
+            <UnreadBadge count={o.badge} style={{ marginVertical: -2 }} />
           </Pressable>
         );
       })}

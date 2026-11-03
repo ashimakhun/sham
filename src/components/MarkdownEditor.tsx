@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react';
-import { Pressable, Text, TextInput, type TextInputInstance, View } from 'react-native';
+import { Keyboard, Pressable, Text, TextInput, type TextInputInstance, useWindowDimensions, View } from 'react-native';
 
 import { ErrorText, styles } from '@/components/ui';
-import { type Edit, insertLink, NOTES_MAX, notesCounter, type Selection, toggleList, toggleWrap } from '@/lib/markdown';
+import { type Edit, NOTES_MAX, notesCounter, type Selection, toggleList, toggleWrap } from '@/lib/markdown';
 import { colors } from '@/lib/theme';
+import { useKeyboardHeight } from '@/lib/useKeyboardHeight';
 
 type Props = {
   value: string;
@@ -21,15 +22,19 @@ const TOOLS = [
   { key: 'italic', label: 'Italic', glyph: 'I', glyphStyle: { fontStyle: 'italic' as const, fontFamily: 'serif' } },
   { key: 'bullets', label: 'Bulleted list', glyph: '•', glyphStyle: { fontSize: 22 } },
   { key: 'numbers', label: 'Numbered list', glyph: '1.', glyphStyle: {} },
-  { key: 'link', label: 'Link', glyph: 'Link', glyphStyle: { textDecorationLine: 'underline' as const } },
 ] as const;
 type Tool = (typeof TOOLS)[number]['key'];
 
+/** Room for everything but the field with the keyboard open: header, topic line, toolbar, gaps and padding, Save. */
+const OTHER_CONTENT = 300;
+/** The field never gets shorter than about four lines. */
+const MIN_OPEN = 96;
+
 /**
  * Multi-line text editor with a formatting toolbar above it (ARU-28; reusable for ARU-30): Bold, Italic, Bulleted
- * list, Numbered list and Link act on the selection or the current line and store Markdown (src/lib/markdown.ts).
- * Link asks for an http/https URL in an inline field (works on iOS, Android and web). Typing past `maxLength` is
- * blocked, and a counter shows near the limit.
+ * list and Numbered list act on the selection or the current line and store Markdown (src/lib/markdown.ts). There is
+ * no Link tool (ARU-64); links typed by hand as `[text](url)` are kept as plain text and still render when viewed.
+ * Typing past `maxLength` is blocked, and a counter shows near the limit.
  */
 export function MarkdownEditor({
   value,
@@ -43,10 +48,19 @@ export function MarkdownEditor({
   const selection = useRef<Selection>({ start: value.length, end: value.length });
   // Set only right after a toolbar edit, so the cursor lands where the edit put it; cleared on the next change.
   const [forced, setForced] = useState<Selection>();
-  const [linkFor, setLinkFor] = useState<Selection>();
-  const [url, setUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
   const input = useRef<TextInputInstance>(null);
+  // Bounded, so the field never pushes Save off screen; longer text scrolls inside it (ARU-58). While the keyboard is
+  // open, the field only takes the room left above it after the header, toolbar and Save, so a 4-line note
+  // on an iPhone still leaves Save and some form to drag (which closes the keyboard) above the keyboard.
+  const { height: windowHeight } = useWindowDimensions();
+  const keyboardHeight = useKeyboardHeight();
+  const closedMax = Math.round(windowHeight * 0.4);
+  const maxHeight =
+    keyboardHeight > 0
+      ? Math.min(closedMax, Math.max(MIN_OPEN, windowHeight - keyboardHeight - OTHER_CONTENT))
+      : Math.max(160, closedMax);
+  const minHeight = Math.min(160, maxHeight);
 
   function apply(edit: Edit) {
     if (edit.text.length > maxLength) {
@@ -64,29 +78,13 @@ export function MarkdownEditor({
     const sel = selection.current;
     if (tool === 'bold') apply(toggleWrap(value, sel, '**'));
     else if (tool === 'italic') apply(toggleWrap(value, sel, '_'));
-    else if (tool === 'bullets' || tool === 'numbers') apply(toggleList(value, sel, tool));
-    else {
-      setError(null);
-      setUrl('');
-      setLinkFor(sel);
-    }
-  }
-
-  function addLink() {
-    if (!linkFor) return;
-    const result = insertLink(value, linkFor, url);
-    if ('error' in result) {
-      setError(result.error);
-      return;
-    }
-    setLinkFor(undefined);
-    apply(result);
+    else apply(toggleList(value, sel, tool));
   }
 
   const counter = notesCounter(value.length);
 
   return (
-    <View style={{ gap: 8, flex: 1 }}>
+    <View style={{ gap: 8 }}>
       <View
         accessibilityRole="toolbar"
         accessibilityLabel="Formatting"
@@ -106,45 +104,30 @@ export function MarkdownEditor({
               justifyContent: 'center',
               borderWidth: 1,
               borderColor: colors.border,
-              backgroundColor: pressed || (t.key === 'link' && linkFor) ? colors.primarySoft : colors.card,
+              backgroundColor: pressed ? colors.primarySoft : colors.card,
             })}>
             <Text style={[{ fontSize: 16, color: colors.text }, t.glyphStyle]}>{t.glyph}</Text>
           </Pressable>
         ))}
+        {/* Return adds a line in a multiline field, so this is the explicit way out while typing (ARU-58). */}
+        {keyboardHeight > 0 && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Hide keyboard"
+            onPress={() => Keyboard.dismiss()}
+            style={({ pressed }) => ({
+              height: 44,
+              paddingHorizontal: 12,
+              borderRadius: 10,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginLeft: 'auto',
+              backgroundColor: pressed ? colors.primarySoft : 'transparent',
+            })}>
+            <Text style={{ fontSize: 16, color: colors.primary, fontWeight: '600' }}>Done</Text>
+          </Pressable>
+        )}
       </View>
-
-      {linkFor && (
-        <View style={{ gap: 6 }}>
-          <TextInput
-            accessibilityLabel="Link URL"
-            placeholder="https://…"
-            placeholderTextColor={colors.muted}
-            value={url}
-            onChangeText={setUrl}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            autoFocus
-            onSubmitEditing={addLink}
-            style={styles.input}
-          />
-          <View style={{ flexDirection: 'row', gap: 16 }}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Add link" hitSlop={8} onPress={addLink}>
-              <Text style={{ color: colors.primary, fontWeight: '600' }}>Add link</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Cancel link"
-              hitSlop={8}
-              onPress={() => {
-                setLinkFor(undefined);
-                setError(null);
-              }}>
-              <Text style={{ color: colors.muted, fontWeight: '600' }}>Cancel</Text>
-            </Pressable>
-          </View>
-        </View>
-      )}
 
       <TextInput
         ref={input}
@@ -169,7 +152,7 @@ export function MarkdownEditor({
         }}
         scrollEnabled
         textAlignVertical="top"
-        style={[styles.input, { flex: 1, minHeight: 200 }]}
+        style={[styles.input, { minHeight, maxHeight }]}
       />
       {counter && (
         <Text

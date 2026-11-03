@@ -28,6 +28,7 @@ export default function RootLayout() {
           <Stack.Screen name="courses/[id]" options={{ title: 'Course' }} />
           <Stack.Screen name="courses/[id]/chat" options={{ title: 'Chat' }} />
           <Stack.Screen name="courses/[id]/owner" options={{ title: 'Change owner', presentation: 'modal' }} />
+          <Stack.Screen name="courses/[id]/feedback" options={{ title: 'Feedback', presentation: 'modal' }} />
           <Stack.Screen name="courses/[id]/listeners" options={{ title: 'Add listeners', presentation: 'modal' }} />
           <Stack.Screen name="courses/[id]/meetings/new" options={{ title: 'Schedule meeting', presentation: 'modal' }} />
           <Stack.Screen name="courses/[id]/meetings/[meetingId]" options={{ title: 'Edit meeting', presentation: 'modal' }} />
@@ -42,6 +43,10 @@ export default function RootLayout() {
           <Stack.Screen name="materials/files/[id]" options={{ title: 'File' }} />
           <Stack.Screen name="materials/files/[id]/edit" options={{ title: 'Edit file', presentation: 'modal' }} />
           <Stack.Screen name="roles" options={{ title: 'Manage roles' }} />
+          <Stack.Screen name="accountant/courses" options={{ title: 'Select courses' }} />
+          <Stack.Screen name="general-chat" options={{ title: 'General chat' }} />
+          <Stack.Screen name="disciplines/new" options={{ title: 'New discipline', presentation: 'modal' }} />
+          <Stack.Screen name="disciplines/[id]" options={{ title: 'Discipline' }} />
         </Stack>
       </AccessGate>
     </StoreProvider>

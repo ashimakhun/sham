@@ -74,9 +74,13 @@ describe('Blog | Knowledge base switch (AC 1–4)', () => {
   it('back to Blog keeps the chosen author chip (minor note 1)', async () => {
     setStore(fakeStore('S1', { materials: [mat('t1', 'T'), mat('m1', 'M', 'Body', '2026-10-21T10:00:00.000Z')] }));
     await render(<MaterialsScreen />);
+    // ARU-62: the author list opens from one Filter button instead of a chip row.
+    await fireEvent.press(screen.getByRole('button', { name: 'Filter by author, All' }));
     await fireEvent.press(screen.getByRole('button', { name: 'Mentor Max' }));
     await fireEvent.press(tab('Knowledge base'));
     await fireEvent.press(tab('Blog'));
+    expect(screen.getByRole('button', { name: 'Filter by author, Mentor Max' })).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Filter by author, Mentor Max' }));
     expect(screen.getByRole('button', { name: 'Mentor Max' }).props.accessibilityState).toEqual({ selected: true });
     expect(titles()).toEqual(['Material m1']);
   });
@@ -92,10 +96,14 @@ describe('Blog | Knowledge base switch (AC 1–4)', () => {
     expect(titles()).toEqual(['Material t2', 'Material t1']);
   });
 
-  it('Blog card preview has no Markdown symbols (AC 9)', async () => {
+  // ARU-54 replaced the 2-line plain-text preview: the card shows the whole body formatted, without Markdown symbols.
+  it('Blog card shows the body formatted, with no Markdown symbols (AC 9, ARU-54)', async () => {
     setStore(fakeStore('S1', { materials: [mat('x', 'T', '**Read** _this_:\n- [chapter 2](https://a.b)\n1. notes')] }));
     await render(<MaterialsScreen />);
-    expect(screen.getByText('Read this: chapter 2 notes')).toBeTruthy();
+    expect(screen.getByText('Read')).toBeTruthy();
+    expect(screen.getByText('chapter 2')).toBeTruthy();
+    expect(screen.getByText('notes')).toBeTruthy();
+    expect(screen.queryByText(/\*\*|\]\(/)).toBeNull();
   });
 });
 
@@ -104,8 +112,10 @@ describe('Share material with the Markdown editor (AC 5–6)', () => {
     const store = fakeStore('M');
     setStore(store);
     await render(<NewMaterialScreen />);
-    for (const name of ['Bold', 'Italic', 'Bulleted list', 'Numbered list', 'Link'])
+    for (const name of ['Bold', 'Italic', 'Bulleted list', 'Numbered list'])
       expect(screen.getByRole('button', { name })).toBeTruthy();
+    // ARU-64: the toolbar no longer has a Link button.
+    expect(screen.queryByRole('button', { name: 'Link' })).toBeNull();
     expect(screen.getByText('Content')).toBeTruthy();
     await fireEvent.changeText(screen.getByPlaceholderText('e.g. Lesson 3: Decimals'), 'Lesson');
     await fireEvent.changeText(screen.getByLabelText('Content'), '**Read** chapter 2');

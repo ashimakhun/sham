@@ -9,6 +9,26 @@ export function sortMeetings(meetings: Meeting[], now: number = Date.now()) {
   return { upcoming, past };
 }
 
+/** ARU-60: the course page's meeting groups (device clock, like sortMeetings).
+ *  - inProgress: Scheduled and started, oldest start first
+ *  - upcoming: Scheduled, start in the future, soonest first
+ *  - awaitingCheck: Completed and homework not marked checked, newest first
+ *  - history: Completed and checked, or Canceled, newest first (shown at the bottom of the page) */
+export function groupMeetings(meetings: Meeting[], now: number = Date.now()) {
+  const time = (m: Meeting) => new Date(m.startsAt).getTime();
+  const oldestFirst = (a: Meeting, b: Meeting) => time(a) - time(b);
+  const newestFirst = (a: Meeting, b: Meeting) => time(b) - time(a);
+  const scheduled = meetings.filter((m) => m.status === 'scheduled');
+  return {
+    inProgress: scheduled.filter((m) => time(m) <= now).sort(oldestFirst),
+    upcoming: scheduled.filter((m) => time(m) > now).sort(oldestFirst),
+    awaitingCheck: meetings.filter((m) => m.status === 'completed' && !m.homeworkCheckedAt).sort(newestFirst),
+    history: meetings
+      .filter((m) => m.status === 'canceled' || (m.status === 'completed' && !!m.homeworkCheckedAt))
+      .sort(newestFirst),
+  };
+}
+
 /** True once the meeting's start time has passed (device clock): it can then be marked completed. */
 export function hasStarted(meeting: Pick<Meeting, 'startsAt'>, now: number = Date.now()) {
   return new Date(meeting.startsAt).getTime() <= now;

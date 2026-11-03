@@ -1,11 +1,12 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Text, View } from 'react-native';
+import { FlatList, Pressable, Text, View } from 'react-native';
 
-import { Button, Card, EmptyState, ErrorText, FilterChips, Segmented, styles } from '@/components/ui';
+import { AuthorFilter } from '@/components/AuthorFilter';
+import { MarkdownText } from '@/components/MarkdownText';
+import { Button, Card, EmptyState, ErrorText, Segmented, styles } from '@/components/ui';
 import { formatSize, isAllowedPdf, PDF_RULE } from '@/lib/files';
-import { markdownToPlainText } from '@/lib/markdown';
 import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
 
@@ -18,7 +19,7 @@ const SECTIONS: { value: Section; label: string }[] = [
 ];
 
 export default function MaterialsScreen() {
-  const { currentUser, loading, refresh, materials, materialFiles, getUser, getCourse } = useStore();
+  const { currentUser, loading, refresh, materials, materialFiles, materialLikes, getUser, getCourse } = useStore();
   // Teachers and mentors share materials (ARU-26); students only read.
   const canShare = currentUser?.role === 'teacher' || currentUser?.role === 'mentor';
   // Author filter (ARU-29): kept while the tab stays mounted (tab switches, opening a material, sharing one);
@@ -57,7 +58,7 @@ export default function MaterialsScreen() {
   }
 
   const authorName = (id: string) => getUser(id)?.name ?? 'Unknown';
-  // One chip per author of a currently loaded material, by name (case-insensitive); by id, so same names stay apart.
+  // One entry per author of a currently loaded material, by name (case-insensitive); by id, so same names stay apart.
   const authors = [...new Set(materials.map((m) => m.teacherId))]
     .map((id) => ({ value: id, label: authorName(id) }))
     .sort(
@@ -69,6 +70,12 @@ export default function MaterialsScreen() {
   // (Adjusting state while rendering, as React recommends instead of an effect.)
   if (filter !== selected) setSelected(ALL);
 
+  // Like counts per post (ARU-52), counting only likers whose profile loads, as the post screen does.
+  const likeCounts = new Map<string, number>();
+  for (const l of materialLikes) {
+    if (getUser(l.userId)) likeCounts.set(l.materialId, (likeCounts.get(l.materialId) ?? 0) + 1);
+  }
+
   const sorted = materials
     .filter((m) => filter === ALL || m.teacherId === filter)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -77,8 +84,9 @@ export default function MaterialsScreen() {
     <View style={{ gap: 12 }}>
       <Segmented<Section> options={SECTIONS} value={section} onChange={setSection} />
       {blog && canShare && <Button title="+ Share material" onPress={() => router.push('/materials/new')} />}
+      {/* ARU-62: one Filter button that opens the author list, in place of the ARU-29 chip row. */}
       {blog && materials.length > 0 && (
-        <FilterChips options={[{ value: ALL, label: 'All' }, ...authors]} value={filter} onChange={setSelected} />
+        <AuthorFilter options={[{ value: ALL, label: 'All' }, ...authors]} value={filter} onChange={setSelected} />
       )}
       {!blog && canShare && <Button title="+ Upload PDF" onPress={uploadPdf} />}
       {!blog && <ErrorText error={pickError} />}
@@ -139,18 +147,29 @@ export default function MaterialsScreen() {
       onRefresh={() => refresh().catch(() => {})}
       keyExtractor={(m) => m.id}
       ListHeaderComponent={header}
-      renderItem={({ item }) => (
-        <Card onPress={() => router.push({ pathname: '/materials/[id]', params: { id: item.id } })}>
-          <Text style={styles.title}>{item.title}</Text>
-          <Text style={styles.body} numberOfLines={2}>
-            {markdownToPlainText(item.body)}
-          </Text>
-          <Text style={styles.muted}>
-            {getUser(item.teacherId)?.name} · {formatDate(item.createdAt)}
-            {item.link ? ' · 🔗 link' : ''}
-          </Text>
-        </Card>
-      )}
+      renderItem={({ item }) => {
+        const likes = likeCounts.get(item.id) ?? 0;
+        const open = () => router.push({ pathname: '/materials/[id]', params: { id: item.id } });
+        return (
+          // ARU-54: the whole post, formatted as on the post screen. The card doesn't group its content for screen
+          // readers (as in ARU-27), so each link in the body is its own element; the title is the button that opens
+          // the post. A tap anywhere else that isn't a link opens it too (the card's own onPress).
+          <Card onPress={open} accessible={false}>
+            <Pressable accessibilityRole="button" onPress={open}>
+              <Text style={styles.title}>{item.title}</Text>
+            </Pressable>
+            <MarkdownText source={item.body} />
+            <Text style={styles.muted}>
+              {getUser(item.teacherId)?.name} · {formatDate(item.createdAt)}
+              {item.link ? ' · 🔗 link' : ''}
+              {/* Hidden when no one liked it; read as "N likes" by screen readers. */}
+              {likes > 0 && (
+                <Text accessibilityLabel={`${likes} ${likes === 1 ? 'like' : 'likes'}`}>{` · ♥ ${likes}`}</Text>
+              )}
+            </Text>
+          </Card>
+        );
+      }}
       ListEmptyComponent={
         <EmptyState
           title="No materials yet"

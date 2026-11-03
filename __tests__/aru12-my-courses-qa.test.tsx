@@ -1,9 +1,12 @@
 // ARU-12 QA: cases from the TEST DESIGN that aru12-my-courses.test.tsx does not cover yet —
 // re-selecting "My courses" on focus, other users' memberships, owner changes, failed refresh.
+// Updated for ARU-63: "My courses" / "All courses" became "Courses" / "Disciplines" (AC 7), and the Courses view also
+// lists other courses that have no discipline under "No discipline" (AC 8). Chemistry is in a discipline here, so it
+// is still "someone else's course I can't see in my list", as before.
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import CoursesScreen from '@/app/(tabs)/courses';
-import type { Course } from '@/lib/types';
+import type { Course, Discipline } from '@/lib/types';
 import { router } from 'expo-router';
 
 import { courseA, courseB, fakeStore, member } from './helpers/fakeStore';
@@ -12,55 +15,78 @@ import { refocus, setStore } from './helpers/mocks';
 jest.mock('expo-router', () => require('./helpers/mocks').expoRouter);
 jest.mock('@/lib/store', () => require('./helpers/mocks').store);
 
-const courseC: Course = { id: 'C', title: 'Chemistry', description: '', createdById: 'N', createdAt: '2026-10-03T10:00:00.000Z' };
+const science: Discipline = { id: 'D1', name: 'Science', hidden: false, createdById: 'T', createdAt: '2026-10-01T10:00:00.000Z' };
+const courseC: Course = {
+  id: 'C',
+  title: 'Chemistry',
+  description: '',
+  createdById: 'N',
+  createdAt: '2026-10-03T10:00:00.000Z',
+  disciplineId: 'D1',
+};
 const courses = [courseC, courseB, courseA];
 // S1 in A and B; M (owner of A) in B.
 const courseMembers = [member('A', 'S1'), member('B', 'S1'), member('B', 'M')];
-const store = (who: Parameters<typeof fakeStore>[0], over = {}) => fakeStore(who, { courses, courseMembers, ...over });
+const store = (who: Parameters<typeof fakeStore>[0], over = {}) =>
+  fakeStore(who, { courses, courseMembers, disciplines: [science], ...over });
 
 const tab = (name: string) => screen.getByRole('tab', { name });
 const titles = () => screen.queryAllByText(/^(Algebra|Biology|Chemistry)$/).map((t) => t.props.children);
-const headings = () => screen.queryAllByText(/^COURSES I/).map((t) => t.props.children);
+const headings = () => screen.queryAllByText(/^(COURSES I|NO DISCIPLINE)/).map((t) => t.props.children);
 
 beforeEach(() => jest.clearAllMocks());
 
-describe('AC1: "My courses" is selected each time the tab is opened', () => {
-  it('re-entering the tab after "All courses" selects "My courses" again', async () => {
+describe('AC1 (ARU-63 AC 7): "Courses" is selected each time the tab is opened', () => {
+  it('re-entering the tab after "Disciplines" selects "Courses" again', async () => {
     setStore(store('S1'));
     await render(<CoursesScreen />);
-    await fireEvent.press(tab('All courses'));
-    expect(tab('All courses')).toBeSelected();
+    await fireEvent.press(tab('Disciplines'));
+    expect(tab('Disciplines')).toBeSelected();
     await refocus(); // switch to another tab and back
-    expect(tab('My courses')).toBeSelected();
+    expect(tab('Courses')).toBeSelected();
     expect(titles()).toEqual(['Biology', 'Algebra']);
   });
 
-  it('coming back from a course opened in "All courses" keeps "All courses"', async () => {
+  it('coming back from a discipline opened in "Disciplines" keeps "Disciplines"', async () => {
     setStore(store('S1'));
     await render(<CoursesScreen />);
-    await fireEvent.press(tab('All courses'));
-    await fireEvent.press(screen.getByText('Chemistry'));
-    expect(router.push).toHaveBeenCalledWith({ pathname: '/courses/[id]', params: { id: 'C' } });
-    await refocus(); // back from course details
-    expect(tab('All courses')).toBeSelected();
+    await fireEvent.press(tab('Disciplines'));
+    await fireEvent.press(screen.getByText('Science'));
+    expect(router.push).toHaveBeenCalledWith({ pathname: '/disciplines/[id]', params: { id: 'D1' } });
+    await refocus(); // back from the discipline card
+    expect(tab('Disciplines')).toBeSelected();
     await refocus(); // later: another tab and back
-    expect(tab('My courses')).toBeSelected();
+    expect(tab('Courses')).toBeSelected();
   });
 
-  it('coming back from "+ New course" keeps the current view', async () => {
-    setStore(store('N'));
+  it('coming back from "+ New course" or "+ New discipline" keeps the current view', async () => {
+    setStore(store('T'));
     await render(<CoursesScreen />);
-    await fireEvent.press(tab('All courses'));
     await fireEvent.press(screen.getByRole('button', { name: '+ New course' }));
     expect(router.push).toHaveBeenCalledWith('/courses/new');
     await refocus();
-    expect(tab('All courses')).toBeSelected();
+    expect(tab('Courses')).toBeSelected();
+    await fireEvent.press(tab('Disciplines'));
+    await fireEvent.press(screen.getByRole('button', { name: '+ New discipline' }));
+    expect(router.push).toHaveBeenCalledWith('/disciplines/new');
+    await refocus();
+    expect(tab('Disciplines')).toBeSelected();
   });
 });
 
 describe('access: only my own memberships count', () => {
   it('AC6: a mentor who can read every membership row sees none of other people\'s courses as theirs', async () => {
     setStore(store('M2'));
+    await render(<CoursesScreen />);
+    // Not owner or listener of anything: only the courses with no discipline, untagged; Chemistry (in a discipline) is out.
+    expect(headings()).toEqual(['NO DISCIPLINE']);
+    expect(titles()).toEqual(['Biology', 'Algebra']);
+    expect(screen.queryByText('Owner')).toBeNull();
+    expect(screen.queryByText('Listener')).toBeNull();
+  });
+
+  it('AC6: with every other course in a discipline, that mentor gets today\'s empty state', async () => {
+    setStore(store('M2', { courses: courses.map((c) => ({ ...c, disciplineId: 'D1' })) }));
     await render(<CoursesScreen />);
     expect(titles()).toEqual([]);
     expect(screen.getByText("You don't own or attend any course yet")).toBeTruthy();
@@ -71,8 +97,13 @@ describe('access: only my own memberships count', () => {
     await render(<CoursesScreen />);
     expect(headings()).toEqual(["COURSES I'M IN"]);
     expect(titles()).not.toContain('Chemistry');
-    await fireEvent.press(tab('All courses'));
-    expect(titles()).toEqual(['Chemistry', 'Biology', 'Algebra']); // AC6: still in "All courses"
+  });
+
+  it('ARU-63 AC 8: the same course without a discipline is listed for that student under "No discipline"', async () => {
+    setStore(store('S1', { courses: [{ ...courseC, disciplineId: undefined }, courseB, courseA] }));
+    await render(<CoursesScreen />);
+    expect(headings()).toEqual(["COURSES I'M IN", 'NO DISCIPLINE']);
+    expect(titles()).toEqual(['Biology', 'Algebra', 'Chemistry']);
   });
 
   it('roles: the teacher only has "Courses I own"', async () => {
@@ -94,15 +125,18 @@ describe('access: only my own memberships count', () => {
 it('AC10: when the owner changes, the course moves between owners\' "Courses I own"', async () => {
   setStore(store('M2'));
   const { rerender } = await render(<CoursesScreen />);
-  expect(titles()).toEqual([]);
+  expect(titles()).not.toContain('Chemistry');
   const moved = [{ ...courseC, createdById: 'M2' }, courseB, courseA];
   setStore(store('M2', { courses: moved }));
   await rerender(<CoursesScreen />);
-  expect(headings()).toEqual(['COURSES I OWN']);
-  expect(titles()).toEqual(['Chemistry']);
+  expect(headings()).toEqual(['COURSES I OWN', 'NO DISCIPLINE']);
+  expect(titles()).toEqual(['Chemistry', 'Biology', 'Algebra']);
+  expect(screen.getAllByText('Owner')).toHaveLength(1);
+  // N (owner of Biology) no longer owns Chemistry, which is in a discipline, so it leaves N's list entirely.
   setStore(store('N', { courses: moved }));
   await rerender(<CoursesScreen />);
-  expect(titles()).toEqual(['Biology']);
+  expect(headings()).toEqual(['COURSES I OWN', 'NO DISCIPLINE']);
+  expect(titles()).toEqual(['Biology', 'Algebra']);
 });
 
 it('edge: a failed pull-to-refresh keeps the list and does not crash', async () => {

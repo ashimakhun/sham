@@ -3,7 +3,9 @@ import { router } from 'expo-router';
 import { useRef } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { DisciplineLabel } from '@/components/Disciplines';
 import { Card, HiddenBadge, OwnerLine, UnreadBadge, styles } from '@/components/ui';
+import { feedbackFor, ratingSummary, ratingSummaryLabel } from '@/lib/feedback';
 import { inCourseChat, seesOnlyCourseSummary } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
@@ -22,13 +24,16 @@ type Props = {
 const TAP_GUARD_MS = 800;
 
 export function CourseCard({ course, tag, onOpen }: Props) {
-  const { getUser, currentUser, courseMembers, unreadCount } = useStore();
+  const { getUser, currentUser, courseMembers, unreadCount, courseFeedback } = useStore();
   // A student who is not a listener sees only the title and description (ARU-24).
   const summaryOnly = seesOnlyCourseSummary(currentUser, course, courseMembers);
   // The chat icon shows only to people in the course chat; it follows live store updates (ARU-25).
   const showChat = inCourseChat(currentUser, course, courseMembers);
   // New messages from others since the user last read this chat (ARU-31); only for people in the chat.
   const unread = showChat ? unreadCount(course.id) : 0;
+  // Average rating and count (ARU-53); nothing when the course has no feedback.
+  const feedback = feedbackFor(courseFeedback, course.id);
+  const rating = ratingSummary(feedback);
   const lastTap = useRef(0);
 
   const open = (pathname: '/courses/[id]' | '/courses/[id]/chat') => {
@@ -60,6 +65,8 @@ export function CourseCard({ course, tag, onOpen }: Props) {
           {course.title}
         </Text>
       )}
+      {/* ARU-63 AC 6: only a discipline the viewer can see. */}
+      <DisciplineLabel course={course} />
       {course.description ? (
         <Text style={styles.body} numberOfLines={2}>
           {course.description}
@@ -68,6 +75,11 @@ export function CourseCard({ course, tag, onOpen }: Props) {
       {!summaryOnly && (
         <OwnerLine name={getUser(course.createdById)?.name ?? 'Unknown'} date={formatDate(course.createdAt)} />
       )}
+      {rating ? (
+        <Text style={styles.muted} accessibilityLabel={ratingSummaryLabel(feedback)}>
+          {rating}
+        </Text>
+      ) : null}
     </>
   );
 
@@ -103,8 +115,10 @@ export function CourseCard({ course, tag, onOpen }: Props) {
           backgroundColor: pressed ? colors.primarySoft : 'transparent',
         })}>
         <Ionicons name="chatbubble-outline" size={24} color={colors.primary} />
-        {/* Drawn over the icon's corner, so the 44×44 target and the content column keep their size. */}
-        <UnreadBadge count={unread} style={{ position: 'absolute', top: -2, right: -6 }} />
+        {/* Centred on the 24 pt icon's top-right corner (it spans 10–34 in the 44×44 target), so it covers part of the
+            bubble's outline (ARU-57). Anchored by `right`, so a wider "99+" pill grows inwards over the icon and stays
+            inside the target and the content column keeps its size. */}
+        <UnreadBadge count={unread} ring style={{ position: 'absolute', top: 0, right: 0 }} />
       </Pressable>
     </Card>
   );

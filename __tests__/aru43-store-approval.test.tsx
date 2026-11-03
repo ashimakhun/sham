@@ -104,5 +104,5 @@ it('before the migration (no access_status column) everyone counts as approved',
   expect(store.currentUser?.accessStatus).toBe('approved');
   expect(store.users).toHaveLength(2);
   expect(store.accessRequests).toEqual([]);
-  expect(mockState.rpcs.map((r) => r.name)).toEqual(['chat_unread_counts']);
+  expect(mockState.rpcs.map((r) => r.name)).toEqual(['chat_unread_counts', 'general_chat_unread_count']); // + ARU-72
 });

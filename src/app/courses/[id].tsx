@@ -2,6 +2,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { FlatList, RefreshControl, ScrollView, Text, View } from 'react-native';
 
 import { CourseMaterialsSection } from '@/components/CourseMaterialsSection';
+import { CourseDisciplineSection, DisciplineLabel } from '@/components/Disciplines';
+import { FeedbackSection } from '@/components/FeedbackSection';
 import { HomeworkCard } from '@/components/HomeworkCard';
 import { ListenersSection } from '@/components/ListenersSection';
 import { MeetingsSection } from '@/components/MeetingsSection';
@@ -28,8 +30,11 @@ export default function CourseDetailScreen() {
         refreshControl={<RefreshControl refreshing={loading} onRefresh={() => refresh().catch(() => {})} />}>
         <Card>
           <Text style={styles.h1}>{course.title}</Text>
+          <DisciplineLabel course={course} />
           {course.description ? <Text style={styles.body}>{course.description}</Text> : null}
         </Card>
+        {/* ARU-53: everyone who sees the course reads its feedback. */}
+        <FeedbackSection course={course} />
         <EmptyState title="You are not in this course" hint="Ask your teacher or mentor to add you." />
       </ScrollView>
     );
@@ -60,11 +65,17 @@ export default function CourseDetailScreen() {
               <Text style={styles.h1}>{course.title}</Text>
             )}
             <OwnerLine name={getUser(course.createdById)?.name ?? 'Unknown'} date={formatDate(course.createdAt)} />
+            {/* ARU-63 AC 6: only a discipline the viewer can see. */}
+            <DisciplineLabel course={course} />
             {course.description ? <Text style={styles.body}>{course.description}</Text> : null}
           </Card>
+          {/* ARU-63 AC 5 / ARU-70: the teacher (any course) or the current owner changes the discipline here. */}
+          <CourseDisciplineSection course={course} />
           {inCourseChat(currentUser, course, courseMembers) && (
             <Button
-              title="Chat"
+              // ARU-69: the chat icon; screen readers hear the same label as the course card's icon.
+              title={`Open chat for ${course.title}`}
+              icon="chatbubble-outline"
               variant="secondary"
               unread={unreadCount(course.id)}
               onPress={() => router.push({ pathname: '/courses/[id]/chat', params: { id: course.id } })}
@@ -80,10 +91,13 @@ export default function CourseDetailScreen() {
           <MeetingsSection course={course} />
           <ListenersSection course={course} />
           <CourseMaterialsSection course={course} />
+          <FeedbackSection course={course} />
           <Text style={styles.label}>HOMEWORK</Text>
         </View>
       }
       ListEmptyComponent={<EmptyState title="No homework for this course yet" />}
+      // ARU-60: checked and canceled meetings, at the very bottom (after the homework list or its empty state).
+      ListFooterComponent={<MeetingsSection course={course} part="history" />}
     />
   );
 }

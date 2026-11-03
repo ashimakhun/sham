@@ -53,6 +53,11 @@ export function canChangeOwner(role: Role | undefined) {
 }
 
 /** Mirrors set_user_role() (supabase/migrations/0009_roles_screen.sql): only the teacher manages roles. */
+/** ARU-61: every approved account, any role, reads and posts in the general chat (mirrors is_approved(), 0021). */
+export function canUseGeneralChat(user: User | null | undefined) {
+  return !!user && (user.accessStatus ?? 'approved') === 'approved';
+}
+
 export function canManageRoles(role: Role | undefined) {
   return role === 'teacher';
 }
@@ -79,6 +84,14 @@ export function canSeeAttendance(user: User | null | undefined, course: Course, 
     course.createdById === user.id ||
     (user.role === 'mentor' && !isCourseListener(user, course, members))
   );
+}
+
+/** ARU-60: who marks a Completed meeting's homework checked or undoes it. Mirrors set_meeting_homework_checked()
+ *  (supabase/migrations/0028_meeting_homework_checked.sql): the teacher, or a mentor who isn't a listener of the course
+ *  (the owner included). */
+export function canCheckMeetingHomework(user: User | null | undefined, course: Course, members: CourseMember[]) {
+  if (!user) return false;
+  return user.role === 'teacher' || (user.role === 'mentor' && !isCourseListener(user, course, members));
 }
 
 /** Mirrors is_member() (supabase/migrations/0004_course_members.sql): the user is a listener of the course. */

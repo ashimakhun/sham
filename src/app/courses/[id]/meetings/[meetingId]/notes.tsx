@@ -1,14 +1,15 @@
 import { router, Stack, useLocalSearchParams, usePreventRemove } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
+import { KeyboardForm } from '@/components/KeyboardForm';
 import { MarkdownEditor } from '@/components/MarkdownEditor';
 import { MarkdownText } from '@/components/MarkdownText';
 import { Button, Card, EmptyState, ErrorText, styles } from '@/components/ui';
 import { confirmAction } from '@/lib/confirm';
 import { canManageMeetings, canSeeMeetings } from '@/lib/roles';
 import { useStore } from '@/lib/store';
-import { formatDateTime } from '@/lib/theme';
+import { colors, formatDateTime } from '@/lib/theme';
 import type { Course, Meeting } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
 
@@ -120,16 +121,38 @@ function NotesEditor({ course, meeting }: { course: Course; meeting: Meeting }) 
   }
 
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Stack.Screen options={{ title: meeting.notes ? 'Edit notes' : 'Add notes' }} />
-      <View style={[styles.content, { flex: 1 }]}>
-        <Text style={styles.muted} numberOfLines={1}>
-          {meeting.topic} · {formatDateTime(meeting.startsAt)}
-        </Text>
-        <MarkdownEditor value={draft} onChange={setDraft} placeholder="What was covered in this meeting?" />
-        <ErrorText error={error} />
-        <Button title={busy ? 'Saving…' : 'Save'} onPress={save} disabled={busy} />
-      </View>
-    </KeyboardAvoidingView>
+    // Scrolls above the keyboard and closes it on drag or a tap outside the field; Save is always reachable (ARU-58).
+    <KeyboardForm contentContainerStyle={styles.content}>
+      <Stack.Screen
+        options={{
+          title: meeting.notes ? 'Edit notes' : 'Add notes',
+          // Always above the keyboard, whatever the field's size (ARU-58); the Save below stays for when it's closed.
+          headerRight: () => <HeaderSave busy={busy} onPress={save} />,
+        }}
+      />
+      <Text style={styles.muted} numberOfLines={1}>
+        {meeting.topic} · {formatDateTime(meeting.startsAt)}
+      </Text>
+      <MarkdownEditor value={draft} onChange={setDraft} placeholder="What was covered in this meeting?" />
+      <ErrorText error={error} />
+      <Button title={busy ? 'Saving…' : 'Save'} onPress={save} disabled={busy} />
+    </KeyboardForm>
+  );
+}
+
+function HeaderSave({ busy, onPress }: { busy: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Save notes"
+      accessibilityState={{ disabled: busy }}
+      disabled={busy}
+      hitSlop={8}
+      onPress={onPress}
+      style={{ paddingHorizontal: 8, minHeight: 44, justifyContent: 'center' }}>
+      <Text style={{ fontSize: 17, fontWeight: '600', color: busy ? colors.muted : colors.primary }}>
+        {busy ? 'Saving…' : 'Save'}
+      </Text>
+    </Pressable>
   );
 }

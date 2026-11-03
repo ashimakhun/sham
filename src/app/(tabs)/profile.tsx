@@ -1,14 +1,16 @@
 import { router } from 'expo-router';
 import { ScrollView, Text, View } from 'react-native';
 
+import { AccountantSection } from '@/components/Accountant';
+import { ProfileNameCard } from '@/components/ProfileNameCard';
 import { TelegramCard } from '@/components/TelegramCard';
-import { Button, Card, ErrorText, RoleBadge, styles } from '@/components/ui';
-import { canManageRoles } from '@/lib/roles';
+import { Button, Card, ErrorText, styles } from '@/components/ui';
+import { canManageRoles, canUseGeneralChat } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
 
 export default function ProfileScreen() {
-  const { currentUser, session, courses, courseMembers, getUser, signOut, accessRequests } = useStore();
+  const { currentUser, courses, courseMembers, getUser, signOut, accessRequests, generalUnreadCount } = useStore();
   const { busy, error, run } = useAction();
   if (!currentUser) return null;
 
@@ -23,12 +25,8 @@ export default function ProfileScreen() {
   const isStaff = currentUser.role === 'teacher' || currentUser.role === 'mentor';
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Card>
-        <Text style={styles.h1}>{currentUser.name}</Text>
-        <Text style={styles.muted}>{session?.user.email}</Text>
-        <RoleBadge role={currentUser.role} />
-      </Card>
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ProfileNameCard />
 
       {(currentUser.role === 'student' || listening.length > 0) && (
         <Card>
@@ -73,8 +71,22 @@ export default function ProfileScreen() {
       )}
 
       <TelegramCard />
+      {/* ARU-65: accountants and the teacher. */}
+      <AccountantSection />
 
       <View style={{ gap: 10, marginTop: 8 }}>
+        {/* ARU-61: first in this group, so the order is the same for every role. */}
+        {canUseGeneralChat(currentUser) && (
+          // ARU-69: the chat icon instead of the words; read as "Open general chat".
+          // ARU-72: new messages show as the same badge as the course details Chat button, and join the label.
+          <Button
+            title="Open general chat"
+            icon="chatbubble-outline"
+            variant="secondary"
+            unread={generalUnreadCount}
+            onPress={() => router.push('/general-chat')}
+          />
+        )}
         {canManageRoles(currentUser.role) && (
           <Button
             // Accounts waiting for approval (ARU-43), e.g. "Manage roles (2)"; no count when there are none.

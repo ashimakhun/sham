@@ -45,23 +45,25 @@ beforeEach(() => {
   params.edit = undefined;
 });
 
+// ARU-60 replaced the Upcoming / History groups (a started meeting is In progress, a completed one Awaiting homework
+// check); updated with the product owner's approval, keeping what this checks: the move needs no new data.
 describe('AC1: Upcoming and History while the screen is open', () => {
   afterEach(() => jest.useRealTimers());
 
-  it('a meeting moves from Upcoming to History once it starts, without new data', async () => {
+  it('a meeting moves from Upcoming to In progress (ARU-60) once it starts, without new data', async () => {
     jest.useFakeTimers({ now: new Date('2026-10-30T10:00:00.000Z') });
     const soon = meeting({ id: 'S', startsAt: '2026-10-30T10:00:20.000Z', topic: 'Starts soon' });
     setStore(fakeStore('S1', { courseMembers: members, meetings: [soon, C] }));
     await render(<CourseDetailScreen />);
-    expect(headings()).toEqual(['Upcoming', 'History']);
+    expect(headings()).toEqual(['Upcoming', 'Awaiting homework check']);
     const upcomingCard = () => within(screen.getByText('Upcoming').parent!.parent!);
     expect(upcomingCard().getByText('Starts soon')).toBeTruthy();
     await act(async () => {
       jest.advanceTimersByTime(31_000);
     });
-    // Nothing is upcoming any more: the heading is hidden and both meetings are in History.
-    expect(headings()).toEqual(['History']);
-    expect(screen.getByText('Starts soon')).toBeTruthy();
+    // Nothing is upcoming any more: the heading is hidden and the meeting is In progress.
+    expect(headings()).toEqual(['In progress', 'Awaiting homework check']);
+    expect(within(screen.getByText('In progress').parent!.parent!).getByText('Starts soon')).toBeTruthy();
   });
 });
 
@@ -120,16 +122,14 @@ describe('AC4: links accept only http/https', () => {
     });
   });
 
-  it('the UI rejects ftp: and keeps the text', async () => {
+  it('the editor offers no Link tool or Link URL field (ARU-64)', async () => {
     Object.assign(params, { meetingId: 'C', edit: '1' });
     setStore(fakeStore('M', { courseMembers: members, meetings: [C] }));
     await render(<MeetingNotesScreen />);
     await fireEvent.changeText(notes(), 'files');
     await select(0, 5);
-    await tool('Link');
-    await fireEvent.changeText(screen.getByLabelText('Link URL'), 'ftp://files.example.com');
-    await tool('Add link');
-    expect(screen.getByText(/starting with http:\/\/ or https:\/\//)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Link' })).toBeNull();
+    expect(screen.queryByLabelText('Link URL')).toBeNull();
     expect(notes().props.value).toBe('files');
   });
 });

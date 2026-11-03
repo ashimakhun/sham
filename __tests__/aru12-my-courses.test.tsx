@@ -1,10 +1,11 @@
-// ARU-12: "My courses" / "All courses" on the Courses tab. No database change: it filters the store's courses and
-// memberships. Users per the TEST DESIGN: M owns A and is a listener of B; N owns B and C; S in A and B;
-// S2 and M2 in nothing; T owns nothing.
+// ARU-12: "My courses" on the Courses tab. No database change: it filters the store's courses and memberships.
+// Users per the TEST DESIGN: M owns A and is a listener of B; N owns B and C; S in A and B; S2 and M2 in nothing;
+// T owns nothing. ARU-63 renamed the view "Courses", replaced "All courses" with "Disciplines", and lists courses with
+// no discipline after the user's own; these courses all have discipline D, so the ARU-12 sections are unchanged.
 import { fireEvent, render, screen, within } from '@testing-library/react-native';
 
 import CoursesScreen from '@/app/(tabs)/courses';
-import type { Course } from '@/lib/types';
+import type { Course, Discipline } from '@/lib/types';
 import { router } from 'expo-router';
 
 import { courseA, courseB, fakeStore, member } from './helpers/fakeStore';
@@ -14,10 +15,11 @@ jest.mock('expo-router', () => require('./helpers/mocks').expoRouter);
 jest.mock('@/lib/store', () => require('./helpers/mocks').store);
 
 const courseC: Course = { id: 'C', title: 'Chemistry', description: '', createdById: 'N', createdAt: '2026-10-03T10:00:00.000Z' };
-// Newest first, as the store provides them.
-const courses = [courseC, courseB, courseA];
+const D: Discipline = { id: 'D', name: 'Sciences', hidden: false, createdById: 'T', createdAt: '2026-10-01T10:00:00.000Z' };
+// Newest first, as the store provides them; all in discipline D (ARU-63).
+const courses = [courseC, courseB, courseA].map((c) => ({ ...c, disciplineId: 'D' }));
 const courseMembers = [member('A', 'S1'), member('B', 'S1'), member('B', 'M')];
-const store = (who: Parameters<typeof fakeStore>[0]) => fakeStore(who, { courses, courseMembers });
+const store = (who: Parameters<typeof fakeStore>[0]) => fakeStore(who, { courses, courseMembers, disciplines: [D] });
 
 const tab = (name: string) => screen.getByRole('tab', { name });
 const titles = () => screen.queryAllByText(/^(Algebra|Biology|Chemistry)$/).map((t) => t.props.children);
@@ -26,20 +28,22 @@ const headings = () => screen.queryAllByText(/^COURSES I/).map((t) => t.props.ch
 beforeEach(() => jest.clearAllMocks());
 
 describe('switch', () => {
-  it.each(['S1', 'M', 'T'] as const)('AC1: %s sees the switch with "My courses" selected', async (who) => {
+  it.each(['S1', 'M', 'T'] as const)('AC1 (ARU-63): %s sees the switch with "Courses" selected', async (who) => {
     setStore(store(who));
     await render(<CoursesScreen />);
-    expect(tab('My courses')).toBeSelected();
-    expect(tab('All courses')).not.toBeSelected();
+    expect(tab('Courses')).toBeSelected();
+    expect(tab('Disciplines')).not.toBeSelected();
   });
 
-  it('AC2: "All courses" is the full list, newest first, with "+ New course" for mentors', async () => {
-    setStore(store('N'));
+  it('AC2 (ARU-63): courses with no discipline follow under "No discipline", newest first', async () => {
+    const free = [courseC, courseB, courseA]; // no discipline
+    setStore(fakeStore('S2', { courses: free, courseMembers }));
     await render(<CoursesScreen />);
-    await fireEvent.press(tab('All courses'));
+    expect(screen.getByText('NO DISCIPLINE')).toBeTruthy();
     expect(titles()).toEqual(['Chemistry', 'Biology', 'Algebra']);
+    setStore(fakeStore('N', { courses: free, courseMembers }));
+    await render(<CoursesScreen />);
     expect(screen.getByRole('button', { name: '+ New course' })).toBeTruthy();
-    expect(headings()).toEqual([]);
   });
 });
 
@@ -82,7 +86,7 @@ describe('My courses', () => {
     setStore(store('S2'));
     const { rerender } = await render(<CoursesScreen />);
     expect(titles()).toEqual([]);
-    setStore(fakeStore('S2', { courses, courseMembers: [...courseMembers, member('C', 'S2')] }));
+    setStore(fakeStore('S2', { courses, courseMembers: [...courseMembers, member('C', 'S2')], disciplines: [D] }));
     await rerender(<CoursesScreen />);
     expect(titles()).toEqual(['Chemistry']);
     setStore(store('S2'));
@@ -96,7 +100,7 @@ describe('My courses', () => {
     const { container } = await render(<CoursesScreen />);
     const list = () => container.queryAll((n) => typeof n.props.onRefresh === 'function')[0];
     list().props.onRefresh();
-    await fireEvent.press(tab('All courses'));
+    await fireEvent.press(tab('Disciplines'));
     list().props.onRefresh();
     expect(s.refresh).toHaveBeenCalledTimes(2);
   });

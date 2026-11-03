@@ -22,7 +22,7 @@ const members = [member('A', 'S1'), member('A', 'M2')];
 const counts = (c: Record<string, number>) => (id: string) => c[id] ?? 0;
 // The badge is hidden from screen readers (its count is in the button's label), so queries must include it.
 const hidden = { includeHiddenElements: true };
-const showAll = () => fireEvent.press(screen.getByRole('tab', { name: 'All courses' }));
+const showAll = () => fireEvent.press(screen.getByRole('tab', { name: 'Courses' }));
 const msg = (id: string, authorId: string, minute: number): CourseMessage => ({
   id,
   courseId: 'A',
@@ -100,14 +100,14 @@ describe('Chat button on course details (AC2, AC3, AC11)', () => {
   it('shows the same count, with the count in its label', async () => {
     setStore(fakeStore('S1', { courseMembers: members, unreadCount: counts({ A: 3 }) }));
     await render(<CourseDetailScreen />);
-    expect(screen.getByRole('button', { name: 'Chat, 3 new messages' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Open chat for Algebra, 3 new messages' })).toBeTruthy();
     expect(screen.getByText('3', hidden)).toBeTruthy();
   });
 
   it('0 new messages: plain "Chat" with no badge', async () => {
     setStore(fakeStore('S1', { courseMembers: members }));
     await render(<CourseDetailScreen />);
-    expect(screen.getByRole('button', { name: 'Chat' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Open chat for Algebra' })).toBeTruthy(); // ARU-69: the chat icon
     expect(screen.queryByTestId('unread-badge', hidden)).toBeNull();
   });
 });

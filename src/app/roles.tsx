@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, SectionList, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, SectionList, Switch, Text, TextInput, View } from 'react-native';
 
 import { Button, EmptyState, ErrorText, RoleBadge, styles } from '@/components/ui';
 import { confirmDestructive } from '@/lib/confirm';
@@ -22,8 +22,18 @@ type Row = { kind: 'user'; user: User } | { kind: 'request'; request: AccessRequ
  * student and mentor (ARU-13). set_access_status() and set_user_role() enforce every rule.
  */
 export default function RolesScreen() {
-  const { currentUser, users, courses, dataLoaded, loading, refresh, setUserRole, accessRequests, setAccessStatus } =
-    useStore();
+  const {
+    currentUser,
+    users,
+    courses,
+    dataLoaded,
+    loading,
+    refresh,
+    setUserRole,
+    accessRequests,
+    setAccessStatus,
+    setAccountant,
+  } = useStore();
   const [query, setQuery] = useState('');
   const { busy, error, run } = useAction();
 
@@ -167,7 +177,19 @@ export default function RolesScreen() {
               <Button title="Make mentor" variant="secondary" disabled={busy} onPress={() => makeMentor(item)} />
             )}
             {item.role === 'mentor' && (
-              <Button title="Make student" variant="secondary" disabled={busy} onPress={() => makeStudent(item)} />
+              <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                <Button title="Make student" variant="secondary" disabled={busy} onPress={() => makeStudent(item)} />
+                {/* ARU-65: the teacher turns Accountant on or off for a mentor (set_accountant() checks it). */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={styles.muted}>Accountant</Text>
+                  <Switch
+                    accessibilityLabel={`Accountant, ${item.name}`}
+                    value={!!item.isAccountant}
+                    disabled={busy}
+                    onValueChange={(on) => run(() => setAccountant(item.id, on))}
+                  />
+                </View>
+              </View>
             )}
           </View>
         );

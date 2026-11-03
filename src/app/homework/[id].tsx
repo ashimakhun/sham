@@ -1,8 +1,9 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text } from 'react-native';
+import { Image, Pressable, Text, View } from 'react-native';
 
 import { dueText } from '@/components/AssignmentCard';
+import { KeyboardForm } from '@/components/KeyboardForm';
 import { PhotoPreview } from '@/components/PhotoPreview';
 
 import { Button, Card, EmptyState, ErrorText, Field, StatusBadge, styles } from '@/components/ui';
@@ -29,9 +30,8 @@ export default function HomeworkDetailScreen() {
   const meeting = meetings.find((m) => m.id === assignment?.meetingId);
 
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled"
-        contentInsetAdjustmentBehavior="automatic">
+    <View style={styles.screen}>
+      <KeyboardForm contentContainerStyle={styles.content}>
         <Card>
           <StatusBadge status={item.status} />
           <Text style={styles.h1}>{item.title}</Text>
@@ -88,7 +88,7 @@ export default function HomeworkDetailScreen() {
             />
           </Card>
         )}
-      </ScrollView>
+      </KeyboardForm>
       {previewOpen && item.photoPath && (
         <PhotoPreview
           path={item.photoPath}
@@ -97,6 +97,6 @@ export default function HomeworkDetailScreen() {
           onClose={() => setPreviewOpen(false)}
         />
       )}
-    </KeyboardAvoidingView>
+    </View>
   );
 }

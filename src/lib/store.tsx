@@ -2,20 +2,28 @@ import type { Session } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 
+import { periodProblem } from './billing';
+import { FEEDBACK_MAX } from './feedback';
 import { fileFieldsError, isAllowedPdf, PDF_MAX_BYTES, PDF_RULE } from './files';
 import { NOTES_MAX } from './markdown';
+import { nameProblem } from './profileName';
 import { supabase } from './supabase';
 import type {
   AccessRequest,
   Course,
   CourseMember,
+  CourseBilling,
   CourseMessage,
+  Discipline,
+  GeneralMessage,
   Homework,
   HomeworkAssignment,
   Material,
   MaterialFile,
   MaterialFileEdit,
   Meeting,
+  MaterialLike,
+  CourseFeedback,
   MeetingAttendance,
   MeetingEdit,
   MeetingStatus,
@@ -34,7 +42,7 @@ import type {
 // (supabase/migrations) decides what each role can read and change; the role
 // checks here only keep the UI honest.
 
-type Store = {
+export type Store = {
   ready: boolean;
   session: Session | null;
   currentUser: User | null;
@@ -54,6 +62,20 @@ type Store = {
   assignments: HomeworkAssignment[];
   /** Attendance marks (ARU-33): own marks for students, all for mentors and the teacher. */
   attendance: MeetingAttendance[];
+  /** Likes on Blog posts (ARU-52), newest first: every approved user sees all. */
+  materialLikes: MaterialLike[];
+  /** Course feedback (ARU-53), newest first: every approved user sees it for the courses they can see. */
+  courseFeedback: CourseFeedback[];
+  /** ARU-63: disciplines the user can see, A-Z (hidden ones only for the teacher). */
+  disciplines: Discipline[];
+  /** A discipline the user can see, or undefined (unknown, or hidden from them). */
+  getDiscipline: (id: string | undefined) => Discipline | undefined;
+  /** Teacher only (ARU-63). The name is trimmed; a name that already exists (any case) is refused. */
+  addDiscipline: (input: { id: string; name: string; hidden: boolean }) => Promise<void>;
+  /** Teacher only (ARU-63): hide or unhide a discipline. */
+  setDisciplineHidden: (id: string, hidden: boolean) => Promise<void>;
+  /** The course's current owner (ARU-63): set, change or clear (null) its discipline. */
+  setCourseDiscipline: (courseId: string, disciplineId: string | null) => Promise<void>;
   loading: boolean;
   /** True once data has been fetched (successfully or not) for the signed-in user. */
   dataLoaded: boolean;
@@ -63,6 +85,9 @@ type Store = {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  /** Approved users change their own name (ARU-55): trimmed, not blank, at most NAME_MAX characters. The database
+   *  allows only the own row and refuses blank names; the store's profiles are updated right after the save. */
+  updateMyName: (name: string) => Promise<void>;
   /** A listener sends homework for an assignment of their course (ARU-32): one per assignment. */
   addHomework: (input: NewHomework) => Promise<void>;
   /** Course owner or teacher, Completed meetings only, one per meeting (ARU-32). `id` makes a retry safe. */
@@ -101,16 +126,33 @@ type Store = {
   updateMeeting: (id: string, input: MeetingEdit) => Promise<void>;
   /** Course owner or teacher, Completed meetings only (ARU-28). Blank text removes the notes. */
   setMeetingNotes: (id: string, notes: string) => Promise<void>;
+  /** ARU-60: the teacher or a non-listener mentor marks a Completed meeting's homework checked (or undoes it). Marking
+   *  a checked meeting or undoing an unchecked one is a no-op, so a retry is safe. */
+  setMeetingHomeworkChecked: (id: string, checked: boolean) => Promise<void>;
   /** A listener marks their own attendance of a Completed meeting (ARU-33). Marking again is a no-op. */
   markAttendance: (meetingId: string) => Promise<void>;
   /** A listener removes their own attendance mark (ARU-33). */
   unmarkAttendance: (meetingId: string) => Promise<void>;
+  /** Likes a Blog post as the current user (ARU-52). Liking again is a no-op. */
+  likeMaterial: (materialId: string) => Promise<void>;
+  /** Removes the current user's like (ARU-52). Removing a like that is already gone is a no-op. */
+  unlikeMaterial: (materialId: string) => Promise<void>;
+  /** A listener adds (no `id`) or edits (`id`) their feedback on a started course (ARU-53). Text is trimmed. */
+  saveFeedback: (input: { id?: string; courseId: string; rating: number; body: string }) => Promise<void>;
+  /** The author deletes their own feedback (ARU-53). Already gone counts as done. */
+  deleteFeedback: (id: string) => Promise<void>;
   /** Course chat (ARU-8): a page of messages, newest first, older than `before` when given. */
   loadMessages: (courseId: string, before?: CourseMessage) => Promise<{ messages: CourseMessage[]; hasMore: boolean }>;
   /** Posts as the current user. `id` is generated once per message so a retry cannot post twice. */
   sendMessage: (input: { id: string; courseId: string; body: string }) => Promise<void>;
   /** Live inserts for one course's chat (its own channel, not the global refetch). Returns an unsubscribe. */
   subscribeToMessages: (courseId: string, onMessage: (m: CourseMessage) => void) => () => void;
+  /** General chat (ARU-61), for every approved user: a page of messages, newest first, older than `before`. */
+  loadGeneralMessages: (before?: GeneralMessage) => Promise<{ messages: GeneralMessage[]; hasMore: boolean }>;
+  /** Posts to the general chat as the current user; `id` is kept across retries so a retry cannot post twice. */
+  sendGeneralMessage: (input: { id: string; body: string }) => Promise<void>;
+  /** Live inserts in the general chat, on its own channel (not the store's refetch or ARU-31 counters). */
+  subscribeToGeneralMessages: (onMessage: (m: GeneralMessage) => void) => () => void;
   /** Teacher only (ARU-43): accounts waiting for approval and declined ones, oldest first. Empty for others. */
   accessRequests: AccessRequest[];
   /** Teacher only (ARU-43): accept (approved) or decline (rejected) an account, then refetch. A retry is a no-op. */
@@ -127,6 +169,16 @@ type Store = {
   setTelegramNotification: (kind: TelegramKind, enabled: boolean) => Promise<void>;
   /** Removes the Telegram link and its switches. */
   disconnectTelegram: () => Promise<void>;
+  /** ARU-65: paid courses with their periods. Only loaded for accountants and the teacher (empty for everyone else). */
+  courseBilling: CourseBilling[];
+  /** Teacher only (ARU-65): turn Accountant on or off for an approved mentor. Takes effect on their next refresh. */
+  setAccountant: (userId: string, on: boolean) => Promise<void>;
+  /** An accountant selects a paid course with its period. If another accountant was first, their period stays. */
+  selectPaidCourse: (courseId: string, startDay: number, endDay: number) => Promise<void>;
+  /** An accountant or the teacher changes a paid course's period (applies from this month on). */
+  setBillingPeriod: (courseId: string, startDay: number, endDay: number) => Promise<void>;
+  /** An accountant unselects a paid course, for everyone. Already gone counts as done. */
+  unselectPaidCourse: (courseId: string) => Promise<void>;
   /** New messages from others per course chat since the user last read it (ARU-31). 0 while that chat is open. */
   unreadCount: (courseId: string) => number;
   /** Marks a chat read up to `upToMessageId` (the newest message shown), by that message's server time. Clears the
@@ -134,6 +186,14 @@ type Store = {
   markChatRead: (courseId: string, upToMessageId: string) => Promise<void>;
   /** The chat that is open on screen (or null): its messages are read as they arrive, so it never shows a count. */
   setActiveChat: (courseId: string | null) => void;
+  /** New general chat messages from others since the user last read it (ARU-72). 0 while the general chat is open.
+   *  Kept apart from the course counts, so the two never affect each other. */
+  generalUnreadCount: number;
+  /** Marks the general chat read up to `upToMessageId` (the newest message shown), by its server time. Clears the
+   *  count at once; a failed save (e.g. offline) is ignored and the count comes back on the next refetch. */
+  markGeneralChatRead: (upToMessageId: string) => Promise<void>;
+  /** Whether the general chat is open on screen: its messages are read as they arrive, so it never shows a count. */
+  setGeneralChatOpen: (open: boolean) => void;
 };
 
 /** Live count refetches are batched: one request at most this often while messages arrive (ARU-31). */
@@ -143,7 +203,14 @@ export const MESSAGES_PAGE = 50;
 
 const StoreContext = createContext<Store | null>(null);
 
-type ProfileRow = { id: string; full_name: string; role: User['role']; access_status?: User['accessStatus'] | null };
+type ProfileRow = {
+  id: string;
+  full_name: string;
+  role: User['role'];
+  access_status?: User['accessStatus'] | null;
+  is_accountant?: boolean | null;
+};
+type BillingRow = { course_id: string; start_day: number; end_day: number; selected_by: string; selected_at: string };
 type AccessRequestRow = { id: string; full_name: string; email: string | null; created_at: string; access_status: AccessRequest['status'] };
 type HomeworkRow = {
   id: string;
@@ -176,7 +243,9 @@ type CourseRow = {
   created_by: string;
   created_at: string;
   hidden?: boolean | null;
+  discipline_id?: string | null;
 };
+type DisciplineRow = { id: string; name: string; hidden: boolean; created_by: string; created_at: string };
 type CourseMemberRow = { course_id: string; user_id: string; added_by: string; added_at: string };
 type MeetingRow = {
   id: string;
@@ -193,9 +262,22 @@ type MeetingRow = {
   notes?: string | null;
   notes_updated_by?: string | null;
   notes_updated_at?: string | null;
+  homework_checked_at?: string | null;
+  homework_checked_by?: string | null;
 };
 type AttendanceRow = { meeting_id: string; user_id: string; marked_at: string };
+type MaterialLikeRow = { material_id: string; user_id: string; created_at: string };
+type FeedbackRow = {
+  id: string;
+  course_id: string;
+  user_id: string;
+  rating: number;
+  body: string;
+  created_at: string;
+  updated_at: string;
+};
 type MessageRow = { id: string; course_id: string; author_id: string; body: string; created_at: string };
+type GeneralMessageRow = { id: string; author_id: string; body: string; created_at: string };
 type UnreadRow = { course_id: string; unread: number | string };
 type MaterialFileRow = {
   id: string;
@@ -240,7 +322,21 @@ const toUser = (r: ProfileRow): User => ({
   role: r.role,
   // No column yet (migration 0021 not run): everyone counts as approved.
   accessStatus: r.access_status ?? 'approved',
+  isAccountant: !!r.is_accountant,
 });
+
+const toBilling = (r: BillingRow): CourseBilling => ({
+  courseId: r.course_id,
+  startDay: r.start_day,
+  endDay: r.end_day,
+  selectedById: r.selected_by,
+  selectedAt: r.selected_at,
+});
+
+/** ARU-65: who reads paid courses (mirrors 0032's select policy): the teacher and approved mentor accountants. */
+const seesBilling = (u: User | undefined) =>
+  !!u && u.accessStatus === 'approved' && (u.role === 'teacher' || (u.role === 'mentor' && !!u.isAccountant));
+
 
 const toAccessRequest = (r: AccessRequestRow): AccessRequest => ({
   id: r.id,
@@ -283,7 +379,19 @@ const toCourse = (r: CourseRow): Course => ({
   createdById: r.created_by,
   createdAt: r.created_at,
   hidden: !!r.hidden,
+  disciplineId: r.discipline_id ?? undefined,
 });
+
+const toDiscipline = (r: DisciplineRow): Discipline => ({
+  id: r.id,
+  name: r.name,
+  hidden: !!r.hidden,
+  createdById: r.created_by,
+  createdAt: r.created_at,
+});
+
+export const DISCIPLINE_NAME_MAX = 100;
+const DUPLICATE_DISCIPLINE = 'A discipline with this name already exists.';
 
 const toCourseMember = (r: CourseMemberRow): CourseMember => ({
   courseId: r.course_id,
@@ -307,12 +415,37 @@ const toMeeting = (r: MeetingRow): Meeting => ({
   notes: r.notes ?? undefined,
   notesUpdatedById: r.notes_updated_by ?? undefined,
   notesUpdatedAt: r.notes_updated_at ?? undefined,
+  homeworkCheckedAt: r.homework_checked_at ?? undefined,
+  homeworkCheckedById: r.homework_checked_by ?? undefined,
 });
 
 const toAttendance = (r: AttendanceRow): MeetingAttendance => ({
   meetingId: r.meeting_id,
   userId: r.user_id,
   markedAt: r.marked_at,
+});
+
+const toMaterialLike = (r: MaterialLikeRow): MaterialLike => ({
+  materialId: r.material_id,
+  userId: r.user_id,
+  createdAt: r.created_at,
+});
+
+const toFeedback = (r: FeedbackRow): CourseFeedback => ({
+  id: r.id,
+  courseId: r.course_id,
+  userId: r.user_id,
+  rating: r.rating,
+  body: r.body,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+});
+
+const toGeneralMessage = (r: GeneralMessageRow): GeneralMessage => ({
+  id: r.id,
+  authorId: r.author_id,
+  body: r.body,
+  createdAt: r.created_at,
 });
 
 const toMessage = (r: MessageRow): CourseMessage => ({
@@ -361,6 +494,15 @@ function checkInsert(res: Result) {
   check(res);
 }
 
+const NO_LONGER_LISTENER = "You're no longer a listener of this course.";
+
+/** Course feedback writes refused by RLS mean the user isn't a listener (any more), or the course hasn't started. */
+function checkFeedback(res: Result) {
+  if (res.error?.code === '42501') throw new Error(NO_LONGER_LISTENER);
+  if (res.error?.code === '23505') throw new Error('You have already left feedback on this course.');
+  check(res);
+}
+
 const ALREADY_SENT = 'You have already sent homework for this assignment.';
 const DEADLINE_PAST = 'The deadline must be in the future.';
 
@@ -398,10 +540,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [assignments, setAssignments] = useState<HomeworkAssignment[]>([]);
   const [attendance, setAttendance] = useState<MeetingAttendance[]>([]);
+  const [materialLikes, setMaterialLikes] = useState<MaterialLike[]>([]);
+  const [courseFeedback, setCourseFeedback] = useState<CourseFeedback[]>([]);
+  const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+  const [courseBilling, setCourseBilling] = useState<CourseBilling[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [unread, setUnread] = useState<Record<string, number>>({});
   const [activeChat, setActiveChat] = useState<string | null>(null);
+  const [generalUnread, setGeneralUnread] = useState(0);
+  const [generalChatOpen, setGeneralChatOpen] = useState(false);
 
   const userId = session?.user.id;
 
@@ -425,8 +573,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setMeetings([]);
         setAssignments([]);
         setAttendance([]);
+        setMaterialLikes([]);
+        setCourseFeedback([]);
         setUnread({});
         setActiveChat(null);
+        setGeneralUnread(0);
+        setGeneralChatOpen(false);
         setLoadedFor(null);
       }
     });
@@ -446,6 +598,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setUnread(counts);
   }, [userId]);
 
+  // The general chat's count (ARU-72), the same way: only the latest answer is used, errors keep the last count.
+  const generalUnreadRequest = useRef(0);
+  const loadGeneralUnread = useCallback(async () => {
+    if (!userId) return;
+    const request = ++generalUnreadRequest.current;
+    const res = await supabase.rpc('general_chat_unread_count');
+    if (res.error || request !== generalUnreadRequest.current) return;
+    setGeneralUnread(Number(res.data ?? 0) || 0);
+  }, [userId]);
+
   // Fetches everything the signed-in user may see. State is only set after the
   // awaits, so it is safe to call from an effect.
   const load = useCallback(async () => {
@@ -453,7 +615,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     try {
       // RLS returns nothing but the own profile to an account that isn't approved (ARU-43), so these all succeed
       // (empty) for it and the app shows the waiting screen.
-      const [profileRows, hw, mats, crs, members, mtgs, asgs, att, files] = await Promise.all([
+      const [profileRows, hw, mats, crs, members, mtgs, asgs, att, files, likes, fb, discs] = await Promise.all([
         // '*' so the app keeps working if the access_status column (0021) isn't there yet.
         supabase.from('profiles').select('*').order('full_name'),
         supabase.from('homework').select('*').order('created_at', { ascending: false }),
@@ -464,6 +626,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         supabase.from('homework_assignments').select('*').order('created_at', { ascending: false }),
         supabase.from('meeting_attendance').select('*'),
         supabase.from('material_files').select('*').order('created_at', { ascending: false }),
+        supabase.from('material_likes').select('*').order('created_at', { ascending: false }),
+        supabase.from('course_feedback').select('*').order('created_at', { ascending: false }),
+        supabase.from('disciplines').select('*').order('name'),
       ]);
       const all = rows<ProfileRow>(profileRows).map(toUser);
       const me = all.find((u) => u.id === userId);
@@ -476,10 +641,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setAssignments(rows<AssignmentRow>(asgs).map(toAssignment));
       setAttendance(rows<AttendanceRow>(att).map(toAttendance));
       setMaterialFiles(rows<MaterialFileRow>(files).map(toMaterialFile));
+      setMaterialLikes(rows<MaterialLikeRow>(likes).map(toMaterialLike));
+      setCourseFeedback(rows<FeedbackRow>(fb).map(toFeedback));
+      // Before 0031_disciplines.sql runs there is no table: no disciplines, and the rest of the app keeps working.
+      setDisciplines(discs.error ? [] : ((discs.data as DisciplineRow[] | null) ?? []).map(toDiscipline));
       if (me?.accessStatus !== 'approved') {
         setAccessRequests([]);
         setUnread({});
+        setGeneralUnread(0);
+        setCourseBilling([]);
         return;
+      }
+      // ARU-65: paid courses, only for those who may read them (students and other mentors make no request).
+      if (seesBilling(me)) {
+        const bill = await supabase.from('course_billing').select('*');
+        // Before 0032 runs there is no table: no paid courses.
+        setCourseBilling(bill.error ? [] : ((bill.data as BillingRow[] | null) ?? []).map(toBilling));
+      } else {
+        setCourseBilling([]);
       }
       // Requests for the teacher's Manage roles screen. Not live: they refresh with every load.
       if (me.role === 'teacher') {
@@ -488,11 +667,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       } else {
         setAccessRequests([]);
       }
-      await loadUnread().catch(() => {});
+      await Promise.all([loadUnread().catch(() => {}), loadGeneralUnread().catch(() => {})]);
     } finally {
       setLoadedFor(userId);
     }
-  }, [userId, loadUnread]);
+  }, [userId, loadUnread, loadGeneralUnread]);
 
   /** User-triggered reload (pull to refresh, retry) with a spinner. */
   const refresh = useCallback(async () => {
@@ -506,6 +685,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   // Not approved yet (ARU-43): nothing to listen to.
   const waiting = profiles.some((u) => u.id === userId && u.accessStatus !== 'approved');
+  // ARU-65: only accountants and the teacher listen to paid-course changes.
+  const listensToBilling = seesBilling(profiles.find((u) => u.id === userId));
 
   useEffect(() => {
     if (!userId) return;
@@ -517,13 +698,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!userId || !firstLoadDone || waiting) return;
     let unreadTimer: ReturnType<typeof setTimeout> | null = null;
+    let generalUnreadTimer: ReturnType<typeof setTimeout> | null = null;
     // Live updates: refetch when someone submits, checks or shares something.
     const channel = supabase
       .channel('sham-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'homework' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'materials' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'material_files' }, () => load().catch(() => {}))
+      // Likes (ARU-52): counts and "Liked by" update on every open device.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'material_likes' }, () => load().catch(() => {}))
+      // Feedback (ARU-53): the list, the average and the course cards update on every open device.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'course_feedback' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'courses' }, () => load().catch(() => {}))
+      // ARU-63: created and unhidden disciplines reach everyone; hiding reaches only the teacher (RLS).
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'disciplines' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'course_members' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'course_meetings' }, () => load().catch(() => {}))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'homework_assignments' }, () =>
@@ -541,17 +729,32 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           loadUnread().catch(() => {});
         }, UNREAD_DEBOUNCE_MS);
       })
-      .subscribe();
+      // A general chat message refetches only the general count, batched the same way (ARU-72).
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'general_messages' }, (payload) => {
+        if ((payload.new as { author_id?: string }).author_id === userId) return;
+        if (generalUnreadTimer) return;
+        generalUnreadTimer = setTimeout(() => {
+          generalUnreadTimer = null;
+          loadGeneralUnread().catch(() => {});
+        }, UNREAD_DEBOUNCE_MS);
+      });
+    if (listensToBilling) {
+      channel.on('postgres_changes', { event: '*', schema: 'public', table: 'course_billing' }, () => load().catch(() => {}));
+    }
+    channel.subscribe();
     // Back from the background: realtime may have missed messages, so refetch the counts.
     const appState = AppState.addEventListener('change', (state) => {
-      if (state === 'active') loadUnread().catch(() => {});
+      if (state !== 'active') return;
+      loadUnread().catch(() => {});
+      loadGeneralUnread().catch(() => {});
     });
     return () => {
       if (unreadTimer) clearTimeout(unreadTimer);
+      if (generalUnreadTimer) clearTimeout(generalUnreadTimer);
       appState.remove();
       supabase.removeChannel(channel);
     };
-  }, [userId, firstLoadDone, waiting, load, loadUnread]);
+  }, [userId, firstLoadDone, waiting, listensToBilling, load, loadUnread, loadGeneralUnread]);
 
   const currentUser = profiles.find((u) => u.id === userId) ?? null;
   // Only approved accounts are users of the app: pickers and lists never offer people still waiting (ARU-43).
@@ -566,6 +769,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [materialFiles],
   );
   const getCourse = useCallback((id: string | undefined) => courses.find((c) => c.id === id), [courses]);
+  const sortedDisciplines = useMemo(
+    () => [...disciplines].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+    [disciplines],
+  );
+  const getDiscipline = useCallback(
+    (id: string | undefined) => (id ? disciplines.find((d) => d.id === id) : undefined),
+    [disciplines],
+  );
   const visibleHomework = useMemo(
     () => [...homework].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     [homework],
@@ -603,6 +814,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [loadUnread],
   );
 
+  const markGeneralChatRead = useCallback<Store['markGeneralChatRead']>(
+    async (upToMessageId) => {
+      generalUnreadRequest.current++;
+      setGeneralUnread(0);
+      const res = await supabase.rpc('mark_general_chat_read', { upto: upToMessageId });
+      if (res.error) return;
+      await loadGeneralUnread().catch(() => {});
+    },
+    [loadGeneralUnread],
+  );
+
   const requireRole = (...roles: User['role'][]) => {
     if (!currentUser || !roles.includes(currentUser.role)) throw new Error(`Only a ${roles.join(' or ')} can do this.`);
     return currentUser;
@@ -621,6 +843,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     meetings,
     assignments,
     attendance,
+    materialLikes,
+    courseFeedback,
+    disciplines: sortedDisciplines,
+    getDiscipline,
     loading,
     dataLoaded: !!userId && loadedFor === userId,
     refresh,
@@ -640,6 +866,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     signOut: async () => {
       check(await supabase.auth.signOut());
+    },
+    updateMyName: async (name) => {
+      if (!currentUser || (currentUser.accessStatus && currentUser.accessStatus !== 'approved')) {
+        throw new Error('Your account is waiting for the teacher\'s approval.');
+      }
+      const problem = nameProblem(name);
+      if (problem) throw new Error(problem);
+      const fullName = name.trim();
+      const me = currentUser.id;
+      const res = await supabase.from('profiles').update({ full_name: fullName }).eq('id', me).select('id');
+      check(res);
+      if (!res.data?.length) throw new Error('Your name could not be saved. Please try again.');
+      // Every name on this device comes from profiles: show the new one right away, then refetch.
+      setProfiles((all) => all.map((u) => (u.id === me ? { ...u, name: fullName } : u)));
+      load().catch(() => {});
     },
     addHomework: async (input) => {
       // Students and mentors submit, only to courses they are a listener of, for an assignment of that course, once
@@ -746,8 +987,35 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           created_by: creator.id,
           // Hidden courses (ARU-40): RLS shows them only to the owner, listeners and the teacher.
           hidden: !!input.hidden,
+          // ARU-63: only sent when chosen, so creating a course works before 0031 runs.
+          ...(input.disciplineId ? { discipline_id: input.disciplineId } : {}),
         }),
       );
+      await load();
+    },
+    addDiscipline: async ({ id, name, hidden }) => {
+      requireRole('teacher');
+      const trimmed = name.trim();
+      if (!trimmed) throw new Error('Enter a name for the discipline.');
+      if (trimmed.length > DISCIPLINE_NAME_MAX) {
+        throw new Error(`A discipline name can be at most ${DISCIPLINE_NAME_MAX} characters.`);
+      }
+      const res = await supabase.from('disciplines').insert({ id, name: trimmed, hidden });
+      // The unique name index answers both "already exists" and a retry of a create that went through (AC 1).
+      if (res.error?.code === '23505') throw new Error(DUPLICATE_DISCIPLINE);
+      check(res);
+      await load();
+    },
+    setDisciplineHidden: async (id, hidden) => {
+      requireRole('teacher');
+      const res = await supabase.from('disciplines').update({ hidden }).eq('id', id).select('id');
+      check(res);
+      if (!res.data?.length) throw new Error('Discipline not found.');
+      await load();
+    },
+    setCourseDiscipline: async (courseId, disciplineId) => {
+      requireRole('teacher', 'mentor');
+      check(await supabase.rpc('set_course_discipline', { course: courseId, discipline: disciplineId }));
       await load();
     },
     changeCourseOwner: async (courseId, userId) => {
@@ -915,12 +1183,60 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       check(await supabase.rpc('set_meeting_notes', { meeting: id, new_notes: notes }));
       await load();
     },
+    setMeetingHomeworkChecked: async (id, checked) => {
+      requireRole('teacher', 'mentor');
+      check(await supabase.rpc('set_meeting_homework_checked', { meeting: id, checked }));
+      await load();
+    },
     markAttendance: async (meetingId) => {
       check(await supabase.rpc('mark_attendance', { meeting: meetingId }));
       await load();
     },
     unmarkAttendance: async (meetingId) => {
       check(await supabase.rpc('unmark_attendance', { meeting: meetingId }));
+      await load();
+    },
+    likeMaterial: async (materialId) => {
+      // user_id defaults to the caller; a duplicate key means an earlier tap already saved it.
+      checkInsert(await supabase.from('material_likes').insert({ material_id: materialId }));
+      await load();
+    },
+    unlikeMaterial: async (materialId) => {
+      if (!userId) throw new Error('Please sign in again.');
+      // Deleting nothing (already removed elsewhere) is fine.
+      check(await supabase.from('material_likes').delete().eq('material_id', materialId).eq('user_id', userId));
+      await load();
+    },
+    saveFeedback: async ({ id, courseId, rating, body }) => {
+      const text = body.trim();
+      if (!Number.isInteger(rating) || rating < 1 || rating > 5) throw new Error('Choose 1 to 5 stars.');
+      if (!text) throw new Error('Write a few words about the course.');
+      if (text.length > FEEDBACK_MAX) throw new Error('Feedback can be at most 1,000 characters.');
+      if (id) {
+        // An edit that matches no row: the user was removed as a listener (or deleted it on another device).
+        const res = await supabase.from('course_feedback').update({ rating, body: text }).eq('id', id).select('id');
+        checkFeedback(res);
+        if (!res.data?.length) {
+          await load().catch(() => {});
+          throw new Error(NO_LONGER_LISTENER);
+        }
+      } else {
+        // user_id defaults to the caller.
+        checkFeedback(await supabase.from('course_feedback').insert({ course_id: courseId, rating, body: text }));
+      }
+      await load();
+    },
+    deleteFeedback: async (id) => {
+      const res = await supabase.from('course_feedback').delete().eq('id', id).select('id');
+      check(res);
+      // Nothing deleted: either already gone (fine), or it is still there and the user can't delete it any more.
+      if (!res.data?.length) {
+        const still = await supabase.from('course_feedback').select('id').eq('id', id);
+        if (still.data?.length) {
+          await load().catch(() => {});
+          throw new Error(NO_LONGER_LISTENER);
+        }
+      }
       await load();
     },
     loadMessages: async (courseId, before) => {
@@ -959,6 +1275,70 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         supabase.removeChannel(channel);
       };
     },
+    loadGeneralMessages: async (before) => {
+      let query = supabase
+        .from('general_messages')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(MESSAGES_PAGE + 1);
+      if (before) {
+        // Same stable cursor as the course chat: older timestamp, or the same timestamp with a smaller id.
+        query = query.or(
+          `created_at.lt."${before.createdAt}",and(created_at.eq."${before.createdAt}",id.lt.${before.id})`,
+        );
+      }
+      const list = rows<GeneralMessageRow>(await query).map(toGeneralMessage);
+      return { messages: list.slice(0, MESSAGES_PAGE), hasMore: list.length > MESSAGES_PAGE };
+    },
+    sendGeneralMessage: async ({ id, body }) => {
+      if (!currentUser) throw new Error('Please sign in again.');
+      checkInsert(await supabase.from('general_messages').insert({ id, author_id: currentUser.id, body: body.trim() }));
+    },
+    subscribeToGeneralMessages: (onMessage) => {
+      const channel = supabase
+        .channel(`general-chat-${Math.random().toString(36).slice(2)}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'general_messages' }, (payload) =>
+          onMessage(toGeneralMessage(payload.new as GeneralMessageRow)),
+        )
+        .subscribe();
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    },
+    courseBilling,
+    setAccountant: async (userId, on) => {
+      requireRole('teacher');
+      check(await supabase.rpc('set_accountant', { target: userId, on_off: on }));
+      // profiles is not in realtime: refetch so the switch shows the saved value.
+      await load();
+    },
+    selectPaidCourse: async (courseId, startDay, endDay) => {
+      requireRole('mentor');
+      const problem = periodProblem(startDay, endDay);
+      if (problem) throw new Error(problem);
+      // A duplicate means another accountant selected it first: their period stays and nobody gets an error.
+      checkInsert(await supabase.from('course_billing').insert({ course_id: courseId, start_day: startDay, end_day: endDay }));
+      await load();
+    },
+    setBillingPeriod: async (courseId, startDay, endDay) => {
+      requireRole('teacher', 'mentor');
+      const problem = periodProblem(startDay, endDay);
+      if (problem) throw new Error(problem);
+      const res = await supabase
+        .from('course_billing')
+        .update({ start_day: startDay, end_day: endDay })
+        .eq('course_id', courseId)
+        .select('course_id');
+      check(res);
+      if (!res.data?.length) throw new Error('This course is no longer a paid course.');
+      await load();
+    },
+    unselectPaidCourse: async (courseId) => {
+      requireRole('mentor');
+      check(await supabase.from('course_billing').delete().eq('course_id', courseId));
+      await load();
+    },
     setUserRole: async (userId, role) => {
       requireRole('teacher');
       check(await supabase.rpc('set_user_role', { target: userId, new_role: role }));
@@ -990,6 +1370,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     unreadCount: (courseId) => (courseId === activeChat ? 0 : (unread[courseId] ?? 0)),
     markChatRead,
     setActiveChat,
+    generalUnreadCount: generalChatOpen ? 0 : generalUnread,
+    markGeneralChatRead,
+    setGeneralChatOpen,
   };
 
   return <StoreContext.Provider value={store}>{children}</StoreContext.Provider>;

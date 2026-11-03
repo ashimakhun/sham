@@ -8,8 +8,17 @@ An educational mobile app where teachers, mentors and students work together:
 - **Listeners** send homework (text + optional photo) for an assignment from the **New** list on the Homework tab.
 - **Mentors and the teacher** see all homework, leave a comment and mark it as checked (never their own).
 - **Each course** has a chat with a new-message counter for its owner, listeners and the teacher.
-- **Teachers and mentors** share formatted posts (lessons, notes, links) with everyone on the Materials tab's
-  **Blog**, filterable by author; a **Knowledge base** tab for PDF books is coming.
+- **General chat** for every accepted account, any role, opened from the Profile tab.
+- **Teachers and mentors** share formatted posts (lessons, notes, links) on the Materials tab's **Blog**, filterable
+  by author, which everyone can like; and PDF books in the **Knowledge base**, optionally linked to a course and
+  optionally visible only to that course's participants.
+- **Listeners** rate a course once it has started (1–5 stars and a review); everyone who sees the course reads it.
+- **Hidden courses** are seen only by their owner, their listeners and the teacher.
+- **Disciplines** (ARU-63): the teacher groups courses into disciplines; the Courses tab shows **Courses** (your courses,
+  then those with no discipline) and **Disciplines** (each with the rating and reviews of its courses).
+- **Accountants** (ARU-65): the teacher turns Accountant on for mentors; accountants pick the paid courses and give
+  each a monthly payment period (Profile tab).
+- **New accounts** wait for the teacher's approval before they can use the app.
 
 How each feature behaves today is described in the Linear project document **Sham: product documentation**.
 
@@ -46,7 +55,29 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `0022_attendance_from_start.sql` (ARU-45: attendance can be marked once a meeting has started, not only when it is
    completed, and never on a canceled meeting; replaces two functions, deletes nothing),
    `0023_telegram_links.sql` (ARU-48: Telegram notifications setup; adds two tables and five functions, changes
-   nothing else; see [Telegram notifications](#telegram-notifications)).
+   nothing else; see [Telegram notifications](#telegram-notifications)),
+   `0024_material_likes.sql` (ARU-52: likes on Blog posts; adds a table, deletes nothing; it doesn't depend on 0023),
+   `0025_course_feedback.sql` (ARU-53: listeners rate a started course; adds a table, a helper and a trigger, deletes
+   nothing; it doesn't depend on 0023 or 0024),
+   `0026_profile_name_not_blank.sql` (ARU-55: an edited name can't be blank; adds a trigger),
+   `0027_profile_name_unicode_blank.sql` (ARU-56: Unicode spaces count as blank too; replaces that trigger's function),
+   `0028_meeting_homework_checked.sql` (ARU-60: mark a completed meeting's homework checked, which moves it to the
+   course's MEETING HISTORY; adds two nullable columns and a function, deletes nothing; existing meetings start
+   unchecked),
+   `0029_general_chat.sql` (ARU-61: the general chat; adds a table with policies and puts it in realtime, deletes
+   nothing; it doesn't depend on 0028),
+   `0030_chat_server_time.sql` (ARU-67: the server sets every chat message's time, in the general and course chats;
+   changes insert grants only),
+   `0031_disciplines.sql` (ARU-63: disciplines; adds a table, a nullable `courses.discipline_id` and two functions,
+   deletes nothing; existing courses get no discipline; it doesn't
+   depend on 0028-0030),
+   `0032_accountant.sql` (ARU-65: the teacher turns Accountant on for mentors, who pick paid courses with a monthly
+   payment period; adds `profiles.is_accountant`, the `course_billing` table and `set_accountant()`, and replaces
+   `set_user_role()` so a mentor who becomes a student stops being an accountant; deletes nothing),
+   `0033_teacher_sets_any_course_discipline.sql` (ARU-70: the teacher sets the discipline of any course; replaces
+   `set_course_discipline`, no table or data changes; it doesn't depend on 0032),
+   `0034_general_chat_reads.sql` (ARU-72: new message count for the general chat; adds the `general_chat_reads` table
+   with policies, a trigger and functions, deletes nothing; accounts already approved start with everything read).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 
@@ -131,18 +162,20 @@ src/app/                  screens (Expo Router — every file is a route)
   (tabs)/                 Homework · Courses (My courses / All courses) · Materials · Profile tabs
   homework/new.tsx        a listener sends homework for an assignment (opened from New)
   homework/[id].tsx       homework details; mentor marks it checked
-  courses/new.tsx         teacher or mentor creates a course
-  courses/[id].tsx        course details, listeners, linked Knowledge base PDFs and the course's homework
+  courses/new.tsx         teacher or mentor creates a course (visible or hidden)
+  courses/[id].tsx        course details, meetings, listeners, linked Knowledge base PDFs, feedback and homework
+  courses/[id]/feedback.tsx  a listener adds or edits their feedback (stars + review)
   courses/[id]/listeners.tsx  teacher or mentor adds listeners
   courses/[id]/chat.tsx   course chat (owner, listeners and the teacher)
+  general-chat.tsx        general chat for every accepted account (from Profile)
   courses/[id]/owner.tsx  teacher or mentor changes the course owner
   courses/[id]/meetings/  schedule / edit a meeting; [meetingId]/notes.tsx notes; [meetingId]/assign-homework.tsx;
                           [meetingId]/attendance.tsx who attended
-  roles.tsx               teacher switches users between student and mentor
-  materials/new.tsx       teacher or mentor shares a material
-  materials/[id].tsx      material details
+  roles.tsx               teacher accepts / rejects new accounts and switches users between student and mentor
+  materials/new.tsx       teacher or mentor shares a Blog post
+  materials/[id].tsx      Blog post details and likes
   materials/files/        Knowledge base PDFs: new.tsx upload, [id].tsx details and Open PDF, [id]/edit.tsx edit
-src/components/           shared UI
+src/components/           shared UI (AccessGate.tsx: the only screen a waiting or declined account sees)
 src/lib/supabase.ts       Supabase client
 src/lib/store.tsx         data loading, actions, live updates
 supabase/migrations/      database schema + row-level security (the real access rules)
@@ -158,25 +191,35 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Assign homework to a completed meeting | | own courses        | any course |
 | Send homework (for an assignment) | courses they're in | courses they're in |  |
 | Mark homework checked      |           | any (not their own) | any (not their own) |
-| See courses                | all (title and description only unless they're in it) | all | all |
+| See courses (database)     | all except hidden ones they're not in (title and description only unless they're in it) | all except hidden ones they don't own or attend | all |
+| Courses list (Courses tab, ARU-63) | courses they're in + courses with no discipline | own and attended courses + courses with no discipline | own courses + courses with no discipline (hidden ones too); every course through a discipline card |
+| See disciplines, their rating and reviews | visible ones | visible ones | ✓ (hidden ones too) |
+| Create a discipline, hide / unhide it |   |                    | ✓       |
+| Set / change / clear a course's discipline (ARU-70) | | own courses   | any course |
 | Create courses             |           | ✓                  | ✓       |
 | Create a hidden course     |           | ✓                  | ✓       |
 | See a hidden course and its content | (listeners only) | owner and listeners only | ✓ (all) |
-| Change course owner        |           | ✓ (any course)     | ✓       |
+| Change course owner        |           | ✓ (any course they can reach¹) | ✓       |
 | Own a course               | never     | ✓ (not if a listener) | ✓    |
 | Be a course listener       | ✓         | ✓ (not own course) |         |
 | See course listeners       | own courses | ✓                | ✓       |
-| Add / remove listeners     |           | ✓ (any course)     | ✓       |
+| Add / remove listeners     |           | ✓ (any course they can reach¹) | ✓       |
 | Course chat (read / post)  | courses they're in | own courses + courses they're in | all |
+| General chat (read / post; no edit or delete) | ✓ | ✓ | ✓ |
+| General chat new message count (`general_chat_reads`, own row only) | ✓ | ✓ | ✓ |
 | See course meetings        | courses they're in | ✓ (all courses)  | ✓       |
 | Schedule meetings, mark completed / canceled | | own courses    | any course |
 | Edit / reschedule a scheduled meeting | | own courses           | any course |
 | Read meeting notes         | courses they're in | ✓ (all courses)  | ✓       |
 | Add / edit / clear notes on a completed meeting | | own courses | any course |
+| Mark a completed meeting's homework checked / undo | | any course they can see, not one they're a listener of | any course |
 | Mark / undo own attendance of a started meeting | courses they're in | courses they're in |  |
 | See who attended a meeting | own marks only | ✓ (own courses and courses they don't listen to; own marks only where a listener) | ✓ |
 | See materials              | ✓         | ✓                  | ✓       |
 | Share / delete materials   |           | ✓ (own materials)  | ✓ (own) |
+| Like Blog posts, see who liked them | ✓ | ✓                | ✓       |
+| Add / edit / delete own course feedback | if a listener and the course started | if a listener and the course started | |
+| Read course feedback and average | courses they can see (hidden: only if in it) | same | ✓ (all) |
 | See Knowledge base, open PDFs | ✓      | ✓                  | ✓       |
 | Upload PDFs (25 MB at most) |          | ✓                  | ✓       |
 | Edit name / description / course, delete PDFs | | ✓ (own)   | ✓ (own) |
@@ -185,7 +228,14 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Switch student ↔ mentor    |           |                    | ✓       |
 | Accept or reject new accounts |        |                    | ✓       |
 | Connect Telegram and choose own notifications | ✓ (own) | ✓ (own) | ✓ (own) |
+| Turn Accountant on / off for a mentor (ARU-65) | |         | ✓       |
+| Select / unselect paid courses |         | accountants (any course they can see) |  |
+| See paid courses, change their payment period | | accountants (all they can see) | ✓ (all) |
 | Become / stop being teacher |          |                    | (nobody) |
+
+¹ Since ARU-63 a mentor reaches a course through the Courses list (courses they own or attend, and courses with no
+discipline), the Profile tab or a Knowledge base PDF's course link. Courses in a discipline that they neither own nor
+attend aren't listed; database access to them is unchanged.
 
 ## Development workflow
 
@@ -200,11 +250,12 @@ mentor or the teacher change homework that is already checked; the app never off
 
 ## Work in progress
 
-- **Knowledge base of PDF files, each optionally linked to a course** (ARU-30): ready for development. The
-  Knowledge base tab shows a placeholder until then.
-- **Linked PDFs on the course screen** (ARU-39): after ARU-30.
+- **Telegram notifications** (instead of push notifications, which were canceled): linking a Sham account to the
+  Sham Telegram bot (ARU-48, in QA, PR #46; it uses migration 0023), then notifications for new chat messages
+  (ARU-44), checked homework (ARU-49), new homework assignments (ARU-50) and meetings starting (ARU-41). The
+  product owner starts this work; the dev agent skips it until then.
+- **Full formatted posts on Blog cards** (ARU-54): in development.
 
 ## Next steps
 
-1. Push notifications (new homework for mentors, feedback for students, new chat messages).
-2. Private (one-to-one) chat between teacher, mentors and students; each course already has a group chat.
+1. Private (one-to-one) chat between teacher, mentors and students; each course already has a group chat.

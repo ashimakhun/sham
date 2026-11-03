@@ -91,9 +91,14 @@ describe('Edit action', () => {
     const later = meeting({ id: 'L', startsAt: at(48) });
     setStore(fakeStore('S1', { courseMembers: members, meetings: [later, { ...P, startsAt: at(-2) }] }));
     const view = await render(<CourseDetailScreen />);
-    expect(screen.getAllByTestId(/^meeting-/).map((v) => v.props.testID)).toEqual(['meeting-L', 'meeting-P']);
+    // ARU-60: a started meeting is In progress, listed before Upcoming.
+    const headings = () => screen.getAllByRole('header').map((h) => h.props.children);
+    expect(headings()).toEqual(['In progress', 'Upcoming']);
+    expect(screen.getAllByTestId(/^meeting-/).map((v) => v.props.testID)).toEqual(['meeting-P', 'meeting-L']);
     setStore(fakeStore('S1', { courseMembers: members, meetings: [later, { ...P, startsAt: at(5), rescheduledAt: at(0) }] }));
     await view.rerender(<CourseDetailScreen />);
+    // Moved to the future: both upcoming, soonest first.
+    expect(headings()).toEqual(['Upcoming']);
     expect(screen.getAllByTestId(/^meeting-/).map((v) => v.props.testID)).toEqual(['meeting-P', 'meeting-L']);
   });
 });

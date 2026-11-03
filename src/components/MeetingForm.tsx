@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text } from 'react-native';
+import { Text } from 'react-native';
 
 import { DateTimeField } from '@/components/DateTimeField';
-import { Button, ErrorText, Field, styles } from '@/components/ui';
+import { KeyboardForm } from '@/components/KeyboardForm';
+import { Button, ErrorText, Field } from '@/components/ui';
 import { colors } from '@/lib/theme';
 import { useNow } from '@/lib/useNow';
 
@@ -40,30 +41,25 @@ export function MeetingForm({ initial, submitTitle, busyTitle, busy, error, onSu
   const timeOk = (checkTimeOnlyWhenChanged && !timeChanged) || startsAt.getTime() > now;
 
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView
-        contentContainerStyle={[styles.content, { gap: 16 }]}
-        keyboardShouldPersistTaps="handled"
-        contentInsetAdjustmentBehavior="automatic">
-        <DateTimeField label="Date and start time" value={startsAt} onChange={setStartsAt} />
-        {!timeOk && <Text style={{ color: colors.warning, fontSize: 14 }}>Pick a time in the future</Text>}
-        <Field label="Topic (optional)" placeholder="Meeting" value={topic} onChangeText={setTopic} maxLength={200} />
-        <Field
-          label="Link or place (optional)"
-          placeholder="https://… or Room 12"
-          value={location}
-          onChangeText={setLocation}
-          autoCapitalize="none"
-          autoCorrect={false}
-          maxLength={500}
-        />
-        <ErrorText error={error} />
-        <Button
-          title={busy ? busyTitle : submitTitle}
-          onPress={() => onSubmit({ startsAt, topic, location, timeChanged })}
-          disabled={!timeOk || busy}
-        />
-      </ScrollView>
-    </KeyboardAvoidingView>
+    <KeyboardForm>
+      <DateTimeField label="Date and start time" value={startsAt} onChange={setStartsAt} />
+      {!timeOk && <Text style={{ color: colors.warning, fontSize: 14 }}>Pick a time in the future</Text>}
+      <Field label="Topic (optional)" placeholder="Meeting" value={topic} onChangeText={setTopic} maxLength={200} />
+      <Field
+        label="Link or place (optional)"
+        placeholder="https://… or Room 12"
+        value={location}
+        onChangeText={setLocation}
+        autoCapitalize="none"
+        autoCorrect={false}
+        maxLength={500}
+      />
+      <ErrorText error={error} />
+      <Button
+        title={busy ? busyTitle : submitTitle}
+        onPress={() => onSubmit({ startsAt, topic, location, timeChanged })}
+        disabled={!timeOk || busy}
+      />
+    </KeyboardForm>
   );
 }

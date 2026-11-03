@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import type { ComponentProps, ReactNode } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
 
 import { colors, roleColor, roleLabel } from '@/lib/theme';
 import type { HomeworkStatus, Role } from '@/lib/types';
@@ -35,13 +36,17 @@ type ButtonProps = {
   disabled?: boolean;
   /** New-message count shown next to the title (ARU-31); nothing is shown at 0 and the label stays the title. */
   unread?: number;
+  /** ARU-69: show this icon instead of the title text. The title is then the button's screen reader label. */
+  icon?: ComponentProps<typeof Ionicons>['name'];
 };
 
-export function Button({ title, onPress, variant = 'primary', disabled, unread = 0 }: ButtonProps) {
+export function Button({ title, onPress, variant = 'primary', disabled, unread = 0, icon }: ButtonProps) {
+  const textColor = variant === 'primary' ? '#fff' : variant === 'danger' ? colors.danger : colors.primary;
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={unread > 0 ? withUnreadLabel(title, unread) : undefined}
+      // With an icon there is no visible text, so the label is always set; the unread count joins it (ARU-31).
+      accessibilityLabel={unread > 0 ? withUnreadLabel(title, unread) : icon ? title : undefined}
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [
@@ -51,23 +56,21 @@ export function Button({ title, onPress, variant = 'primary', disabled, unread =
         variant === 'danger' && { backgroundColor: '#FEF2F2' },
         (pressed || disabled) && { opacity: disabled ? 0.4 : 0.8 },
       ]}>
-      <Text
-        style={[
-          styles.buttonText,
-          variant === 'primary' && { color: '#fff' },
-          variant === 'secondary' && { color: colors.primary },
-          variant === 'danger' && { color: colors.danger },
-        ]}>
-        {title}
-      </Text>
+      {icon ? (
+        // Same size as the course card's chat icon (ARU-25); the button keeps its full-width, 46 pt target.
+        <Ionicons name={icon} size={24} color={textColor} style={{ marginVertical: -3 }} accessibilityElementsHidden importantForAccessibility="no" />
+      ) : (
+        <Text style={[styles.buttonText, { color: textColor }]}>{title}</Text>
+      )}
       {unread > 0 && <UnreadBadge count={unread} style={{ position: 'absolute', right: 12, top: 11 }} />}
     </Pressable>
   );
 }
 
 /** A new-message count bubble (ARU-31), the same on the course card's chat icon and the course's Chat button. Part
- *  of its button's label, so screen readers don't read it on its own. */
-export function UnreadBadge({ count, style }: { count: number; style?: ViewStyle }) {
+ *  of its button's label, so screen readers don't read it on its own. In the button colour (ARU-57). `ring` adds a
+ *  thin card-coloured ring for when it sits over the chat icon, so the icon's outline breaks around it (ARU-57). */
+export function UnreadBadge({ count, style, ring }: { count: number; style?: ViewStyle; ring?: boolean }) {
   if (count <= 0) return null;
   return (
     <View
@@ -76,7 +79,7 @@ export function UnreadBadge({ count, style }: { count: number; style?: ViewStyle
       importantForAccessibility="no-hide-descendants"
       accessibilityElementsHidden
       pointerEvents="none"
-      style={[styles.unread, style]}>
+      style={[styles.unread, ring && styles.unreadRing, style]}>
       <Text style={styles.unreadText} numberOfLines={1}>
         {formatUnread(count)}
       </Text>
@@ -91,7 +94,8 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
       <TextInput
         placeholderTextColor={colors.muted}
         {...props}
-        style={[styles.input, props.multiline && { minHeight: 110, textAlignVertical: 'top' }]}
+        // Multiline fields grow up to a cap, then scroll inside, so the form's buttons stay reachable (ARU-59).
+        style={[styles.input, props.multiline && { minHeight: 110, maxHeight: 200, textAlignVertical: 'top' }]}
       />
     </View>
   );
@@ -178,49 +182,6 @@ export function Segmented<T extends string>({
   );
 }
 
-/**
- * A horizontal, scrollable row of single-select chips for a variable number of options (ARU-29). Unlike Segmented,
- * chips size to their label (long labels are cut with an ellipsis) and the row scrolls sideways instead of wrapping.
- */
-export function FilterChips<T extends string>({
-  options,
-  value,
-  onChange,
-}: {
-  options: { value: T; label: string }[];
-  value: T;
-  onChange: (v: T) => void;
-}) {
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-      contentContainerStyle={{ gap: 8 }}>
-      {options.map((o) => {
-        const selected = value === o.value;
-        return (
-          <Pressable
-            key={o.value}
-            accessibilityRole="button"
-            accessibilityLabel={o.label}
-            accessibilityState={{ selected }}
-            // 36 pt chip + 4 pt on each side = a 44 pt touch target.
-            hitSlop={4}
-            onPress={() => {
-              if (!selected) onChange(o.value);
-            }}
-            style={[styles.chip, selected && { backgroundColor: colors.primary, borderColor: colors.primary }]}>
-            <Text numberOfLines={1} style={[styles.chipText, selected && { color: '#fff' }]}>
-              {o.label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </ScrollView>
-  );
-}
-
 export const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16, gap: 12 },
@@ -259,8 +220,10 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 5,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.danger,
+    backgroundColor: colors.primary,
   },
+  // Grows by the ring's width so the number keeps the same room inside it (ARU-57).
+  unreadRing: { minWidth: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: colors.card },
   unreadText: { fontSize: 11, fontWeight: '700', color: '#fff' },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   empty: { alignItems: 'center', paddingVertical: 48, gap: 6 },
@@ -269,15 +232,4 @@ export const styles = StyleSheet.create({
   segment: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
   segmentActive: { backgroundColor: colors.card },
   segmentText: { fontSize: 13, fontWeight: '600', color: colors.muted },
-  chip: {
-    maxWidth: 200,
-    minHeight: 36,
-    justifyContent: 'center',
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-  },
-  chipText: { fontSize: 13, fontWeight: '600', color: colors.text },
 });
