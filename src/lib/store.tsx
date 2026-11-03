@@ -319,6 +319,8 @@ type TelegramLinkRow = {
   notify_new_account?: boolean;
   /** ARU-89 (0045); undefined before that migration runs. */
   notify_homework_submitted?: boolean;
+  /** ARU-87 (0046); undefined before that migration runs. */
+  notify_general_chat?: boolean;
 };
 const toTelegramLink = (r: TelegramLinkRow): TelegramLink => ({
   linkedAt: r.linked_at,
@@ -329,6 +331,7 @@ const toTelegramLink = (r: TelegramLinkRow): TelegramLink => ({
     chat_message: r.notify_chat_message,
     new_account: r.notify_new_account ?? true,
     homework_submitted: r.notify_homework_submitted ?? true,
+    general_chat: r.notify_general_chat ?? true,
   },
 });
 type MaterialRow = {

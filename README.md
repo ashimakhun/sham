@@ -111,7 +111,14 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `set_telegram_notification()` (keeps 0044's kinds), `homework_submitted_recipient()` and an after-insert trigger
    on `homework`, turns on `pg_net` if the server offers it; no policy changes, deletes nothing; needs 0044. Works
    without the Vault secrets (it then sends nothing), see [Telegram notifications](#telegram-notifications) →
-   Homework submitted).
+   Homework submitted),
+   `0046_every_chat_message_notifications.sql` (ARU-87: a Telegram message for every chat message; replaces
+   `chat_message_recipients()` without the read-position rules (one message per post, not per batch), adds
+   `telegram_links.notify_general_chat` (default true), the kind `general_chat` in `set_telegram_notification()`
+   (keeps 0044/0045's kinds), `general_message_recipients()` and an after-insert trigger on `general_messages` that
+   calls the same `chat-message-notifications` function with the same Vault secrets; no policy changes, deletes
+   nothing; needs 0036 and 0045. Redeploy `chat-message-notifications` after it, see
+   [Telegram notifications](#telegram-notifications) → New chat messages).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 
@@ -183,14 +190,26 @@ minute; the function claims the meetings that just started (`claim_started_meeti
 
 To change a Vault value later: `select vault.update_secret((select id from vault.secrets where name = 'meeting_notify_secret'), '<new>');`.
 
-#### New chat messages (ARU-44)
+#### New chat messages (ARU-44, ARU-87)
 
 When someone posts in a course chat, the other people in that chat (owner, listeners, every teacher; Approved only)
-get "New message in the <course title> chat" if they linked Telegram and have **Chat messages** on. One message per
-batch: only for the oldest message from others they haven't read yet, so after opening the chat the next post
-notifies them again. An after-insert trigger on `course_messages` (migration 0036) queues one `pg_net` call to the
-Edge Function `chat-message-notifications`, which asks `chat_message_recipients()` (service role only) who gets it.
-Failures are logged and dropped, never retried, and never stop a message from being posted.
+get "New message in the <course title> chat" if they linked Telegram and have **Chat messages** on. Since ARU-87
+(migration 0046) this is **one message per post**, whether or not they have opened the chat since the last one (the
+ARU-44 "one per batch of unread messages" rule is gone). An after-insert trigger on `course_messages` (migration 0036)
+queues one `pg_net` call to the Edge Function `chat-message-notifications`, which asks `chat_message_recipients()`
+(service role only) who gets it.
+
+The general chat (ARU-87) works the same way with its own switch, **General chat**: every Approved user except the
+author gets "New message in the general chat" for each post (no text, no author). An after-insert trigger on
+`general_messages` (migration 0046) calls the same function with `{"general_message_id": "<id>"}` and the same Vault
+secrets, and the function asks `general_message_recipients()`. So after migration 0046 only step 3 below (redeploy)
+is needed; no new secret.
+
+Failures are logged and dropped, never retried, and never stop a message from being posted. There is no throttling by
+design: a busy chat sends one Telegram message per post. The shared helper sends at most 25 messages a second within
+a 50-second budget, so about 1,250 recipients per post; any beyond that are logged as failed and dropped. The trigger's
+`pg_net` timeout is 30 s, so for a very large general chat `net._http_response` may show a timeout while the function
+is still sending.
 
 1. **Database → Extensions**: turn on `pg_net` (then run migration 0036 if it isn't applied yet).
 2. Pick a random secret (e.g. `openssl rand -hex 32`) and set it, with the bot token from above, as function secrets:
@@ -210,8 +229,9 @@ Failures are logged and dropped, never retried, and never stop a message from be
    (and set `CHAT_NOTIFY_SECRET` to the same value).
 
 Check a post: `select status_code, content from net._http_response order by created desc limit 5;` shows the
-function's answer (`{"message_id": …, "recipients": n, "sent": …, "skipped": …, "failed": […]}`); the function's
-log (dashboard → Edge Functions → chat-message-notifications → Logs) has one line per post.
+function's answer (`{"message_id": …, "recipients": n, "sent": …, "skipped": …, "failed": […]}`, or
+`{"general_message_id": …, …}` for the general chat); the function's log (dashboard → Edge Functions →
+chat-message-notifications → Logs) has one line per post.
 
 #### Homework reviewed (ARU-49)
 
@@ -447,7 +467,8 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Switch student ↔ mentor    |           |                    | ✓       |
 | Accept or reject new accounts |        |                    | ✓       |
 | Connect Telegram and choose own notifications | ✓ (own) | ✓ (own) | ✓ (own) |
-| Get a Telegram message for new course chat messages (ARU-44; linked, **Chat messages** on) | courses they're in | own courses + courses they're in | all courses |
+| Get a Telegram message for every new course chat message (ARU-44, ARU-87; linked, **Chat messages** on) | courses they're in | own courses + courses they're in | all courses |
+| Get a Telegram message for every new general chat message (ARU-87; linked, **General chat** on) | ✓ | ✓ | ✓ |
 | Get "Your homework … was reviewed" in Telegram (ARU-49) | own homework, when checked | own homework (sent as a listener), when checked | (never sends homework) |
 | Get "New homework" Telegram messages (ARU-50) | courses they're in | courses they're in (not their own) |  |
 | Get "New account waiting for your approval" in Telegram (ARU-84; linked, **New accounts** on) |  |  | ✓ (every new sign-up) |
