@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
@@ -7,6 +8,15 @@ import { ACCOUNT_DELETED, DELETE_FAILED, DELETE_OFFLINE } from './deleteAccount'
 import { FEEDBACK_MAX } from './feedback';
 import { fileFieldsError, isAllowedPdf, PDF_MAX_BYTES, PDF_RULE } from './files';
 import { NOTES_MAX } from './markdown';
+import {
+  authErrorMessage,
+  cleanCode,
+  codeErrorMessage,
+  isInvalidCredentials,
+  NETWORK_ERROR,
+  SAME_PASSWORD,
+  WRONG_CURRENT_PASSWORD,
+} from './password';
 import { nameProblem } from './profileName';
 import { supabase } from './supabase';
 import type {
@@ -95,6 +105,14 @@ export type Store = {
   deleteAccount: (password: string) => Promise<void>;
   /** ARU-75: a message for the sign-in screen ("Your account was deleted"), or null. Cleared by the next sign-in. */
   accountNotice: string | null;
+  /** ARU-76: the signed-in user changes their own password. The current password is checked first by signing in
+   *  again (same user, so no reload); a wrong one throws WRONG_CURRENT_PASSWORD and nothing changes. */
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  /** ARU-77: asks Supabase to email a reset code (the email is trimmed). Same result whether or not it has an account. */
+  requestPasswordReset: (email: string) => Promise<void>;
+  /** ARU-77: checks the emailed code, then saves the new password, as one action. The app is signed in only once the
+   *  password is saved; if saving fails the user is signed out again and the old password still works. */
+  resetPasswordWithCode: (email: string, code: string, newPassword: string) => Promise<void>;
   /** Approved users change their own name (ARU-55): trimmed, not blank, at most NAME_MAX characters. The database
    *  allows only the own row and refuses blank names; the store's profiles are updated right after the save. */
   updateMyName: (name: string) => Promise<void>;
@@ -624,6 +642,29 @@ async function withSignedPhotoUrls(items: Homework[]) {
   return items.map((h) => (h.photoPath ? { ...h, photoUrl: urls.get(h.photoPath) ?? undefined } : h));
 }
 
+// ARU-77: set while a forgotten-password reset runs. If the app is killed after the code was accepted but before the
+// new password was saved, the next start signs out instead of opening the app with the old password still in place.
+const RESET_PENDING_KEY = 'sham.passwordResetPending';
+
+async function setResetPending(pending: boolean) {
+  try {
+    if (pending) await AsyncStorage.setItem(RESET_PENDING_KEY, '1');
+    else await AsyncStorage.removeItem(RESET_PENDING_KEY);
+  } catch {
+    // Storage unavailable: the reset still works, only the kill-mid-reset clean-up is lost.
+  }
+}
+
+async function finishInterruptedReset() {
+  try {
+    if ((await AsyncStorage.getItem(RESET_PENDING_KEY)) !== '1') return;
+    await supabase.auth.signOut({ scope: 'local' });
+    await AsyncStorage.removeItem(RESET_PENDING_KEY);
+  } catch {
+    // Never block start-up.
+  }
+}
+
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
@@ -675,13 +716,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return false;
     }
   }, []);
+  // ARU-77: while a forgotten-password reset runs (and while start-up checks for an unfinished one), a new session is
+  // parked here instead of being shown: verifyOtp signs the user in before the new password is saved, and the app
+  // must not open (or the approval gate take over) until it is. Signing out (null) always goes through.
+  const holdingSession = useRef(true);
+  const parkedSession = useRef<Session | null>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setReady(true);
-    });
+    finishInterruptedReset()
+      .then(() => supabase.auth.getSession())
+      .then(({ data }) => {
+        holdingSession.current = false;
+        parkedSession.current = null;
+        setSession(data.session);
+        setReady(true);
+      });
     const { data } = supabase.auth.onAuthStateChange((_event, s) => {
+      if (s && holdingSession.current) {
+        parkedSession.current = s;
+        return;
+      }
+      if (!s) parkedSession.current = null;
       setSession(s);
       if (!s) {
         // Signed out: drop the previous user's data.
@@ -1050,6 +1105,57 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setAccountNotice(ACCOUNT_DELETED);
       // The server already ended the account; only this device's stored session is left to remove.
       await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+    },
+    changePassword: async (currentPassword, newPassword) => {
+      const me = session?.user;
+      if (!me?.email || !currentUser) throw new Error('You are signed out. Please sign in again.');
+      // Checked before any request (AC 4), so it wins over a wrong current password.
+      if (newPassword === currentPassword) throw new Error(SAME_PASSWORD);
+      // A stolen unlocked phone isn't enough: the current password must be right. Signing in again also gives a
+      // fresh session, so the update passes with "Secure password change" turned on.
+      const verified = await supabase.auth.signInWithPassword({ email: me.email, password: currentPassword });
+      if (verified.error) {
+        throw new Error(isInvalidCredentials(verified.error) ? WRONG_CURRENT_PASSWORD : authErrorMessage(verified.error));
+      }
+      if (verified.data.user?.id !== me.id) throw new Error('Something went wrong. Please sign in again.');
+      const updated = await supabase.auth.updateUser({ password: newPassword });
+      if (updated.error) throw new Error(authErrorMessage(updated.error));
+    },
+    requestPasswordReset: async (email) => {
+      // Supabase answers the same for unknown emails, so the app can't tell (and never says) whether one exists.
+      const res = await supabase.auth.resetPasswordForEmail(email.trim());
+      if (res.error) throw new Error(authErrorMessage(res.error));
+    },
+    resetPasswordWithCode: async (email, code, newPassword) => {
+      holdingSession.current = true;
+      parkedSession.current = null;
+      await setResetPending(true);
+      let verified = false;
+      let saved = false;
+      try {
+        const res = await supabase.auth.verifyOtp({ email: email.trim(), token: cleanCode(code), type: 'recovery' });
+        if (res.error) throw new Error(codeErrorMessage(res.error));
+        verified = true;
+        const updated = await supabase.auth.updateUser({ password: newPassword });
+        if (updated.error) throw new Error(authErrorMessage(updated.error));
+        saved = true;
+        const next = parkedSession.current ?? res.data.session ?? (await supabase.auth.getSession()).data.session;
+        holdingSession.current = false;
+        parkedSession.current = null;
+        // Now the app opens as after a normal sign-in: Homework, or the waiting / declined screen (ARU-43).
+        setSession(next);
+      } catch (e) {
+        if (e instanceof Error && e.message) throw e;
+        throw new Error(NETWORK_ERROR);
+      } finally {
+        if (verified && !saved) {
+          // No half-finished reset (AC 8): back to signed out; local scope works offline too. The old password stays.
+          await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+        }
+        holdingSession.current = false;
+        parkedSession.current = null;
+        await setResetPending(false);
+      }
     },
     updateMyName: async (name) => {
       if (!currentUser || (currentUser.accessStatus && currentUser.accessStatus !== 'approved')) {

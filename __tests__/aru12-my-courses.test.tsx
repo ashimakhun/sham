@@ -2,7 +2,7 @@
 // Users per the TEST DESIGN: M owns A and is a listener of B; N owns B and C; S in A and B; S2 and M2 in nothing;
 // T owns nothing. ARU-63 renamed the view "Courses", replaced "All courses" with "Disciplines", and lists courses with
 // no discipline after the user's own; these courses all have discipline D, so the ARU-12 sections are unchanged.
-import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import CoursesScreen from '@/app/(tabs)/courses';
 import type { Course, Discipline } from '@/lib/types';
@@ -48,22 +48,23 @@ describe('switch', () => {
 });
 
 describe('My courses', () => {
-  it('AC3/AC6/AC13: a student sees only "Courses I\'m in", newest first, with a Listener tag', async () => {
+  it('AC3/AC6/AC13: a student sees only "Courses I\'m in", newest first (no Listener tag since ARU-81)', async () => {
     setStore(store('S1'));
     await render(<CoursesScreen />);
     expect(headings()).toEqual(["COURSES I'M IN"]);
     expect(titles()).toEqual(['Biology', 'Algebra']);
-    expect(screen.getAllByText('Listener')).toHaveLength(2);
+    // ARU-81: the section heading says it; the cards carry no "Listener" / "Owner" tag.
+    expect(screen.queryByText('Listener')).toBeNull();
     expect(screen.queryByText('Owner')).toBeNull();
     expect(screen.queryByRole('button', { name: '+ New course' })).toBeNull();
   });
 
-  it('AC4/AC13: an owner who attends nothing sees only "Courses I own" with Owner tags', async () => {
+  it('AC4/AC13: an owner who attends nothing sees only "Courses I own" (no Owner tag since ARU-81)', async () => {
     setStore(store('N'));
     await render(<CoursesScreen />);
     expect(headings()).toEqual(['COURSES I OWN']);
     expect(titles()).toEqual(['Chemistry', 'Biology']);
-    expect(screen.getAllByText('Owner')).toHaveLength(2);
+    expect(screen.queryByText('Owner')).toBeNull();
   });
 
   it('AC5: a mentor who owns A and attends B sees each once, in the right section', async () => {
@@ -71,8 +72,9 @@ describe('My courses', () => {
     await render(<CoursesScreen />);
     expect(headings()).toEqual(["COURSES I'M IN", 'COURSES I OWN']);
     expect(titles()).toEqual(['Biology', 'Algebra']);
-    const biology = screen.getByText('Biology').parent!.parent!;
-    expect(within(biology).getByText('Listener')).toBeTruthy();
+    // ARU-81: the sections place the courses; neither card has a tag.
+    expect(screen.queryByText('Listener')).toBeNull();
+    expect(screen.queryByText('Owner')).toBeNull();
   });
 
   it('AC7: tapping a course in "My courses" opens the same details screen', async () => {
