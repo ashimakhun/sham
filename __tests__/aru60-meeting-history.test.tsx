@@ -87,7 +87,8 @@ describe('AC1/AC2: top card and MEETING HISTORY', () => {
     setStore(fakeStore(who, { courseMembers: members, meetings: all }));
     await render(<CourseDetailScreen />);
     expect(screen.getByText('MEETINGS (6)')).toBeTruthy();
-    expect(headings()).toEqual(['In progress', 'Upcoming', 'Awaiting homework check', 'MEETING HISTORY (2)']);
+    // ARU-88: uppercase headings with the group's count.
+    expect(headings()).toEqual(['IN PROGRESS (2)', 'UPCOMING (2)', 'AWAITING HOMEWORK CHECK (2)', 'MEETING HISTORY (2)']);
     expect(top()).toEqual(['meeting-P1', 'meeting-P2', 'meeting-F2', 'meeting-F1', 'meeting-C2', 'meeting-C1']);
     expect(history().getAllByTestId(/^meeting-/).map((n) => n.props.testID)).toEqual(['meeting-X', 'meeting-K']);
   });
@@ -116,7 +117,7 @@ describe('AC1/AC2: top card and MEETING HISTORY', () => {
   it('an empty group has no heading; no history → no MEETING HISTORY section', async () => {
     setStore(fakeStore('S1', { courseMembers: members, meetings: [F1, C1] }));
     await render(<CourseDetailScreen />);
-    expect(headings()).toEqual(['Upcoming', 'Awaiting homework check']);
+    expect(headings()).toEqual(['UPCOMING (1)', 'AWAITING HOMEWORK CHECK (1)']);
     expect(screen.queryByTestId('meeting-history')).toBeNull();
   });
 
@@ -145,7 +146,7 @@ describe('AC3/AC4: status changes move meetings live', () => {
     setStore(fakeStore('S1', { courseMembers: members, meetings: [{ ...F2, status: 'canceled' }, { ...P1, status: 'completed' }] }));
     await view.rerender(<CourseDetailScreen />);
     expect(history().getByTestId('meeting-F2')).toBeTruthy();
-    expect(headings()).toEqual(['Awaiting homework check', 'MEETING HISTORY (1)']);
+    expect(headings()).toEqual(['AWAITING HOMEWORK CHECK (1)', 'MEETING HISTORY (1)']);
     expect(top()).toEqual(['meeting-P1']);
   });
 
@@ -155,11 +156,13 @@ describe('AC3/AC4: status changes move meetings live', () => {
       const soon = meeting({ id: 'SO', startsAt: new Date(Date.now() + 30 * 1000).toISOString() });
       setStore(fakeStore('S1', { courseMembers: members, meetings: [soon] }));
       await render(<CourseDetailScreen />);
-      expect(headings()).toEqual(['Upcoming']);
+      expect(headings()).toEqual(['UPCOMING (1)']);
+      expect(inMeeting('SO').getByText('Scheduled')).toBeTruthy();
       await act(async () => {
         jest.advanceTimersByTime(90 * 1000);
       });
-      expect(headings()).toEqual(['In progress']);
+      expect(headings()).toEqual(['IN PROGRESS (1)']);
+      expect(inMeeting('SO').getByText('In progress')).toBeTruthy(); // ARU-88: the badge follows live
     } finally {
       jest.useRealTimers();
     }

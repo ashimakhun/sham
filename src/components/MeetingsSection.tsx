@@ -1,11 +1,19 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Linking, Pressable, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Card, ErrorText, styles } from '@/components/ui';
 import { meetingAttendance } from '@/lib/attendance';
 import { confirmAction } from '@/lib/confirm';
-import { groupMeetings, hasStarted, isLink, isOpenForAttendance } from '@/lib/meetings';
+import {
+  groupMeetings,
+  hasStarted,
+  isLink,
+  isOpenForAttendance,
+  meetingAccent,
+  meetingBadge,
+  type MeetingGroup,
+} from '@/lib/meetings';
 import {
   canCheckMeetingHomework,
   canManageMeetings,
@@ -19,22 +27,51 @@ import type { Course, Meeting, MeetingStatus } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
 import { useNow } from '@/lib/useNow';
 
-const statusLabel: Record<MeetingStatus, string> = {
-  scheduled: 'Scheduled',
-  completed: 'Completed',
-  canceled: 'Canceled',
-};
-const statusColors: Record<MeetingStatus, { bg: string; fg: string }> = {
-  scheduled: { bg: colors.primarySoft, fg: colors.primary },
-  completed: { bg: colors.successSoft, fg: colors.success },
-  canceled: { bg: '#F3F4F6', fg: colors.muted },
-};
-
-export function MeetingBadge({ status }: { status: MeetingStatus }) {
+/** ARU-88: the meeting's display state; a started Scheduled meeting reads "In progress" (see `meetingBadge`). Read
+ *  by screen readers as plain text. */
+export function MeetingBadge({ meeting, now }: { meeting: Pick<Meeting, 'status' | 'startsAt'>; now: number }) {
+  const { label, bg, fg } = meetingBadge(meeting, now);
   return (
-    <View style={[styles.badge, { backgroundColor: statusColors[status].bg }]}>
-      <Text style={[styles.badgeText, { color: statusColors[status].fg }]}>{statusLabel[status]}</Text>
+    <View testID="status-badge" style={[styles.badge, { backgroundColor: bg, flexShrink: 0 }]}>
+      <Text style={[styles.badgeText, { color: fg }]}>{label}</Text>
     </View>
+  );
+}
+
+/** Pills are about 30 pt tall; the vertical hit slop makes the tap target at least 44 pt (ARU-88 AC 6). */
+const PILL_HIT_SLOP = { top: 8, bottom: 8, left: 4, right: 4 };
+
+/** ARU-88: a compact action pill in a meeting tile's footer. Red (`danger`) for Mark canceled / Cancel meeting and
+ *  attendance Undo. `disabled` is passed only by actions that were disabled while saving before. */
+function ActionPill({
+  title,
+  label = title,
+  role = 'button',
+  tone = 'primary',
+  disabled,
+  onPress,
+}: {
+  title: string;
+  label?: string;
+  role?: 'button' | 'link';
+  tone?: 'primary' | 'danger';
+  disabled?: boolean;
+  onPress: () => void;
+}) {
+  const danger = tone === 'danger';
+  return (
+    <Pressable
+      accessibilityRole={role}
+      accessibilityLabel={label}
+      accessibilityState={disabled === undefined ? undefined : { disabled }}
+      disabled={disabled}
+      hitSlop={PILL_HIT_SLOP}
+      onPress={onPress}
+      style={({ pressed }) => [tile.pill, danger && tile.pillDanger, pressed && { opacity: 0.7 }]}>
+      <Text style={[tile.pillText, { color: danger ? colors.danger : colors.primary, opacity: disabled ? 0.4 : 1 }]}>
+        {title}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -156,7 +193,7 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
           <Text accessibilityRole="header" style={styles.label}>
             MEETING HISTORY ({history.length})
           </Text>
-          {history.map((m) => renderMeeting(m))}
+          <View style={tile.list}>{history.map((m) => renderMeeting(m, 'history'))}</View>
           <ErrorText error={error} />
         </Card>
       </View>
@@ -169,21 +206,24 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
       {current.length === 0 ? (
         <Text style={styles.muted}>{history.length > 0 ? 'No current meetings' : 'No meetings scheduled yet'}</Text>
       ) : (
-        [
-          inProgress.length > 0 && { heading: 'In progress', items: inProgress },
-          upcoming.length > 0 && { heading: 'Upcoming', items: upcoming },
-          awaitingCheck.length > 0 && { heading: 'Awaiting homework check', items: awaitingCheck },
-        ].map(
-          (group) =>
-            group && (
-              <View key={group.heading} style={{ gap: 12 }}>
-                <Text accessibilityRole="header" style={[styles.title, { fontSize: 15 }]}>
-                  {group.heading}
-                </Text>
-                {group.items.map((m) => renderMeeting(m))}
-              </View>
-            ),
+        (
+          [
+            { group: 'inProgress', heading: 'In progress', items: inProgress },
+            { group: 'upcoming', heading: 'Upcoming', items: upcoming },
+            { group: 'awaitingCheck', heading: 'Awaiting homework check', items: awaitingCheck },
+          ] as const
         )
+          .filter((g) => g.items.length > 0)
+          .map((g) => (
+            // ARU-88 AC 5: small uppercase muted headings with the group's count, and 8 pt more space above each
+            // group than between tiles, so a heading can't be mistaken for a meeting.
+            <View key={g.group} style={[tile.list, { marginTop: 8 }]}>
+              <Text accessibilityRole="header" style={styles.label}>
+                {`${g.heading.toUpperCase()} (${g.items.length})`}
+              </Text>
+              {g.items.map((m) => renderMeeting(m, g.group))}
+            </View>
+          ))
       )}
       <ErrorText error={error} />
       {canManage && (
@@ -196,7 +236,7 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
     </Card>
   );
 
-  function renderMeeting(m: Meeting) {
+  function renderMeeting(m: Meeting, group: MeetingGroup) {
     const started = hasStarted(m, now);
     const canEdit = canManage && m.status === 'scheduled';
     const actions: { title: string; status: Target }[] =
@@ -238,69 +278,112 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
       seesAttendance && isOpenForAttendance(m, now)
         ? meetingAttendance(m.id, course.id, courseMembers, attendance)
         : null;
-    const attendanceItems = [
-      ...(canMark && !attended
+
+    // ARU-88 AC 6: the footer's pills, in the order they had before; the red ones (attendance Undo, Mark canceled /
+    // Cancel meeting) always come last.
+    const footer = [
+      ...(canEdit
         ? [
-            <Pressable
-              key="attend"
-              accessibilityRole="button"
-              accessibilityLabel="I attended"
-              accessibilityState={{ disabled: busy }}
+            <ActionPill
+              key="edit"
+              title="Edit"
               disabled={busy}
-              hitSlop={8}
-              onPress={() => markAttended(m)}>
-              <Text style={{ color: colors.primary, fontWeight: '600', opacity: busy ? 0.4 : 1 }}>I attended</Text>
-            </Pressable>,
+              onPress={() =>
+                router.push({ pathname: '/courses/[id]/meetings/[meetingId]', params: { id: course.id, meetingId: m.id } })
+              }
+            />,
           ]
         : []),
+      ...notesActions.map((a) => (
+        <ActionPill key={a.title} title={a.title} role={a.edit ? 'button' : 'link'} onPress={() => openNotes(m, a.edit)} />
+      )),
+      ...(canAssign
+        ? [
+            <ActionPill
+              key="assign"
+              title="Assign homework"
+              onPress={() =>
+                router.push({
+                  pathname: '/courses/[id]/meetings/[meetingId]/assign-homework',
+                  params: { id: course.id, meetingId: m.id },
+                })
+              }
+            />,
+          ]
+        : []),
+      ...(canMark && !attended
+        ? [<ActionPill key="attend" title="I attended" disabled={busy} onPress={() => markAttended(m)} />]
+        : []),
+      // ARU-88 AC 7: a status chip, not a button, so it doesn't look tappable.
       ...(attended
         ? [
-            <Text key="attended" style={{ color: colors.success, fontWeight: '600' }}>
-              ✓ You attended
-            </Text>,
-            <Pressable
-              key="undo"
-              accessibilityRole="button"
-              accessibilityLabel="Undo attendance"
-              accessibilityState={{ disabled: busy }}
-              disabled={busy}
-              hitSlop={8}
-              onPress={() => undoAttended(m)}>
-              <Text style={{ color: colors.primary, fontWeight: '600', opacity: busy ? 0.4 : 1 }}>Undo</Text>
-            </Pressable>,
+            <View key="attended" style={[tile.pill, { backgroundColor: colors.successSoft }]}>
+              <Text style={[tile.pillText, { color: colors.success }]}>✓ You attended</Text>
+            </View>,
           ]
         : []),
       ...(counts
         ? [
-            <Pressable
+            <ActionPill
               key="count"
-              accessibilityRole="link"
-              accessibilityLabel={`Attended ${counts.attended.length} of ${counts.total}`}
-              hitSlop={8}
+              role="link"
+              title={`Attended: ${counts.attended.length} of ${counts.total}`}
+              label={`Attended ${counts.attended.length} of ${counts.total}`}
               onPress={() =>
                 router.push({
                   pathname: '/courses/[id]/meetings/[meetingId]/attendance',
                   params: { id: course.id, meetingId: m.id },
                 })
-              }>
-              <Text style={{ color: colors.primary, fontWeight: '600' }}>
-                Attended: {counts.attended.length} of {counts.total}
-              </Text>
-            </Pressable>,
+              }
+            />,
           ]
         : []),
+      ...(checkAction
+        ? [
+            <ActionPill
+              key="check"
+              title={checkAction.title}
+              disabled={busy}
+              onPress={() => setChecked(m, checkAction.checked)}
+            />,
+          ]
+        : []),
+      ...actions
+        .filter((a) => a.status === 'completed')
+        .map((a) => <ActionPill key={a.title} title={a.title} disabled={busy} onPress={() => changeStatus(m, a.status)} />),
+      ...(attended
+        ? [
+            <ActionPill
+              key="undo"
+              title="Undo"
+              label="Undo attendance"
+              tone="danger"
+              disabled={busy}
+              onPress={() => undoAttended(m)}
+            />,
+          ]
+        : []),
+      ...actions
+        .filter((a) => a.status === 'canceled')
+        .map((a) => (
+          <ActionPill key={a.title} title={a.title} tone="danger" disabled={busy} onPress={() => changeStatus(m, a.status)} />
+        )),
     ];
+
+    // ARU-88 AC 1/2: its own tile, with a left bar in the group's colour. Not `accessible` as a whole, so screen
+    // readers still reach each action (ARU-27).
     return (
-      <View key={m.id} testID={`meeting-${m.id}`} style={{ gap: 4 }}>
+      <View key={m.id} testID={`meeting-${m.id}`} style={[tile.tile, { borderLeftColor: meetingAccent[group] }]}>
+        {/* AC 4: the topic first, with the badge on the right that never gets squeezed off. */}
         <View style={[styles.row, { alignItems: 'flex-start' }]}>
-          <Text style={[styles.body, { flex: 1, fontWeight: '600' }]}>
-            {formatDateTime(m.startsAt)}
-            {m.rescheduledAt ? <Text style={styles.muted}>{'  '}Rescheduled</Text> : null}
+          <Text style={tile.topic} numberOfLines={2}>
+            {m.topic}
           </Text>
-          <MeetingBadge status={m.status} />
+          <MeetingBadge meeting={m} now={now} />
         </View>
-        <Text style={styles.body} numberOfLines={2}>
-          {m.topic}
+        <Text style={styles.muted}>
+          {formatDateTime(m.startsAt)}
+          {m.rescheduledAt ? <Text style={styles.muted}>{'  '}Rescheduled</Text> : null}
         </Text>
         {m.location ? (
           isLink(m.location) ? (
@@ -329,104 +412,49 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
             {checkedLine}
           </Text>
         ) : null}
-        {(actions.length > 0 ||
-          canEdit ||
-          notesActions.length > 0 ||
-          canAssign ||
-          attendanceItems.length > 0 ||
-          checkAction) && (
-          <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap', paddingTop: 2 }}>
-            {changing === m.id ? (
-              <Text style={styles.muted}>Saving…</Text>
-            ) : (
-              [
-                ...(canEdit
-                  ? [
-                      <Pressable
-                        key="edit"
-                        accessibilityRole="button"
-                        accessibilityLabel="Edit"
-                        accessibilityState={{ disabled: busy }}
-                        disabled={busy}
-                        hitSlop={8}
-                        onPress={() =>
-                          router.push({
-                            pathname: '/courses/[id]/meetings/[meetingId]',
-                            params: { id: course.id, meetingId: m.id },
-                          })
-                        }>
-                        <Text style={{ color: colors.primary, fontWeight: '600', opacity: busy ? 0.4 : 1 }}>Edit</Text>
-                      </Pressable>,
-                    ]
-                  : []),
-                ...notesActions.map((a) => (
-                  <Pressable
-                    key={a.title}
-                    accessibilityRole={a.edit ? 'button' : 'link'}
-                    accessibilityLabel={a.title}
-                    hitSlop={8}
-                    onPress={() => openNotes(m, a.edit)}>
-                    <Text style={{ color: colors.primary, fontWeight: '600' }}>{a.title}</Text>
-                  </Pressable>
-                )),
-                ...(canAssign
-                  ? [
-                      <Pressable
-                        key="assign"
-                        accessibilityRole="button"
-                        accessibilityLabel="Assign homework"
-                        hitSlop={8}
-                        onPress={() =>
-                          router.push({
-                            pathname: '/courses/[id]/meetings/[meetingId]/assign-homework',
-                            params: { id: course.id, meetingId: m.id },
-                          })
-                        }>
-                        <Text style={{ color: colors.primary, fontWeight: '600' }}>Assign homework</Text>
-                      </Pressable>,
-                    ]
-                  : []),
-                ...attendanceItems,
-                ...(checkAction
-                  ? [
-                      <Pressable
-                        key="check"
-                        accessibilityRole="button"
-                        accessibilityLabel={checkAction.title}
-                        accessibilityState={{ disabled: busy }}
-                        disabled={busy}
-                        hitSlop={8}
-                        onPress={() => setChecked(m, checkAction.checked)}>
-                        <Text style={{ color: colors.primary, fontWeight: '600', opacity: busy ? 0.4 : 1 }}>
-                          {checkAction.title}
-                        </Text>
-                      </Pressable>,
-                    ]
-                  : []),
-                ...actions.map((a) => (
-                  <Pressable
-                    key={a.title}
-                    accessibilityRole="button"
-                    accessibilityLabel={a.title}
-                    accessibilityState={{ disabled: busy }}
-                    disabled={busy}
-                    hitSlop={8}
-                    onPress={() => changeStatus(m, a.status)}>
-                    <Text
-                      style={{
-                        color: a.status === 'canceled' ? colors.danger : colors.primary,
-                        fontWeight: '600',
-                        opacity: busy ? 0.4 : 1,
-                      }}>
-                      {a.title}
-                    </Text>
-                  </Pressable>
-                )),
-              ]
-            )}
+        {/* AC 6: no divider and no footer when the meeting has no actions. "Saving…" replaces the footer. */}
+        {footer.length > 0 && (
+          <View testID={`actions-${m.id}`} style={tile.footer}>
+            {changing === m.id ? <Text style={styles.muted}>Saving…</Text> : footer}
           </View>
         )}
       </View>
     );
   }
 }
+
+const tile = StyleSheet.create({
+  list: { gap: 10 },
+  // AC 1: rounded, light background, 1 pt outline; AC 2: a 4 pt left bar (its colour is set per tile).
+  tile: {
+    backgroundColor: colors.bg,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderLeftWidth: 4,
+    padding: 12,
+    gap: 4,
+  },
+  topic: { flex: 1, fontSize: 16, fontWeight: '700', color: colors.text },
+  // AC 6: a thin divider above the actions, which wrap in rows with 8 pt gaps.
+  footer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 6,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  pill: {
+    minHeight: 30,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    justifyContent: 'center',
+    backgroundColor: colors.primarySoft,
+  },
+  pillDanger: { backgroundColor: '#FEF2F2' },
+  pillText: { fontSize: 13, fontWeight: '600' },
+});

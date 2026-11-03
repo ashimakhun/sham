@@ -93,12 +93,12 @@ describe('Edit action', () => {
     const view = await render(<CourseDetailScreen />);
     // ARU-60: a started meeting is In progress, listed before Upcoming.
     const headings = () => screen.getAllByRole('header').map((h) => h.props.children);
-    expect(headings()).toEqual(['In progress', 'Upcoming']);
+    expect(headings()).toEqual(['IN PROGRESS (1)', 'UPCOMING (1)']); // ARU-88: uppercase, with the group's count
     expect(screen.getAllByTestId(/^meeting-/).map((v) => v.props.testID)).toEqual(['meeting-P', 'meeting-L']);
     setStore(fakeStore('S1', { courseMembers: members, meetings: [later, { ...P, startsAt: at(5), rescheduledAt: at(0) }] }));
     await view.rerender(<CourseDetailScreen />);
     // Moved to the future: both upcoming, soonest first.
-    expect(headings()).toEqual(['Upcoming']);
+    expect(headings()).toEqual(['UPCOMING (2)']);
     expect(screen.getAllByTestId(/^meeting-/).map((v) => v.props.testID)).toEqual(['meeting-P', 'meeting-L']);
   });
 });
