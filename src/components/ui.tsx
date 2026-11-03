@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import type { ComponentProps, ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
 
 import { colors, roleColor, roleLabel } from '@/lib/theme';
@@ -35,13 +36,17 @@ type ButtonProps = {
   disabled?: boolean;
   /** New-message count shown next to the title (ARU-31); nothing is shown at 0 and the label stays the title. */
   unread?: number;
+  /** ARU-69: show this icon instead of the title text. The title is then the button's screen reader label. */
+  icon?: ComponentProps<typeof Ionicons>['name'];
 };
 
-export function Button({ title, onPress, variant = 'primary', disabled, unread = 0 }: ButtonProps) {
+export function Button({ title, onPress, variant = 'primary', disabled, unread = 0, icon }: ButtonProps) {
+  const textColor = variant === 'primary' ? '#fff' : variant === 'danger' ? colors.danger : colors.primary;
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={unread > 0 ? withUnreadLabel(title, unread) : undefined}
+      // With an icon there is no visible text, so the label is always set; the unread count joins it (ARU-31).
+      accessibilityLabel={unread > 0 ? withUnreadLabel(title, unread) : icon ? title : undefined}
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [
@@ -51,15 +56,12 @@ export function Button({ title, onPress, variant = 'primary', disabled, unread =
         variant === 'danger' && { backgroundColor: '#FEF2F2' },
         (pressed || disabled) && { opacity: disabled ? 0.4 : 0.8 },
       ]}>
-      <Text
-        style={[
-          styles.buttonText,
-          variant === 'primary' && { color: '#fff' },
-          variant === 'secondary' && { color: colors.primary },
-          variant === 'danger' && { color: colors.danger },
-        ]}>
-        {title}
-      </Text>
+      {icon ? (
+        // Same size as the course card's chat icon (ARU-25); the button keeps its full-width, 46 pt target.
+        <Ionicons name={icon} size={24} color={textColor} style={{ marginVertical: -3 }} accessibilityElementsHidden importantForAccessibility="no" />
+      ) : (
+        <Text style={[styles.buttonText, { color: textColor }]}>{title}</Text>
+      )}
       {unread > 0 && <UnreadBadge count={unread} style={{ position: 'absolute', right: 12, top: 11 }} />}
     </Pressable>
   );

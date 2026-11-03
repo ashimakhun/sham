@@ -71,7 +71,13 @@ export default function ProfileScreen() {
       <View style={{ gap: 10, marginTop: 8 }}>
         {/* ARU-61: first in this group, so the order is the same for every role. */}
         {canUseGeneralChat(currentUser) && (
-          <Button title="General chat" variant="secondary" onPress={() => router.push('/general-chat')} />
+          // ARU-69: the chat icon instead of the words; read as "Open general chat".
+          <Button
+            title="Open general chat"
+            icon="chatbubble-outline"
+            variant="secondary"
+            onPress={() => router.push('/general-chat')}
+          />
         )}
         {canManageRoles(currentUser.role) && (
           <Button
