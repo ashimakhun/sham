@@ -248,21 +248,13 @@ describe('AC3-AC6: editor', () => {
     expect(router.back).toHaveBeenCalled();
   });
 
-  it('Link rejects non-web URLs inline and leaves the text unchanged', async () => {
+  it('has no Link tool; a hand-typed link is kept as plain text (ARU-64)', async () => {
     Object.assign(params, { meetingId: 'C', edit: '1' });
     setStore(fakeStore('M', { courseMembers: members, meetings: [C] }));
     await render(<MeetingNotesScreen />);
-    await fireEvent.changeText(screen.getByLabelText('Notes'), 'docs');
-    await fireEvent(screen.getByLabelText('Notes'), 'selectionChange', {
-      nativeEvent: { selection: { start: 0, end: 4 } },
-    });
-    await fireEvent.press(screen.getByRole('button', { name: 'Link' }));
-    await fireEvent.changeText(screen.getByLabelText('Link URL'), 'javascript:alert(1)');
-    await fireEvent.press(screen.getByRole('button', { name: 'Add link' }));
-    expect(screen.getByText(/starting with http:\/\/ or https:\/\//)).toBeTruthy();
-    expect(screen.getByLabelText('Notes').props.value).toBe('docs');
-    await fireEvent.changeText(screen.getByLabelText('Link URL'), 'https://x.io');
-    await fireEvent.press(screen.getByRole('button', { name: 'Add link' }));
+    expect(screen.queryByRole('button', { name: 'Link' })).toBeNull();
+    await fireEvent.changeText(screen.getByLabelText('Notes'), '[docs](https://x.io)');
+    expect(screen.queryByLabelText('Link URL')).toBeNull();
     expect(screen.getByLabelText('Notes').props.value).toBe('[docs](https://x.io)');
   });
 
