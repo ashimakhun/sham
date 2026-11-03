@@ -22,9 +22,8 @@ select t.eq((select count(*) from listener_homework_photos(t.id('A'), t.id('S2')
   'AC1 no photo path is returned for a non-listener, so the app has nothing to delete');
 select t.eq(t.affected($$delete from storage.objects where name like '%/a2.jpg'$$), 0::bigint,
   'storage: a mentor cannot delete a non-listener''s photo directly either');
+-- (ARU-85 changed the teacher's side on purpose: the teacher may delete every homework photo, see the end of file.)
 reset role; select t.login('T');
-select t.eq(t.affected($$delete from storage.objects where name like '%/a2.jpg'$$), 0::bigint,
-  'storage: the teacher cannot delete a non-listener''s photo directly either');
 select t.lives($$select remove_listener('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000c2')$$,
   'AC2 the full app flow for a non-listener returns without error');
 reset role;
@@ -68,3 +67,10 @@ select t.eq((select pg_get_function_result(oid) from pg_proc where proname = 'li
   'listener_homework_photos keeps its return shape');
 select t.ok(not exists (select 1 from pg_policies where tablename = 'course_members' and cmd in ('DELETE', 'ALL')),
   'still no delete policy on course_members (removal only through remove_listener)');
+
+-- ARU-85 (0041): the teacher may now delete any homework photo, a non-listener's included (needed to delete a course).
+-- Mentors still can't (checked above).
+select t.login('T');
+select t.eq(t.affected($$delete from storage.objects where name like '%/a2.jpg'$$), 1::bigint,
+  'ARU-85 storage: the teacher can delete a non-listener''s photo directly');
+reset role;

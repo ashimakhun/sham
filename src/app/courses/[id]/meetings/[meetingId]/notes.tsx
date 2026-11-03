@@ -7,6 +7,7 @@ import { MarkdownEditor } from '@/components/MarkdownEditor';
 import { MarkdownText } from '@/components/MarkdownText';
 import { Button, Card, EmptyState, ErrorText, styles } from '@/components/ui';
 import { confirmAction } from '@/lib/confirm';
+import { DELETED_ACCOUNT } from '@/lib/deleteAccount';
 import { canManageMeetings, canSeeMeetings } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors, formatDateTime } from '@/lib/theme';
@@ -38,7 +39,12 @@ export default function MeetingNotesScreen() {
 
 function NotesView({ course, meeting, canEdit }: { course: Course; meeting: Meeting; canEdit: boolean }) {
   const { getUser } = useStore();
-  const editor = meeting.notesUpdatedById ? (getUser(meeting.notesUpdatedById)?.name ?? 'Unknown') : undefined;
+  // Notes edited by someone who then deleted their account have no editor any more (ARU-75): "Deleted account".
+  const editor = meeting.notesUpdatedById
+    ? (getUser(meeting.notesUpdatedById)?.name ?? 'Unknown')
+    : meeting.notes && meeting.notesUpdatedAt
+      ? DELETED_ACCOUNT
+      : undefined;
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic">
       <Stack.Screen options={{ title: 'Notes' }} />

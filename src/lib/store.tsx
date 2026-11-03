@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { AppState } from 'react-native';
 
 import { periodProblem } from './billing';
+import { ACCOUNT_DELETED, DELETE_FAILED, DELETE_OFFLINE } from './deleteAccount';
 import { FEEDBACK_MAX } from './feedback';
 import { fileFieldsError, isAllowedPdf, PDF_MAX_BYTES, PDF_RULE } from './files';
 import { NOTES_MAX } from './markdown';
@@ -88,6 +89,12 @@ export type Store = {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  /** ARU-75: deletes the signed-in user's own account through the delete-account Edge Function, after checking the
+   *  password there. On success this device is signed out and the sign-in screen shows `accountNotice`. On failure
+   *  the error is thrown and the user stays signed in (unless the account turns out to be gone already). */
+  deleteAccount: (password: string) => Promise<void>;
+  /** ARU-75: a message for the sign-in screen ("Your account was deleted"), or null. Cleared by the next sign-in. */
+  accountNotice: string | null;
   /** Approved users change their own name (ARU-55): trimmed, not blank, at most NAME_MAX characters. The database
    *  allows only the own row and refuses blank names; the store's profiles are updated right after the save. */
   updateMyName: (name: string) => Promise<void>;
@@ -234,8 +241,8 @@ type ProfileRow = {
   access_status?: User['accessStatus'] | null;
   is_accountant?: boolean | null;
 };
-type BillingRow = { course_id: string; start_day: number; end_day: number; selected_by: string; selected_at: string };
-type PaymentRow = { course_id: string; user_id: string; month: string; marked_by: string; marked_at: string };
+type BillingRow = { course_id: string; start_day: number; end_day: number; selected_by: string | null; selected_at: string };
+type PaymentRow = { course_id: string; user_id: string; month: string; marked_by: string | null; marked_at: string };
 type ExemptionRow = { course_id: string; user_id: string };
 type DueRow = { course_id: string; deadline: string };
 type AccessRequestRow = { id: string; full_name: string; email: string | null; created_at: string; access_status: AccessRequest['status'] };
@@ -260,7 +267,7 @@ type AssignmentRow = {
   title: string;
   description: string;
   due_at: string | null;
-  created_by: string;
+  created_by: string | null;
   created_at: string;
 };
 type CourseRow = {
@@ -272,8 +279,8 @@ type CourseRow = {
   hidden?: boolean | null;
   discipline_id?: string | null;
 };
-type DisciplineRow = { id: string; name: string; hidden: boolean; created_by: string; created_at: string };
-type CourseMemberRow = { course_id: string; user_id: string; added_by: string; added_at: string };
+type DisciplineRow = { id: string; name: string; hidden: boolean; created_by: string | null; created_at: string };
+type CourseMemberRow = { course_id: string; user_id: string; added_by: string | null; added_at: string };
 type MeetingRow = {
   id: string;
   course_id: string;
@@ -281,7 +288,7 @@ type MeetingRow = {
   topic: string;
   location: string | null;
   status: MeetingStatus;
-  created_by: string;
+  created_by: string | null;
   created_at: string;
   status_changed_by: string | null;
   status_changed_at: string | null;
@@ -303,8 +310,9 @@ type FeedbackRow = {
   created_at: string;
   updated_at: string;
 };
-type MessageRow = { id: string; course_id: string; author_id: string; body: string; created_at: string };
-type GeneralMessageRow = { id: string; author_id: string; body: string; created_at: string };
+// ARU-75: references to people are null once that person deleted their account.
+type MessageRow = { id: string; course_id: string; author_id: string | null; body: string; created_at: string };
+type GeneralMessageRow = { id: string; author_id: string | null; body: string; created_at: string };
 type UnreadRow = { course_id: string; unread: number | string };
 type MaterialFileRow = {
   id: string;
@@ -518,6 +526,22 @@ const toMaterialFile = (r: MaterialFileRow): MaterialFile => ({
 
 type ListenerHomeworkRow = { id: string; photo_path: string | null };
 
+/** ARU-75: the readable message for a failed delete-account call. The function answers {"error": "<message>"}; no
+ *  answer at all (offline) or an unreadable one gets a generic message. */
+async function deleteErrorMessage(error: unknown): Promise<string> {
+  const e = error as { name?: string; context?: { json?: () => Promise<unknown>; status?: number } };
+  if (e?.name === 'FunctionsFetchError') return DELETE_OFFLINE;
+  if (typeof e?.context?.json === 'function') {
+    try {
+      const body = (await e.context.json()) as { error?: unknown } | null;
+      if (typeof body?.error === 'string' && body.error) return body.error;
+    } catch {
+      // Not JSON (e.g. a gateway error page).
+    }
+  }
+  return DELETE_FAILED;
+}
+
 type Result = { error: { message: string; code?: string } | null };
 
 function check(res: Result) {
@@ -621,8 +645,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [activeChat, setActiveChat] = useState<string | null>(null);
   const [generalUnread, setGeneralUnread] = useState(0);
   const [generalChatOpen, setGeneralChatOpen] = useState(false);
+  const [accountNotice, setAccountNotice] = useState<string | null>(null);
 
   const userId = session?.user.id;
+
+  // ARU-75 AC 9: the stored session is used without asking the server, so on start, on returning to the app and when
+  // the own profile is missing, ask Auth whether the user still exists. If it was deleted (e.g. on another device),
+  // sign out here and say so. Network and other errors change nothing.
+  const verifiedFor = useRef<string | null>(null);
+  const verifyUser = useCallback(async (): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase.auth.getUser();
+      if (!error || data?.user) return false;
+      const e = error as { status?: number; code?: string; message?: string };
+      const gone =
+        e.code === 'user_not_found' || /user from sub claim in jwt does not exist|user not found/i.test(e.message ?? '');
+      if (!gone) return false;
+      setAccountNotice(ACCOUNT_DELETED);
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+      return true;
+    } catch {
+      // Offline or no auth client: try again next time.
+      return false;
+    }
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -706,6 +752,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       ]);
       const all = rows<ProfileRow>(profileRows).map(toUser);
       const me = all.find((u) => u.id === userId);
+      // ARU-75 AC 9: once per sign-in (app start), and whenever the own profile is missing (the account may have been
+      // deleted on another device), check the user with the server.
+      if (!me || verifiedFor.current !== userId) {
+        verifiedFor.current = userId;
+        verifyUser().catch(() => {});
+      }
       setProfiles(all);
       setHomework(await withSignedPhotoUrls(rows<HomeworkRow>(hw).map(toHomework)));
       setMaterials(rows<MaterialRow>(mats).map(toMaterial));
@@ -760,7 +812,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoadedFor(userId);
     }
-  }, [userId, loadUnread, loadGeneralUnread]);
+  }, [userId, loadUnread, loadGeneralUnread, verifyUser]);
 
   /** User-triggered reload (pull to refresh, retry) with a spinner. */
   const refresh = useCallback(async () => {
@@ -781,6 +833,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!userId) return;
     load().catch(() => {});
   }, [userId, load]);
+
+  // ARU-75 AC 9: check the user with the server every time the app comes back to the foreground (on start: load()).
+  useEffect(() => {
+    if (!userId) return;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') verifyUser().catch(() => {});
+    });
+    return () => sub.remove();
+  }, [userId, verifyUser]);
 
   // Live updates start once the first load has said whether the account is approved.
   const firstLoadDone = !!userId && loadedFor === userId;
@@ -947,9 +1008,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     getUser,
     getCourse,
     signIn: async (email, password) => {
+      setAccountNotice(null);
       check(await supabase.auth.signInWithPassword({ email: email.trim(), password }));
     },
     signUp: async (name, email, password) => {
+      setAccountNotice(null);
       check(
         await supabase.auth.signUp({
           email: email.trim(),
@@ -960,6 +1023,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     signOut: async () => {
       check(await supabase.auth.signOut());
+    },
+    accountNotice,
+    deleteAccount: async (password) => {
+      if (!userId) throw new Error('You are not signed in.');
+      if (currentUser?.role === 'teacher') throw new Error("The teacher's account can't be deleted.");
+      let res: { error: unknown };
+      try {
+        res = await supabase.functions.invoke('delete-account', { body: { password } });
+      } catch {
+        throw new Error(DELETE_OFFLINE);
+      }
+      if (res.error) {
+        const message = await deleteErrorMessage(res.error);
+        // The account may be gone even though the answer didn't arrive (a retry after a lost response, or the app
+        // was stopped half-way): then sign out with the notice instead of showing an error.
+        if (await verifyUser()) return;
+        throw new Error(message);
+      }
+      setAccountNotice(ACCOUNT_DELETED);
+      // The server already ended the account; only this device's stored session is left to remove.
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
     },
     updateMyName: async (name) => {
       if (!currentUser || (currentUser.accessStatus && currentUser.accessStatus !== 'approved')) {

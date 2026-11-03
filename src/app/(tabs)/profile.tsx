@@ -98,6 +98,10 @@ export default function ProfileScreen() {
         <ErrorText error={error} />
         {/* The root screen redirects to sign-in once the session is gone. */}
         <Button title="Sign out" variant="secondary" disabled={busy} onPress={() => run(signOut)} />
+        {/* ARU-75: last in the group; the teacher's account can't be deleted. */}
+        {currentUser.role !== 'teacher' && (
+          <Button title="Delete account" variant="danger" disabled={busy} onPress={() => router.push('/delete-account')} />
+        )}
       </View>
     </ScrollView>
   );
