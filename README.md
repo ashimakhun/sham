@@ -80,7 +80,11 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    with policies, a trigger and functions, deletes nothing; accounts already approved start with everything read),
    `0035_meeting_start_notifications.sql` (ARU-41: Telegram message when a meeting starts; adds
    `course_meetings.start_notified_at`, `claim_started_meetings()` and a `pg_cron` job, and replaces `update_meeting()`;
-   deletes nothing. Turn on **pg_cron** and **pg_net** first, see [Telegram notifications](#telegram-notifications)).
+   deletes nothing. Turn on **pg_cron** and **pg_net** first, see [Telegram notifications](#telegram-notifications)),
+   `0036_chat_message_notifications.sql` (ARU-44: Telegram message for new course chat messages; adds the
+   `chat_message_recipients()` function and an after-insert trigger on `course_messages`, turns on `pg_net` where the
+   server offers it; no table, column or policy changes, deletes nothing; needs 0023; until the Vault secrets below
+   are stored the trigger does nothing; see [Telegram notifications](#telegram-notifications)).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 
@@ -151,6 +155,36 @@ minute; the function claims the meetings that just started (`claim_started_meeti
    `{"meetings":0,"sent":0,…}`. A `401` means the two secrets differ.
 
 To change a Vault value later: `select vault.update_secret((select id from vault.secrets where name = 'meeting_notify_secret'), '<new>');`.
+
+#### New chat messages (ARU-44)
+
+When someone posts in a course chat, the other people in that chat (owner, listeners, every teacher; Approved only)
+get "New message in the <course title> chat" if they linked Telegram and have **Chat messages** on. One message per
+batch: only for the oldest message from others they haven't read yet, so after opening the chat the next post
+notifies them again. An after-insert trigger on `course_messages` (migration 0036) queues one `pg_net` call to the
+Edge Function `chat-message-notifications`, which asks `chat_message_recipients()` (service role only) who gets it.
+Failures are logged and dropped, never retried, and never stop a message from being posted.
+
+1. **Database → Extensions**: turn on `pg_net` (then run migration 0036 if it isn't applied yet).
+2. Pick a random secret (e.g. `openssl rand -hex 32`) and set it, with the bot token from above, as function secrets:
+   ```bash
+   npx supabase secrets set CHAT_NOTIFY_SECRET=<random secret>
+   ```
+3. Deploy the function (the trigger sends the secret, not a Supabase JWT):
+   ```bash
+   npx supabase functions deploy chat-message-notifications --no-verify-jwt
+   ```
+4. In the SQL Editor, store the function's URL and the same secret in Vault:
+   ```sql
+   select vault.create_secret('https://<project-ref>.supabase.co/functions/v1/chat-message-notifications', 'chat_notify_url');
+   select vault.create_secret('<the same random secret>', 'chat_notify_secret');
+   ```
+   To change one later: `select vault.update_secret((select id from vault.secrets where name = 'chat_notify_secret'), '<new>');`
+   (and set `CHAT_NOTIFY_SECRET` to the same value).
+
+Check a post: `select status_code, content from net._http_response order by created desc limit 5;` shows the
+function's answer (`{"message_id": …, "recipients": n, "sent": …, "skipped": …, "failed": […]}`); the function's
+log (dashboard → Edge Functions → chat-message-notifications → Logs) has one line per post.
 
 ## Run it
 
@@ -259,6 +293,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Switch student ↔ mentor    |           |                    | ✓       |
 | Accept or reject new accounts |        |                    | ✓       |
 | Connect Telegram and choose own notifications | ✓ (own) | ✓ (own) | ✓ (own) |
+| Get a Telegram message for new course chat messages (ARU-44; linked, **Chat messages** on) | courses they're in | own courses + courses they're in | all courses |
 | Turn Accountant on / off for a mentor (ARU-65) | |         | ✓       |
 | Select / unselect paid courses |         | accountants (any course they can see) |  |
 | See paid courses, change their payment period | | accountants (all they can see) | ✓ (all) |
