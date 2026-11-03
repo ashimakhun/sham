@@ -67,7 +67,9 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    changes insert grants only),
    `0031_disciplines.sql` (ARU-63: disciplines; adds a table, a nullable `courses.discipline_id` and two functions,
    deletes nothing; existing courses get no discipline; it doesn't
-   depend on 0028-0030).
+   depend on 0028-0030),
+   `0032_general_chat_reads.sql` (ARU-72: new message count for the general chat; adds the `general_chat_reads` table
+   with policies, a trigger and functions, deletes nothing; accounts already approved start with everything read).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 
@@ -170,6 +172,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Add / remove listeners     |           | ✓ (any course they can reach¹) | ✓       |
 | Course chat (read / post)  | courses they're in | own courses + courses they're in | all |
 | General chat (read / post; no edit or delete) | ✓ | ✓ | ✓ |
+| General chat new message count (`general_chat_reads`, own row only) | ✓ | ✓ | ✓ |
 | See course meetings        | courses they're in | ✓ (all courses)  | ✓       |
 | Schedule meetings, mark completed / canceled | | own courses    | any course |
 | Edit / reschedule a scheduled meeting | | own courses           | any course |
