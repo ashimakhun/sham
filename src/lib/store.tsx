@@ -110,6 +110,11 @@ export type Store = {
   countListenerHomework: (courseId: string, userId: string) => Promise<number>;
   /** Teachers and mentors only. Deletes the listener's homework for the course (and photos), then the membership. */
   removeListener: (courseId: string, userId: string) => Promise<void>;
+  /** Teacher only (ARU-85): deletes the course with everything in it. Homework photos first (checked that Storage
+   *  really removed them), then the course and its rows in one transaction. A course that is already gone counts as
+   *  deleted, so a retry finishes a half-done delete. Doesn't wait for the refetch, so the caller can navigate away
+   *  before the course screen turns into "Course not found". */
+  deleteCourse: (courseId: string) => Promise<void>;
   deleteMaterial: (id: string) => Promise<void>;
   /** Teachers and mentors (ARU-30): uploads the PDF, then saves the item. A retry with the same `id` reuses both.
    *  When `isCancelled()` is true after the upload (the user left the screen), nothing is saved and the file is
@@ -520,6 +525,10 @@ function checkInsert(res: Result) {
   if (res.error?.code === '23505') return;
   check(res);
 }
+
+/** Postgres "no data found": the course doesn't exist (any more) or is hidden from the caller. */
+const COURSE_NOT_FOUND = 'P0002';
+const PHOTOS_NOT_REMOVED = "Some homework photos couldn't be deleted, so the course wasn't deleted. Try again.";
 
 const NO_LONGER_LISTENER = "You're no longer a listener of this course.";
 
@@ -1107,6 +1116,32 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       //    their homework minus photos, and tapping "Remove" again finishes the job.
       check(await supabase.rpc('remove_listener', { course: courseId, member: userId }));
       await load();
+    },
+    deleteCourse: async (courseId) => {
+      requireRole('teacher');
+      // Photos of the course still in Storage; null when the course is already gone (a retry after a delete).
+      const listPhotos = async () => {
+        const res = await supabase.rpc('course_homework_photos', { course: courseId });
+        if (res.error?.code === COURSE_NOT_FOUND) return null;
+        return rows<{ photo_path: string }>(res).map((r) => r.photo_path);
+      };
+      const done = () => {
+        load().catch(() => {});
+      };
+      // 1. Photos first (SQL can't delete Storage files). If this fails, nothing else has changed.
+      const paths = await listPhotos();
+      if (paths === null) return done();
+      if (paths.length) {
+        check(await supabase.storage.from('homework').remove(paths));
+        // remove() silently skips objects it may not delete, so check that none is left.
+        const left = await listPhotos();
+        if (left === null) return done();
+        if (left.length) throw new Error(PHOTOS_NOT_REMOVED);
+      }
+      // 2. The course and everything in it, in one transaction. Already gone (P0002) counts as done.
+      const res = await supabase.rpc('delete_course', { course: courseId });
+      if (res.error?.code !== COURSE_NOT_FOUND) check(res);
+      done();
     },
     deleteMaterial: async (id) => {
       requireRole('teacher', 'mentor');

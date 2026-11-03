@@ -100,7 +100,13 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    month or are exempt; adds the `course_payments` and `course_payment_exemptions` tables with RLS (accountants and
    the teacher, current listeners of paid courses only, hidden courses as in 0019), `can_manage_payment()` and
    `my_payment_dues(today)` (a listener's own due courses for their device-local date), and puts both tables in the
-   realtime publication; changes and deletes no existing data; needs 0032).
+   realtime publication; changes and deletes no existing data; needs 0032),
+   `0041_delete_course.sql` (ARU-85: the teacher deletes a course with everything in it; adds
+   `course_homework_photos(course)` (the course's homework photos still in Storage, teacher only) and
+   `delete_course(course)` (the course's homework, then the course, in one transaction; its other rows cascade and
+   Knowledge base PDFs keep "No course"), plus Storage policies that let the teacher read and delete every photo in
+   the `homework` bucket; changes and deletes no existing data. The app removes the photos through the Storage API
+   before calling `delete_course`, so no Edge Function or extra setup is needed).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 
@@ -343,6 +349,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Create a discipline, hide / unhide it |   |                    | ✓       |
 | Set / change / clear a course's discipline (ARU-70) | | own courses   | any course |
 | Create courses             |           | ✓                  | ✓       |
+| Delete a course and everything in it (ARU-85) | |          | ✓ (any course, hidden ones too) |
 | Create a hidden course     |           | ✓                  | ✓       |
 | See a hidden course and its content | (listeners only) | owner and listeners only | ✓ (all) |
 | Change course owner        |           | ✓ (any course they can reach¹) | ✓       |
