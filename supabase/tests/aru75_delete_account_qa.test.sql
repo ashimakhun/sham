@@ -2,7 +2,7 @@
 -- a listener with Paid marks and an exemption is deleted (their rows go), an accountant who marked and exempted is
 -- deleted (the rows stay with no marker), the deleted listener no longer owes anything and others' dues are
 -- unchanged, a deleted accountant's paid-course selection stays, and the 0039 foreign keys have the right actions.
--- Fails on the ARU-75 branch alone (no 0039 there) until main is merged in (ARU-83).
+-- Fails on the ARU-75 branch alone (no 0039 there) until main is merged in (ARU-92).
 -- Fixture: teacher T; mentor M owns A (paid, days 1-28); M2 (owns nothing) is an accountant; S1 and S2 are listeners of A.
 select t.seed();
 
