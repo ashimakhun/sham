@@ -8,3 +8,8 @@ export function withUnreadLabel(label: string, count: number) {
   if (count <= 0) return label;
   return `${label}, ${formatUnread(count)} new ${count === 1 ? 'message' : 'messages'}`;
 }
+
+/** ARU-73: the Homework tab's Listener switch label, e.g. "Listener, 3 new homework"; just "Listener" at 0. */
+export function listenerTabLabel(newCount: number) {
+  return newCount > 0 ? `Listener, ${formatUnread(newCount)} new homework` : 'Listener';
+}

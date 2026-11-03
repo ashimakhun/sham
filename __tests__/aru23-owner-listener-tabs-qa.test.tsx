@@ -28,7 +28,8 @@ const asg = (id: string, courseId: string, title: string, createdById: string) =
 });
 const ASSIGNMENTS = [asg('asgA', 'A', 'Task in A', 'M'), asg('asgB', 'B', 'Task in B', 'N')];
 const titles = () => screen.queryAllByText(/^(S1 |Max |Nina )/).map((t) => t.props.children);
-const tab = (name: 'Owner' | 'Listener') => screen.queryByRole('tab', { name });
+// ARU-73: with new assignments the Listener tab is read as "Listener, N new homework", so match the start of the name.
+const tab = (name: 'Owner' | 'Listener') => screen.queryByRole('tab', { name: new RegExp(`^${name}(,|$)`) });
 const addButton = () => screen.queryByRole('button', { name: '+ Add homework' });
 
 beforeEach(() => jest.clearAllMocks());
