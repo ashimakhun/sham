@@ -5,6 +5,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { DisciplineLabel } from '@/components/Disciplines';
 import { Card, HiddenBadge, OwnerLine, UnreadBadge, styles } from '@/components/ui';
+import { paymentDueText } from '@/lib/billing';
 import { feedbackFor, ratingSummary, ratingSummaryLabel } from '@/lib/feedback';
 import { inCourseChat, seesOnlyCourseSummary } from '@/lib/roles';
 import { useStore } from '@/lib/store';
@@ -18,12 +19,14 @@ type Props = {
   tag?: string;
   /** Called just before the details or chat screen opens (keeps the Courses tab view). */
   onOpen?: () => void;
+  /** ARU-66: the signed-in listener owes this course; the deadline (YYYY-MM-DD). Red border and a "Payment due" line. */
+  paymentDue?: string;
 };
 
 /** A second tap within this window is ignored, so a quick double tap opens only one screen (ARU-25). */
 const TAP_GUARD_MS = 800;
 
-export function CourseCard({ course, tag, onOpen }: Props) {
+export function CourseCard({ course, tag, onOpen, paymentDue }: Props) {
   const { getUser, currentUser, courseMembers, unreadCount, courseFeedback } = useStore();
   // A student who is not a listener sees only the title and description (ARU-24).
   const summaryOnly = seesOnlyCourseSummary(currentUser, course, courseMembers);
@@ -80,10 +83,23 @@ export function CourseCard({ course, tag, onOpen }: Props) {
           {rating}
         </Text>
       ) : null}
+      {/* ARU-66 AC 7: read with the card's other text by screen readers. */}
+      {paymentDue ? (
+        <Text testID={`payment-due-${course.id}`} style={{ color: colors.danger, fontSize: 14, fontWeight: '600' }}>
+          {paymentDueText(paymentDue)}
+        </Text>
+      ) : null}
     </>
   );
+  // A thin (1 pt) red border in the theme's red.
+  const dueBorder = paymentDue ? { borderWidth: 1, borderColor: colors.danger } : null;
 
-  if (!showChat) return <Card onPress={() => open('/courses/[id]')}>{content}</Card>;
+  if (!showChat)
+    return (
+      <Card onPress={() => open('/courses/[id]')} style={dueBorder ?? undefined}>
+        {content}
+      </Card>
+    );
 
   return (
     // The card opts out of accessibility grouping so screen readers reach the chat icon on its own; the content
@@ -92,7 +108,7 @@ export function CourseCard({ course, tag, onOpen }: Props) {
     <Card
       onPress={() => open('/courses/[id]')}
       accessible={false}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 8, ...dueBorder }}>
       <Pressable
         accessibilityRole="button"
         onPress={() => open('/courses/[id]')}

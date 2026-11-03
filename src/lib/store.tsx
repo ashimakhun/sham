@@ -14,6 +14,9 @@ import type {
   CourseMember,
   CourseBilling,
   CourseMessage,
+  CoursePayment,
+  PaymentDue,
+  PaymentExemption,
   Discipline,
   GeneralMessage,
   Homework,
@@ -179,6 +182,18 @@ export type Store = {
   setBillingPeriod: (courseId: string, startDay: number, endDay: number) => Promise<void>;
   /** An accountant unselects a paid course, for everyone. Already gone counts as done. */
   unselectPaidCourse: (courseId: string) => Promise<void>;
+  /** ARU-66: Paid marks of current listeners of paid courses (accountants and the teacher; empty for others). */
+  coursePayments: CoursePayment[];
+  /** ARU-66: exemptions of current listeners of paid courses (accountants and the teacher; empty for others). */
+  paymentExemptions: PaymentExemption[];
+  /** ARU-66: marks a listener Paid for `month` (YYYY-MM-01, device-local). Marking again is a no-op. */
+  markPaid: (courseId: string, userId: string, month: string) => Promise<void>;
+  /** ARU-66: removes the listener's Paid mark for `month`, whoever made it. */
+  undoPaid: (courseId: string, userId: string, month: string) => Promise<void>;
+  /** ARU-66: sets (true) or clears (false) a listener's exemption. Repeats are no-ops. */
+  setExempt: (courseId: string, userId: string, exempt: boolean) => Promise<void>;
+  /** ARU-66: the signed-in listener's own due courses for `today` (YYYY-MM-DD, device-local). Throws on error. */
+  loadPaymentDues: (today: string) => Promise<PaymentDue[]>;
   /** New messages from others per course chat since the user last read it (ARU-31). 0 while that chat is open. */
   unreadCount: (courseId: string) => number;
   /** Marks a chat read up to `upToMessageId` (the newest message shown), by that message's server time. Clears the
@@ -211,6 +226,9 @@ type ProfileRow = {
   is_accountant?: boolean | null;
 };
 type BillingRow = { course_id: string; start_day: number; end_day: number; selected_by: string; selected_at: string };
+type PaymentRow = { course_id: string; user_id: string; month: string; marked_by: string; marked_at: string };
+type ExemptionRow = { course_id: string; user_id: string };
+type DueRow = { course_id: string; deadline: string };
 type AccessRequestRow = { id: string; full_name: string; email: string | null; created_at: string; access_status: AccessRequest['status'] };
 type HomeworkRow = {
   id: string;
@@ -331,6 +349,15 @@ const toBilling = (r: BillingRow): CourseBilling => ({
   endDay: r.end_day,
   selectedById: r.selected_by,
   selectedAt: r.selected_at,
+});
+
+const toPayment = (r: PaymentRow): CoursePayment => ({
+  courseId: r.course_id,
+  userId: r.user_id,
+  // A date column; keep only YYYY-MM-DD in case a time part comes back.
+  month: String(r.month).slice(0, 10),
+  markedById: r.marked_by,
+  markedAt: r.marked_at,
 });
 
 /** ARU-65: who reads paid courses (mirrors 0032's select policy): the teacher and approved mentor accountants. */
@@ -544,6 +571,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [courseFeedback, setCourseFeedback] = useState<CourseFeedback[]>([]);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
   const [courseBilling, setCourseBilling] = useState<CourseBilling[]>([]);
+  const [coursePayments, setCoursePayments] = useState<CoursePayment[]>([]);
+  const [paymentExemptions, setPaymentExemptions] = useState<PaymentExemption[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [unread, setUnread] = useState<Record<string, number>>({});
@@ -575,6 +604,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setAttendance([]);
         setMaterialLikes([]);
         setCourseFeedback([]);
+        setCourseBilling([]);
+        setCoursePayments([]);
+        setPaymentExemptions([]);
         setUnread({});
         setActiveChat(null);
         setGeneralUnread(0);
@@ -650,15 +682,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setUnread({});
         setGeneralUnread(0);
         setCourseBilling([]);
+        setCoursePayments([]);
+        setPaymentExemptions([]);
         return;
       }
       // ARU-65: paid courses, only for those who may read them (students and other mentors make no request).
+      // ARU-66: the same people read Paid marks and exemptions (RLS: current listeners of paid courses only).
       if (seesBilling(me)) {
-        const bill = await supabase.from('course_billing').select('*');
-        // Before 0032 runs there is no table: no paid courses.
+        const [bill, pays, exempts] = await Promise.all([
+          supabase.from('course_billing').select('*'),
+          supabase.from('course_payments').select('*'),
+          supabase.from('course_payment_exemptions').select('*'),
+        ]);
+        // Before 0032 / 0039 run there is no table: no paid courses, marks or exemptions.
         setCourseBilling(bill.error ? [] : ((bill.data as BillingRow[] | null) ?? []).map(toBilling));
+        setCoursePayments(pays.error ? [] : ((pays.data as PaymentRow[] | null) ?? []).map(toPayment));
+        setPaymentExemptions(
+          exempts.error
+            ? []
+            : ((exempts.data as ExemptionRow[] | null) ?? []).map((r) => ({ courseId: r.course_id, userId: r.user_id })),
+        );
       } else {
         setCourseBilling([]);
+        setCoursePayments([]);
+        setPaymentExemptions([]);
       }
       // Requests for the teacher's Manage roles screen. Not live: they refresh with every load.
       if (me.role === 'teacher') {
@@ -740,6 +787,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       });
     if (listensToBilling) {
       channel.on('postgres_changes', { event: '*', schema: 'public', table: 'course_billing' }, () => load().catch(() => {}));
+      // ARU-66: another accountant or the teacher marks, undoes or exempts.
+      channel.on('postgres_changes', { event: '*', schema: 'public', table: 'course_payments' }, () => load().catch(() => {}));
+      channel.on('postgres_changes', { event: '*', schema: 'public', table: 'course_payment_exemptions' }, () =>
+        load().catch(() => {}),
+      );
     }
     channel.subscribe();
     // Back from the background: realtime may have missed messages, so refetch the counts.
@@ -1338,6 +1390,46 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       requireRole('mentor');
       check(await supabase.from('course_billing').delete().eq('course_id', courseId));
       await load();
+    },
+    coursePayments,
+    paymentExemptions,
+    markPaid: async (courseId, member, month) => {
+      requireRole('teacher', 'mentor');
+      if (!/^\d{4}-\d{2}-01$/.test(month)) throw new Error('Invalid month.');
+      // marked_by and marked_at are set by the server. A duplicate means it's already marked: a safe retry.
+      checkInsert(await supabase.from('course_payments').insert({ course_id: courseId, user_id: member, month }));
+      await load();
+    },
+    undoPaid: async (courseId, member, month) => {
+      requireRole('teacher', 'mentor');
+      // Deleting nothing (already undone elsewhere) is fine.
+      check(
+        await supabase
+          .from('course_payments')
+          .delete()
+          .eq('course_id', courseId)
+          .eq('user_id', member)
+          .eq('month', month),
+      );
+      await load();
+    },
+    setExempt: async (courseId, member, exempt) => {
+      requireRole('teacher', 'mentor');
+      if (exempt) {
+        checkInsert(await supabase.from('course_payment_exemptions').insert({ course_id: courseId, user_id: member }));
+      } else {
+        check(await supabase.from('course_payment_exemptions').delete().eq('course_id', courseId).eq('user_id', member));
+      }
+      await load();
+    },
+    loadPaymentDues: async (today) => {
+      if (!userId) return [];
+      const res = await supabase.rpc('my_payment_dues', { today });
+      check(res);
+      return ((res.data as DueRow[] | null) ?? []).map((r) => ({
+        courseId: r.course_id,
+        deadline: String(r.deadline).slice(0, 10),
+      }));
     },
     setUserRole: async (userId, role) => {
       requireRole('teacher');
