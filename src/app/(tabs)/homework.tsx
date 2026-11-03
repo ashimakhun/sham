@@ -98,13 +98,15 @@ export default function HomeworkScreen() {
   // ARU-80: course filter on Checked only (AC 3, AC 4). Options are the courses of the current Checked list, by
   // course id (same-title courses stay separate), sorted by title case-insensitively (AC 5). Filtering narrows the
   // loaded list only, in its existing order (AC 6). A choice whose course left the list counts as All courses during
-  // render, so there is never an empty filtered list (AC 7).
+  // render, so there is never an empty filtered list (AC 7), and the choice itself is reset to All courses then, so
+  // the old course coming back later doesn't silently re-apply the filter.
   const checked = list.filter((h) => h.status === 'checked');
   const courseOptions = [...new Set(checked.map(courseKey))]
     .map((id) => ({ value: id, label: (id === NO_COURSE ? undefined : getCourse(id)?.title) ?? 'No course' }))
     .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }) || a.value.localeCompare(b.value));
   const chosen = courseChoice[tab];
   const courseFilter = courseOptions.some((o) => o.value === chosen) ? chosen : ALL_COURSES;
+  if (courseFilter !== chosen) setCourseChoice((c) => ({ ...c, [tab]: ALL_COURSES }));
   const filterByCourse = shown === 'checked';
   const data: (Homework | HomeworkAssignment)[] =
     filterByCourse && courseFilter !== ALL_COURSES
