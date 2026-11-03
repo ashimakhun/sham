@@ -55,3 +55,43 @@ grant all on storage.objects, storage.buckets to anon, authenticated, service_ro
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
 alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
+
+-- pg_cron, pg_net and Vault (ARU-41): just enough for migrations that schedule a job. cron.schedule() stores the job
+-- (replacing one of the same name, like pg_cron); net.http_post() records the request instead of sending it;
+-- vault.decrypted_secrets is a plain table here.
+create schema cron;
+create table cron.job (
+  jobid bigserial primary key,
+  jobname text unique,
+  schedule text not null,
+  command text not null
+);
+create function cron.schedule(job_name text, schedule text, command text) returns bigint language sql as $$
+  insert into cron.job (jobname, schedule, command) values (job_name, schedule, command)
+  on conflict (jobname) do update set schedule = excluded.schedule, command = excluded.command
+  returning jobid
+$$;
+
+create schema net;
+create table net.requests (
+  id bigserial primary key,
+  url text,
+  body jsonb,
+  params jsonb,
+  headers jsonb,
+  timeout_milliseconds integer
+);
+create function net.http_post(
+  url text,
+  body jsonb default '{}'::jsonb,
+  params jsonb default '{}'::jsonb,
+  headers jsonb default '{"Content-Type": "application/json"}'::jsonb,
+  timeout_milliseconds integer default 5000
+) returns bigint language sql as $$
+  insert into net.requests (url, body, params, headers, timeout_milliseconds)
+  values (url, body, params, headers, timeout_milliseconds)
+  returning id
+$$;
+
+create schema vault;
+create table vault.decrypted_secrets (name text primary key, decrypted_secret text);
