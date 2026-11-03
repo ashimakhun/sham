@@ -174,6 +174,14 @@ export type Store = {
   markChatRead: (courseId: string, upToMessageId: string) => Promise<void>;
   /** The chat that is open on screen (or null): its messages are read as they arrive, so it never shows a count. */
   setActiveChat: (courseId: string | null) => void;
+  /** New general chat messages from others since the user last read it (ARU-72). 0 while the general chat is open.
+   *  Kept apart from the course counts, so the two never affect each other. */
+  generalUnreadCount: number;
+  /** Marks the general chat read up to `upToMessageId` (the newest message shown), by its server time. Clears the
+   *  count at once; a failed save (e.g. offline) is ignored and the count comes back on the next refetch. */
+  markGeneralChatRead: (upToMessageId: string) => Promise<void>;
+  /** Whether the general chat is open on screen: its messages are read as they arrive, so it never shows a count. */
+  setGeneralChatOpen: (open: boolean) => void;
 };
 
 /** Live count refetches are batched: one request at most this often while messages arrive (ARU-31). */
@@ -511,6 +519,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [unread, setUnread] = useState<Record<string, number>>({});
   const [activeChat, setActiveChat] = useState<string | null>(null);
+  const [generalUnread, setGeneralUnread] = useState(0);
+  const [generalChatOpen, setGeneralChatOpen] = useState(false);
 
   const userId = session?.user.id;
 
@@ -537,6 +547,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setCourseFeedback([]);
         setUnread({});
         setActiveChat(null);
+        setGeneralUnread(0);
+        setGeneralChatOpen(false);
         setLoadedFor(null);
       }
     });
@@ -554,6 +566,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const counts: Record<string, number> = {};
     for (const r of (res.data as UnreadRow[] | null) ?? []) counts[r.course_id] = Number(r.unread);
     setUnread(counts);
+  }, [userId]);
+
+  // The general chat's count (ARU-72), the same way: only the latest answer is used, errors keep the last count.
+  const generalUnreadRequest = useRef(0);
+  const loadGeneralUnread = useCallback(async () => {
+    if (!userId) return;
+    const request = ++generalUnreadRequest.current;
+    const res = await supabase.rpc('general_chat_unread_count');
+    if (res.error || request !== generalUnreadRequest.current) return;
+    setGeneralUnread(Number(res.data ?? 0) || 0);
   }, [userId]);
 
   // Fetches everything the signed-in user may see. State is only set after the
@@ -596,6 +618,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (me?.accessStatus !== 'approved') {
         setAccessRequests([]);
         setUnread({});
+        setGeneralUnread(0);
         setCourseBilling([]);
         return;
       }
@@ -614,11 +637,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       } else {
         setAccessRequests([]);
       }
-      await loadUnread().catch(() => {});
+      await Promise.all([loadUnread().catch(() => {}), loadGeneralUnread().catch(() => {})]);
     } finally {
       setLoadedFor(userId);
     }
-  }, [userId, loadUnread]);
+  }, [userId, loadUnread, loadGeneralUnread]);
 
   /** User-triggered reload (pull to refresh, retry) with a spinner. */
   const refresh = useCallback(async () => {
@@ -645,6 +668,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!userId || !firstLoadDone || waiting) return;
     let unreadTimer: ReturnType<typeof setTimeout> | null = null;
+    let generalUnreadTimer: ReturnType<typeof setTimeout> | null = null;
     // Live updates: refetch when someone submits, checks or shares something.
     const channel = supabase
       .channel('sham-changes')
@@ -674,6 +698,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           unreadTimer = null;
           loadUnread().catch(() => {});
         }, UNREAD_DEBOUNCE_MS);
+      })
+      // A general chat message refetches only the general count, batched the same way (ARU-72).
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'general_messages' }, (payload) => {
+        if ((payload.new as { author_id?: string }).author_id === userId) return;
+        if (generalUnreadTimer) return;
+        generalUnreadTimer = setTimeout(() => {
+          generalUnreadTimer = null;
+          loadGeneralUnread().catch(() => {});
+        }, UNREAD_DEBOUNCE_MS);
       });
     if (listensToBilling) {
       channel.on('postgres_changes', { event: '*', schema: 'public', table: 'course_billing' }, () => load().catch(() => {}));
@@ -681,14 +714,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     channel.subscribe();
     // Back from the background: realtime may have missed messages, so refetch the counts.
     const appState = AppState.addEventListener('change', (state) => {
-      if (state === 'active') loadUnread().catch(() => {});
+      if (state !== 'active') return;
+      loadUnread().catch(() => {});
+      loadGeneralUnread().catch(() => {});
     });
     return () => {
       if (unreadTimer) clearTimeout(unreadTimer);
+      if (generalUnreadTimer) clearTimeout(generalUnreadTimer);
       appState.remove();
       supabase.removeChannel(channel);
     };
-  }, [userId, firstLoadDone, waiting, listensToBilling, load, loadUnread]);
+  }, [userId, firstLoadDone, waiting, listensToBilling, load, loadUnread, loadGeneralUnread]);
 
   const currentUser = profiles.find((u) => u.id === userId) ?? null;
   // Only approved accounts are users of the app: pickers and lists never offer people still waiting (ARU-43).
@@ -736,6 +772,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       await loadUnread().catch(() => {});
     },
     [loadUnread],
+  );
+
+  const markGeneralChatRead = useCallback<Store['markGeneralChatRead']>(
+    async (upToMessageId) => {
+      generalUnreadRequest.current++;
+      setGeneralUnread(0);
+      const res = await supabase.rpc('mark_general_chat_read', { upto: upToMessageId });
+      if (res.error) return;
+      await loadGeneralUnread().catch(() => {});
+    },
+    [loadGeneralUnread],
   );
 
   const requireRole = (...roles: User['role'][]) => {
@@ -1267,6 +1314,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     unreadCount: (courseId) => (courseId === activeChat ? 0 : (unread[courseId] ?? 0)),
     markChatRead,
     setActiveChat,
+    generalUnreadCount: generalChatOpen ? 0 : generalUnread,
+    markGeneralChatRead,
+    setGeneralChatOpen,
   };
 
   return <StoreContext.Provider value={store}>{children}</StoreContext.Provider>;

@@ -9,7 +9,7 @@ import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
 
 export default function ProfileScreen() {
-  const { currentUser, courses, courseMembers, getUser, signOut, accessRequests } = useStore();
+  const { currentUser, courses, courseMembers, getUser, signOut, accessRequests, generalUnreadCount } = useStore();
   const { busy, error, run } = useAction();
   if (!currentUser) return null;
 
@@ -76,10 +76,12 @@ export default function ProfileScreen() {
         {/* ARU-61: first in this group, so the order is the same for every role. */}
         {canUseGeneralChat(currentUser) && (
           // ARU-69: the chat icon instead of the words; read as "Open general chat".
+          // ARU-72: new messages show as the same badge as the course details Chat button, and join the label.
           <Button
             title="Open general chat"
             icon="chatbubble-outline"
             variant="secondary"
+            unread={generalUnreadCount}
             onPress={() => router.push('/general-chat')}
           />
         )}

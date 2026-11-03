@@ -74,7 +74,9 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    payment period; adds `profiles.is_accountant`, the `course_billing` table and `set_accountant()`, and replaces
    `set_user_role()` so a mentor who becomes a student stops being an accountant; deletes nothing),
    `0033_teacher_sets_any_course_discipline.sql` (ARU-70: the teacher sets the discipline of any course; replaces
-   `set_course_discipline`, no table or data changes; it doesn't depend on 0032).
+   `set_course_discipline`, no table or data changes; it doesn't depend on 0032),
+   `0034_general_chat_reads.sql` (ARU-72: new message count for the general chat; adds the `general_chat_reads` table
+   with policies, a trigger and functions, deletes nothing; accounts already approved start with everything read).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 
@@ -177,6 +179,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Add / remove listeners     |           | ✓ (any course they can reach¹) | ✓       |
 | Course chat (read / post)  | courses they're in | own courses + courses they're in | all |
 | General chat (read / post; no edit or delete) | ✓ | ✓ | ✓ |
+| General chat new message count (`general_chat_reads`, own row only) | ✓ | ✓ | ✓ |
 | See course meetings        | courses they're in | ✓ (all courses)  | ✓       |
 | Schedule meetings, mark completed / canceled | | own courses    | any course |
 | Edit / reschedule a scheduled meeting | | own courses           | any course |
