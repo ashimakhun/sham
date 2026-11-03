@@ -164,3 +164,11 @@ reset role;
 
 select t.ok(not exists (select 1 from pg_policies where tablename = 'general_messages' and cmd in ('UPDATE', 'DELETE')),
   'AC8 general messages still can''t be edited or deleted (no new policy)');
+
+-- ARU-75 (0040): a deleted author is null; their messages still reach everyone else ("is distinct from", not "<>").
+reset role;
+insert into general_messages (id, author_id, body) values (t.u('gdel'), null, 'from a deleted user');
+insert into course_messages (id, course_id, author_id, body) values (t.u('cdel'), t.id('A'), null, 'from a deleted user');
+select t.eq(t.general('gdel'), 'M,M2,N,S1,S2,S3,T', '0040 a deleted author''s general message reaches every Approved user');
+select t.eq(t.course('cdel'), 'Algebra:M,S1,T',
+  '0040 a deleted author''s course message reaches the owner, the listener (S2 was removed above) and the teacher');

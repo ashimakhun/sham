@@ -49,7 +49,7 @@ create or replace function set_telegram_notification(kind text, enabled boolean)
   end $$;
 
 -- AC 1-3: who gets a Telegram message for course chat message M (course C, author A), computed now: every user U with
---   (a) U <> A;
+--   (a) U is not A ("is distinct from": a deleted author is null, 0040 note 1);
 --   (b) U Approved and in C's chat: C's owner, a listener of C, or any teacher (hidden courses: the same rule).
 -- Read positions no longer matter (ARU-44's "one per batch" rules (c) and (d) are gone). One row (the course title now,
 -- and the recipients) for a known message; no row for an unknown one.
@@ -62,7 +62,7 @@ create or replace function chat_message_recipients(message uuid)
       array(
         select p.id
         from profiles p
-        where p.id <> m.author_id
+        where p.id is distinct from m.author_id
           and p.access_status = 'approved'
           and (
             p.role = 'teacher'
@@ -85,7 +85,7 @@ create function general_message_recipients(message uuid)
     select array(
       select p.id
       from profiles p
-      where p.id <> m.author_id
+      where p.id is distinct from m.author_id
         and p.access_status = 'approved'
       order by p.id
     )
