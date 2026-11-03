@@ -15,7 +15,8 @@ import { withUnreadLabel } from '@/lib/unread';
 
 type Props = {
   course: Course;
-  /** Optional relation tag ("Listener" / "Owner") shown above the title (ARU-12). */
+  /** Optional relation tag shown above the title (ARU-12). Since ARU-81 no screen passes one: the Courses tab's
+   *  section headings say which courses the user is in or owns, so cards start with the title. */
   tag?: string;
   /** Called just before the details or chat screen opens (keeps the Courses tab view). */
   onOpen?: () => void;

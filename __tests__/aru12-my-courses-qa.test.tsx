@@ -110,15 +110,19 @@ describe('access: only my own memberships count', () => {
     setStore(store('T', { courses: [{ ...courseC, id: 'D', title: 'Algebra', createdById: 'T' }] }));
     await render(<CoursesScreen />);
     expect(headings()).toEqual(['COURSES I OWN']);
-    expect(screen.getByText('Owner')).toBeTruthy();
+    // ARU-81: the section heading says it; cards have no "Owner" tag.
+    expect(screen.queryByText('Owner')).toBeNull();
   });
 
   it('AC5: owning wins if bad data ever lists the owner as a listener too (no duplicates)', async () => {
     setStore(store('M', { courseMembers: [...courseMembers, member('A', 'M')] }));
     await render(<CoursesScreen />);
     expect(titles()).toEqual(['Biology', 'Algebra']);
-    expect(screen.getAllByText('Owner')).toHaveLength(1);
-    expect(screen.getAllByText('Listener')).toHaveLength(1);
+    // ARU-81: no tags; A is listed once, under "Courses I own" (the second section).
+    expect(headings()).toEqual(["COURSES I'M IN", 'COURSES I OWN']);
+    expect(screen.getAllByText('Algebra')).toHaveLength(1);
+    expect(screen.queryByText('Owner')).toBeNull();
+    expect(screen.queryByText('Listener')).toBeNull();
   });
 });
 
@@ -131,7 +135,7 @@ it('AC10: when the owner changes, the course moves between owners\' "Courses I o
   await rerender(<CoursesScreen />);
   expect(headings()).toEqual(['COURSES I OWN', 'NO DISCIPLINE']);
   expect(titles()).toEqual(['Chemistry', 'Biology', 'Algebra']);
-  expect(screen.getAllByText('Owner')).toHaveLength(1);
+  expect(screen.queryByText('Owner')).toBeNull(); // ARU-81: no tag on the card
   // N (owner of Biology) no longer owns Chemistry, which is in a discipline, so it leaves N's list entirely.
   setStore(store('N', { courses: moved }));
   await rerender(<CoursesScreen />);
