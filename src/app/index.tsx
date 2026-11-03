@@ -11,7 +11,7 @@ import { useAction } from '@/lib/useAction';
 type Mode = 'signIn' | 'signUp';
 
 export default function SignInScreen() {
-  const { ready, session, currentUser, dataLoaded, refresh, signIn, signUp, signOut } = useStore();
+  const { ready, session, currentUser, dataLoaded, refresh, signIn, signUp, signOut, accountNotice } = useStore();
   const [mode, setMode] = useState<Mode>('signIn');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -50,6 +50,13 @@ export default function SignInScreen() {
             <Text style={styles.h1}>Sham</Text>
             <Text style={styles.muted}>Homework, checks and lessons in one place.</Text>
           </View>
+
+          {/* ARU-75: after this account was deleted (here or on another device). */}
+          {accountNotice ? (
+            <Text style={[styles.body, { color: colors.success }]} testID="account-notice" accessibilityRole="alert">
+              {accountNotice}
+            </Text>
+          ) : null}
 
           <Segmented<Mode>
             value={mode}

@@ -10,4 +10,7 @@ export function photoFileName(title: string, id: string) {
   return `${safe || 'homework'}-${id.slice(0, 8)}.jpg`;
 }
 
+/** ARU-75 (AC 12 b): a homework whose photo file is gone (or whose link couldn't be made) shows this instead. */
+export const PHOTO_UNAVAILABLE = 'Photo unavailable';
+
 export const PHOTO_ERROR = "Couldn't load the photo. Check your connection and try again.";

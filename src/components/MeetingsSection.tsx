@@ -5,6 +5,7 @@ import { Linking, Pressable, Text, View } from 'react-native';
 import { Button, Card, ErrorText, styles } from '@/components/ui';
 import { meetingAttendance } from '@/lib/attendance';
 import { confirmAction } from '@/lib/confirm';
+import { DELETED_ACCOUNT } from '@/lib/deleteAccount';
 import { groupMeetings, hasStarted, isLink, isOpenForAttendance } from '@/lib/meetings';
 import {
   canCheckMeetingHomework,
@@ -232,7 +233,8 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
         : null;
     const checkedLine =
       m.status === 'completed' && m.homeworkCheckedAt
-        ? `Homework checked by ${(m.homeworkCheckedById && getUser(m.homeworkCheckedById)?.name) || 'Unknown'} · ${formatDate(m.homeworkCheckedAt)}`
+        ? // ARU-75: no checker any more means they deleted their account.
+          `Homework checked by ${m.homeworkCheckedById ? getUser(m.homeworkCheckedById)?.name || 'Unknown' : DELETED_ACCOUNT} · ${formatDate(m.homeworkCheckedAt)}`
         : null;
     const counts =
       seesAttendance && isOpenForAttendance(m, now)
