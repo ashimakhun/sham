@@ -1,7 +1,7 @@
 -- QA ARU-44: gaps in aru44_chat_message_notifications.test.sql: a hidden course's chat, a Pending second teacher,
 -- the owner as author, a read position in another course, an owner who is also listed as a listener (counted once), a
--- message deleted before processing, empty Vault values, a multi-row insert, an update, the general chat, and the
--- function's search_path / security definer settings.
+-- message deleted before processing, empty Vault values, a multi-row insert, an update, the general chat (one call
+-- since ARU-87), and the function's search_path / security definer settings.
 -- Fixture (t.seed): course A owned by M, B by N; teacher T. Added: H (hidden, owner M2, listener S2), a Pending
 -- teacher TP (0009 allows one teacher, so the unique index is dropped as in the dev test).
 select t.seed();
@@ -110,10 +110,10 @@ select t.eq((select count(*) from net.requests where headers ->> 'Authorization'
   and headers ->> 'Content-Type' = 'application/json' and timeout_milliseconds = 30000), 3::bigint,
   'AC8 each call: bearer secret, JSON content type, 30 s timeout');
 
--- An update (only the admin can) and a general chat message queue nothing.
+-- An update (only the admin can) queues nothing. ARU-87 (0046): a general chat message now queues one call too.
 update course_messages set body = 'edited' where id = t.u('r1');
 insert into general_messages (author_id, body) values (t.id('S1'), 'hello everyone');
-select t.eq((select count(*) from net.requests), 3::bigint, 'out of scope: update and general chat message queue nothing');
+select t.eq((select count(*) from net.requests), 4::bigint, 'an update queues nothing; a general chat message queues one call (ARU-87)');
 
 -- No call body or header carries the chat text or the author.
 select t.ok(not exists (select 1 from net.requests where body::text ~ '(one|two|three)' or body ? 'author_id'
