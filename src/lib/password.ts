@@ -11,6 +11,18 @@ export const PASSWORD_CHANGED = 'Password changed';
 export const NETWORK_ERROR = 'Could not reach the server. Check your connection and try again.';
 export const RATE_LIMITED = 'Too many requests. Please wait a few minutes and try again.';
 
+// ARU-77: the forgotten-password reset with a code from the email.
+export const CODE_INVALID = 'This code is wrong or has expired. Check the email or send a new code.';
+/** Seconds before "Send a new code" can be tapped again. */
+export const RESEND_COOLDOWN_S = 60;
+/** The same answer whether or not an account exists for the email (AC 3). */
+export const codeSentMessage = (email: string) =>
+  `If an account exists for ${email}, we've sent a code to it. It can take a few minutes.`;
+/** Digits only: letters are dropped and a pasted "123 456" becomes "123456". */
+export const cleanCode = (text: string) => text.replace(/\D/g, '').slice(0, 10);
+/** A complete code: 6–10 digits (the project's OTP length, 6 by default). */
+export const codeReady = (code: string) => /^\d{6,10}$/.test(code);
+
 /** Both new-password fields are filled and differ (shows "Passwords don't match"). */
 export function passwordsMismatch(password: string, confirm: string) {
   return password.length > 0 && confirm.length > 0 && password !== confirm;
@@ -36,12 +48,22 @@ export function isRateLimited(error: AuthErrorLike) {
   return !!error && (error.status === 429 || /^over_.*rate_limit$/.test(error.code ?? ''));
 }
 
+/** No answer from the server (offline, timeout): supabase-js reports a retryable fetch error with status 0. */
+export function isNetworkError(error: AuthErrorLike) {
+  return !!error && (error.name === 'AuthRetryableFetchError' || error.status === 0);
+}
+
+/** verifyOtp refused the code: wrong, already used or expired. Network and rate-limit errors keep their own text. */
+export function codeErrorMessage(error: AuthErrorLike) {
+  if (isRateLimited(error) || isNetworkError(error)) return authErrorMessage(error);
+  return CODE_INVALID;
+}
+
 /** A user-readable message for an Auth error: the server's own text, except for the cases the app words itself. */
 export function authErrorMessage(error: AuthErrorLike): string {
   if (!error) return 'Something went wrong. Please try again.';
   if (error.code === 'same_password') return SAME_PASSWORD;
   if (isRateLimited(error)) return RATE_LIMITED;
-  // No answer from the server (offline, timeout): supabase-js reports a retryable fetch error with status 0.
-  if (error.name === 'AuthRetryableFetchError' || error.status === 0) return NETWORK_ERROR;
+  if (isNetworkError(error)) return NETWORK_ERROR;
   return error.message || 'Something went wrong. Please try again.';
 }
