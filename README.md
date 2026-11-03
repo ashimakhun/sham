@@ -7,6 +7,8 @@ An educational mobile app where teachers, mentors and students work together:
   homework, and listeners mark that they attended.
 - **Listeners** send homework (text + optional photo) for an assignment from the **New** list on the Homework tab.
 - **Mentors and the teacher** see all homework, leave a comment and mark it as checked (never their own).
+- **All homework lives on the Homework tab** (ARU-80; course details no longer lists it); its **Checked** list has a
+  course filter.
 - **Each course** has a chat with a new-message counter for its owner, listeners and the teacher.
 - **General chat** for every accepted account, any role, opened from the Profile tab.
 - **Teachers and mentors** share formatted posts (lessons, notes, links) on the Materials tab's **Blog**, filterable
@@ -22,6 +24,13 @@ An educational mobile app where teachers, mentors and students work together:
   listener Paid for the month, undo it, or set them Exempt; "Unpaid this month" lists who still owes during the
   payment period. An unpaid listener's course card on the Courses tab gets a red border and "Payment due by <date>".
 - **New accounts** wait for the teacher's approval before they can use the app.
+- **Delete account** (ARU-75): students and mentors (and waiting or declined accounts) delete their own account after
+  re-entering their password. Personal data is removed; chat messages and work done for others stay, shown as
+  **Deleted account**. A mentor who owns courses must hand them over first; the teacher can't delete their account.
+- **Change password** (ARU-76): any approved user changes their own password from the Profile tab, with the current
+  password checked first.
+- **Forgot password?** (ARU-77): on the sign-in screen, anyone resets their password with a code sent by email (needs
+  the [Password reset email](#password-reset-email) setup).
 
 How each feature behaves today is described in the Linear project document **Sham: product documentation**.
 
@@ -100,9 +109,59 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    month or are exempt; adds the `course_payments` and `course_payment_exemptions` tables with RLS (accountants and
    the teacher, current listeners of paid courses only, hidden courses as in 0019), `can_manage_payment()` and
    `my_payment_dues(today)` (a listener's own due courses for their device-local date), and puts both tables in the
-   realtime publication; changes and deletes no existing data; needs 0032).
+   realtime publication; changes and deletes no existing data; needs 0032),
+   `0040_delete_account.sql` (ARU-75: deleting your own account; makes the non-cascading references to `profiles`
+   nullable with `on delete set null` (chat authors, homework checker, listener adder, meeting creator / status /
+   notes editor, assignment creator, paid-course selector, discipline creator, `profiles.mentor_id`) and, if 0039 is
+   applied, cascades ARU-66's payment marks / exemptions of a listener and nulls their marker; adds a before-delete
+   trigger on `profiles` that refuses the teacher and course owners, the service-role-only functions
+   `account_deletion_problem()` and `account_storage_objects()`, and null-safe comparisons in the unread counters and
+   the chat / new-homework notification recipient functions. Existing rows don't change; `courses.created_by` still
+   blocks. Then deploy the `delete-account` Edge Function, see [Delete account](#delete-account-aru-75)).
+   `0041_delete_course.sql` (ARU-85: the teacher deletes a course with everything in it; adds
+   `course_homework_photos(course)` (the course's homework photos still in Storage, teacher only) and
+   `delete_course(course)` (the course's homework, then the course, in one transaction; its other rows cascade and
+   Knowledge base PDFs keep "No course"), plus Storage policies that let the teacher read and delete every photo in
+   the `homework` bucket; changes and deletes no existing data. The app removes the photos through the Storage API
+   before calling `delete_course`, so no Edge Function or extra setup is needed),
+   `0042_delete_discipline.sql` (ARU-83: the teacher deletes a discipline with every course in it; adds
+   `discipline_homework_photos(discipline)` and `delete_discipline(discipline)`, which calls 0041's `delete_course()`
+   for each course (hidden ones too) and then deletes the discipline, in one transaction; teacher only; changes no
+   existing data; needs 0041),
+   `0043_teacher_deletes_any_material_file.sql` (ARU-86: the teacher deletes any Knowledge base PDF, row and file in
+   the `materials` bucket; adds two delete policies, keeps the authors' own; changes no data).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
+4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
+   [Password reset email](#password-reset-email). On the default email sender only the project's team members get
+   the email; real users need custom SMTP.
+
+### Password reset email
+
+**Forgot password?** on the sign-in screen (ARU-77) emails the user a one-time **code** (no link, so no deep links
+are needed and it works the same in Expo Go, dev builds, iOS and Android). The user types it into the app with a new
+password. Nothing is in the database; it's all Supabase Auth settings in the dashboard:
+
+1. **Custom SMTP (required before real users can reset).** Supabase's default sender only delivers to the project's
+   team members and is heavily rate-limited. Set up a provider (for example Resend, Postmark or SendGrid) under
+   **Authentication → Emails → SMTP Settings** (enable custom SMTP, fill host, port, user, password and the sender
+   address/name). Development can be tested with a team member's address on the default sender.
+2. **Reset Password template.** Under **Authentication → Emails → Templates → Reset Password**, replace the body so
+   it shows the code (`{{ .Token }}`) instead of the link. Sample:
+
+   Subject: `Your Sham password reset code`
+
+   ```html
+   <h2>Reset your Sham password</h2>
+   <p>Enter this code in the Sham app to choose a new password:</p>
+   <p style="font-size:24px;font-weight:bold;letter-spacing:4px">{{ .Token }}</p>
+   <p>The code works once and expires in 1 hour. If you didn't ask to reset your password, ignore this email.</p>
+   ```
+3. **Optional.** **Authentication → Providers → Email**: *Email OTP Length* (6 by default; the app accepts 6–10 digits)
+   and *Email OTP Expiration* (3600 s by default). **Authentication → Rate Limits** sets how many emails can be sent
+   per hour. The app also waits 60 seconds between "Send a new code" taps.
+
+No redirect URL is needed (`resetPasswordForEmail` is called without `redirectTo`).
 
 ### Upgrading an existing project to 0005 (ARU-14)
 
@@ -265,6 +324,25 @@ message is dropped (never resent later).
 
 To change a Vault value later: `select vault.update_secret((select id from vault.secrets where name = 'new_homework_notify_secret'), '<new>');`.
 
+### Delete account (ARU-75)
+
+The Delete account screen calls the Edge Function `delete-account` with the user's access token and password. It
+only ever deletes the caller: it checks the password (a sign-in on a throwaway client), refuses the teacher and
+course owners (`account_deletion_problem()`), removes the caller's Storage files (`account_storage_objects()`:
+`homework/<id>/…`, `materials/<id>/…` and anything they own) and then deletes the Auth user, which removes the profile
+and every personal row and clears the shared references in one transaction. If a step fails, the account stays and
+tapping again continues. Other devices sign out with "Your account was deleted" when the app starts or comes back to
+the foreground (it asks Auth whether the user still exists).
+
+1. Run `supabase/migrations/0040_delete_account.sql`.
+2. Deploy the function, keeping JWT verification on (only signed-in users may call it). It needs no secrets of its
+   own: `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are provided by Supabase.
+   ```bash
+   npx supabase functions deploy delete-account
+   ```
+3. Check: sign in as a test student and delete the account from Profile → **Delete account**; the user disappears
+   from **Authentication → Users** and from `profiles`, and its files from the `homework` bucket.
+
 ## Run it
 
 ```bash
@@ -312,6 +390,8 @@ src/app/                  screens (Expo Router — every file is a route)
   courses/[id]/listeners.tsx  teacher or mentor adds listeners
   courses/[id]/chat.tsx   course chat (owner, listeners and the teacher)
   general-chat.tsx        general chat for every accepted account (from Profile)
+  change-password.tsx     the signed-in user changes their own password (from Profile)
+  reset-password.tsx      Forgot password?: email a code, then set a new password with it (signed out)
   courses/[id]/owner.tsx  teacher or mentor changes the course owner
   courses/[id]/meetings/  schedule / edit a meeting; [meetingId]/notes.tsx notes; [meetingId]/assign-homework.tsx;
                           [meetingId]/attendance.tsx who attended
@@ -341,8 +421,10 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Courses list (Courses tab, ARU-63) | courses they're in + courses with no discipline | own and attended courses + courses with no discipline | own courses + courses with no discipline (hidden ones too); every course through a discipline card |
 | See disciplines, their rating and reviews | visible ones | visible ones | ✓ (hidden ones too) |
 | Create a discipline, hide / unhide it |   |                    | ✓       |
+| Delete a discipline and every course in it (ARU-83) | |         | ✓ (visible and hidden disciplines) |
 | Set / change / clear a course's discipline (ARU-70) | | own courses   | any course |
 | Create courses             |           | ✓                  | ✓       |
+| Delete a course and everything in it (ARU-85) | |          | ✓ (any course, hidden ones too) |
 | Create a hidden course     |           | ✓                  | ✓       |
 | See a hidden course and its content | (listeners only) | owner and listeners only | ✓ (all) |
 | Change course owner        |           | ✓ (any course they can reach¹) | ✓       |
@@ -368,7 +450,8 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Read course feedback and average | courses they can see (hidden: only if in it) | same | ✓ (all) |
 | See Knowledge base, open PDFs | ✓      | ✓                  | ✓       |
 | Upload PDFs (25 MB at most) |          | ✓                  | ✓       |
-| Edit name / description / course, delete PDFs | | ✓ (own)   | ✓ (own) |
+| Edit name / description / course of PDFs | | ✓ (own)   | ✓ (own) |
+| Delete Knowledge base PDFs (ARU-86) |      | ✓ (own)   | ✓ (any) |
 | Make a course-linked PDF course-only | | ✓ (own)       | ✓ (own) |
 | See a course-only Knowledge base PDF | if in its course | if in its course, or its author | ✓ |
 | Switch student ↔ mentor    |           |                    | ✓       |
@@ -382,7 +465,11 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | See paid courses, change their payment period | | accountants (all they can see) | ✓ (all) |
 | See / set / undo Paid marks and exemptions, see "Unpaid this month" (ARU-66) | | accountants (paid courses they can see) | ✓ (all paid courses) |
 | See own payment deadline on a course card (`my_payment_dues`, ARU-66) | as a listener | as a listener |  |
+| Change own password (Supabase Auth, current password required, ARU-76) | own | own | own |
+| Reset a forgotten password with an emailed code (signed out, any approval state, ARU-77) | own | own | own |
 | Become / stop being teacher |          |                    | (nobody) |
+| Delete own account (ARU-75; password again; also waiting / declined accounts) | ✓ | ✓ (not while owning a course) | (never) |
+| Delete someone else's account |         |                    | (nobody) |
 
 ¹ Since ARU-63 a mentor reaches a course through the Courses list (courses they own or attend, and courses with no
 discipline), the Profile tab or a Knowledge base PDF's course link. Courses in a discipline that they neither own nor

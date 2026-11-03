@@ -1,4 +1,4 @@
-import { Redirect } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,7 +11,7 @@ import { useAction } from '@/lib/useAction';
 type Mode = 'signIn' | 'signUp';
 
 export default function SignInScreen() {
-  const { ready, session, currentUser, dataLoaded, refresh, signIn, signUp, signOut } = useStore();
+  const { ready, session, currentUser, dataLoaded, refresh, signIn, signUp, signOut, accountNotice } = useStore();
   const [mode, setMode] = useState<Mode>('signIn');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -51,6 +51,13 @@ export default function SignInScreen() {
             <Text style={styles.muted}>Homework, checks and lessons in one place.</Text>
           </View>
 
+          {/* ARU-75: after this account was deleted (here or on another device). */}
+          {accountNotice ? (
+            <Text style={[styles.body, { color: colors.success }]} testID="account-notice" accessibilityRole="alert">
+              {accountNotice}
+            </Text>
+          ) : null}
+
           <Segmented<Mode>
             value={mode}
             onChange={setMode}
@@ -80,6 +87,15 @@ export default function SignInScreen() {
             secureTextEntry
             autoComplete={mode === 'signIn' ? 'current-password' : 'new-password'}
           />
+          {mode === 'signIn' && (
+            // ARU-77: reset a forgotten password with a code sent by email.
+            <Text
+              accessibilityRole="link"
+              style={{ color: colors.primary, fontSize: 15, fontWeight: '600', alignSelf: 'flex-start', paddingVertical: 4 }}
+              onPress={() => router.push({ pathname: '/reset-password', params: { email: email.trim() } })}>
+              Forgot password?
+            </Text>
+          )}
 
           <ErrorText error={error} />
           <Button

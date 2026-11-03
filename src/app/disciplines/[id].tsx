@@ -2,6 +2,7 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { RefreshControl, ScrollView, Switch, Text, View } from 'react-native';
 
 import { CourseCard } from '@/components/CourseCard';
+import { DeleteDisciplineButton } from '@/components/DeleteDisciplineButton';
 import { Card, EmptyState, ErrorText, HiddenBadge, styles } from '@/components/ui';
 import { canManageDisciplines, coursesInDiscipline, disciplineFeedback } from '@/lib/disciplines';
 import { isEdited, ratingSummary, ratingSummaryLabel, stars, starsLabel } from '@/lib/feedback';
@@ -94,6 +95,8 @@ export default function DisciplineScreen() {
           )}
         </View>
       )}
+      {/* ARU-83: below the COURSES list, the teacher only. */}
+      <DeleteDisciplineButton discipline={discipline} />
     </ScrollView>
   );
 }

@@ -24,6 +24,16 @@ export function confirmAction(
   );
 }
 
+/** Shows a short message with an OK button (ARU-76/77 "Password changed"): native Alert, or window.alert on web. */
+export function notify(title: string, message?: string) {
+  if (Platform.OS === 'web') {
+    const alert = (globalThis as { alert?: (text: string) => void }).alert;
+    alert?.(message ? `${title}\n\n${message}` : title);
+    return;
+  }
+  Alert.alert(title, message);
+}
+
 /** Asks the user to confirm a destructive action (red confirm button). */
 export function confirmDestructive(title: string, message: string, confirmText: string): Promise<boolean> {
   return confirmAction(title, message, confirmText, { destructive: true });

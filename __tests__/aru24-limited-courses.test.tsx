@@ -59,11 +59,12 @@ describe('Courses list', () => {
     expect(router.push).toHaveBeenCalledWith({ pathname: '/courses/[id]', params: { id: 'B' } });
   });
 
-  it('AC4: courses in a discipline the student isn\'t in aren\'t listed (only A, tagged Listener, full card)', async () => {
+  it('AC4: courses in a discipline the student isn\'t in aren\'t listed (only A, under Courses I\'m in, full card)', async () => {
     const inDiscipline = courses.map((c) => ({ ...c, disciplineId: 'D' }));
     setStore(fakeStore('S1', { courses: inDiscipline, courseMembers: members }));
     await render(<CoursesScreen />);
-    expect(screen.getByText('Listener')).toBeTruthy();
+    expect(screen.getByText("COURSES I'M IN")).toBeTruthy(); // ARU-81: the heading, no Listener tag on the card
+    expect(screen.queryByText('Listener')).toBeNull();
     expect(screen.getByText('Algebra')).toBeTruthy();
     expect(screen.queryByText('Biology')).toBeNull();
     expect(screen.getByText(ownerA)).toBeTruthy();
@@ -105,7 +106,7 @@ describe('Course details', () => {
     setStore(fakeStore('S1', { courses, courseMembers: members, visibleHomework: [hw({ id: 'h1', courseId: 'A' })] }));
     await render(<CourseDetailScreen />);
     expect(screen.getByText(ownerA)).toBeTruthy();
-    expect(screen.getByText('HOMEWORK')).toBeTruthy();
+    expect(screen.queryByText('HOMEWORK')).toBeNull(); // ARU-80: no homework list on course details
     expect(screen.getByRole('button', { name: 'Open chat for Algebra' })).toBeTruthy(); // ARU-69: the chat icon
     expect(screen.queryByText('You are not in this course')).toBeNull();
   });
@@ -139,7 +140,7 @@ describe('Course details', () => {
     setStore(fakeStore(who, { courses, courseMembers: members }));
     await render(<CourseDetailScreen />);
     expect(screen.getByText(/Owner:/)).toBeTruthy();
-    expect(screen.getByText('HOMEWORK')).toBeTruthy();
+    expect(screen.getByText(/^MEETINGS/)).toBeTruthy(); // ARU-80: HOMEWORK is gone; meetings mark the full screen
     expect(screen.queryByText('You are not in this course')).toBeNull();
   });
 

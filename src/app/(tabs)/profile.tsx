@@ -78,10 +78,11 @@ export default function ProfileScreen() {
         {/* ARU-61: first in this group, so the order is the same for every role. */}
         {canUseGeneralChat(currentUser) && (
           // ARU-69: the chat icon instead of the words; read as "Open general chat".
-          // ARU-72: new messages show as the same badge as the course details Chat button, and join the label.
+          // ARU-72: new messages show as a badge and join the label. ARU-78: the badge sits on the icon, as on a course card.
           <Button
             title="Open general chat"
             icon="chatbubble-outline"
+            badgeOnIcon
             variant="secondary"
             unread={generalUnreadCount}
             onPress={() => router.push('/general-chat')}
@@ -95,9 +96,15 @@ export default function ProfileScreen() {
             onPress={() => router.push('/roles')}
           />
         )}
+        {/* ARU-76: own password only; waiting / declined accounts never get here (AccessGate). */}
+        <Button title="Change password" variant="secondary" onPress={() => router.push('/change-password')} />
         <ErrorText error={error} />
         {/* The root screen redirects to sign-in once the session is gone. */}
         <Button title="Sign out" variant="secondary" disabled={busy} onPress={() => run(signOut)} />
+        {/* ARU-75: last in the group; the teacher's account can't be deleted. */}
+        {currentUser.role !== 'teacher' && (
+          <Button title="Delete account" variant="danger" disabled={busy} onPress={() => router.push('/delete-account')} />
+        )}
       </View>
     </ScrollView>
   );

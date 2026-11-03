@@ -58,14 +58,11 @@ select t.ok((select created_at > now() - interval '1 minute' and updated_at > no
 select t.throws($$update material_files set created_at = '2000-01-01' where id = '00000000-0000-0000-0000-0000000f0061'$$, '42501',
   'row: the author cannot change created_at (column grants)');
 
--- The teacher has no special rights over a mentor's item (AC 8: only the author edits and deletes).
+-- The teacher can't edit a mentor's item (AC 8: only the author edits).
 reset role; select t.login('T');
 select t.eq(t.affected($$update material_files set name = 'Teacher rename' where id = '00000000-0000-0000-0000-0000000f0051'$$), 0::bigint,
   'AC8 the teacher cannot rename a mentor''s item');
-select t.eq(t.affected($$delete from material_files where id = '00000000-0000-0000-0000-0000000f0051'$$), 0::bigint,
-  'AC8 the teacher cannot delete a mentor''s item');
-select t.eq(t.affected($$delete from storage.objects where bucket_id = 'materials' and name = t.fpath('M', 51)$$), 0::bigint,
-  'AC8 the teacher cannot delete a mentor''s PDF');
+-- (ARU-86 changed deleting on purpose: the teacher may delete any PDF; checked at the end of this file.)
 select t.throws($$insert into material_files (id, author_id, name, storage_path, size_bytes)
   values (t.f(62), t.id('M'), 'In M''s name', t.fpath('M', 62), 10)$$, '42501', 'AC8 the teacher cannot add an item as a mentor');
 
@@ -85,3 +82,11 @@ select t.eq((select name || '|' || storage_path from material_files where id = t
   'M''s item is unchanged by everyone else''s attempts');
 select t.eq((select count(*) from storage.objects where bucket_id = 'materials' and name = t.fpath('M', 51)), 1::bigint,
   'M''s PDF is still there');
+
+-- ARU-86 (0043): the teacher may now delete a mentor's PDF and item (file first, then the row, as the app does).
+select t.login('T');
+select t.eq(t.affected($$delete from storage.objects where bucket_id = 'materials' and name = t.fpath('M', 51)$$), 1::bigint,
+  'ARU-86 the teacher can delete a mentor''s PDF');
+select t.eq(t.affected($$delete from material_files where id = '00000000-0000-0000-0000-0000000f0051'$$), 1::bigint,
+  'ARU-86 the teacher can delete a mentor''s item');
+reset role;

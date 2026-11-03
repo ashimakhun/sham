@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 
 import { AssignmentCard } from '@/components/AssignmentCard';
+import { AuthorFilter } from '@/components/AuthorFilter';
 import { HomeworkCard } from '@/components/HomeworkCard';
 import { EmptyState, Segmented, styles, UnreadBadge } from '@/components/ui';
 import { useStore } from '@/lib/store';
@@ -14,6 +15,12 @@ import { useNow } from '@/lib/useNow';
 type Filter = 'new' | HomeworkStatus;
 /** ARU-23: mentors switch between homework they check (Owner) and homework they sent (Listener). */
 type Tab = 'owner' | 'listener';
+
+/** ARU-80: the course filter's "All courses" entry. Not a uuid, so it can never be a course id. */
+const ALL_COURSES = 'all';
+/** Homework without a course id: one "No course" entry. Also not a uuid. */
+const NO_COURSE = 'none';
+const courseKey = (h: Homework) => h.courseId ?? NO_COURSE;
 
 const NO_COURSE_HINT = 'You are not in any course yet — ask your teacher or mentor to add you.';
 const SENT_HINT = 'Homework you send will appear here.';
@@ -29,7 +36,7 @@ const emptyText: Record<string, { title: string; hint: string }> = {
 };
 
 export default function HomeworkScreen() {
-  const { currentUser, courses, courseMembers, loading, refresh, visibleHomework, assignments } = useStore();
+  const { currentUser, courses, courseMembers, loading, refresh, visibleHomework, assignments, getCourse } = useStore();
   const role = currentUser?.role ?? 'student';
   const me = currentUser?.id;
   const now = useNow();
@@ -58,6 +65,9 @@ export default function HomeworkScreen() {
   const [selectedTab, setSelectedTab] = useState<Tab>('owner');
   const [filter, setFilter] = useState<Filter>(isChecker ? 'submitted' : 'new');
   const tab: Tab = showSwitcher ? selectedTab : 'owner';
+  // ARU-80 AC 8: the Checked list's course choice, kept per tab while the app is open (students and the teacher use
+  // only the 'owner' slot). Switching tabs resets the status list, never this.
+  const [courseChoice, setCourseChoice] = useState<Record<Tab, string>>({ owner: ALL_COURSES, listener: ALL_COURSES });
 
   // The switcher disappeared while on Listener (last course and homework gone): back to Owner / To check
   // (analysis note 3), so a Listener filter never stays applied to the Owner list. Adjusted during render.
@@ -82,7 +92,24 @@ export default function HomeworkScreen() {
   const waiting = list.filter((h) => h.status === 'submitted').length;
   // A checker never has "new" (e.g. right after the switcher went away); show their default list.
   const shown: Filter = filter === 'new' && !listenerView ? 'submitted' : filter;
-  const data: (Homework | HomeworkAssignment)[] = shown === 'new' ? fresh : list.filter((h) => h.status === shown);
+  const byStatus: (Homework | HomeworkAssignment)[] =
+    shown === 'new' ? fresh : list.filter((h) => h.status === shown);
+
+  // ARU-80: course filter on Checked only (AC 3, AC 4). Options are the courses of the current Checked list, by
+  // course id (same-title courses stay separate), sorted by title case-insensitively (AC 5). Filtering narrows the
+  // loaded list only, in its existing order (AC 6). A choice whose course left the list counts as All courses during
+  // render, so there is never an empty filtered list (AC 7).
+  const checked = list.filter((h) => h.status === 'checked');
+  const courseOptions = [...new Set(checked.map(courseKey))]
+    .map((id) => ({ value: id, label: (id === NO_COURSE ? undefined : getCourse(id)?.title) ?? 'No course' }))
+    .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }) || a.value.localeCompare(b.value));
+  const chosen = courseChoice[tab];
+  const courseFilter = courseOptions.some((o) => o.value === chosen) ? chosen : ALL_COURSES;
+  const filterByCourse = shown === 'checked';
+  const data: (Homework | HomeworkAssignment)[] =
+    filterByCourse && courseFilter !== ALL_COURSES
+      ? checked.filter((h) => courseKey(h) === courseFilter)
+      : byStatus;
 
   const options: { value: Filter; label: string }[] = listenerView
     ? [
@@ -111,12 +138,25 @@ export default function HomeworkScreen() {
       onRefresh={() => refresh().catch(() => {})}
       keyExtractor={(h) => h.id}
       renderItem={({ item }) =>
-        'meetingId' in item ? <AssignmentCard item={item} now={now} /> : <HomeworkCard item={item} />
+        'meetingId' in item ? (
+          <AssignmentCard item={item} now={now} />
+        ) : (
+          // ARU-90: the Checked list already says "checked"; its cards show the checker's comment instead of the badge.
+          <HomeworkCard item={item} showStatus={shown !== 'checked'} />
+        )
       }
       ListHeaderComponent={
         <View style={{ gap: 12 }}>
           {showSwitcher && <TabSwitch value={tab} onChange={switchTab} newCount={fresh.length} />}
           <Segmented<Filter> value={shown} onChange={setFilter} options={options} />
+          {filterByCourse && (
+            <AuthorFilter
+              noun="course"
+              options={[{ value: ALL_COURSES, label: 'All courses' }, ...courseOptions]}
+              value={courseFilter}
+              onChange={(v) => setCourseChoice((c) => ({ ...c, [tab]: v }))}
+            />
+          )}
         </View>
       }
       ListEmptyComponent={<EmptyState {...empty} />}

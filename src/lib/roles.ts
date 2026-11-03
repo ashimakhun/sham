@@ -52,6 +52,12 @@ export function canChangeOwner(role: Role | undefined) {
   return role === 'teacher' || role === 'mentor';
 }
 
+/** Mirrors delete_course() (supabase/migrations/0041_delete_course.sql, ARU-85): only the teacher deletes a course,
+ *  any course (hidden ones too), never a mentor, not even the course's owner. */
+export function canDeleteCourse(role: Role | undefined) {
+  return role === 'teacher';
+}
+
 /** Mirrors set_user_role() (supabase/migrations/0009_roles_screen.sql): only the teacher manages roles. */
 /** ARU-61: every approved account, any role, reads and posts in the general chat (mirrors is_approved(), 0021). */
 export function canUseGeneralChat(user: User | null | undefined) {

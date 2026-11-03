@@ -43,9 +43,12 @@ export default function RootLayout() {
           <Stack.Screen name="materials/files/[id]" options={{ title: 'File' }} />
           <Stack.Screen name="materials/files/[id]/edit" options={{ title: 'Edit file', presentation: 'modal' }} />
           <Stack.Screen name="roles" options={{ title: 'Manage roles' }} />
+          <Stack.Screen name="delete-account" options={{ title: 'Delete account' }} />
           <Stack.Screen name="accountant/courses" options={{ title: 'Select courses' }} />
           <Stack.Screen name="accountant/[id]" options={{ title: 'Payments' }} />
           <Stack.Screen name="general-chat" options={{ title: 'General chat' }} />
+          <Stack.Screen name="change-password" options={{ title: 'Change password', presentation: 'modal' }} />
+          <Stack.Screen name="reset-password" options={{ title: 'Reset password' }} />
           <Stack.Screen name="disciplines/new" options={{ title: 'New discipline', presentation: 'modal' }} />
           <Stack.Screen name="disciplines/[id]" options={{ title: 'Discipline' }} />
         </Stack>
