@@ -77,7 +77,10 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `0033_teacher_sets_any_course_discipline.sql` (ARU-70: the teacher sets the discipline of any course; replaces
    `set_course_discipline`, no table or data changes; it doesn't depend on 0032),
    `0034_general_chat_reads.sql` (ARU-72: new message count for the general chat; adds the `general_chat_reads` table
-   with policies, a trigger and functions, deletes nothing; accounts already approved start with everything read).
+   with policies, a trigger and functions, deletes nothing; accounts already approved start with everything read),
+   `0035_meeting_start_notifications.sql` (ARU-41: Telegram message when a meeting starts; adds
+   `course_meetings.start_notified_at`, `claim_started_meetings()` and a `pg_cron` job, and replaces `update_meeting()`;
+   deletes nothing. Turn on **pg_cron** and **pg_net** first, see [Telegram notifications](#telegram-notifications)).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 
@@ -120,6 +123,34 @@ and chooses which types they get. Until the steps below are done the card stays 
 
 The bot only answers `/start <code>` (from the app's Connect button) and `/stop`, in private chats. Notifications
 themselves are sent by `supabase/functions/_shared/telegram.ts` from the notification stories' functions.
+
+#### Meeting started (ARU-41)
+
+Listeners get "<course title> meeting has started" within 2 minutes of a Scheduled meeting's start, if they connected
+Telegram and left **Meeting started** on. A `pg_cron` job calls the Edge Function `meeting-start-notifications` every
+minute; the function claims the meetings that just started (`claim_started_meetings()`, at most once each) and sends.
+
+1. Dashboard → **Database → Extensions**: turn on **pg_cron** and **pg_net**.
+2. Run `supabase/migrations/0035_meeting_start_notifications.sql` (it stops with a message if step 1 is missing).
+3. Make a random secret (`openssl rand -hex 24`) and set it as the function's secret:
+   ```bash
+   npx supabase secrets set MEETING_NOTIFY_SECRET=<secret>
+   ```
+4. Deploy the function (the cron job sends the secret in `x-cron-secret`, not a Supabase JWT):
+   ```bash
+   npx supabase functions deploy meeting-start-notifications --no-verify-jwt
+   ```
+5. Store the URL and the same secret in Vault (SQL Editor). The job reads both on every run, so neither is in
+   `cron.job`:
+   ```sql
+   select vault.create_secret('https://<project-ref>.supabase.co/functions/v1/meeting-start-notifications', 'meeting_notify_url');
+   select vault.create_secret('<secret>', 'meeting_notify_secret');
+   ```
+6. Check: `select * from cron.job_run_details order by start_time desc limit 5;` shows a run every minute, and
+   `select status_code, content from net._http_response order by created desc limit 5;` shows `200` with
+   `{"meetings":0,"sent":0,…}`. A `401` means the two secrets differ.
+
+To change a Vault value later: `select vault.update_secret((select id from vault.secrets where name = 'meeting_notify_secret'), '<new>');`.
 
 ## Run it
 

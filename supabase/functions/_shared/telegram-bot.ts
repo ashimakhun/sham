@@ -46,7 +46,8 @@ export async function handleTelegramUpdate(update: Update, deps: BotDeps): Promi
   // Any other text: no reply.
 }
 
-function timingSafeEqual(a: string, b: string): boolean {
+/** Compares two secrets without stopping at the first difference. */
+export function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
