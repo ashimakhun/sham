@@ -138,7 +138,12 @@ export default function HomeworkScreen() {
       onRefresh={() => refresh().catch(() => {})}
       keyExtractor={(h) => h.id}
       renderItem={({ item }) =>
-        'meetingId' in item ? <AssignmentCard item={item} now={now} /> : <HomeworkCard item={item} />
+        'meetingId' in item ? (
+          <AssignmentCard item={item} now={now} />
+        ) : (
+          // ARU-90: the Checked list already says "checked"; its cards show the checker's comment instead of the badge.
+          <HomeworkCard item={item} showStatus={shown !== 'checked'} />
+        )
       }
       ListHeaderComponent={
         <View style={{ gap: 12 }}>
