@@ -1,4 +1,4 @@
-import { Redirect } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -87,6 +87,15 @@ export default function SignInScreen() {
             secureTextEntry
             autoComplete={mode === 'signIn' ? 'current-password' : 'new-password'}
           />
+          {mode === 'signIn' && (
+            // ARU-77: reset a forgotten password with a code sent by email.
+            <Text
+              accessibilityRole="link"
+              style={{ color: colors.primary, fontSize: 15, fontWeight: '600', alignSelf: 'flex-start', paddingVertical: 4 }}
+              onPress={() => router.push({ pathname: '/reset-password', params: { email: email.trim() } })}>
+              Forgot password?
+            </Text>
+          )}
 
           <ErrorText error={error} />
           <Button
