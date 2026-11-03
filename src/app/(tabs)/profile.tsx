@@ -95,6 +95,8 @@ export default function ProfileScreen() {
             onPress={() => router.push('/roles')}
           />
         )}
+        {/* ARU-76: own password only; waiting / declined accounts never get here (AccessGate). */}
+        <Button title="Change password" variant="secondary" onPress={() => router.push('/change-password')} />
         <ErrorText error={error} />
         {/* The root screen redirects to sign-in once the session is gone. */}
         <Button title="Sign out" variant="secondary" disabled={busy} onPress={() => run(signOut)} />

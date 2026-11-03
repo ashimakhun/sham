@@ -22,6 +22,8 @@ An educational mobile app where teachers, mentors and students work together:
   listener Paid for the month, undo it, or set them Exempt; "Unpaid this month" lists who still owes during the
   payment period. An unpaid listener's course card on the Courses tab gets a red border and "Payment due by <date>".
 - **New accounts** wait for the teacher's approval before they can use the app.
+- **Change password** (ARU-76): any approved user changes their own password from the Profile tab, with the current
+  password checked first.
 
 How each feature behaves today is described in the Linear project document **Sham: product documentation**.
 
@@ -312,6 +314,7 @@ src/app/                  screens (Expo Router — every file is a route)
   courses/[id]/listeners.tsx  teacher or mentor adds listeners
   courses/[id]/chat.tsx   course chat (owner, listeners and the teacher)
   general-chat.tsx        general chat for every accepted account (from Profile)
+  change-password.tsx     the signed-in user changes their own password (from Profile)
   courses/[id]/owner.tsx  teacher or mentor changes the course owner
   courses/[id]/meetings/  schedule / edit a meeting; [meetingId]/notes.tsx notes; [meetingId]/assign-homework.tsx;
                           [meetingId]/attendance.tsx who attended
@@ -382,6 +385,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | See paid courses, change their payment period | | accountants (all they can see) | ✓ (all) |
 | See / set / undo Paid marks and exemptions, see "Unpaid this month" (ARU-66) | | accountants (paid courses they can see) | ✓ (all paid courses) |
 | See own payment deadline on a course card (`my_payment_dues`, ARU-66) | as a listener | as a listener |  |
+| Change own password (Supabase Auth, current password required, ARU-76) | own | own | own |
 | Become / stop being teacher |          |                    | (nobody) |
 
 ¹ Since ARU-63 a mentor reaches a course through the Courses list (courses they own or attend, and courses with no

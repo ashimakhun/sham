@@ -6,6 +6,7 @@ import { periodProblem } from './billing';
 import { FEEDBACK_MAX } from './feedback';
 import { fileFieldsError, isAllowedPdf, PDF_MAX_BYTES, PDF_RULE } from './files';
 import { NOTES_MAX } from './markdown';
+import { authErrorMessage, isInvalidCredentials, SAME_PASSWORD, WRONG_CURRENT_PASSWORD } from './password';
 import { nameProblem } from './profileName';
 import { supabase } from './supabase';
 import type {
@@ -88,6 +89,9 @@ export type Store = {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  /** ARU-76: the signed-in user changes their own password. The current password is checked first by signing in
+   *  again (same user, so no reload); a wrong one throws WRONG_CURRENT_PASSWORD and nothing changes. */
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   /** Approved users change their own name (ARU-55): trimmed, not blank, at most NAME_MAX characters. The database
    *  allows only the own row and refuses blank names; the store's profiles are updated right after the save. */
   updateMyName: (name: string) => Promise<void>;
@@ -918,6 +922,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     signOut: async () => {
       check(await supabase.auth.signOut());
+    },
+    changePassword: async (currentPassword, newPassword) => {
+      const me = session?.user;
+      if (!me?.email || !currentUser) throw new Error('You are signed out. Please sign in again.');
+      // Checked before any request (AC 4), so it wins over a wrong current password.
+      if (newPassword === currentPassword) throw new Error(SAME_PASSWORD);
+      // A stolen unlocked phone isn't enough: the current password must be right. Signing in again also gives a
+      // fresh session, so the update passes with "Secure password change" turned on.
+      const verified = await supabase.auth.signInWithPassword({ email: me.email, password: currentPassword });
+      if (verified.error) {
+        throw new Error(isInvalidCredentials(verified.error) ? WRONG_CURRENT_PASSWORD : authErrorMessage(verified.error));
+      }
+      if (verified.data.user?.id !== me.id) throw new Error('Something went wrong. Please sign in again.');
+      const updated = await supabase.auth.updateUser({ password: newPassword });
+      if (updated.error) throw new Error(authErrorMessage(updated.error));
     },
     updateMyName: async (name) => {
       if (!currentUser || (currentUser.accessStatus && currentUser.accessStatus !== 'approved')) {
