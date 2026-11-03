@@ -108,7 +108,8 @@ describe('AC1/AC2: top card and MEETING HISTORY', () => {
     setStore(fakeStore('T', { courseMembers: members, meetings: all, visibleHomework: [] }));
     const view = await render(<CourseDetailScreen />);
     before('MEETINGS (', 'MEETING HISTORY');
-    expect(rendered()).not.toContain('HOMEWORK');
+    // The old homework list's own HOMEWORK label ("AWAITING HOMEWORK CHECK (2)", ARU-88, is a meeting group).
+    expect(rendered()).not.toMatch(/(^|\|)HOMEWORK(\||$)/);
     expect(rendered()).not.toContain('No homework for this course yet');
     setStore(fakeStore('T', { courseMembers: members, meetings: all, visibleHomework: [hw({ id: 'h1', courseId: 'A', title: 'Sam answer' })] }));
     await view.rerender(<CourseDetailScreen />);
