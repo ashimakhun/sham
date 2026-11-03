@@ -118,6 +118,12 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `account_deletion_problem()` and `account_storage_objects()`, and null-safe comparisons in the unread counters and
    the chat / new-homework notification recipient functions. Existing rows don't change; `courses.created_by` still
    blocks. Then deploy the `delete-account` Edge Function, see [Delete account](#delete-account-aru-75)).
+   `0041_delete_course.sql` (ARU-85: the teacher deletes a course with everything in it; adds
+   `course_homework_photos(course)` (the course's homework photos still in Storage, teacher only) and
+   `delete_course(course)` (the course's homework, then the course, in one transaction; its other rows cascade and
+   Knowledge base PDFs keep "No course"), plus Storage policies that let the teacher read and delete every photo in
+   the `homework` bucket; changes and deletes no existing data. The app removes the photos through the Storage API
+   before calling `delete_course`, so no Edge Function or extra setup is needed).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
@@ -411,6 +417,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Create a discipline, hide / unhide it |   |                    | ✓       |
 | Set / change / clear a course's discipline (ARU-70) | | own courses   | any course |
 | Create courses             |           | ✓                  | ✓       |
+| Delete a course and everything in it (ARU-85) | |          | ✓ (any course, hidden ones too) |
 | Create a hidden course     |           | ✓                  | ✓       |
 | See a hidden course and its content | (listeners only) | owner and listeners only | ✓ (all) |
 | Change course owner        |           | ✓ (any course they can reach¹) | ✓       |

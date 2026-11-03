@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 
 import { CourseMaterialsSection } from '@/components/CourseMaterialsSection';
+import { DeleteCourseButton } from '@/components/DeleteCourseButton';
 import { CourseDisciplineSection, DisciplineLabel } from '@/components/Disciplines';
 import { FeedbackSection } from '@/components/FeedbackSection';
 import { ListenersSection } from '@/components/ListenersSection';
@@ -85,8 +86,9 @@ export default function CourseDetailScreen() {
           <CourseMaterialsSection course={course} />
           <FeedbackSection course={course} />
         </View>
-      {/* ARU-60: checked and canceled meetings, at the very bottom. */}
+      {/* ARU-60: checked and canceled meetings, at the very bottom. ARU-85: the teacher's "Delete course" below them. */}
       <MeetingsSection course={course} part="history" />
+      <DeleteCourseButton course={course} />
     </ScrollView>
   );
 }

@@ -83,6 +83,7 @@ export function fakeStore(who: keyof typeof users | null, over: Partial<Store> =
     changeCourseOwner: jest.fn(async () => {}),
     countListenerHomework: jest.fn(async () => 0),
     removeListener: jest.fn(async () => {}),
+    deleteCourse: jest.fn(async () => {}),
     deleteMaterial: jest.fn(async () => {}),
     addMaterialFile: jest.fn(async () => {}),
     updateMaterialFile: jest.fn(async () => {}),
