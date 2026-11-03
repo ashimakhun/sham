@@ -134,7 +134,13 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    approval; adds `telegram_links.notify_new_account` (default true, existing links get true), the kind `new_account`
    in `set_telegram_notification()`, `new_account_notification()` and an after-insert trigger on `profiles` (pending
    sign-ups only), turns on `pg_net` if the server offers it; no policy changes, deletes nothing. Sign-up never fails
-   because of it; see [Telegram notifications](#telegram-notifications) → New accounts).
+   because of it; see [Telegram notifications](#telegram-notifications) → New accounts),
+   `0045_homework_submitted_notifications.sql` (ARU-89: Telegram message to a course's owner when a listener submits
+   homework; adds `telegram_links.notify_homework_submitted` (default true), the kind `homework_submitted` in
+   `set_telegram_notification()` (keeps 0044's kinds), `homework_submitted_recipient()` and an after-insert trigger
+   on `homework`, turns on `pg_net` if the server offers it; no policy changes, deletes nothing; needs 0044. Works
+   without the Vault secrets (it then sends nothing), see [Telegram notifications](#telegram-notifications) →
+   Homework submitted).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
@@ -361,6 +367,36 @@ trigger runs inside the Auth sign-up and only logs a warning); a failed send is 
 
 To change a Vault value later: `select vault.update_secret((select id from vault.secrets where name = 'new_account_notify_secret'), '<new>');`.
 
+#### Homework submitted (ARU-89)
+
+When a listener submits homework, the course's current owner (teacher or mentor, if Approved) gets "New homework to
+check from <sender name> in <course title>: <assignment title>" within seconds, if they connected Telegram and left
+**Homework submitted** on (teachers and mentors see this switch; students don't). An after-insert trigger on
+`homework` queues one `pg_net` POST `{"homework_id": "<id>"}` with `Authorization: Bearer <secret>` to the Edge
+Function `homework-submitted-notifications`, which asks `homework_submitted_recipient()` (service role only) for the
+owner at that moment and sends. Checking, unchecking and comment edits send nothing. Submitting never fails because
+of this; a failed send is dropped, never retried.
+
+1. Dashboard → **Database → Extensions**: make sure **pg_net** is on.
+2. Run `supabase/migrations/0045_homework_submitted_notifications.sql` (after 0044).
+3. Make a random secret (`openssl rand -hex 24`) and set it as the function's secret:
+   ```bash
+   npx supabase secrets set HOMEWORK_SUBMITTED_NOTIFY_SECRET=<secret>
+   ```
+4. Deploy the function (the trigger sends `Authorization: Bearer <secret>`, not a Supabase JWT):
+   ```bash
+   npx supabase functions deploy homework-submitted-notifications --no-verify-jwt
+   ```
+5. Store the URL and the same secret in Vault (SQL Editor). Until both exist the trigger sends nothing:
+   ```sql
+   select vault.create_secret('https://<project-ref>.supabase.co/functions/v1/homework-submitted-notifications', 'homework_submitted_notify_url');
+   select vault.create_secret('<secret>', 'homework_submitted_notify_secret');
+   ```
+6. Check: submit homework, then `select status_code, content from net._http_response order by created desc limit 5;`
+   shows `200` with `{"recipients":1,"sent":1,…}`. A `401` means the two secrets differ.
+
+To change a Vault value later: `select vault.update_secret((select id from vault.secrets where name = 'homework_submitted_notify_secret'), '<new>');`.
+
 ### Delete account (ARU-75)
 
 The Delete account screen calls the Edge Function `delete-account` with the user's access token and password. It
@@ -498,6 +534,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Get "Your homework … was reviewed" in Telegram (ARU-49) | own homework, when checked | own homework (sent as a listener), when checked | (never sends homework) |
 | Get "New homework" Telegram messages (ARU-50) | courses they're in | courses they're in (not their own) |  |
 | Get "New account waiting for your approval" in Telegram (ARU-84; linked, **New accounts** on) |  |  | ✓ (every new sign-up) |
+| Get "New homework to check" in Telegram (ARU-89; linked, **Homework submitted** on) | never | courses they own | courses they own |
 | Turn Accountant on / off for a mentor (ARU-65) | |         | ✓       |
 | Select / unselect paid courses |         | accountants (any course they can see) |  |
 | See paid courses, change their payment period | | accountants (all they can see) | ✓ (all) |
