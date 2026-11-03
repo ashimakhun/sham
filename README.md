@@ -7,6 +7,8 @@ An educational mobile app where teachers, mentors and students work together:
   homework, and listeners mark that they attended.
 - **Listeners** send homework (text + optional photo) for an assignment from the **New** list on the Homework tab.
 - **Mentors and the teacher** see all homework, leave a comment and mark it as checked (never their own).
+- **All homework lives on the Homework tab** (ARU-80; course details no longer lists it); its **Checked** list has a
+  course filter.
 - **Each course** has a chat with a new-message counter for its owner, listeners and the teacher.
 - **General chat** for every accepted account, any role, opened from the Profile tab.
 - **Teachers and mentors** share formatted posts (lessons, notes, links) on the Materials tab's **Blog**, filterable
