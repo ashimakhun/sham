@@ -4,22 +4,33 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { colors } from '@/lib/theme';
 
 type Option = { value: string; label: string };
+/** What the list filters by (ARU-80): the Blog's authors (default) or the Homework tab's courses. */
+type Noun = 'author' | 'course';
+
+const nounText: Record<Noun, { plural: string; testID: string }> = {
+  author: { plural: 'authors', testID: 'author-filter' },
+  course: { plural: 'courses', testID: 'course-filter' },
+};
 
 /**
  * Blog author filter (ARU-62): one "Filter: <All | author>" button that opens a list of authors (All first). Picking
  * an entry closes the list; tapping outside, Android back (or Esc on web) or the selected entry closes it unchanged.
- * Core `Modal`, so it works in Expo Go on iOS, Android and web.
+ * Core `Modal`, so it works in Expo Go on iOS, Android and web. ARU-80: `noun="course"` reuses it as the Homework tab's
+ * course filter ("Filter by course", testIDs `course-filter-*`); the Blog wording and testIDs stay the default.
  */
 export function AuthorFilter({
   options,
   value,
   onChange,
+  noun = 'author',
 }: {
   options: Option[];
   value: string;
   onChange: (v: string) => void;
+  noun?: Noun;
 }) {
   const [open, setOpen] = useState(false);
+  const { plural, testID } = nounText[noun];
   const current = options.find((o) => o.value === value)?.label ?? options[0]?.label ?? 'All';
 
   const pick = (v: string) => {
@@ -31,8 +42,8 @@ export function AuthorFilter({
     <>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Filter by author, ${current}`}
-        accessibilityHint="Opens the list of authors"
+        accessibilityLabel={`Filter by ${noun}, ${current}`}
+        accessibilityHint={`Opens the list of ${plural}`}
         onPress={() => setOpen(true)}
         style={s.button}>
         <Text style={s.buttonText} numberOfLines={1} ellipsizeMode="tail">
@@ -46,17 +57,17 @@ export function AuthorFilter({
         <View style={s.backdrop}>
           {/* Tap outside the list: close without changing the filter. */}
           <Pressable
-            testID="author-filter-backdrop"
+            testID={`${testID}-backdrop`}
             accessibilityRole="button"
-            accessibilityLabel="Close author filter"
+            accessibilityLabel={`Close ${noun} filter`}
             onPress={() => setOpen(false)}
             style={StyleSheet.absoluteFill}
           />
           <View style={s.sheet} accessibilityViewIsModal>
             <Text style={s.heading} accessibilityRole="header">
-              Filter by author
+              {`Filter by ${noun}`}
             </Text>
-            <ScrollView testID="author-filter-list" style={s.list} keyboardShouldPersistTaps="handled">
+            <ScrollView testID={`${testID}-list`} style={s.list} keyboardShouldPersistTaps="handled">
               {options.map((o) => {
                 const selected = o.value === value;
                 return (

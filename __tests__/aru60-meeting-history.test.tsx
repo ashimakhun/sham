@@ -92,7 +92,8 @@ describe('AC1/AC2: top card and MEETING HISTORY', () => {
     expect(history().getAllByTestId(/^meeting-/).map((n) => n.props.testID)).toEqual(['meeting-X', 'meeting-K']);
   });
 
-  it('MEETING HISTORY comes after the HOMEWORK list, and after its empty state', async () => {
+  // ARU-80: the homework list is gone from course details; MEETING HISTORY is still the last section.
+  it('MEETING HISTORY comes last, with no homework list or empty state', async () => {
     // All rendered text, in screen order.
     type Json = { children?: (Json | string)[] | null } | string | null;
     const texts = (n: Json): string[] =>
@@ -105,11 +106,12 @@ describe('AC1/AC2: top card and MEETING HISTORY', () => {
     };
     setStore(fakeStore('T', { courseMembers: members, meetings: all, visibleHomework: [] }));
     const view = await render(<CourseDetailScreen />);
-    before('|HOMEWORK|', 'MEETING HISTORY');
-    before('No homework for this course yet', 'MEETING HISTORY');
+    before('MEETINGS (', 'MEETING HISTORY');
+    expect(rendered()).not.toContain('HOMEWORK');
+    expect(rendered()).not.toContain('No homework for this course yet');
     setStore(fakeStore('T', { courseMembers: members, meetings: all, visibleHomework: [hw({ id: 'h1', courseId: 'A', title: 'Sam answer' })] }));
     await view.rerender(<CourseDetailScreen />);
-    before('Sam answer', 'MEETING HISTORY');
+    expect(rendered()).not.toContain('Sam answer');
     expect(headings().at(-1)).toBe('MEETING HISTORY (2)');
   });
 
