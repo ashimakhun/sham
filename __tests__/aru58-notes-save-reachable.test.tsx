@@ -91,14 +91,15 @@ describe('with the keyboard open (an iPhone keyboard of 336 pt)', () => {
     expect(maxHeight).toBeLessThan(Math.round(height * 0.4));
   });
 
-  it('opening the Link row shrinks the field further', async () => {
+  it('there is no Link row any more (ARU-64), so the toolbar never shrinks the field', async () => {
     jest.spyOn(Dimensions, 'get').mockReturnValue({ width: 390, height: 932, scale: 3, fontScale: 1 });
     setStore(fakeStore('T', { courseMembers: members, meetings: [C] }));
     mockKeyboard = 346;
     await render(<MeetingNotesScreen />);
     const before = field().maxHeight as number;
-    await fireEvent.press(screen.getByRole('button', { name: 'Link' }));
-    expect(field().maxHeight as number).toBeLessThan(before);
+    expect(screen.queryByRole('button', { name: 'Link' })).toBeNull();
+    await fireEvent.press(screen.getByRole('button', { name: 'Bold' }));
+    expect(field().maxHeight as number).toBe(before);
   });
 
   it('closing the keyboard gives the field its full height back', async () => {
