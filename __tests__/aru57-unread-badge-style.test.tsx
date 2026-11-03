@@ -78,7 +78,7 @@ describe('Chat button on course details (AC 4)', () => {
   it('only the colour changes: button colour, no ring, same place', async () => {
     setStore(fakeStore('S1', { courseMembers: members, unreadCount: counts({ A: 3 }) }));
     await render(<CourseDetailScreen />);
-    expect(screen.getByRole('button', { name: 'Chat, 3 new messages' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Open chat for Algebra, 3 new messages' })).toBeTruthy();
     const style = badgeStyle();
     expect(style.backgroundColor).toBe(colors.primary);
     expect(style.borderWidth).toBeUndefined();
