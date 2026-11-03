@@ -104,8 +104,7 @@ select t.login('N');
 select t.eq(t.affected($$delete from material_files where id = t.f(1)$$), 0::bigint, 'AC8 another mentor cannot delete');
 select t.eq(t.affected($$delete from storage.objects where bucket_id = 'materials' and name = t.fpath('M', 1)$$), 0::bigint,
   'AC8 another mentor cannot delete the PDF');
-select t.login('T');
-select t.eq(t.affected($$delete from material_files where id = t.f(1)$$), 0::bigint, 'AC8 the teacher cannot delete a mentor''s item');
+-- (ARU-86: the teacher now deletes any item and PDF; tested in aru86_teacher_deletes_any_pdf.test.sql.)
 select t.login('S1');
 select t.eq(t.affected($$delete from material_files$$), 0::bigint, 'AC8 a student deletes nothing');
 select t.eq(t.affected($$delete from storage.objects where bucket_id = 'materials'$$), 0::bigint, 'AC8 a student deletes no PDF');
