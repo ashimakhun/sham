@@ -3,6 +3,7 @@ import { ScrollView, Text, View } from 'react-native';
 
 import { AccountantSection } from '@/components/Accountant';
 import { ProfileNameCard } from '@/components/ProfileNameCard';
+import { TelegramCard } from '@/components/TelegramCard';
 import { Button, Card, ErrorText, styles } from '@/components/ui';
 import { canManageRoles, canUseGeneralChat } from '@/lib/roles';
 import { useStore } from '@/lib/store';
@@ -69,6 +70,7 @@ export default function ProfileScreen() {
         </Card>
       )}
 
+      <TelegramCard />
       {/* ARU-65: accountants and the teacher. */}
       <AccountantSection />
 

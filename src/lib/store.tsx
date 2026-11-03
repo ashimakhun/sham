@@ -33,6 +33,8 @@ import type {
   NewMaterial,
   NewMaterialFile,
   NewMeeting,
+  TelegramKind,
+  TelegramLink,
   User,
 } from './types';
 
@@ -157,6 +159,16 @@ export type Store = {
   setAccessStatus: (userId: string, status: 'approved' | 'rejected') => Promise<void>;
   /** Teacher only (ARU-13): switches a user between student and mentor via set_user_role(), then refetches. */
   setUserRole: (userId: string, role: 'student' | 'mentor') => Promise<void>;
+  /** The signed-in user's Telegram link (ARU-48): undefined until loaded, null when not connected. */
+  telegram: TelegramLink | null | undefined;
+  /** Refetches the Telegram link (the Profile tab calls it on focus and when the app comes back). */
+  loadTelegram: () => Promise<void>;
+  /** A new one-time code for the bot's /start link (approved accounts only). */
+  createTelegramLinkCode: () => Promise<string>;
+  /** Turns one Telegram notification type on or off. */
+  setTelegramNotification: (kind: TelegramKind, enabled: boolean) => Promise<void>;
+  /** Removes the Telegram link and its switches. */
+  disconnectTelegram: () => Promise<void>;
   /** ARU-65: paid courses with their periods. Only loaded for accountants and the teacher (empty for everyone else). */
   courseBilling: CourseBilling[];
   /** Teacher only (ARU-65): turn Accountant on or off for an approved mentor. Takes effect on their next refresh. */
@@ -279,6 +291,22 @@ type MaterialFileRow = {
   created_at: string;
   updated_at: string;
 };
+type TelegramLinkRow = {
+  linked_at: string;
+  notify_meeting_started: boolean;
+  notify_new_homework: boolean;
+  notify_homework_reviewed: boolean;
+  notify_chat_message: boolean;
+};
+const toTelegramLink = (r: TelegramLinkRow): TelegramLink => ({
+  linkedAt: r.linked_at,
+  switches: {
+    meeting_started: r.notify_meeting_started,
+    new_homework: r.notify_new_homework,
+    homework_reviewed: r.notify_homework_reviewed,
+    chat_message: r.notify_chat_message,
+  },
+});
 type MaterialRow = {
   id: string;
   teacher_id: string;
@@ -503,6 +531,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // Every profile the database returns: approved accounts, plus all accounts for the teacher and the own row (ARU-43).
   const [profiles, setProfiles] = useState<User[]>([]);
   const [accessRequests, setAccessRequests] = useState<AccessRequest[]>([]);
+  const [telegram, setTelegram] = useState<TelegramLink | null | undefined>(undefined);
   const [homework, setHomework] = useState<Homework[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [materialFiles, setMaterialFiles] = useState<MaterialFile[]>([]);
@@ -535,6 +564,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // Signed out: drop the previous user's data.
         setProfiles([]);
         setAccessRequests([]);
+        setTelegram(undefined);
         setHomework([]);
         setMaterials([]);
         setMaterialFiles([]);
@@ -762,6 +792,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Stable, so the chat screen can call it from effects without re-running them on every store update.
+  // ARU-48: the own row only (RLS). Not in load(): the Profile tab refetches it on focus and on returning to the app.
+  // Stable, so the screen can call it from focus effects. An error (e.g. offline) keeps what was loaded.
+  const loadTelegram = useCallback(async () => {
+    if (!userId) return;
+    const res = await supabase.from('telegram_links').select('*').eq('user_id', userId);
+    if (res.error) throw new Error(res.error.message);
+    const row = ((res.data as TelegramLinkRow[] | null) ?? [])[0];
+    setTelegram(row ? toTelegramLink(row) : null);
+  }, [userId]);
+
   const markChatRead = useCallback<Store['markChatRead']>(
     async (courseId, upToMessageId) => {
       // Clear at once (and drop any count request in flight), then save; the refetch after the save is the truth.
@@ -1304,6 +1344,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       check(await supabase.rpc('set_user_role', { target: userId, new_role: role }));
       // profiles is not in realtime: refetch so the user moves to their new section.
       await load();
+    },
+    telegram,
+    loadTelegram,
+    createTelegramLinkCode: async () => {
+      const res = await supabase.rpc('create_telegram_link_code');
+      check(res);
+      if (typeof res.data !== 'string' || !res.data) throw new Error('Could not get a Telegram link. Try again.');
+      return res.data;
+    },
+    setTelegramNotification: async (kind, enabled) => {
+      check(await supabase.rpc('set_telegram_notification', { kind, enabled }));
+      await loadTelegram();
+    },
+    disconnectTelegram: async () => {
+      check(await supabase.rpc('disconnect_telegram'));
+      setTelegram(null);
     },
     accessRequests,
     setAccessStatus: async (target, status) => {

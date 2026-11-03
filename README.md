@@ -54,8 +54,9 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    and open read policies; deletes nothing),
    `0022_attendance_from_start.sql` (ARU-45: attendance can be marked once a meeting has started, not only when it is
    completed, and never on a canceled meeting; replaces two functions, deletes nothing),
-   `0024_material_likes.sql` (ARU-52: likes on Blog posts; adds a table, deletes nothing; 0023 is reserved for the
-   open Telegram branch, ARU-48, and 0024 doesn't depend on it),
+   `0023_telegram_links.sql` (ARU-48: Telegram notifications setup; adds two tables and five functions, changes
+   nothing else; see [Telegram notifications](#telegram-notifications)),
+   `0024_material_likes.sql` (ARU-52: likes on Blog posts; adds a table, deletes nothing; it doesn't depend on 0023),
    `0025_course_feedback.sql` (ARU-53: listeners rate a started course; adds a table, a helper and a trigger, deletes
    nothing; it doesn't depend on 0023 or 0024),
    `0026_profile_name_not_blank.sql` (ARU-55: an edited name can't be blank; adds a trigger),
@@ -93,6 +94,32 @@ There can be only one teacher. If your database already has two or more, `0009_r
 "More than one teacher exists: …; make all but one a mentor first". Run
 `update profiles set role = 'mentor' where id = (select id from auth.users where email = '…');` for each extra
 teacher in the SQL Editor, then run the migration again.
+
+### Telegram notifications
+
+Notifications go through the Sham Telegram bot (ARU-48). Each user connects on **Profile → Telegram notifications**
+and chooses which types they get. Until the steps below are done the card stays hidden and nothing else changes.
+
+1. In Telegram, message **@BotFather**, send `/newbot` and keep the **token** it gives you secret.
+2. Set the Edge Function secrets (dashboard → Edge Functions → Secrets, or the CLI). `TELEGRAM_WEBHOOK_SECRET` is
+   any random string of letters, digits, `_` and `-`:
+   ```bash
+   npx supabase secrets set TELEGRAM_BOT_TOKEN=<token> TELEGRAM_WEBHOOK_SECRET=<random string>
+   ```
+3. Deploy the bot's webhook (Telegram sends no Supabase JWT; the secret header protects it):
+   ```bash
+   npx supabase functions deploy telegram-webhook --no-verify-jwt
+   ```
+4. Point the bot at it once:
+   ```bash
+   curl "https://api.telegram.org/bot<token>/setWebhook" \
+     -d url=https://<project-ref>.supabase.co/functions/v1/telegram-webhook \
+     -d secret_token=<the same random string> -d 'allowed_updates=["message"]'
+   ```
+5. Put the bot's username (without `@`) in `.env.local` as `EXPO_PUBLIC_TELEGRAM_BOT_USERNAME` and restart `npm start`.
+
+The bot only answers `/start <code>` (from the app's Connect button) and `/stop`, in private chats. Notifications
+themselves are sent by `supabase/functions/_shared/telegram.ts` from the notification stories' functions.
 
 ## Run it
 
@@ -200,6 +227,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | See a course-only Knowledge base PDF | if in its course | if in its course, or its author | ✓ |
 | Switch student ↔ mentor    |           |                    | ✓       |
 | Accept or reject new accounts |        |                    | ✓       |
+| Connect Telegram and choose own notifications | ✓ (own) | ✓ (own) | ✓ (own) |
 | Turn Accountant on / off for a mentor (ARU-65) | |         | ✓       |
 | Select / unselect paid courses |         | accountants (any course they can see) |  |
 | See paid courses, change their payment period | | accountants (all they can see) | ✓ (all) |
