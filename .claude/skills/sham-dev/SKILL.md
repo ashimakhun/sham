@@ -13,9 +13,8 @@ Only reviewed work reaches **Ready for Dev**: stories that passed requirements a
 
 ## Choosing the issue
 1. Using the Linear connector, list Sham issues in **Ready for Dev** without `agent:working`. Never pick up anything in Requirements ready: it hasn't been reviewed.
-2. **Skip Telegram work.** Leave out every issue about Telegram (its title, description or labels mention Telegram, or it blocks or is blocked by one that does, e.g. Telegram notifications). Don't pick it up, change its status or labels, or comment on it. The product owner starts Telegram work themselves; only take it when a person explicitly asks for it in the conversation (a Linear trigger or a scheduled run is not such a request).
-3. Take **bugs first** (label `Bug`): severity blocker → major → minor (from the bug's Severity section), then oldest. Otherwise the oldest story. If none is left after step 2, stop and report "nothing to do".
-4. Add `agent:working` and move the issue to **In Dev**.
+2. Take **bugs first** (label `Bug`): severity blocker → major → minor (from the bug's Severity section), then oldest. Otherwise the oldest story. If none, stop and report "nothing to do".
+3. Add `agent:working` and move the issue to **In Dev**.
 
 ## Setup (both cases)
 Attach and clone ashimakhun/sham. Before `npm ci`, `npm install` or `npx expo install`, run `export NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 npm_config_noproxy=localhost,127.0.0.1`: in the cloud sandbox npm only reaches the registry through the proxy, and a "getaddrinfo ENOTFOUND registry.npmjs.org" error means this step was skipped.
@@ -48,5 +47,4 @@ Finally remove `agent:working`.
 - Never push to main.
 - Never change or delete a QA test to make it pass.
 - One bug or one story per run.
-- Telegram work waits for the product owner (see Choosing the issue, step 2). That includes open Telegram PRs: don't push to them, merge `main` into them or fix their CI unless a person asks.
 - If a story's requirements are contradictory or impossible, comment the problem, move it to **Needs Clarification**, and stop.

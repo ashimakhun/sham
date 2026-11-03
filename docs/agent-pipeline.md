@@ -67,7 +67,6 @@ When a story's last open bug is closed, the story goes back to Ready for QA for 
 - The dev agent never edits a QA test to make it pass; if it thinks the test is wrong, the bug goes to requirements analysis.
 - After two `ANALYSIS: CHANGES NEEDED` rounds on the same story, the third problem goes to Needs Clarification instead of back to Idea.
 - The dev agent never codes a story that hasn't passed analysis.
-- Telegram work waits for the product owner: the dev agent doesn't pick up, comment on or change Telegram issues (or issues linked to them by blocks / blocked by), and doesn't push to open Telegram PRs, unless a person asks for it in the conversation.
 
 ## How the agents run
 
@@ -77,7 +76,7 @@ Each agent is a Claude routine (shown as a scheduled task) that runs in a fresh 
 
 - **Requirements agent: started by Linear.** When an issue is created in, or moved to, **Idea** in the Sham team, Linear calls the `linear-webhook` Supabase Edge Function, which starts the routine through its API trigger (see [Event trigger setup](#event-trigger-setup)). A fallback run every hour at :06 picks up anything a missed start left behind.
 - **QA agent, requirements analysis: hourly at :43.** Reviews one Requirements ready issue per run (requirements bugs first).
-- **Dev agent: started by Linear** when an issue is created in, or moved to, **Ready for Dev** (stories that passed analysis and bugs routed to dev), through the same Edge Function. A fallback run every 6 hours (at :22) picks up anything a missed start left behind. It skips Telegram work (see Guardrails).
+- **Dev agent: started by Linear** when an issue is created in, or moved to, **Ready for Dev** (stories that passed analysis and bugs routed to dev), through the same Edge Function. A fallback run every 6 hours (at :22) picks up anything a missed start left behind.
 - **QA testing: hourly at :06** (paused).
 
 The prompts are:
