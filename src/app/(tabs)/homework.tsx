@@ -141,8 +141,9 @@ export default function HomeworkScreen() {
         'meetingId' in item ? (
           <AssignmentCard item={item} now={now} />
         ) : (
-          // ARU-90: the Checked list already says "checked"; its cards show the checker's comment instead of the badge.
-          <HomeworkCard item={item} showStatus={shown !== 'checked'} />
+          // ARU-90 / ARU-91: every list here already names the status, so cards never show the badge; Checked cards
+          // show the checker's comment instead.
+          <HomeworkCard item={item} showStatus={false} />
         )
       }
       ListHeaderComponent={
