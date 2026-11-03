@@ -243,7 +243,14 @@ export type NewMaterialFile = {
 };
 export type MaterialFileEdit = { name: string; description: string; courseId?: string; courseOnly?: boolean };
 
-/** Telegram notification types (ARU-48); each one has its own on/off switch. */
-export type TelegramKind = 'meeting_started' | 'new_homework' | 'homework_reviewed' | 'chat_message';
+/** Telegram notification types from ARU-48. */
+type BaseTelegramKind = 'meeting_started' | 'new_homework' | 'homework_reviewed' | 'chat_message';
+/** Types added later (ARU-84 new_account). Optional in a link's switches: a missing one reads as on (the default). */
+export type LaterTelegramKind = 'new_account';
+/** Telegram notification types; each one has its own on/off switch. */
+export type TelegramKind = BaseTelegramKind | LaterTelegramKind;
 /** The signed-in user's link to the Sham Telegram bot (ARU-48). */
-export type TelegramLink = { linkedAt: string; switches: Record<TelegramKind, boolean> };
+export type TelegramLink = {
+  linkedAt: string;
+  switches: Record<BaseTelegramKind, boolean> & Partial<Record<LaterTelegramKind, boolean>>;
+};

@@ -140,10 +140,10 @@ describe('Switches (AC 5)', () => {
     expect(screen.getByLabelText('Chat messages').props.value).toBe(true);
   });
 
-  it('the teacher sees only Chat messages', async () => {
+  it('the teacher sees only Chat messages (and New accounts, ARU-84)', async () => {
     setStore(fakeStore('T', { telegram: linked() }));
     await render(<ProfileScreen />);
-    expect(switches()).toEqual(['Chat messages']);
+    expect(switches()).toEqual(['Chat messages', 'New accounts']);
   });
 
   it('flipping a switch saves it', async () => {

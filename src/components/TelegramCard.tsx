@@ -185,7 +185,7 @@ function TelegramCardBody({ username }: { username: string }) {
               <Text style={[styles.body, { flex: 1 }]}>{label}</Text>
               <Switch
                 accessibilityLabel={label}
-                value={pending[kind] ?? telegram.switches[kind]}
+                value={pending[kind] ?? telegram.switches[kind] ?? true}
                 onValueChange={(v) => toggle(kind, v)}
                 disabled={busy || pending[kind] !== undefined}
               />
