@@ -201,9 +201,9 @@ select t.throws(format($$insert into storage.objects (bucket_id, name, owner) va
   t.id('M2') || '/late.pdf'), '42501', 'AC9 ... can''t upload a PDF');
 reset role;
 
--- S1 has no read position in A: cm_old (deleted author) is the oldest unread, so cm_new isn't a new batch for S1.
-select t.ok((select not (t.id('S1') = any (recipient_ids)) from chat_message_recipients(t.x('cm_new'))),
-  'note 1 (0036) no second Telegram message for a batch that starts with a deleted author''s message');
+-- ARU-87 (0046) dropped ARU-44's one-per-batch rule: every message after a deleted author's one notifies too.
+select t.ok((select t.id('S1') = any (recipient_ids) from chat_message_recipients(t.x('cm_new'))),
+  'note 1 (0046) a message after a deleted author''s message still notifies');
 select t.ok((select t.id('S1') = any (recipient_ids) from chat_message_recipients(t.x('cm_old'))),
   'note 1 (0036) a deleted author''s message still has recipients');
 select t.eq((select array_agg(user_id order by user_id) from new_homework_recipients(t.x('asg'))),

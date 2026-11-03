@@ -28,10 +28,9 @@ afterEach(() => {
 });
 
 describe('telegramSwitchesFor', () => {
-  it('teacher: New accounts right after Chat messages', () => {
+  it('teacher: New accounts next to the chat switches (Chat messages, then General chat since ARU-87)', () => {
     const labels = telegramSwitchesFor('teacher').map((s) => s.label);
-    expect(labels).toContain('Chat messages');
-    expect(labels[labels.indexOf('Chat messages') + 1]).toBe('New accounts');
+    expect(labels.slice(labels.indexOf('Chat messages'))).toEqual(['Chat messages', 'General chat', 'New accounts']);
   });
 
   it.each(['mentor', 'student'] as const)('%s: never New accounts', (role) => {
@@ -42,11 +41,11 @@ describe('telegramSwitchesFor', () => {
 });
 
 describe('the card', () => {
-  it('the teacher sees New accounts after Chat messages, on by default (no saved value yet)', async () => {
+  it('the teacher sees New accounts after the chat switches, on by default (no saved value yet)', async () => {
     setStore(fakeStore('T', { telegram: linked() }));
     await render(<ProfileScreen />);
     const labels = switches();
-    expect(labels[labels.indexOf('Chat messages') + 1]).toBe('New accounts');
+    expect(labels.slice(labels.indexOf('Chat messages'))).toEqual(['Chat messages', 'General chat', 'New accounts']);
     expect(screen.getByLabelText('New accounts').props.value).toBe(true);
   });
 

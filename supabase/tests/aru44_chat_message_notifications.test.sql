@@ -1,5 +1,7 @@
 -- ARU-44: chat_message_recipients() and the after-insert trigger that queues the Edge Function call.
--- Rules under test: supabase/migrations/0036_chat_message_notifications.sql.
+-- Rules under test: supabase/migrations/0036_chat_message_notifications.sql, as changed by ARU-87 (0046): read
+-- positions no longer matter, every message notifies everyone in the chat but its author (the "one per batch" rules
+-- (c) and (d) are gone, so the expectations below were updated for ARU-87).
 -- Fixture (t.seed): course A owned by mentor M, B by mentor N; teacher T. Added here: a second teacher T2 (0009 allows
 -- only one, so this test database drops that rule's index and trigger for T2: AC 6 says "the teacher" means every
 -- Approved teacher, so the function must not assume there is just one), and students P
@@ -89,12 +91,11 @@ select t.eq(t.rcpt('nope'), '', 'AC9 unknown message id: no row');
 select t.eq((select count(*) from chat_message_recipients(t.u('nope'))), 0::bigint, 'AC9 unknown message id: empty result');
 reset role;
 
--- AC 3 / AC 4: m2 by M2. S1's only earlier new message is their own, so m2 is S1's oldest new one; everyone else
--- already has m1 unread (S3 too: no read position, and m1 is from someone else).
+-- ARU-87 AC 2: m2 by M2. Everyone else still has m1 unread, and they all get m2 too.
 select t.post('m2', 'A', 'M2', interval '8 hours');
 select t.bot();
-select t.eq(t.rcpt('m2'), 'Algebra:S1', 'AC3 m2: only S1 (own earlier message doesn''t count); older unread m1 leaves the others out');
-select t.eq(t.rcpt('m1'), 'Algebra:M,M2,S3,T,T2', 'AC3 m1 is still the oldest new message for them');
+select t.eq(t.rcpt('m2'), 'Algebra:M,S1,S3,T,T2', 'ARU-87 m2: everyone but the author, unread m1 doesn''t matter');
+select t.eq(t.rcpt('m1'), 'Algebra:M,M2,S3,T,T2', 'm1 unchanged');
 reset role;
 
 -- AC 3: M opens the chat (read up to m2), then S1 posts m3: M is notified again; the others still have m1 unread.
@@ -103,36 +104,34 @@ select t.lives($$select mark_chat_read('$$ || t.id('A') || $$', '$$ || t.u('m2')
 reset role;
 select t.post('m3', 'A', 'S1', interval '7 hours');
 select t.bot();
-select t.eq(t.rcpt('m3'), 'Algebra:M', 'AC3 after mark_chat_read: M included again for m3');
-select t.eq(t.rcpt('m1'), 'Algebra:M2,S3,T,T2', 'AC3 m1 no longer for M (read)');
+select t.eq(t.rcpt('m3'), 'Algebra:M,M2,S3,T,T2', 'ARU-87 m3: everyone but the author, read or not');
+select t.eq(t.rcpt('m1'), 'Algebra:M,M2,S3,T,T2', 'ARU-87 m1 still for M after reading (computed without positions)');
 reset role;
 
--- AC (c): m4 by M. T2's position equals m4's time (already read); T's is just before it.
+-- ARU-87: m4 by M. T2's position equals m4's time (already read); T's is just before it. Both get it.
 select t.post('m4', 'A', 'M', interval '6 hours');
 update course_chat_reads set last_read_at = (select created_at from course_messages where id = t.u('m4'))
   where course_id = t.id('A') and user_id = t.u('T2');
 update course_chat_reads set last_read_at = (select created_at from course_messages where id = t.u('m4')) - interval '1 second'
   where course_id = t.id('A') and user_id = t.id('T');
 select t.bot();
-select t.eq(t.rcpt('m4'), 'Algebra:T', 'AC rule (c): position equal to T leaves T2 out; T (position just before) is in');
+select t.eq(t.rcpt('m4'), 'Algebra:M2,S1,S3,T,T2', 'ARU-87 rule (c) gone: a position at or after the message changes nothing');
 reset role;
 
--- AC 4: S3 has no read position: only the first message from others (m1) counts; after opening the chat once, the
--- next one notifies again.
+-- ARU-87: S3 opens the chat once; the next message notifies everyone in the chat but its author.
 select t.login('S3');
 select t.lives($$select mark_chat_read('$$ || t.id('A') || $$', '$$ || t.u('m4') || $$')$$, 'AC4 S3 opens the chat once');
 reset role;
 select t.post('m5', 'A', 'M2', interval '5 hours');
 select t.bot();
-select t.eq(t.rcpt('m5'), 'Algebra:S3,T2',
-  'AC4 m5: S3 again after reading once; T2 (read up to m4); M (m3 unread), S1 (m2 unread) and T (m4 unread) left out');
+select t.eq(t.rcpt('m5'), 'Algebra:M,S1,S3,T,T2', 'ARU-87 m5: everyone but the author, unread messages or not');
 reset role;
 
 -- AC 6: removal before processing; Pending / Rejected never; a course rename shows the title at processing time.
 delete from course_members where course_id = t.id('A') and user_id = t.id('S3');
 update courses set title = 'Algebra *2* <new>' where id = t.id('A');
 select t.bot();
-select t.eq(t.rcpt('m5'), 'Algebra *2* <new>:T2', 'AC6 S3 removed before processing: left out; new title used');
+select t.eq(t.rcpt('m5'), 'Algebra *2* <new>:M,S1,T,T2', 'AC6 S3 removed before processing: left out; new title used');
 reset role;
 
 -- AC 6: ownership moves away. B (owner N): message by T. N is in; after B moves to M2, N is out and M2 (no position:
@@ -164,8 +163,8 @@ select t.eq((select array_to_string(array(select k from unnest(array['M2', 'S1',
   'AC10 first post (S1): owner, S2 and both teachers');
 select t.eq((select array_to_string(array(select k from unnest(array['M2', 'S1', 'S2', 'T', 'T2']) k
     where t.u(k) = any (r.recipient_ids) order by k), ',')
-  from chat_message_recipients('00000000-0000-0000-0000-0000000044b2') r), 'S1',
-  'AC10 second post (S2, same time, larger id): only S1 (it is S1''s oldest new message); the others left out');
+  from chat_message_recipients('00000000-0000-0000-0000-0000000044b2') r), 'M2,S1,T,T2',
+  'ARU-87 second post (S2, same time): everyone but S2 again (one per message)');
 reset role;
 
 -- AC 8 / AC 7: the trigger. (i) No Vault secrets: every insert above succeeded and queued nothing.

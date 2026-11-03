@@ -28,8 +28,13 @@ afterEach(() => {
 });
 
 describe('telegramSwitchesFor', () => {
-  it('teacher: Homework submitted, Chat messages, New accounts', () => {
-    expect(telegramSwitchesFor('teacher').map((s) => s.kind)).toEqual(['homework_submitted', 'chat_message', 'new_account']);
+  it('teacher: Homework submitted, Chat messages, General chat (ARU-87), New accounts', () => {
+    expect(telegramSwitchesFor('teacher').map((s) => s.kind)).toEqual([
+      'homework_submitted',
+      'chat_message',
+      'general_chat',
+      'new_account',
+    ]);
   });
 
   it('mentor: every listener switch plus Homework submitted, never New accounts', () => {
@@ -39,6 +44,7 @@ describe('telegramSwitchesFor', () => {
       'Homework reviewed',
       'Homework submitted',
       'Chat messages',
+      'General chat',
     ]);
   });
 
@@ -48,6 +54,7 @@ describe('telegramSwitchesFor', () => {
       'New homework',
       'Homework reviewed',
       'Chat messages',
+      'General chat',
     ]);
   });
 });

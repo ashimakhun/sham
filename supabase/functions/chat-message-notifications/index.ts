@@ -1,6 +1,7 @@
-// ARU-44: a Telegram message "New message in the <course title> chat" when someone else writes in a course chat.
-// Called through pg_net by the after-insert trigger on course_messages (migration 0036), with the message id and
-// `Authorization: Bearer <CHAT_NOTIFY_SECRET>`. The logic is in ../_shared/chat-message.ts (tested with Jest); this file
+// ARU-44: a Telegram message "New message in the <course title> chat" when someone else writes in a course chat; since
+// ARU-87 (0046) for every message, and also "New message in the general chat" for the general chat. Called through
+// pg_net by the after-insert triggers on course_messages (0036, {"message_id"}) and general_messages (0046,
+// {"general_message_id"}), with `Authorization: Bearer <CHAT_NOTIFY_SECRET>`. The logic is in ../_shared/chat-message.ts (tested with Jest); this file
 // only wires it to Supabase and Telegram.
 //
 // Secrets (Supabase dashboard → Edge Functions → Secrets, or `npx supabase secrets set ...`):
@@ -13,7 +14,11 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-import { type ChatMessageRecipients, handleChatMessageRequest } from '../_shared/chat-message.ts';
+import {
+  type ChatMessageRecipients,
+  type GeneralMessageRecipients,
+  handleChatMessageRequest,
+} from '../_shared/chat-message.ts';
 import { sendTelegramMessages, type ServiceClient } from '../_shared/telegram.ts';
 
 const token = Deno.env.get('TELEGRAM_BOT_TOKEN') ?? '';
@@ -28,6 +33,11 @@ Deno.serve((request) =>
       const { data, error } = await supabase.rpc('chat_message_recipients', { message: messageId });
       if (error) throw new Error(error.message);
       return ((data ?? []) as ChatMessageRecipients[])[0] ?? null;
+    },
+    async generalRecipients(messageId) {
+      const { data, error } = await supabase.rpc('general_message_recipients', { message: messageId });
+      if (error) throw new Error(error.message);
+      return ((data ?? []) as GeneralMessageRecipients[])[0] ?? null;
     },
     send: (messages) => sendTelegramMessages(supabase as unknown as ServiceClient, token, fetch, messages),
     log: (line) => console.log(line),
