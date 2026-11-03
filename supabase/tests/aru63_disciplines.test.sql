@@ -76,7 +76,7 @@ select t.lives(format('insert into courses (id, title, created_by, discipline_id
   'AC4 the teacher may use a hidden discipline (they can see it)');
 reset role;
 
--- AC 5: the current owner changes, clears and re-sets the discipline; nobody else can.
+-- AC 5: the current owner changes, clears and re-sets the discipline; nobody else can (except the teacher, ARU-70).
 select t.login('M');
 select t.lives(format('select set_course_discipline(%L, %L)', t.id('A'), '00000000-0000-0000-0000-0000000063d1'), 'AC5 owner sets Math on A');
 select t.lives(format('select set_course_discipline(%L, null)', t.id('A')), 'AC5 owner clears it');
@@ -86,7 +86,9 @@ select t.throws(format('select set_course_discipline(%L, %L)', t.id('A'), '00000
 select t.throws(format('select set_course_discipline(%L, %L)', t.id('A'), '00000000-0000-0000-0000-0000000063ff'), 'P0002',
   'AC5 an unknown discipline is refused');
 select t.login('T');
-select t.throws(format('select set_course_discipline(%L, null)', t.id('A')), '42501', 'AC5 the teacher can''t change a course they don''t own');
+-- ARU-70: the teacher may now change any course (see aru70_teacher_sets_any_course_discipline.test.sql).
+select t.lives(format('select set_course_discipline(%L, null)', t.id('A')), 'ARU-70 the teacher clears a course they don''t own');
+select t.lives(format('select set_course_discipline(%L, %L)', t.id('A'), '00000000-0000-0000-0000-0000000063d1'), 'ARU-70 and sets it back');
 select t.login('N');
 select t.throws(format('select set_course_discipline(%L, null)', t.id('A')), '42501', 'AC5 another mentor can''t');
 select t.login('S1');
