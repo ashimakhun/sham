@@ -207,7 +207,7 @@ describe('AC5/AC6/AC9: New column', () => {
     setStore(fakeStore('M2', { courses: [ownB, courseA], courseMembers: members, meetings, assignments: [a2, b1] }));
     await render(<HomeworkScreen />);
     expect(screen.getByText(/^To check/)).toBeTruthy();
-    await fireEvent.press(screen.getByRole('tab', { name: 'Listener' }));
+    await fireEvent.press(screen.getByRole('tab', { name: /^Listener/ }));
     expect(screen.getByText('New (1)')).toBeTruthy();
     expect(titles()).toEqual(['Fresh one']);
   });
