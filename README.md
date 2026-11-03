@@ -88,7 +88,11 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `0037_homework_reviewed_notifications.sql` (ARU-49: Telegram message to a homework's sender when it is checked;
    adds `homework_reviewed_recipient()` and an `after update` trigger on `homework`, turns on `pg_net` where the
    server offers it; no table, column, policy or data changes. See
-   [Telegram notifications](#telegram-notifications) → Homework reviewed).
+   [Telegram notifications](#telegram-notifications) → Homework reviewed),
+   `0038_new_homework_notifications.sql` (ARU-50: Telegram message to a course's listeners when new homework is
+   assigned; adds `new_homework_recipients()` and an after-insert trigger on `homework_assignments`, turns on `pg_net`
+   if the server offers it; no table, column or policy changes, deletes nothing. Works without the Vault secrets (it
+   then sends nothing), see [Telegram notifications](#telegram-notifications)).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 
@@ -224,6 +228,35 @@ the trigger only logs a warning and nothing is sent. A failed send is logged and
 
 To change a Vault value later: `select vault.update_secret((select id from vault.secrets where name = 'homework_reviewed_notify_secret'), '<new>');`.
 
+#### New homework (ARU-50)
+
+When the course owner or the teacher assigns homework, the course's Approved listeners (students and mentors, never
+the assigner) get "New homework assigned to you in <course title>" within seconds, if they connected Telegram and left
+**New homework** on. An after-insert trigger on `homework_assignments` queues one `pg_net` call to the Edge Function
+`new-homework-notifications` with the assignment id; the function asks `new_homework_recipients()` for the listeners
+at that moment and sends through the shared helper. If anything is missing or down, assigning still works and the
+message is dropped (never resent later).
+
+1. Dashboard → **Database → Extensions**: make sure **pg_net** is on.
+2. Run `supabase/migrations/0038_new_homework_notifications.sql`.
+3. Make a random secret (`openssl rand -hex 24`) and set it as the function's secret:
+   ```bash
+   npx supabase secrets set NEW_HOMEWORK_NOTIFY_SECRET=<secret>
+   ```
+4. Deploy the function (the trigger sends `Authorization: Bearer <secret>`, not a Supabase JWT):
+   ```bash
+   npx supabase functions deploy new-homework-notifications --no-verify-jwt
+   ```
+5. Store the URL and the same secret in Vault (SQL Editor). Until both exist the trigger sends nothing:
+   ```sql
+   select vault.create_secret('https://<project-ref>.supabase.co/functions/v1/new-homework-notifications', 'new_homework_notify_url');
+   select vault.create_secret('<secret>', 'new_homework_notify_secret');
+   ```
+6. Check: assign homework, then `select status_code, content from net._http_response order by created desc limit 5;`
+   shows `200` with `{"recipients":…,"sent":…}`. A `401` means the two secrets differ.
+
+To change a Vault value later: `select vault.update_secret((select id from vault.secrets where name = 'new_homework_notify_secret'), '<new>');`.
+
 ## Run it
 
 ```bash
@@ -333,6 +366,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Connect Telegram and choose own notifications | ✓ (own) | ✓ (own) | ✓ (own) |
 | Get a Telegram message for new course chat messages (ARU-44; linked, **Chat messages** on) | courses they're in | own courses + courses they're in | all courses |
 | Get "Your homework … was reviewed" in Telegram (ARU-49) | own homework, when checked | own homework (sent as a listener), when checked | (never sends homework) |
+| Get "New homework" Telegram messages (ARU-50) | courses they're in | courses they're in (not their own) |  |
 | Turn Accountant on / off for a mentor (ARU-65) | |         | ✓       |
 | Select / unselect paid courses |         | accountants (any course they can see) |  |
 | See paid courses, change their payment period | | accountants (all they can see) | ✓ (all) |
