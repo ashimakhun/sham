@@ -21,7 +21,7 @@ const myEmpty: Record<string, { title: string; hint: string }> = {
   teacher: { title: "You don't own any course yet", hint: 'Create one with "+ New course".' },
 };
 
-type Section = { key: string; title?: string; tag?: string; data: Course[] };
+type Section = { key: string; title?: string; data: Course[] };
 
 export default function CoursesScreen() {
   const { currentUser, courseMembers, loading, refresh, courses, disciplines } = useStore();
@@ -59,9 +59,9 @@ export default function CoursesScreen() {
   const noDiscipline = courses.filter((c) => !mine.has(c.id) && !c.disciplineId);
 
   const sections: Section[] = [
-    { key: 'in', title: "Courses I'm in", tag: 'Listener', data: listening },
+    { key: 'in', title: "Courses I'm in", data: listening },
     // A student can't own a course, so the section is only for teachers and mentors.
-    ...(canCreate ? [{ key: 'own', title: 'Courses I own', tag: 'Owner', data: owned }] : []),
+    ...(canCreate ? [{ key: 'own', title: 'Courses I own', data: owned }] : []),
     { key: 'none', title: 'No discipline', data: noDiscipline },
   ].filter((s) => s.data.length > 0); // no empty headings; with no sections the empty state shows
 
@@ -126,7 +126,7 @@ export default function CoursesScreen() {
         section.title ? <Text style={[styles.label, { marginTop: 8 }]}>{section.title.toUpperCase()}</Text> : null
       }
       renderItem={({ item, section }) => (
-        <CourseCard course={item} tag={section.tag} onOpen={openFromHere} paymentDue={dues.get(item.id)} />
+        <CourseCard course={item} onOpen={openFromHere} paymentDue={dues.get(item.id)} />
       )}
       ListEmptyComponent={<EmptyState {...myEmpty[role]} />}
     />

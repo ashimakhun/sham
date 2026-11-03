@@ -59,11 +59,12 @@ describe('Courses list', () => {
     expect(router.push).toHaveBeenCalledWith({ pathname: '/courses/[id]', params: { id: 'B' } });
   });
 
-  it('AC4: courses in a discipline the student isn\'t in aren\'t listed (only A, tagged Listener, full card)', async () => {
+  it('AC4: courses in a discipline the student isn\'t in aren\'t listed (only A, under Courses I\'m in, full card)', async () => {
     const inDiscipline = courses.map((c) => ({ ...c, disciplineId: 'D' }));
     setStore(fakeStore('S1', { courses: inDiscipline, courseMembers: members }));
     await render(<CoursesScreen />);
-    expect(screen.getByText('Listener')).toBeTruthy();
+    expect(screen.getByText("COURSES I'M IN")).toBeTruthy(); // ARU-81: the heading, no Listener tag on the card
+    expect(screen.queryByText('Listener')).toBeNull();
     expect(screen.getByText('Algebra')).toBeTruthy();
     expect(screen.queryByText('Biology')).toBeNull();
     expect(screen.getByText(ownerA)).toBeTruthy();
