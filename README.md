@@ -22,6 +22,10 @@ An educational mobile app where teachers, mentors and students work together:
   listener Paid for the month, undo it, or set them Exempt; "Unpaid this month" lists who still owes during the
   payment period. An unpaid listener's course card on the Courses tab gets a red border and "Payment due by <date>".
 - **New accounts** wait for the teacher's approval before they can use the app.
+- **Change password** (ARU-76): any approved user changes their own password from the Profile tab, with the current
+  password checked first.
+- **Forgot password?** (ARU-77): on the sign-in screen, anyone resets their password with a code sent by email (needs
+  the [Password reset email](#password-reset-email) setup).
 
 How each feature behaves today is described in the Linear project document **Sham: product documentation**.
 
@@ -103,6 +107,36 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    realtime publication; changes and deletes no existing data; needs 0032).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
+4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
+   [Password reset email](#password-reset-email). On the default email sender only the project's team members get
+   the email; real users need custom SMTP.
+
+### Password reset email
+
+**Forgot password?** on the sign-in screen (ARU-77) emails the user a one-time **code** (no link, so no deep links
+are needed and it works the same in Expo Go, dev builds, iOS and Android). The user types it into the app with a new
+password. Nothing is in the database; it's all Supabase Auth settings in the dashboard:
+
+1. **Custom SMTP (required before real users can reset).** Supabase's default sender only delivers to the project's
+   team members and is heavily rate-limited. Set up a provider (for example Resend, Postmark or SendGrid) under
+   **Authentication → Emails → SMTP Settings** (enable custom SMTP, fill host, port, user, password and the sender
+   address/name). Development can be tested with a team member's address on the default sender.
+2. **Reset Password template.** Under **Authentication → Emails → Templates → Reset Password**, replace the body so
+   it shows the code (`{{ .Token }}`) instead of the link. Sample:
+
+   Subject: `Your Sham password reset code`
+
+   ```html
+   <h2>Reset your Sham password</h2>
+   <p>Enter this code in the Sham app to choose a new password:</p>
+   <p style="font-size:24px;font-weight:bold;letter-spacing:4px">{{ .Token }}</p>
+   <p>The code works once and expires in 1 hour. If you didn't ask to reset your password, ignore this email.</p>
+   ```
+3. **Optional.** **Authentication → Providers → Email**: *Email OTP Length* (6 by default; the app accepts 6–10 digits)
+   and *Email OTP Expiration* (3600 s by default). **Authentication → Rate Limits** sets how many emails can be sent
+   per hour. The app also waits 60 seconds between "Send a new code" taps.
+
+No redirect URL is needed (`resetPasswordForEmail` is called without `redirectTo`).
 
 ### Upgrading an existing project to 0005 (ARU-14)
 
@@ -312,6 +346,8 @@ src/app/                  screens (Expo Router — every file is a route)
   courses/[id]/listeners.tsx  teacher or mentor adds listeners
   courses/[id]/chat.tsx   course chat (owner, listeners and the teacher)
   general-chat.tsx        general chat for every accepted account (from Profile)
+  change-password.tsx     the signed-in user changes their own password (from Profile)
+  reset-password.tsx      Forgot password?: email a code, then set a new password with it (signed out)
   courses/[id]/owner.tsx  teacher or mentor changes the course owner
   courses/[id]/meetings/  schedule / edit a meeting; [meetingId]/notes.tsx notes; [meetingId]/assign-homework.tsx;
                           [meetingId]/attendance.tsx who attended
@@ -382,6 +418,8 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | See paid courses, change their payment period | | accountants (all they can see) | ✓ (all) |
 | See / set / undo Paid marks and exemptions, see "Unpaid this month" (ARU-66) | | accountants (paid courses they can see) | ✓ (all paid courses) |
 | See own payment deadline on a course card (`my_payment_dues`, ARU-66) | as a listener | as a listener |  |
+| Change own password (Supabase Auth, current password required, ARU-76) | own | own | own |
+| Reset a forgotten password with an emailed code (signed out, any approval state, ARU-77) | own | own | own |
 | Become / stop being teacher |          |                    | (nobody) |
 
 ¹ Since ARU-63 a mentor reaches a course through the Courses list (courses they own or attend, and courses with no
