@@ -73,7 +73,7 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `0032_accountant.sql` (ARU-65: the teacher turns Accountant on for mentors, who pick paid courses with a monthly
    payment period; adds `profiles.is_accountant`, the `course_billing` table and `set_accountant()`, and replaces
    `set_user_role()` so a mentor who becomes a student stops being an accountant; deletes nothing),
-   `0033_general_chat_reads.sql` (ARU-72: new message count for the general chat; adds the `general_chat_reads` table
+   `0034_general_chat_reads.sql` (ARU-72: new message count for the general chat; adds the `general_chat_reads` table
    with policies, a trigger and functions, deletes nothing; accounts already approved start with everything read).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.

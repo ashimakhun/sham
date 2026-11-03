@@ -1,7 +1,7 @@
 -- ARU-72: new message counter for the general chat (0029), the same pattern as the course chats (ARU-31, 0016).
 -- One read position per user: the server time of the newest general chat message they have seen. A "new" message is
 -- one written by someone else after that position. Approved accounts only (is_approved(), 0021).
--- Run after 0032 (0032_accountant.sql, which it does not depend on). Adds a table, a trigger and three functions, and seeds a position for every approved account;
+-- Run after 0033 (0033_teacher_sets_any_course_discipline.sql; it depends on neither 0032 nor 0033). Adds a table, a trigger and three functions, and seeds a position for every approved account;
 -- nothing existing is changed.
 
 create table general_chat_reads (
