@@ -125,7 +125,8 @@ export type Store = {
   addMaterialFile: (input: NewMaterialFile, options?: { isCancelled?: () => boolean }) => Promise<void>;
   /** The author only, while a teacher or mentor: name, description and course. */
   updateMaterialFile: (id: string, input: MaterialFileEdit) => Promise<void>;
-  /** The author only: removes the PDF first, then the item, so tapping Delete again finishes a half-done delete. */
+  /** The author (while a teacher or mentor), or the teacher on any PDF (ARU-86): removes the PDF first, then the item,
+   *  so tapping Delete again finishes a half-done delete. */
   deleteMaterialFile: (id: string) => Promise<void>;
   /** A signed link to a Knowledge base PDF, valid for 60 seconds; created when the user taps Open PDF. */
   getMaterialFileUrl: (storagePath: string) => Promise<string>;

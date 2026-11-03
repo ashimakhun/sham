@@ -20,9 +20,11 @@ export default function MaterialFileScreen() {
   const item = materialFiles.find((f) => f.id === id);
   if (!item) return <EmptyState title="Material not found" />;
   const course = item.courseId ? getCourse(item.courseId) : undefined;
-  // Only the author, and only while they are still a teacher or mentor.
-  const isAuthor =
+  // Edit: only the author, and only while they are still a teacher or mentor. Delete: the same, plus the teacher on
+  // anyone's PDF (ARU-86, mirrors 0043's policies).
+  const canEdit =
     currentUser?.id === item.authorId && (currentUser.role === 'teacher' || currentUser.role === 'mentor');
+  const canDelete = canEdit || currentUser?.role === 'teacher';
 
   async function openPdf() {
     if (!item || opening) return;
@@ -76,16 +78,16 @@ export default function MaterialFileScreen() {
       <Button title={opening ? 'Opening…' : 'Open PDF'} onPress={openPdf} disabled={opening} />
       <ErrorText error={openError} />
       <ErrorText error={error} />
-      {isAuthor && (
-        <>
-          <Button
-            title="Edit"
-            variant="secondary"
-            disabled={busy}
-            onPress={() => router.push({ pathname: '/materials/files/[id]/edit', params: { id: item.id } })}
-          />
-          <Button title={busy ? 'Deleting…' : 'Delete'} variant="danger" disabled={busy} onPress={remove} />
-        </>
+      {canEdit && (
+        <Button
+          title="Edit"
+          variant="secondary"
+          disabled={busy}
+          onPress={() => router.push({ pathname: '/materials/files/[id]/edit', params: { id: item.id } })}
+        />
+      )}
+      {canDelete && (
+        <Button title={busy ? 'Deleting…' : 'Delete'} variant="danger" disabled={busy} onPress={remove} />
       )}
     </ScrollView>
   );
