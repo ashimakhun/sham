@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { ScrollView, Text, View } from 'react-native';
 
+import { AccountantSection } from '@/components/Accountant';
 import { ProfileNameCard } from '@/components/ProfileNameCard';
 import { Button, Card, ErrorText, styles } from '@/components/ui';
 import { canManageRoles, canUseGeneralChat } from '@/lib/roles';
@@ -67,6 +68,9 @@ export default function ProfileScreen() {
           )}
         </Card>
       )}
+
+      {/* ARU-65: accountants and the teacher. */}
+      <AccountantSection />
 
       <View style={{ gap: 10, marginTop: 8 }}>
         {/* ARU-61: first in this group, so the order is the same for every role. */}

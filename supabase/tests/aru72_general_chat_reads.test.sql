@@ -1,4 +1,4 @@
--- ARU-72: new message count for the general chat. Rules under test: supabase/migrations/0032_general_chat_reads.sql.
+-- ARU-72: new message count for the general chat. Rules under test: supabase/migrations/0033_general_chat_reads.sql.
 -- Fixture: teacher T, mentors M / N / M2, students S1 / S2 / S3 (all approved). P is waiting for approval, D declined.
 select t.seed();
 insert into auth.users (id, email, raw_user_meta_data) values

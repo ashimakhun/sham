@@ -2,6 +2,7 @@ import type { Session } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 
+import { periodProblem } from './billing';
 import { FEEDBACK_MAX } from './feedback';
 import { fileFieldsError, isAllowedPdf, PDF_MAX_BYTES, PDF_RULE } from './files';
 import { NOTES_MAX } from './markdown';
@@ -11,6 +12,7 @@ import type {
   AccessRequest,
   Course,
   CourseMember,
+  CourseBilling,
   CourseMessage,
   Discipline,
   GeneralMessage,
@@ -155,6 +157,16 @@ export type Store = {
   setAccessStatus: (userId: string, status: 'approved' | 'rejected') => Promise<void>;
   /** Teacher only (ARU-13): switches a user between student and mentor via set_user_role(), then refetches. */
   setUserRole: (userId: string, role: 'student' | 'mentor') => Promise<void>;
+  /** ARU-65: paid courses with their periods. Only loaded for accountants and the teacher (empty for everyone else). */
+  courseBilling: CourseBilling[];
+  /** Teacher only (ARU-65): turn Accountant on or off for an approved mentor. Takes effect on their next refresh. */
+  setAccountant: (userId: string, on: boolean) => Promise<void>;
+  /** An accountant selects a paid course with its period. If another accountant was first, their period stays. */
+  selectPaidCourse: (courseId: string, startDay: number, endDay: number) => Promise<void>;
+  /** An accountant or the teacher changes a paid course's period (applies from this month on). */
+  setBillingPeriod: (courseId: string, startDay: number, endDay: number) => Promise<void>;
+  /** An accountant unselects a paid course, for everyone. Already gone counts as done. */
+  unselectPaidCourse: (courseId: string) => Promise<void>;
   /** New messages from others per course chat since the user last read it (ARU-31). 0 while that chat is open. */
   unreadCount: (courseId: string) => number;
   /** Marks a chat read up to `upToMessageId` (the newest message shown), by that message's server time. Clears the
@@ -179,7 +191,14 @@ export const MESSAGES_PAGE = 50;
 
 const StoreContext = createContext<Store | null>(null);
 
-type ProfileRow = { id: string; full_name: string; role: User['role']; access_status?: User['accessStatus'] | null };
+type ProfileRow = {
+  id: string;
+  full_name: string;
+  role: User['role'];
+  access_status?: User['accessStatus'] | null;
+  is_accountant?: boolean | null;
+};
+type BillingRow = { course_id: string; start_day: number; end_day: number; selected_by: string; selected_at: string };
 type AccessRequestRow = { id: string; full_name: string; email: string | null; created_at: string; access_status: AccessRequest['status'] };
 type HomeworkRow = {
   id: string;
@@ -275,7 +294,21 @@ const toUser = (r: ProfileRow): User => ({
   role: r.role,
   // No column yet (migration 0021 not run): everyone counts as approved.
   accessStatus: r.access_status ?? 'approved',
+  isAccountant: !!r.is_accountant,
 });
+
+const toBilling = (r: BillingRow): CourseBilling => ({
+  courseId: r.course_id,
+  startDay: r.start_day,
+  endDay: r.end_day,
+  selectedById: r.selected_by,
+  selectedAt: r.selected_at,
+});
+
+/** ARU-65: who reads paid courses (mirrors 0032's select policy): the teacher and approved mentor accountants. */
+const seesBilling = (u: User | undefined) =>
+  !!u && u.accessStatus === 'approved' && (u.role === 'teacher' || (u.role === 'mentor' && !!u.isAccountant));
+
 
 const toAccessRequest = (r: AccessRequestRow): AccessRequest => ({
   id: r.id,
@@ -481,6 +514,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [materialLikes, setMaterialLikes] = useState<MaterialLike[]>([]);
   const [courseFeedback, setCourseFeedback] = useState<CourseFeedback[]>([]);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
+  const [courseBilling, setCourseBilling] = useState<CourseBilling[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [unread, setUnread] = useState<Record<string, number>>({});
@@ -585,7 +619,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setAccessRequests([]);
         setUnread({});
         setGeneralUnread(0);
+        setCourseBilling([]);
         return;
+      }
+      // ARU-65: paid courses, only for those who may read them (students and other mentors make no request).
+      if (seesBilling(me)) {
+        const bill = await supabase.from('course_billing').select('*');
+        // Before 0032 runs there is no table: no paid courses.
+        setCourseBilling(bill.error ? [] : ((bill.data as BillingRow[] | null) ?? []).map(toBilling));
+      } else {
+        setCourseBilling([]);
       }
       // Requests for the teacher's Manage roles screen. Not live: they refresh with every load.
       if (me.role === 'teacher') {
@@ -612,6 +655,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   // Not approved yet (ARU-43): nothing to listen to.
   const waiting = profiles.some((u) => u.id === userId && u.accessStatus !== 'approved');
+  // ARU-65: only accountants and the teacher listen to paid-course changes.
+  const listensToBilling = seesBilling(profiles.find((u) => u.id === userId));
 
   useEffect(() => {
     if (!userId) return;
@@ -662,8 +707,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           generalUnreadTimer = null;
           loadGeneralUnread().catch(() => {});
         }, UNREAD_DEBOUNCE_MS);
-      })
-      .subscribe();
+      });
+    if (listensToBilling) {
+      channel.on('postgres_changes', { event: '*', schema: 'public', table: 'course_billing' }, () => load().catch(() => {}));
+    }
+    channel.subscribe();
     // Back from the background: realtime may have missed messages, so refetch the counts.
     const appState = AppState.addEventListener('change', (state) => {
       if (state !== 'active') return;
@@ -676,7 +724,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       appState.remove();
       supabase.removeChannel(channel);
     };
-  }, [userId, firstLoadDone, waiting, load, loadUnread, loadGeneralUnread]);
+  }, [userId, firstLoadDone, waiting, listensToBilling, load, loadUnread, loadGeneralUnread]);
 
   const currentUser = profiles.find((u) => u.id === userId) ?? null;
   // Only approved accounts are users of the app: pickers and lists never offer people still waiting (ARU-43).
@@ -1217,6 +1265,39 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return () => {
         supabase.removeChannel(channel);
       };
+    },
+    courseBilling,
+    setAccountant: async (userId, on) => {
+      requireRole('teacher');
+      check(await supabase.rpc('set_accountant', { target: userId, on_off: on }));
+      // profiles is not in realtime: refetch so the switch shows the saved value.
+      await load();
+    },
+    selectPaidCourse: async (courseId, startDay, endDay) => {
+      requireRole('mentor');
+      const problem = periodProblem(startDay, endDay);
+      if (problem) throw new Error(problem);
+      // A duplicate means another accountant selected it first: their period stays and nobody gets an error.
+      checkInsert(await supabase.from('course_billing').insert({ course_id: courseId, start_day: startDay, end_day: endDay }));
+      await load();
+    },
+    setBillingPeriod: async (courseId, startDay, endDay) => {
+      requireRole('teacher', 'mentor');
+      const problem = periodProblem(startDay, endDay);
+      if (problem) throw new Error(problem);
+      const res = await supabase
+        .from('course_billing')
+        .update({ start_day: startDay, end_day: endDay })
+        .eq('course_id', courseId)
+        .select('course_id');
+      check(res);
+      if (!res.data?.length) throw new Error('This course is no longer a paid course.');
+      await load();
+    },
+    unselectPaidCourse: async (courseId) => {
+      requireRole('mentor');
+      check(await supabase.from('course_billing').delete().eq('course_id', courseId));
+      await load();
     },
     setUserRole: async (userId, role) => {
       requireRole('teacher');
