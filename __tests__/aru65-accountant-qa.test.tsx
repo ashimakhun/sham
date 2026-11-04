@@ -5,12 +5,13 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 
 import ProfileScreen from '@/app/(tabs)/profile';
+import CoursePaymentsScreen from '@/app/accountant/[id]';
 import SelectPaidCoursesScreen from '@/app/accountant/courses';
 import RolesScreen from '@/app/roles';
 import type { Course, CourseBilling, User } from '@/lib/types';
 
 import { courseA, courseB, fakeStore, users } from './helpers/fakeStore';
-import { setStore } from './helpers/mocks';
+import { params, setStore } from './helpers/mocks';
 
 jest.mock('expo-router', () => require('./helpers/mocks').expoRouter);
 jest.mock('@/lib/store', () => require('./helpers/mocks').store);
@@ -35,9 +36,11 @@ const a11y = (node: unknown, actionName: 'increment' | 'decrement') =>
 beforeEach(() => jest.clearAllMocks());
 
 it('edge screen readers: increment / decrement change the day and stop at 1 and 28', async () => {
+  // ARU-99: Change period moved from the Profile row to the course payments page.
   const store = as(accountantM, { courseBilling: [bill('A', 2, 27)] });
   setStore(store);
-  await render(<ProfileScreen />);
+  params.id = 'A';
+  await render(<CoursePaymentsScreen />);
   await fireEvent.press(screen.getByRole('button', { name: 'Change period' }));
   const first = () => screen.getByLabelText('First day');
   const last = () => screen.getByLabelText('Last day');
@@ -107,14 +110,22 @@ it('AC 2: a declined mentor whose flag is still on gets no Accountant section', 
   expect(screen.queryByTestId('accountant-section')).toBeNull();
 });
 
-it('AC 6: the teacher gets Change period on every row and Unselect on none', async () => {
+// ARU-99: Change period and Unselect moved to the course payments page; the Profile rows only open it.
+it('AC 6: the teacher gets Change period on every payments page and Unselect on none; rows keep their order', async () => {
   setStore(as(users.T, { courseBilling: [bill('A'), bill('B', 10, 12), bill('H', 28, 28)] }));
-  await render(<ProfileScreen />);
-  expect(screen.getAllByRole('button', { name: 'Change period' })).toHaveLength(3);
-  expect(screen.queryByRole('button', { name: 'Unselect' })).toBeNull();
-  expect(within(screen.getByTestId('paid-H')).getByText('Pays 28 of each month')).toBeTruthy();
+  const view = await render(<ProfileScreen />);
+  expect(screen.queryByRole('button', { name: 'Change period' })).toBeNull();
   const order = screen.getAllByTestId(/^paid-/).map((n) => n.props.testID);
   expect(order).toEqual(['paid-A', 'paid-B', 'paid-H']); // Algebra, Biology, Hidden…
+  await view.unmount();
+  for (const id of ['A', 'B', 'H']) {
+    params.id = id;
+    const page = await render(<CoursePaymentsScreen />);
+    expect(screen.getByRole('button', { name: 'Change period' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Unselect' })).toBeNull();
+    if (id === 'H') expect(screen.getByText('Pays 28 of each month')).toBeTruthy();
+    await page.unmount();
+  }
 });
 
 it('AC 1: each mentor\'s switch shows their saved value', async () => {
