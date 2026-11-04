@@ -184,45 +184,20 @@ describe('Listeners section', () => {
   });
 });
 
-describe('Profile tab', () => {
-  it('AC9: a student sees the courses they attend with the owner as mentor', async () => {
-    setStore(fakeStore('S1', { courseMembers: [member('A', 'S1'), member('B', 'S1')] }));
+// ARU-98: Profile no longer lists courses (the AC9 cards); courses are reached from the Courses tab.
+describe('Profile tab (ARU-98)', () => {
+  it.each([
+    ['S1', [member('A', 'S1'), member('B', 'S1')]],
+    ['S2', []],
+    ['N', [member('A', 'N'), member('B', 'S1')]],
+    ['T', []],
+  ] as const)('%s sees no "MY COURSES" or "COURSES I OWN" card', async (who, courseMembers) => {
+    setStore(fakeStore(who, { courseMembers: [...courseMembers] }));
     await render(<ProfileScreen />);
-    expect(screen.getByText('MY COURSES')).toBeTruthy();
-    expect(screen.getByText('Mentor: Mentor Max')).toBeTruthy();
-    expect(screen.getByText('Mentor: Mentor Nina')).toBeTruthy();
-    expect(screen.queryByText('COURSES I OWN')).toBeNull();
-  });
-
-  it('AC9: a student in no course sees the "No mentor yet" hint', async () => {
-    setStore(fakeStore('S2'));
-    await render(<ProfileScreen />);
-    expect(screen.getByText('No mentor yet — ask your teacher or mentor to add you to a course')).toBeTruthy();
-  });
-
-  it('AC9: a mentor sees the courses they own with their listeners, and the courses they attend', async () => {
-    setStore(fakeStore('N', { courseMembers: [member('A', 'N'), member('B', 'S1'), member('B', 'S3')] }));
-    await render(<ProfileScreen />);
-    expect(screen.getByText('COURSES I OWN')).toBeTruthy();
-    expect(screen.getByText('Abby Student, Student Sam')).toBeTruthy();
-    expect(screen.getByText('MY COURSES')).toBeTruthy();
-    expect(screen.getByText('Mentor: Mentor Max')).toBeTruthy();
-  });
-
-  it('AC9: the teacher sees owned courses; the old mentor_id sections are gone', async () => {
-    setStore(fakeStore('T', { courses: [{ ...courseB, id: 'C', title: 'Chemistry', createdById: 'T' }] }));
-    await render(<ProfileScreen />);
-    expect(screen.getByText('Chemistry')).toBeTruthy();
-    expect(screen.getByText('No listeners yet')).toBeTruthy();
     expect(screen.queryByText('MY COURSES')).toBeNull();
-    expect(screen.queryByText(/Your mentor|Your students/)).toBeNull();
-  });
-
-  it('AC9: tapping a course opens it', async () => {
-    setStore(fakeStore('S1', { courseMembers: [member('A', 'S1')] }));
-    await render(<ProfileScreen />);
-    await fireEvent.press(screen.getByText('Algebra'));
-    expect(router.push).toHaveBeenCalledWith({ pathname: '/courses/[id]', params: { id: 'A' } });
+    expect(screen.queryByText('COURSES I OWN')).toBeNull();
+    expect(screen.queryByText(/No mentor yet|You do not own any courses yet|No listeners yet|^Mentor: /)).toBeNull();
+    expect(screen.queryByText(/^(Algebra|Biology)$/)).toBeNull();
   });
 });
 
