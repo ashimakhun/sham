@@ -5,7 +5,8 @@
 
 export type NotificationKind = 'meeting_started' | 'chat_message' | 'homework_reviewed' | 'new_homework' | 'new_account'
   | 'homework_submitted'
-  | 'general_chat';
+  | 'general_chat'
+  | 'new_material';
 
 export type TelegramMessage = { userId: string; kind: NotificationKind; text: string };
 
@@ -29,6 +30,7 @@ export const SWITCH_COLUMN: Record<NotificationKind, string> = {
   new_account: 'notify_new_account',
   homework_submitted: 'notify_homework_submitted',
   general_chat: 'notify_general_chat',
+  new_material: 'notify_new_material',
 };
 
 type LinkRow = { user_id: string; chat_id: number | string } & Record<string, unknown>;
