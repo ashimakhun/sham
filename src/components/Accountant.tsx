@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
@@ -8,11 +9,12 @@ import {
   BILLING_DAY_MIN,
   canSeeBilling,
   isAccountant,
+  localMonth,
   periodProblem,
-  periodText,
+  requestCountText,
   unpaidThisMonth,
+  waitingRequests,
 } from '@/lib/billing';
-import { confirmAction } from '@/lib/confirm';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import type { CourseBilling } from '@/lib/types';
@@ -140,7 +142,9 @@ export function AccountantSection() {
           {accountant ? <Text style={styles.muted}>Tap &quot;Select courses&quot; to add one.</Text> : null}
         </View>
       ) : (
-        paid.map(({ billing, course }) => <PaidCourseRow key={billing.courseId} billing={billing} title={course.title} />)
+        paid.map(({ billing, course }) => (
+          <PaidCourseRow key={billing.courseId} billing={billing} title={course.title} now={now} />
+        ))
       )}
       {accountant && <Button title="Select courses" variant="secondary" onPress={() => router.push('/accountant/courses')} />}
     </Card>
@@ -183,64 +187,44 @@ function UnpaidThisMonth({ now }: { now: number }) {
   );
 }
 
-function PaidCourseRow({ billing, title }: { billing: CourseBilling; title: string }) {
-  const { currentUser, setBillingPeriod, unselectPaidCourse } = useStore();
-  const [editing, setEditing] = useState(false);
-  const { busy, error, run } = useAction();
-  const accountant = isAccountant(currentUser);
+/**
+ * ARU-99 AC 5 / AC 6: one row per paid course: the title with ">" at the right edge; the whole row opens the course's
+ * payments page (period, Change period and Unselect live there now). A badge counts this month's waiting requests,
+ * live, with the same rule as "Unpaid this month".
+ */
+function PaidCourseRow({ billing, title, now }: { billing: CourseBilling; title: string; now: number }) {
+  const { paymentRequests, courseMembers, coursePayments, paymentExemptions } = useStore();
+  const waiting = waitingRequests({
+    courseId: billing.courseId,
+    month: localMonth(now),
+    requests: paymentRequests,
+    members: courseMembers,
+    payments: coursePayments,
+    exemptions: paymentExemptions,
+  }).length;
+  const label =
+    waiting > 0 ? `${title}, ${waiting} payment ${waiting === 1 ? 'request' : 'requests'}` : `Payments for ${title}`;
   return (
-    <View style={{ gap: 4, paddingTop: 4 }} testID={`paid-${billing.courseId}`}>
-      {/* ARU-66 AC 1 / AC 6: opens the course's listeners with their payments this month. */}
+    <View testID={`paid-${billing.courseId}`}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Payments for ${title}`}
-        accessibilityHint="Opens the listeners and who has paid this month"
-        hitSlop={4}
+        accessibilityLabel={label}
+        accessibilityHint="Opens the listeners, their payment requests and who has paid this month"
         onPress={() => router.push({ pathname: '/accountant/[id]', params: { id: billing.courseId } })}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <Text style={[styles.title, { fontSize: 15, flexShrink: 1 }]}>{title}</Text>
-        <Text style={{ color: colors.primary, fontWeight: '600' }}>›</Text>
+        style={({ pressed }) => [
+          { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingTop: 4 },
+          pressed && { opacity: 0.6 },
+        ]}>
+        <Text style={[styles.title, { fontSize: 15, flex: 1 }]}>{title}</Text>
+        {waiting > 0 ? (
+          <View
+            testID={`requests-${billing.courseId}`}
+            style={{ backgroundColor: colors.primary, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 }}>
+            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{requestCountText(waiting)}</Text>
+          </View>
+        ) : null}
+        <Ionicons name="chevron-forward" size={20} color={colors.muted} />
       </Pressable>
-      <Text style={styles.muted}>{periodText(billing)}</Text>
-      {editing ? (
-        <PeriodEditor
-          initial={billing}
-          saveTitle="Save period"
-          onCancel={() => setEditing(false)}
-          onSave={async (s, e) => {
-            await setBillingPeriod(billing.courseId, s, e);
-            setEditing(false);
-          }}
-        />
-      ) : (
-        <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap' }}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Change period" hitSlop={8} onPress={() => setEditing(true)}>
-            <Text style={{ color: colors.primary, fontWeight: '600' }}>Change period</Text>
-          </Pressable>
-          {accountant && (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Unselect"
-              accessibilityState={{ disabled: busy }}
-              disabled={busy}
-              hitSlop={8}
-              onPress={() =>
-                run(async () => {
-                  const ok = await confirmAction(
-                    'Unselect paid course',
-                    `${title} will stop being a paid course for everyone.`,
-                    'Unselect',
-                    { destructive: true, cancelText: 'Keep' },
-                  );
-                  if (ok) await unselectPaidCourse(billing.courseId);
-                })
-              }>
-              <Text style={{ color: colors.danger, fontWeight: '600', opacity: busy ? 0.4 : 1 }}>Unselect</Text>
-            </Pressable>
-          )}
-        </View>
-      )}
-      <ErrorText error={error} />
     </View>
   );
 }
