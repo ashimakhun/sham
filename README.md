@@ -478,8 +478,9 @@ src/app/                  screens (Expo Router — every file is a route)
   homework/new.tsx        a listener sends homework for an assignment (opened from New)
   homework/[id].tsx       homework details; mentor marks it checked
   courses/new.tsx         teacher or mentor creates a course (visible or hidden)
-  courses/[id].tsx        course details, meetings, listeners, linked Knowledge base PDFs, feedback and homework
+  courses/[id].tsx        course details, meetings, a Listeners row, linked Knowledge base PDFs, feedback and homework
   courses/[id]/feedback.tsx  a listener adds or edits their feedback (stars + review)
+  courses/[id]/members.tsx  Listeners page: the list; teacher or mentor removes (X) and adds (ARU-97)
   courses/[id]/listeners.tsx  teacher or mentor adds listeners
   courses/[id]/chat.tsx   course chat (owner, listeners and the teacher)
   general-chat.tsx        general chat for every accepted account (from Profile)
