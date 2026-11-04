@@ -107,7 +107,7 @@ describe('Course details', () => {
     await render(<CourseDetailScreen />);
     expect(screen.getByText(ownerA)).toBeTruthy();
     expect(screen.queryByText('HOMEWORK')).toBeNull(); // ARU-80: no homework list on course details
-    expect(screen.getByRole('button', { name: 'Open chat for Algebra' })).toBeTruthy(); // ARU-69: the chat icon
+    expect(screen.getByText(/^LISTENERS/)).toBeTruthy(); // full screen sections (ARU-96 removed the chat button)
     expect(screen.queryByText('You are not in this course')).toBeNull();
   });
 

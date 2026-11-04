@@ -96,9 +96,9 @@ describe('AC 4–AC 6', () => {
 });
 
 describe('Other badges unchanged (AC 7)', () => {
-  it('the course details Chat button keeps the badge at the right, without a ring', async () => {
-    setStore(fakeStore('S1', { courseMembers: [member('A', 'S1')], unreadCount: counts({ A: 3 }) }));
-    await render(<CourseDetailScreen />);
+  it('a button with unread and an icon (no badgeOnIcon) keeps the badge at the right, without a ring', async () => {
+    // ARU-96 removed the course details Chat button that this used to render; same Button props here.
+    await render(<Button title="Open chat for Algebra" icon="chatbubble-outline" variant="secondary" unread={3} onPress={() => {}} />);
     expect(screen.queryByTestId('button-icon-box', hidden)).toBeNull();
     const s = badgeStyle();
     expect(s).toMatchObject({ position: 'absolute', right: 12, top: 11, height: 20 });

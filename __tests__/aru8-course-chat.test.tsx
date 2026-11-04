@@ -31,11 +31,11 @@ beforeEach(() => {
 });
 
 describe('Chat button on course details', () => {
-  it.each(['M', 'S1', 'M2', 'T'] as const)('AC1: %s (owner, listener or teacher) sees "Chat" and it opens the chat', async (who) => {
+  // ARU-96: the chat opens from the course card's icon only; course details has no chat button for anyone.
+  it.each(['M', 'S1', 'M2', 'T'] as const)('ARU-96: %s (owner, listener or teacher) sees no chat button on course details', async (who) => {
     setStore(fakeStore(who, { courseMembers: members }));
     await render(<CourseDetailScreen />);
-    await fireEvent.press(button('Open chat for Algebra')); // ARU-69: the chat icon, labelled like the card's
-    expect(router.push).toHaveBeenCalledWith({ pathname: '/courses/[id]/chat', params: { id: 'A' } });
+    expect(screen.queryByRole('button', { name: /^Open chat for Algebra/ })).toBeNull();
   });
 
   it.each(['N', 'S2'] as const)('AC2: %s (not in the course) sees no "Chat"', async (who) => {

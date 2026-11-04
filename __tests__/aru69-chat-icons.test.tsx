@@ -40,52 +40,13 @@ beforeEach(() => {
   params.id = 'A';
 });
 
-describe('AC1/AC3/AC4/AC5: course details', () => {
-  it.each(['T', 'M', 'S1'] as const)('%s sees the chat icon (no "Chat" text), labelled like the card; it opens the chat', async (who) => {
-    setStore(fakeStore(who, { courseMembers: members }));
-    await render(<CourseDetailScreen />);
-    const btn = screen.getByRole('button', { name: 'Open chat for Algebra' });
-    const icon = iconIn(btn);
-    expect(icon).toBeTruthy();
-    expect(icon.props.size).toBe(24);
-    expect(icon.props.color).toBe(colors.primary);
-    expect(screen.queryByText('Chat')).toBeNull();
-    expect(styleOf(btn).backgroundColor).toBe(colors.primarySoft); // still a secondary button
-    await fireEvent.press(btn);
-    expect(router.push).toHaveBeenCalledWith({ pathname: '/courses/[id]/chat', params: { id: 'A' } });
-  });
-
-  it.each(['N', 'S2'] as const)('%s (not in the chat) has no chat button', async (who) => {
-    setStore(fakeStore(who, { courseMembers: members }));
+// ARU-96: course details no longer has a chat button; the course card keeps the chat icon.
+describe('course details (ARU-96)', () => {
+  it.each(['T', 'M', 'S1', 'N', 'S2'] as const)('%s has no chat button on course details', async (who) => {
+    setStore(fakeStore(who, { courseMembers: members, unreadCount: counts({ A: 5 }) }));
     await render(<CourseDetailScreen />);
     expect(screen.queryByRole('button', { name: /^Open chat for/ })).toBeNull();
-  });
-
-  it.each([
-    [1, 'Open chat for Algebra, 1 new message', '1'],
-    [5, 'Open chat for Algebra, 5 new messages', '5'],
-    [150, 'Open chat for Algebra, 99+ new messages', '99+'],
-  ])('%s unread: badge "%s" and the count in the label; the icon stays', async (n, label, text) => {
-    setStore(fakeStore('S1', { courseMembers: members, unreadCount: counts({ A: n }) }));
-    await render(<CourseDetailScreen />);
-    const btn = screen.getByRole('button', { name: label });
-    expect(iconIn(btn)).toBeTruthy();
-    expect(screen.getByText(text, hidden)).toBeTruthy();
-    expect(StyleSheet.flatten(screen.getByTestId('unread-badge', hidden).props.style)).toMatchObject({ right: 12, top: 11 });
-  });
-
-  it('0 unread: no badge', async () => {
-    setStore(fakeStore('S1', { courseMembers: members }));
-    await render(<CourseDetailScreen />);
     expect(screen.queryByTestId('unread-badge', hidden)).toBeNull();
-  });
-
-  it('the icon isn\'t read on its own', async () => {
-    setStore(fakeStore('S1', { courseMembers: members }));
-    await render(<CourseDetailScreen />);
-    const icon = iconIn(screen.getByRole('button', { name: 'Open chat for Algebra' }));
-    expect(icon.props.accessibilityElementsHidden).toBe(true);
-    expect(icon.props.importantForAccessibility).toBe('no');
   });
 });
 

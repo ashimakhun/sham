@@ -74,14 +74,12 @@ describe('course card icon', () => {
   });
 });
 
-describe('Chat button on course details (AC 4)', () => {
-  it('only the colour changes: button colour, no ring, same place', async () => {
+// ARU-96: course details no longer has a chat button, so no badge there.
+describe('Course details (ARU-96)', () => {
+  it('has no chat button or badge', async () => {
     setStore(fakeStore('S1', { courseMembers: members, unreadCount: counts({ A: 3 }) }));
     await render(<CourseDetailScreen />);
-    expect(screen.getByRole('button', { name: 'Open chat for Algebra, 3 new messages' })).toBeTruthy();
-    const style = badgeStyle();
-    expect(style.backgroundColor).toBe(colors.primary);
-    expect(style.borderWidth).toBeUndefined();
-    expect(style).toMatchObject({ position: 'absolute', right: 12, top: 11, height: 20 });
+    expect(screen.queryByRole('button', { name: /^Open chat for/ })).toBeNull();
+    expect(screen.queryByTestId('unread-badge', hidden)).toBeNull();
   });
 });

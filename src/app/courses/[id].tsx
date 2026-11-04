@@ -8,13 +8,13 @@ import { FeedbackSection } from '@/components/FeedbackSection';
 import { ListenersSection } from '@/components/ListenersSection';
 import { MeetingsSection } from '@/components/MeetingsSection';
 import { Button, Card, EmptyState, HiddenBadge, OwnerLine, styles } from '@/components/ui';
-import { canChangeOwner, inCourseChat, seesOnlyCourseSummary } from '@/lib/roles';
+import { canChangeOwner, seesOnlyCourseSummary } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { formatDate } from '@/lib/theme';
 
 export default function CourseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getCourse, getUser, loading, refresh, currentUser, courseMembers, unreadCount } = useStore();
+  const { getCourse, getUser, loading, refresh, currentUser, courseMembers } = useStore();
 
   const course = getCourse(id);
   if (!course) return <EmptyState title="Course not found" />;
@@ -64,16 +64,6 @@ export default function CourseDetailScreen() {
           </Card>
           {/* ARU-63 AC 5 / ARU-70: the teacher (any course) or the current owner changes the discipline here. */}
           <CourseDisciplineSection course={course} />
-          {inCourseChat(currentUser, course, courseMembers) && (
-            <Button
-              // ARU-69: the chat icon; screen readers hear the same label as the course card's icon.
-              title={`Open chat for ${course.title}`}
-              icon="chatbubble-outline"
-              variant="secondary"
-              unread={unreadCount(course.id)}
-              onPress={() => router.push({ pathname: '/courses/[id]/chat', params: { id: course.id } })}
-            />
-          )}
           {canChangeOwner(currentUser?.role) && (
             <Button
               title="Change owner"
