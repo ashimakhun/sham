@@ -23,6 +23,10 @@ An educational mobile app where teachers, mentors and students work together:
 - **Payments** (ARU-66): accountants and the teacher open a paid course from the Accountant section and mark each
   listener Paid for the month, undo it, or set them Exempt; "Unpaid this month" lists who still owes during the
   payment period. An unpaid listener's course card on the Courses tab gets a red border and "Payment due by <date>".
+- **Payment requests** (ARU-99): during the payment period an unpaid listener taps **Pay** on course details and sends
+  a proof (a photo or a PDF, up to 10 MB); **Send again** replaces it. In the Accountant section each paid course is
+  a row with ">" and a count of waiting requests; its payments page has the period, Change period, Unselect and,
+  under each listener, their request with View proof.
 - **New accounts** wait for the teacher's approval before they can use the app.
 - **Delete account** (ARU-75): students and mentors (and waiting or declined accounts) delete their own account after
   re-entering their password. Personal data is removed; chat messages and work done for others stay, shown as
@@ -147,7 +151,12 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    (keeps 0044/0045's kinds), `general_message_recipients()` and an after-insert trigger on `general_messages` that
    calls the same `chat-message-notifications` function with the same Vault secrets; no policy changes, deletes
    nothing; needs 0036 and 0045. Redeploy `chat-message-notifications` after it, see
-   [Telegram notifications](#telegram-notifications) → New chat messages).
+   [Telegram notifications](#telegram-notifications) → New chat messages),
+   `0047_payment_requests.sql` (ARU-99: a listener of a paid course sends one proof of payment per course and month;
+   adds the table `course_payment_requests` (in realtime), the private bucket `payment-proofs` (photos and PDFs, 10 MB)
+   with its policies (own folder; accountants and the teacher read current listeners' proofs; the teacher reads and
+   deletes every proof), `course_payment_proofs()` / `discipline_payment_proofs()` for course and discipline deletion,
+   and replaces `account_storage_objects()` to include the new bucket; deletes nothing; needs 0039, 0040 and 0042).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
@@ -491,7 +500,9 @@ src/app/                  screens (Expo Router — every file is a route)
                           [meetingId]/attendance.tsx who attended
   roles.tsx               teacher accepts / rejects new accounts and switches users between student and mentor
   accountant/courses.tsx  an accountant selects / unselects paid courses
-  accountant/[id].tsx     a paid course's listeners: Paid / Unpaid / Exempt this month (accountants and the teacher)
+  accountant/[id].tsx     a paid course's period (Change period, Unselect) and listeners: Paid / Unpaid / Exempt this
+                          month, payment requests with View proof (accountants and the teacher)
+  courses/[id]/pay.tsx    an unpaid listener sends (or replaces) a payment request with a proof (ARU-99)
   materials/new.tsx       teacher or mentor shares a Blog post
   materials/[id].tsx      Blog post details and likes
   materials/files/        Knowledge base PDFs: new.tsx upload, [id].tsx details and Open PDF, [id]/edit.tsx edit
@@ -562,6 +573,9 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | See paid courses, change their payment period | | accountants (all they can see) | ✓ (all) |
 | See / set / undo Paid marks and exemptions, see "Unpaid this month" (ARU-66) | | accountants (paid courses they can see) | ✓ (all paid courses) |
 | See own payment deadline on a course card (`my_payment_dues`, ARU-66) | as a listener | as a listener |  |
+| Send / replace own payment request with a proof (ARU-99; unpaid, in the period) | as a listener | as a listener |  |
+| See payment requests and proofs, request count (ARU-99) | own only | accountants (current listeners of paid courses they can see) | ✓ (all) |
+| Delete payment proofs (only by deleting a course or discipline, ARU-99) | | | ✓ |
 | Change own password (Supabase Auth, current password required, ARU-76) | own | own | own |
 | Reset a forgotten password with an emailed code (signed out, any approval state, ARU-77) | own | own | own |
 | Become / stop being teacher |          |                    | (nobody) |

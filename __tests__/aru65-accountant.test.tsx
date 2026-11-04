@@ -5,13 +5,14 @@ import { Alert } from 'react-native';
 import { router } from 'expo-router';
 
 import ProfileScreen from '@/app/(tabs)/profile';
+import CoursePaymentsScreen from '@/app/accountant/[id]';
 import SelectPaidCoursesScreen from '@/app/accountant/courses';
 import RolesScreen from '@/app/roles';
 import { canSeeBilling, isAccountant, periodProblem, periodText } from '@/lib/billing';
 import type { Course, CourseBilling, User } from '@/lib/types';
 
 import { courseA, courseB, fakeStore, users } from './helpers/fakeStore';
-import { setStore } from './helpers/mocks';
+import { params, setStore } from './helpers/mocks';
 
 jest.mock('expo-router', () => require('./helpers/mocks').expoRouter);
 jest.mock('@/lib/store', () => require('./helpers/mocks').store);
@@ -37,7 +38,10 @@ const answer = (choice: string) =>
     buttons?.find((b) => b.text === choice)?.onPress?.();
   });
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  params.id = 'A';
+});
 
 describe('helpers', () => {
   it('period text, validation and who sees billing', () => {
@@ -84,25 +88,29 @@ describe('AC1: Accountant switch on Manage roles', () => {
 });
 
 describe('AC2/AC6/AC7: the Accountant section on Profile', () => {
-  it('an accountant sees every paid course sorted by title with its period, and "Select courses"', async () => {
+  // ARU-99 AC 5: the period moved to the course's payments page; the row is the title with ">".
+  it('an accountant sees every paid course sorted by title, and "Select courses"', async () => {
     setStore(forUser('M', { courseBilling: [bill('C', 10, 15), bill('A')] }));
     await render(<ProfileScreen />);
     const section = within(screen.getByTestId('accountant-section'));
     expect(section.getAllByText(/^(Algebra|Biology|Chemistry)$/).map((t) => t.props.children)).toEqual(['Algebra', 'Chemistry']);
-    expect(section.getByText('Pays 1–5 of each month')).toBeTruthy();
-    expect(section.getByText('Pays 10–15 of each month')).toBeTruthy();
+    expect(section.queryByText(/^Pays /)).toBeNull();
     await fireEvent.press(section.getByRole('button', { name: 'Select courses' }));
     expect(router.push).toHaveBeenCalledWith('/accountant/courses');
   });
 
-  it('the teacher sees the paid courses and can change periods, but has no Select courses or Unselect', async () => {
+  it('the teacher sees the paid courses but has no Select courses; Change period is on the payments page, Unselect isn\'t', async () => {
     setStore(forUser('T', { courseBilling: [bill('A')] }));
-    await render(<ProfileScreen />);
+    const view = await render(<ProfileScreen />);
     const section = within(screen.getByTestId('accountant-section'));
     expect(section.getByText('Algebra')).toBeTruthy();
-    expect(section.getByRole('button', { name: 'Change period' })).toBeTruthy();
+    expect(section.queryByRole('button', { name: 'Change period' })).toBeNull();
     expect(section.queryByRole('button', { name: 'Select courses' })).toBeNull();
-    expect(section.queryByRole('button', { name: 'Unselect' })).toBeNull();
+    await view.unmount();
+    await render(<CoursePaymentsScreen />);
+    expect(screen.getByText('Pays 1–5 of each month')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Change period' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Unselect' })).toBeNull();
   });
 
   it.each(['N', 'S1'] as const)('%s (not an accountant) has no Accountant section', async (who) => {
@@ -130,11 +138,12 @@ describe('AC2/AC6/AC7: the Accountant section on Profile', () => {
   });
 });
 
+// ARU-99 AC 8: Change period is on the course's payments page now.
 describe('AC4: changing a period', () => {
   it('the steppers stay within 1–28, start after end is refused, and Save sends the new days', async () => {
     const store = forUser('T', { courseBilling: [bill('A')] });
     setStore(store);
-    await render(<ProfileScreen />);
+    await render(<CoursePaymentsScreen />);
     await fireEvent.press(screen.getByRole('button', { name: 'Change period' }));
     expect(screen.getByRole('button', { name: 'First day, earlier' })).toBeDisabled();
     for (let i = 0; i < 5; i++) await fireEvent.press(screen.getByRole('button', { name: 'First day, later' }));
@@ -147,7 +156,7 @@ describe('AC4: changing a period', () => {
 
   it('the last day can\'t go past 28', async () => {
     setStore(forUser('M', { courseBilling: [bill('A', 1, 27)] }));
-    await render(<ProfileScreen />);
+    await render(<CoursePaymentsScreen />);
     await fireEvent.press(screen.getByRole('button', { name: 'Change period' }));
     await fireEvent.press(screen.getByRole('button', { name: 'Last day, later' }));
     expect(screen.getByRole('button', { name: 'Last day, later' })).toBeDisabled();
@@ -158,7 +167,7 @@ describe('AC4: changing a period', () => {
       throw new Error('Network request failed');
     });
     setStore(forUser('M', { courseBilling: [bill('A')], setBillingPeriod }));
-    await render(<ProfileScreen />);
+    await render(<CoursePaymentsScreen />);
     await fireEvent.press(screen.getByRole('button', { name: 'Change period' }));
     await fireEvent.press(screen.getByRole('button', { name: 'Save period' }));
     expect(await screen.findByText('Network request failed')).toBeTruthy();
@@ -198,11 +207,11 @@ describe('AC3/AC5: Select courses', () => {
     await waitFor(() => expect(store.unselectPaidCourse).toHaveBeenCalledWith('B'));
   });
 
-  it('unselect from the Profile section also asks first', async () => {
+  it('unselect from the course payments page (ARU-99 AC 8) also asks first', async () => {
     answer('Unselect');
     const store = forUser('M', { courseBilling: [bill('A')] });
     setStore(store);
-    await render(<ProfileScreen />);
+    await render(<CoursePaymentsScreen />);
     await fireEvent.press(screen.getByRole('button', { name: 'Unselect' }));
     await waitFor(() => expect(store.unselectPaidCourse).toHaveBeenCalledWith('A'));
   });

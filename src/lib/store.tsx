@@ -7,6 +7,8 @@ import { periodProblem } from './billing';
 import { ACCOUNT_DELETED, DELETE_FAILED, DELETE_OFFLINE } from './deleteAccount';
 import { FEEDBACK_MAX } from './feedback';
 import { fileFieldsError, isAllowedPdf, PDF_MAX_BYTES, PDF_RULE } from './files';
+import { newId } from './id';
+import { isAllowedProof, PROOF_MAX_BYTES, PROOF_RULE, proofFormat } from './paymentProof';
 import { NOTES_MAX } from './markdown';
 import {
   authErrorMessage,
@@ -28,6 +30,8 @@ import type {
   CoursePayment,
   PaymentDue,
   PaymentExemption,
+  PaymentRequest,
+  PickedProof,
   Discipline,
   GeneralMessage,
   Homework,
@@ -228,6 +232,17 @@ export type Store = {
   setExempt: (courseId: string, userId: string, exempt: boolean) => Promise<void>;
   /** ARU-66: the signed-in listener's own due courses for `today` (YYYY-MM-DD, device-local). Throws on error. */
   loadPaymentDues: (today: string) => Promise<PaymentDue[]>;
+  /** ARU-99: payment requests of current listeners of paid courses (accountants and the teacher; empty for others).
+   *  Live. Which of them are still waiting is decided by waitingRequests() in billing.ts. */
+  paymentRequests: PaymentRequest[];
+  /** ARU-99: the signed-in listener's own request for a course and month (YYYY-MM-01), or null. Throws on error. */
+  loadMyPaymentRequest: (courseId: string, month: string) => Promise<PaymentRequest | null>;
+  /** ARU-99: sends (or, with one already sent this month, replaces) the listener's request with a new proof. Uploads
+   *  the file under a new name, saves the row, then deletes the old proof (best effort). If saving the row fails, the
+   *  new file is removed again and nothing changes. */
+  sendPaymentRequest: (courseId: string, month: string, proof: PickedProof) => Promise<void>;
+  /** ARU-99: a signed link to a proof (the sender, accountants and the teacher; RLS decides). */
+  getPaymentProofUrl: (path: string, options?: { expiresIn?: number; download?: string }) => Promise<string>;
   /** New messages from others per course chat since the user last read it (ARU-31). 0 while that chat is open. */
   unreadCount: (courseId: string) => number;
   /** Marks a chat read up to `upToMessageId` (the newest message shown), by that message's server time. Clears the
@@ -263,6 +278,15 @@ type BillingRow = { course_id: string; start_day: number; end_day: number; selec
 type PaymentRow = { course_id: string; user_id: string; month: string; marked_by: string | null; marked_at: string };
 type ExemptionRow = { course_id: string; user_id: string };
 type DueRow = { course_id: string; deadline: string };
+type PaymentRequestRow = {
+  id: string;
+  course_id: string;
+  user_id: string;
+  month: string;
+  proof_path: string;
+  proof_type: 'image' | 'pdf';
+  sent_at: string;
+};
 type AccessRequestRow = { id: string; full_name: string; email: string | null; created_at: string; access_status: AccessRequest['status'] };
 type HomeworkRow = {
   id: string;
@@ -393,6 +417,16 @@ const toBilling = (r: BillingRow): CourseBilling => ({
   endDay: r.end_day,
   selectedById: r.selected_by,
   selectedAt: r.selected_at,
+});
+
+const toPaymentRequest = (r: PaymentRequestRow): PaymentRequest => ({
+  id: r.id,
+  courseId: r.course_id,
+  userId: r.user_id,
+  month: String(r.month).slice(0, 10),
+  proofPath: r.proof_path,
+  proofType: r.proof_type,
+  sentAt: r.sent_at,
 });
 
 const toPayment = (r: PaymentRow): CoursePayment => ({
@@ -584,33 +618,49 @@ function checkInsert(res: Result) {
 /** Postgres "no data found": the course or discipline doesn't exist (any more). */
 const NOT_FOUND = 'P0002';
 
+/** "Could not find the function" from PostgREST: a migration that adds it hasn't run yet. */
+const NO_FUNCTION = 'PGRST202';
+
 /**
- * ARU-85 / ARU-83: deletes a course or a discipline with everything in it. 1. Homework photos first (SQL can't
- * delete Storage files); if this fails, nothing else has changed. remove() silently skips objects it may not
- * delete, so the photos are listed again and any left over is an error. 2. The rows, in one transaction. "Not
- * found" (P0002) at either step means an earlier attempt already deleted it: done.
+ * ARU-85 / ARU-83 / ARU-99: deletes a course or a discipline with everything in it. 1. Storage files first (SQL
+ * can't delete them): homework photos and payment proofs. If this fails, nothing else has changed. remove() silently
+ * skips objects it may not delete, so the files are listed again and any left over is an error. 2. The rows, in one
+ * transaction. "Not found" (P0002) at any step means an earlier attempt already deleted it: done.
  */
-async function deleteWithHomeworkPhotos(
-  photosRpc: 'course_homework_photos' | 'discipline_homework_photos',
-  deleteRpc: 'delete_course' | 'delete_discipline',
-  args: Record<string, string>,
-  what: 'course' | 'discipline',
-) {
-  // Photos still in Storage; null when it is already gone.
-  const listPhotos = async () => {
-    const res = await supabase.rpc(photosRpc, args);
-    if (res.error?.code === NOT_FOUND) return null;
-    return rows<{ photo_path: string }>(res).map((r) => r.photo_path);
-  };
-  const paths = await listPhotos();
-  if (paths === null) return;
-  if (paths.length) {
-    check(await supabase.storage.from('homework').remove(paths));
-    const left = await listPhotos();
-    if (left === null) return;
-    if (left.length) throw new Error(`Some homework photos couldn't be deleted, so the ${what} wasn't deleted. Try again.`);
+async function deleteWithStorageFiles(what: 'course' | 'discipline', args: Record<string, string>) {
+  const steps = [
+    {
+      rpc: what === 'course' ? 'course_homework_photos' : 'discipline_homework_photos',
+      column: 'photo_path',
+      bucket: 'homework',
+      error: `Some homework photos couldn't be deleted, so the ${what} wasn't deleted. Try again.`,
+    },
+    {
+      rpc: what === 'course' ? 'course_payment_proofs' : 'discipline_payment_proofs',
+      column: 'proof_path',
+      bucket: 'payment-proofs',
+      error: `Some payment proofs couldn't be deleted, so the ${what} wasn't deleted. Try again.`,
+    },
+  ] as const;
+  for (const step of steps) {
+    // Files still in Storage; null when the course or discipline is already gone.
+    const list = async () => {
+      const res = await supabase.rpc(step.rpc, args);
+      if (res.error?.code === NOT_FOUND) return null;
+      // Before 0047 runs there are no payment proofs.
+      if (res.error?.code === NO_FUNCTION && step.bucket === 'payment-proofs') return [];
+      return rows<Record<string, string>>(res).map((r) => r[step.column]);
+    };
+    const paths = await list();
+    if (paths === null) return;
+    if (paths.length) {
+      check(await supabase.storage.from(step.bucket).remove(paths));
+      const left = await list();
+      if (left === null) return;
+      if (left.length) throw new Error(step.error);
+    }
   }
-  const res = await supabase.rpc(deleteRpc, args);
+  const res = await supabase.rpc(what === 'course' ? 'delete_course' : 'delete_discipline', args);
   if (res.error?.code !== NOT_FOUND) check(res);
 }
 
@@ -689,6 +739,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [courseBilling, setCourseBilling] = useState<CourseBilling[]>([]);
   const [coursePayments, setCoursePayments] = useState<CoursePayment[]>([]);
   const [paymentExemptions, setPaymentExemptions] = useState<PaymentExemption[]>([]);
+  const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [unread, setUnread] = useState<Record<string, number>>({});
@@ -842,15 +893,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setCourseBilling([]);
         setCoursePayments([]);
         setPaymentExemptions([]);
+        setPaymentRequests([]);
         return;
       }
       // ARU-65: paid courses, only for those who may read them (students and other mentors make no request).
       // ARU-66: the same people read Paid marks and exemptions (RLS: current listeners of paid courses only).
       if (seesBilling(me)) {
-        const [bill, pays, exempts] = await Promise.all([
+        const [bill, pays, exempts, requests] = await Promise.all([
           supabase.from('course_billing').select('*'),
           supabase.from('course_payments').select('*'),
           supabase.from('course_payment_exemptions').select('*'),
+          // ARU-99: RLS returns only current listeners' requests of paid courses the caller can see.
+          supabase.from('course_payment_requests').select('*'),
         ]);
         // Before 0032 / 0039 run there is no table: no paid courses, marks or exemptions.
         setCourseBilling(bill.error ? [] : ((bill.data as BillingRow[] | null) ?? []).map(toBilling));
@@ -860,10 +914,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             ? []
             : ((exempts.data as ExemptionRow[] | null) ?? []).map((r) => ({ courseId: r.course_id, userId: r.user_id })),
         );
+        // Before 0047 runs there is no table: no requests.
+        setPaymentRequests(
+          requests.error ? [] : ((requests.data as PaymentRequestRow[] | null) ?? []).map(toPaymentRequest),
+        );
       } else {
         setCourseBilling([]);
         setCoursePayments([]);
         setPaymentExemptions([]);
+        setPaymentRequests([]);
       }
       // Requests for the teacher's Manage roles screen. Not live: they refresh with every load.
       if (me.role === 'teacher') {
@@ -957,6 +1016,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // ARU-66: another accountant or the teacher marks, undoes or exempts.
       channel.on('postgres_changes', { event: '*', schema: 'public', table: 'course_payments' }, () => load().catch(() => {}));
       channel.on('postgres_changes', { event: '*', schema: 'public', table: 'course_payment_exemptions' }, () =>
+        load().catch(() => {}),
+      );
+      // ARU-99 AC 6: a listener sends or replaces a payment request.
+      channel.on('postgres_changes', { event: '*', schema: 'public', table: 'course_payment_requests' }, () =>
         load().catch(() => {}),
       );
     }
@@ -1351,18 +1414,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     deleteCourse: async (courseId) => {
       requireRole('teacher');
-      await deleteWithHomeworkPhotos('course_homework_photos', 'delete_course', { course: courseId }, 'course');
+      await deleteWithStorageFiles('course', { course: courseId });
       // Not awaited, so the caller can navigate away before the screen turns into "Course not found".
       load().catch(() => {});
     },
     deleteDiscipline: async (disciplineId) => {
       requireRole('teacher');
-      await deleteWithHomeworkPhotos(
-        'discipline_homework_photos',
-        'delete_discipline',
-        { discipline: disciplineId },
-        'discipline',
-      );
+      await deleteWithStorageFiles('discipline', { discipline: disciplineId });
       load().catch(() => {});
     },
     deleteMaterial: async (id) => {
@@ -1678,6 +1736,82 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         check(await supabase.from('course_payment_exemptions').delete().eq('course_id', courseId).eq('user_id', member));
       }
       await load();
+    },
+    paymentRequests,
+    loadMyPaymentRequest: async (courseId, month) => {
+      if (!userId) return null;
+      const found = rows<PaymentRequestRow>(
+        await supabase
+          .from('course_payment_requests')
+          .select('*')
+          .eq('course_id', courseId)
+          .eq('user_id', userId)
+          .eq('month', month),
+      );
+      return found.length ? toPaymentRequest(found[0]) : null;
+    },
+    sendPaymentRequest: async (courseId, month, proof) => {
+      const me = requireRole('student', 'mentor');
+      if (!/^\d{4}-\d{2}-01$/.test(month)) throw new Error('Invalid month.');
+      if (!isAllowedProof(proof)) throw new Error(PROOF_RULE);
+      const file = await fetch(proof.uri).then((r) => r.arrayBuffer());
+      // The picker may not know the size: check what was actually read.
+      if (!file.byteLength || file.byteLength > PROOF_MAX_BYTES) throw new Error(PROOF_RULE);
+      const { ext, contentType } = proofFormat(proof.kind);
+      // A new name for every upload, so a proof is never overwritten (no upsert, no Storage update policy).
+      const path = `${me.id}/${newId()}.${ext}`;
+      const bucket = supabase.storage.from('payment-proofs');
+      const upload = await bucket.upload(path, file, { contentType });
+      if (upload.error) throw new Error(upload.error.message);
+      const fields = { proof_path: path, proof_type: proof.kind };
+      const findMine = async () =>
+        rows<PaymentRequestRow>(
+          await supabase
+            .from('course_payment_requests')
+            .select('*')
+            .eq('course_id', courseId)
+            .eq('user_id', me.id)
+            .eq('month', month),
+        )[0];
+      let oldPath: string | null = null;
+      try {
+        const existing = await findMine();
+        if (existing) {
+          oldPath = existing.proof_path;
+          const updated = rows<{ id: string }>(
+            await supabase.from('course_payment_requests').update(fields).eq('id', existing.id).select('id'),
+          );
+          if (!updated.length) throw new Error(NO_LONGER_LISTENER);
+        } else {
+          const res = await supabase
+            .from('course_payment_requests')
+            .insert({ course_id: courseId, month, ...fields });
+          if (res.error?.code === '23505') {
+            // Sent from another device (or a double tap) meanwhile: replace that one instead.
+            const other = await findMine();
+            if (!other) throw new Error(res.error.message);
+            oldPath = other.proof_path;
+            check(await supabase.from('course_payment_requests').update(fields).eq('id', other.id));
+          } else if (res.error?.code === '42501') {
+            throw new Error(NO_LONGER_LISTENER);
+          } else {
+            check(res);
+          }
+        }
+      } catch (e) {
+        // Nothing was saved: take the new file back out (best effort).
+        await bucket.remove([path]).catch(() => {});
+        throw e;
+      }
+      // The row points at the new proof; the old file can go. If this fails, the row is still right.
+      if (oldPath && oldPath !== path) await bucket.remove([oldPath]).catch(() => {});
+    },
+    getPaymentProofUrl: async (path, { expiresIn = 60 * 60, download } = {}) => {
+      const { data, error } = await supabase.storage
+        .from('payment-proofs')
+        .createSignedUrl(path, expiresIn, download ? { download } : undefined);
+      if (error || !data?.signedUrl) throw new Error(error?.message ?? 'No proof link.');
+      return data.signedUrl;
     },
     loadPaymentDues: async (today) => {
       if (!userId) return [];
