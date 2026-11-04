@@ -5,6 +5,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import ProfileScreen from '@/app/(tabs)/profile';
 import HomeworkDetailScreen from '@/app/homework/[id]';
 import AddListenersScreen from '@/app/courses/[id]/listeners';
+import { ListenersList } from '@/components/ListenersList';
 import { ListenersSection } from '@/components/ListenersSection';
 import { confirmDestructive } from '@/lib/confirm';
 import { formatDate } from '@/lib/theme';
@@ -94,12 +95,13 @@ describe('Add listeners screen', () => {
   });
 });
 
-describe('Listeners section', () => {
+// ARU-97: the list, remove (X, labelled "Remove <name>") and Add moved to the Listeners page (ListenersList).
+describe('Listeners list', () => {
   const members = [member('A', 'S1', '2026-10-05T10:00:00.000Z'), member('A', 'N', '2026-10-06T10:00:00.000Z'), member('B', 'S2')];
 
   it('AC2: shows name, role and date added, sorted by name, for this course only', async () => {
     setStore(fakeStore('M', { courseMembers: members }));
-    await render(<ListenersSection course={courseA} />);
+    await render(<ListenersList course={courseA} />);
     expect(screen.getByText('LISTENERS (2)')).toBeTruthy();
     expect(names(screen.getAllByText(/^(Mentor Nina|Student Sam|Student Sue)$/))).toEqual(['Mentor Nina', 'Student Sam']);
     expect(screen.getByText('Mentor')).toBeTruthy();
@@ -110,7 +112,7 @@ describe('Listeners section', () => {
 
   it('edge: an empty course says "No listeners yet" and offers "+ Add listeners"', async () => {
     setStore(fakeStore('T'));
-    await render(<ListenersSection course={courseB} />);
+    await render(<ListenersList course={courseB} />);
     expect(screen.getByText('No listeners yet')).toBeTruthy();
     await fireEvent.press(button('+ Add listeners'));
     expect(router.push).toHaveBeenCalledWith({ pathname: '/courses/[id]/listeners', params: { id: 'B' } });
@@ -120,8 +122,8 @@ describe('Listeners section', () => {
     const store = fakeStore('M2', { courseMembers: members, countListenerHomework: jest.fn(async () => 2) });
     setStore(store);
     confirm.mockResolvedValue(true);
-    await render(<ListenersSection course={courseA} />);
-    const rows = screen.getAllByRole('button', { name: 'Remove' });
+    await render(<ListenersList course={courseA} />);
+    const rows = screen.getAllByRole('button', { name: /^Remove / });
     await fireEvent.press(rows[1]); // sorted: Mentor Nina, Student Sam
     await waitFor(() => expect(store.removeListener).toHaveBeenCalledWith('A', 'S1'));
     expect(store.countListenerHomework).toHaveBeenCalledWith('A', 'S1');
@@ -136,8 +138,8 @@ describe('Listeners section', () => {
     const store = fakeStore('T', { courseMembers: members, countListenerHomework: jest.fn(async () => 0) });
     setStore(store);
     confirm.mockResolvedValue(true);
-    await render(<ListenersSection course={courseA} />);
-    await fireEvent.press(screen.getAllByRole('button', { name: 'Remove' })[0]);
+    await render(<ListenersList course={courseA} />);
+    await fireEvent.press(screen.getAllByRole('button', { name: /^Remove / })[0]);
     await waitFor(() => expect(store.removeListener).toHaveBeenCalledWith('A', 'N'));
     expect(confirm).toHaveBeenCalledWith('Remove listener', 'Remove Mentor Nina from Algebra?', 'Remove');
   });
@@ -146,8 +148,8 @@ describe('Listeners section', () => {
     const store = fakeStore('M', { courseMembers: members, countListenerHomework: jest.fn(async () => 1) });
     setStore(store);
     confirm.mockResolvedValue(false);
-    await render(<ListenersSection course={courseA} />);
-    await fireEvent.press(screen.getAllByRole('button', { name: 'Remove' })[1]);
+    await render(<ListenersList course={courseA} />);
+    await fireEvent.press(screen.getAllByRole('button', { name: /^Remove / })[1]);
     await waitFor(() => expect(confirm).toHaveBeenCalled());
     expect(store.removeListener).not.toHaveBeenCalled();
   });
@@ -156,24 +158,24 @@ describe('Listeners section', () => {
     const removeListener = jest.fn().mockRejectedValue(new Error('Only a teacher or mentor can do this.'));
     setStore(fakeStore('M', { courseMembers: members, removeListener }));
     confirm.mockResolvedValue(true);
-    await render(<ListenersSection course={courseA} />);
-    await fireEvent.press(screen.getAllByRole('button', { name: 'Remove' })[1]);
+    await render(<ListenersList course={courseA} />);
+    await fireEvent.press(screen.getAllByRole('button', { name: /^Remove / })[1]);
     expect(await screen.findByText('Only a teacher or mentor can do this.')).toBeTruthy();
     expect(screen.getByText('Student Sam')).toBeTruthy();
   });
 
   it('AC7: a mentor who is only a listener (N in A) can still add and remove', async () => {
     setStore(fakeStore('N', { courseMembers: members }));
-    await render(<ListenersSection course={courseA} />);
-    expect(screen.getAllByRole('button', { name: 'Remove' })).toHaveLength(2);
+    await render(<ListenersList course={courseA} />);
+    expect(screen.getAllByRole('button', { name: /^Remove / })).toHaveLength(2);
     expect(button('+ Add listeners')).toBeTruthy();
   });
 
   it('AC7/AC8: a student listener sees the listeners but no "Add listeners" or "Remove"', async () => {
     setStore(fakeStore('S1', { courseMembers: members }));
-    await render(<ListenersSection course={courseA} />);
+    await render(<ListenersList course={courseA} />);
     expect(screen.getByText('LISTENERS (2)')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Remove / })).toBeNull();
     expect(screen.queryByRole('button', { name: '+ Add listeners' })).toBeNull();
   });
 

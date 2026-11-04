@@ -29,6 +29,7 @@ export default function RootLayout() {
           <Stack.Screen name="courses/[id]/chat" options={{ title: 'Chat' }} />
           <Stack.Screen name="courses/[id]/owner" options={{ title: 'Change owner', presentation: 'modal' }} />
           <Stack.Screen name="courses/[id]/feedback" options={{ title: 'Feedback', presentation: 'modal' }} />
+          <Stack.Screen name="courses/[id]/members" options={{ title: 'Listeners' }} />
           <Stack.Screen name="courses/[id]/listeners" options={{ title: 'Add listeners', presentation: 'modal' }} />
           <Stack.Screen name="courses/[id]/meetings/new" options={{ title: 'Schedule meeting', presentation: 'modal' }} />
           <Stack.Screen name="courses/[id]/meetings/[meetingId]" options={{ title: 'Edit meeting', presentation: 'modal' }} />

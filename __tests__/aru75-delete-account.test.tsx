@@ -8,6 +8,7 @@ import { Text } from 'react-native';
 import ProfileScreen from '@/app/(tabs)/profile';
 import CourseDetailScreen from '@/app/courses/[id]';
 import CourseChatScreen from '@/app/courses/[id]/chat';
+import ListenersScreen from '@/app/courses/[id]/members';
 import MeetingNotesScreen from '@/app/courses/[id]/meetings/[meetingId]/notes';
 import DeleteAccountScreen from '@/app/delete-account';
 import GeneralChatScreen from '@/app/general-chat';
@@ -321,6 +322,10 @@ describe('AC8 / AC11: screens that only show rows deleted with the account never
     params.id = 'A';
     setStore(after('M'));
     await render(<CourseDetailScreen />);
+    expect(screen.queryByText(/Student Sue/)).toBeNull();
+    expect(screen.queryByText(/Unknown|Deleted account/)).toBeNull();
+    // ARU-97: listener names moved to the Listeners page.
+    await render(<ListenersScreen />);
     expect(screen.queryByText(/Student Sue/)).toBeNull();
     expect(screen.queryByText(/Unknown|Deleted account/)).toBeNull();
     expect(screen.getByText(/Student Sam/)).toBeTruthy();
