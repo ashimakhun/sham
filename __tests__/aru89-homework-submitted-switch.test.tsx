@@ -3,7 +3,7 @@
 // and supabase/tests/aru89_homework_submitted_notifications.test.sql.
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
-import ProfileScreen from '@/app/(tabs)/profile';
+import TelegramScreen from '@/app/telegram';
 import { telegramSwitchesFor } from '@/lib/telegram';
 import type { TelegramLink } from '@/lib/types';
 
@@ -62,7 +62,7 @@ describe('telegramSwitchesFor', () => {
 describe('the card', () => {
   it.each(['T', 'M'] as const)('%s sees Homework submitted, on by default', async (who) => {
     setStore(fakeStore(who, { telegram: linked() }));
-    await render(<ProfileScreen />);
+    await render(<TelegramScreen />);
     expect(switches()).toContain('Homework submitted');
     expect(screen.getByLabelText('Homework submitted').props.value).toBe(true);
   });
@@ -70,7 +70,7 @@ describe('the card', () => {
   it('shows the saved value and saves kind homework_submitted', async () => {
     const store = fakeStore('M', { telegram: linked({ homework_submitted: false }) });
     setStore(store);
-    await render(<ProfileScreen />);
+    await render(<TelegramScreen />);
     expect(screen.getByLabelText('Homework submitted').props.value).toBe(false);
     await fireEvent(screen.getByLabelText('Homework submitted'), 'valueChange', true);
     expect(store.setTelegramNotification).toHaveBeenCalledWith('homework_submitted', true);
@@ -78,7 +78,7 @@ describe('the card', () => {
 
   it('a student never sees it', async () => {
     setStore(fakeStore('S1', { telegram: linked({ homework_submitted: true }) }));
-    await render(<ProfileScreen />);
+    await render(<TelegramScreen />);
     expect(screen.queryByLabelText('Homework submitted')).toBeNull();
   });
 });
