@@ -20,6 +20,21 @@ export default function ProfileScreen() {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <ProfileNameCard />
 
+      {/* ARU-100: right below the name card, above every other section, for every role.
+          No wrapper, so it gets the same gap as the other sections. */}
+      {canUseGeneralChat(currentUser) && (
+        // ARU-69: the chat icon instead of the words; read as "Open general chat".
+        // ARU-72: new messages show as a badge and join the label. ARU-78: the badge sits on the icon, as on a course card.
+        <Button
+          title="Open general chat"
+          icon="chatbubble-outline"
+          badgeOnIcon
+          variant="secondary"
+          unread={generalUnreadCount}
+          onPress={() => router.push('/general-chat')}
+        />
+      )}
+
       {/* ARU-98: no course cards here; courses are listed on the Courses tab. */}
       {/* ARU-101: a button that opens the Telegram notifications page. */}
       <TelegramButton />
@@ -27,19 +42,6 @@ export default function ProfileScreen() {
       <AccountantSection />
 
       <View style={{ gap: 10, marginTop: 8 }}>
-        {/* ARU-61: first in this group, so the order is the same for every role. */}
-        {canUseGeneralChat(currentUser) && (
-          // ARU-69: the chat icon instead of the words; read as "Open general chat".
-          // ARU-72: new messages show as a badge and join the label. ARU-78: the badge sits on the icon, as on a course card.
-          <Button
-            title="Open general chat"
-            icon="chatbubble-outline"
-            badgeOnIcon
-            variant="secondary"
-            unread={generalUnreadCount}
-            onPress={() => router.push('/general-chat')}
-          />
-        )}
         {canManageRoles(currentUser.role) && (
           <Button
             // Accounts waiting for approval (ARU-43), e.g. "Manage roles (2)"; no count when there are none.
