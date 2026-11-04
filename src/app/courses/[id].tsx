@@ -7,6 +7,7 @@ import { CourseDisciplineSection, DisciplineLabel } from '@/components/Disciplin
 import { FeedbackSection } from '@/components/FeedbackSection';
 import { ListenersSection } from '@/components/ListenersSection';
 import { MeetingsSection } from '@/components/MeetingsSection';
+import { PaySection } from '@/components/PaySection';
 import { Button, Card, EmptyState, HiddenBadge, OwnerLine, styles } from '@/components/ui';
 import { canChangeOwner, seesOnlyCourseSummary } from '@/lib/roles';
 import { useStore } from '@/lib/store';
@@ -62,6 +63,8 @@ export default function CourseDetailScreen() {
             <DisciplineLabel course={course} />
             {course.description ? <Text style={styles.body}>{course.description}</Text> : null}
           </Card>
+          {/* ARU-99 AC 1: Pay (or "request sent") for an unpaid listener of a paid course in its payment period. */}
+          <PaySection course={course} />
           {/* ARU-63 AC 5 / ARU-70: the teacher (any course) or the current owner changes the discipline here. */}
           <CourseDisciplineSection course={course} />
           {canChangeOwner(currentUser?.role) && (

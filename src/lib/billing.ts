@@ -1,5 +1,5 @@
 import { formatDate } from './theme';
-import type { Course, CourseBilling, CourseMember, CoursePayment, PaymentExemption, User } from './types';
+import type { Course, CourseBilling, CourseMember, CoursePayment, PaymentExemption, PaymentRequest, User } from './types';
 
 /** ARU-65: an approved mentor with Accountant on (mirrors is_accountant() in 0032). */
 export function isAccountant(user: User | null | undefined) {
@@ -114,4 +114,31 @@ export function unpaidThisMonth(input: {
     }))
     .filter((c) => c.names.length > 0)
     .sort((a, b) => a.title.localeCompare(b.title) || a.courseId.localeCompare(b.courseId));
+}
+
+/**
+ * ARU-99 AC 6 / AC 9 / AC 10: payment requests still waiting for the accountant in `month`: the sender is a current
+ * listener of the course and Unpaid (no Paid mark, not Exempt). Same helpers as "Unpaid this month", so the two can
+ * never disagree. Requests of other months are never shown (AC 11).
+ */
+export function waitingRequests(input: {
+  courseId: string;
+  month: string;
+  requests: PaymentRequest[];
+  members: CourseMember[];
+  payments: CoursePayment[];
+  exemptions: PaymentExemption[];
+}): PaymentRequest[] {
+  return input.requests.filter(
+    (r) =>
+      r.courseId === input.courseId &&
+      r.month === input.month &&
+      input.members.some((m) => m.courseId === r.courseId && m.userId === r.userId) &&
+      paymentStatus(r.courseId, r.userId, input.month, input.payments, input.exemptions).kind === 'unpaid',
+  );
+}
+
+/** "1 request" / "2 requests" (AC 6). */
+export function requestCountText(n: number) {
+  return `${n} ${n === 1 ? 'request' : 'requests'}`;
 }

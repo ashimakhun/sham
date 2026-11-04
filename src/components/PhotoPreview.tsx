@@ -5,17 +5,36 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PHOTO_ERROR, photoFileName } from '@/lib/photo';
 import { useStore } from '@/lib/store';
 
-type Props = {
-  /** Path in the "homework" bucket; the preview fetches its own fresh link, so an expired one never shows. */
-  path: string;
-  homeworkId: string;
-  title: string;
-  onClose: () => void;
-};
+type UrlLoader = (path: string, options?: { expiresIn?: number; download?: string }) => Promise<string>;
 
-/** Full-screen homework photo with Download (ARU-18). Close with ✕, Android back or Esc on web. */
-export function PhotoPreview({ path, homeworkId, title, onClose }: Props) {
-  const { getPhotoUrl } = useStore();
+type Props = {
+  /** Path in the bucket; the preview fetches its own fresh link, so an expired one never shows. */
+  path: string;
+  onClose: () => void;
+} & (
+  | {
+      /** A homework photo (the "homework" bucket), downloaded as "<title>-<id>.jpg". */
+      homeworkId: string;
+      title: string;
+      loadUrl?: undefined;
+      fileName?: undefined;
+      errorText?: undefined;
+    }
+  | {
+      /** ARU-99: another private bucket (e.g. a payment proof): its signed-link loader and the download name. */
+      loadUrl: UrlLoader;
+      fileName: string;
+      errorText?: string;
+      homeworkId?: undefined;
+      title?: undefined;
+    }
+);
+
+/** Full-screen photo with Download (ARU-18; ARU-99 for payment proofs). Close with ✕, Android back or Esc on web. */
+export function PhotoPreview({ path, homeworkId, title, loadUrl, fileName, errorText, onClose }: Props) {
+  const { getPhotoUrl: homeworkUrl } = useStore();
+  const getPhotoUrl: UrlLoader = loadUrl ?? homeworkUrl;
+  const downloadName = fileName ?? photoFileName(title ?? '', homeworkId ?? '');
   const insets = useSafeAreaInsets();
   const [url, setUrl] = useState<string>();
   const [loaded, setLoaded] = useState(false);
@@ -31,7 +50,9 @@ export function PhotoPreview({ path, homeworkId, title, onClose }: Props) {
     return () => {
       alive = false;
     };
-  }, [getPhotoUrl, path]);
+    // The loader is stable for homework (useCallback); a caller's inline loader must not refetch on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path]);
 
   // Web: Esc closes the preview.
   useEffect(() => {
@@ -47,7 +68,7 @@ export function PhotoPreview({ path, homeworkId, title, onClose }: Props) {
     setDownloading(true);
     try {
       // A short-lived link made on tap, served as an attachment with a readable file name (AC 5, analysis note 3).
-      const link = await getPhotoUrl(path, { expiresIn: 60, download: photoFileName(title, homeworkId) });
+      const link = await getPhotoUrl(path, { expiresIn: 60, download: downloadName });
       await Linking.openURL(link);
     } catch {
       setFailed(true);
@@ -66,7 +87,7 @@ export function PhotoPreview({ path, homeworkId, title, onClose }: Props) {
         </View>
         <View style={s.body}>
           {failed ? (
-            <Text style={s.error}>{PHOTO_ERROR}</Text>
+            <Text style={s.error}>{errorText ?? PHOTO_ERROR}</Text>
           ) : (
             <>
               {url && (

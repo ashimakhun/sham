@@ -39,6 +39,27 @@ export type PaymentExemption = {
 };
 
 /** ARU-66: one of the signed-in listener's own due courses (from my_payment_dues). `deadline` is YYYY-MM-DD. */
+/** ARU-99: a listener's payment request for one paid course and month (YYYY-MM-01), with one proof. */
+export type PaymentRequest = {
+  id: string;
+  courseId: string;
+  userId: string;
+  month: string;
+  /** Path in the private "payment-proofs" bucket: "<user id>/<file id>.<jpg|pdf>". */
+  proofPath: string;
+  proofType: 'image' | 'pdf';
+  sentAt: string;
+};
+
+/** ARU-99: a proof picked on the Pay screen, before it is sent. */
+export type PickedProof = {
+  uri: string;
+  kind: 'image' | 'pdf';
+  name?: string | null;
+  mimeType?: string | null;
+  size?: number | null;
+};
+
 export type PaymentDue = {
   courseId: string;
   deadline: string;
