@@ -96,18 +96,12 @@ describe('course card (AC1, AC3, AC4, AC11)', () => {
   });
 });
 
-describe('Chat button on course details (AC2, AC3, AC11)', () => {
-  it('shows the same count, with the count in its label', async () => {
+// ARU-96: course details no longer has a chat button; the course card's icon is the only entry point.
+describe('Course details has no chat button (ARU-96)', () => {
+  it('no chat button or badge, even with new messages', async () => {
     setStore(fakeStore('S1', { courseMembers: members, unreadCount: counts({ A: 3 }) }));
     await render(<CourseDetailScreen />);
-    expect(screen.getByRole('button', { name: 'Open chat for Algebra, 3 new messages' })).toBeTruthy();
-    expect(screen.getByText('3', hidden)).toBeTruthy();
-  });
-
-  it('0 new messages: plain "Chat" with no badge', async () => {
-    setStore(fakeStore('S1', { courseMembers: members }));
-    await render(<CourseDetailScreen />);
-    expect(screen.getByRole('button', { name: 'Open chat for Algebra' })).toBeTruthy(); // ARU-69: the chat icon
+    expect(screen.queryByRole('button', { name: /^Open chat for/ })).toBeNull();
     expect(screen.queryByTestId('unread-badge', hidden)).toBeNull();
   });
 });
