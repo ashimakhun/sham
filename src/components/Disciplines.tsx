@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { Card, ErrorText, HiddenBadge, styles } from '@/components/ui';
@@ -111,44 +111,57 @@ export function canChangeCourseDiscipline(user: User | null | undefined, course:
 /** ARU-70 / ARU-71: the edit (pencil) icon, the same on course details and the Profile name. */
 export const EDIT_ICON = 'create-outline' as const;
 
-/** A second tap on the pencil within this window is ignored, so a double tap opens the list only once. */
-const TOGGLE_GUARD_MS = 500;
+/** A second tap on the pencil within this window is ignored, so a double tap opens Edit course only once (ARU-103). */
+export const TOGGLE_GUARD_MS = 500;
 
 /**
- * ARU-70 (was ARU-63 AC 5): on course details, the teacher (any course) or the current owner changes the course's
- * discipline. Collapsed it shows the current value and a pencil; the pencil opens the list, picking another option
- * saves and collapses, the same option or the pencil again collapses without saving.
+ * ARU-103 AC 1 / AC 3: the pencil on the right of the course name card. A 44×44 "Edit course" button that opens the
+ * Edit course modal; a double tap opens it only once.
  */
-export function CourseDisciplineSection({ course }: { course: Course }) {
+export function EditCoursePencil({ courseId }: { courseId: string }) {
+  const lastTap = useRef(0);
+  const open = () => {
+    const now = Date.now();
+    if (now - lastTap.current < TOGGLE_GUARD_MS) return;
+    lastTap.current = now;
+    router.push({ pathname: '/courses/[id]/edit', params: { id: courseId } });
+  };
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Edit course"
+      onPress={open}
+      style={({ pressed }) => [
+        { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+        pressed && { opacity: 0.6 },
+      ]}>
+      <Ionicons name={EDIT_ICON} size={22} color={colors.primary} />
+    </Pressable>
+  );
+}
+
+/**
+ * ARU-103 (was ARU-70 / ARU-63 AC 5 on course details): the Discipline section of Edit course. The teacher (any
+ * course) or the current owner sees the current value and the option list; picking another option saves at once,
+ * picking the current one saves nothing. Permission is worked out at render time, so a mentor who hands the course
+ * to someone else loses the section on the next update.
+ */
+export function EditCourseDisciplineSection({ course }: { course: Course }) {
   const { currentUser, disciplines, getDiscipline, setCourseDiscipline } = useStore();
-  const { busy, error, run, clearError } = useAction();
-  const [open, setOpen] = useState(false);
-  const lastToggle = useRef(0);
+  const { busy, error, run } = useAction();
   const saving = useRef(false);
   const { options, current } = useDisciplineOptions(course.disciplineId);
   if (!canChangeCourseDiscipline(currentUser, course)) return null;
   // Nothing to pick and nothing set: no section (as on the Create course form); it appears once a discipline exists.
   if (disciplines.length === 0 && !course.disciplineId) return null;
 
-  const close = () => {
-    setOpen(false);
-    clearError();
-  };
-  const toggle = () => {
-    const now = Date.now();
-    if (busy || now - lastToggle.current < TOGGLE_GUARD_MS) return;
-    lastToggle.current = now;
-    if (open) close();
-    else setOpen(true);
-  };
   const pick = (id: string | undefined) => {
     // Keeping the current value (also a hidden one) saves nothing.
-    if (id === course.disciplineId) return close();
+    if (id === course.disciplineId) return;
     if (saving.current) return; // a second tap before the first save finished
     saving.current = true;
     run(async () => {
       await setCourseDiscipline(course.id, id ?? null);
-      setOpen(false);
     }).finally(() => {
       saving.current = false;
     });
@@ -157,36 +170,18 @@ export function CourseDisciplineSection({ course }: { course: Course }) {
 
   return (
     <Card style={{ gap: 8 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <View style={{ flex: 1, gap: 2 }} accessible accessibilityLabel={`Discipline, ${current.label}`}>
-          <Text style={styles.label}>Discipline</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={[styles.body, { flexShrink: 1 }]} numberOfLines={2}>
-              {current.label}
-            </Text>
-            {hidden ? <HiddenBadge /> : null}
-          </View>
+      <View style={{ gap: 2 }} accessible accessibilityLabel={`Discipline, ${current.label}`}>
+        <Text style={styles.label}>Discipline</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={[styles.body, { flexShrink: 1 }]} numberOfLines={2}>
+            {current.label}
+          </Text>
+          {hidden ? <HiddenBadge /> : null}
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Change discipline"
-          accessibilityState={{ expanded: open, disabled: busy }}
-          disabled={busy}
-          onPress={toggle}
-          style={({ pressed }) => [
-            { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-            pressed && { opacity: 0.6 },
-          ]}>
-          <Ionicons name={EDIT_ICON} size={22} color={colors.primary} />
-        </Pressable>
       </View>
-      {open ? (
-        <>
-          <DisciplineOptions options={options} value={course.disciplineId} onChange={pick} disabled={busy} />
-          {busy ? <Text style={styles.muted}>Saving…</Text> : null}
-          <ErrorText error={error} />
-        </>
-      ) : null}
+      <DisciplineOptions options={options} value={course.disciplineId} onChange={pick} disabled={busy} />
+      {busy ? <Text style={styles.muted}>Saving…</Text> : null}
+      <ErrorText error={error} />
     </Card>
   );
 }
