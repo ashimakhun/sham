@@ -3,7 +3,7 @@ import { ScrollView, View } from 'react-native';
 
 import { AccountantSection } from '@/components/Accountant';
 import { ProfileNameCard } from '@/components/ProfileNameCard';
-import { TelegramCard } from '@/components/TelegramCard';
+import { TelegramButton } from '@/components/Telegram';
 import { Button, ErrorText, styles } from '@/components/ui';
 import { canManageRoles, canUseGeneralChat } from '@/lib/roles';
 import { useStore } from '@/lib/store';
@@ -36,7 +36,8 @@ export default function ProfileScreen() {
       )}
 
       {/* ARU-98: no course cards here; courses are listed on the Courses tab. */}
-      <TelegramCard />
+      {/* ARU-101: a button that opens the Telegram notifications page. */}
+      <TelegramButton />
       {/* ARU-65: accountants and the teacher. */}
       <AccountantSection />
 
