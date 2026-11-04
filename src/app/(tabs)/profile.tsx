@@ -1,75 +1,26 @@
 import { router } from 'expo-router';
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 
 import { AccountantSection } from '@/components/Accountant';
 import { ProfileNameCard } from '@/components/ProfileNameCard';
 import { TelegramCard } from '@/components/TelegramCard';
-import { Button, Card, ErrorText, styles } from '@/components/ui';
+import { Button, ErrorText, styles } from '@/components/ui';
 import { canManageRoles, canUseGeneralChat } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
 
 export default function ProfileScreen() {
-  const { currentUser, courses, courseMembers, getUser, signOut, accessRequests, generalUnreadCount } = useStore();
+  const { currentUser, signOut, accessRequests, generalUnreadCount } = useStore();
   const { busy, error, run } = useAction();
   if (!currentUser) return null;
 
   const pending = accessRequests.filter((r) => r.status === 'pending').length;
-  const openCourse = (id: string) => router.push({ pathname: '/courses/[id]', params: { id } });
-
-  // Courses I attend; their owner is my mentor there (ARU-7). Teachers are never listeners.
-  const myMemberships = new Set(courseMembers.filter((m) => m.userId === currentUser.id).map((m) => m.courseId));
-  const listening = courses.filter((c) => myMemberships.has(c.id));
-  // Courses I own, each with its listeners (mentors and the teacher).
-  const owned = courses.filter((c) => c.createdById === currentUser.id);
-  const isStaff = currentUser.role === 'teacher' || currentUser.role === 'mentor';
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <ProfileNameCard />
 
-      {(currentUser.role === 'student' || listening.length > 0) && (
-        <Card>
-          <Text style={styles.label}>MY COURSES</Text>
-          {listening.length ? (
-            listening.map((c) => (
-              <View key={c.id} style={{ gap: 2 }}>
-                <Text style={[styles.title, { fontSize: 15 }]} numberOfLines={2} onPress={() => openCourse(c.id)}>
-                  {c.title}
-                </Text>
-                <Text style={styles.muted}>Mentor: {getUser(c.createdById)?.name ?? 'Unknown'}</Text>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.muted}>No mentor yet — ask your teacher or mentor to add you to a course</Text>
-          )}
-        </Card>
-      )}
-
-      {isStaff && (
-        <Card>
-          <Text style={styles.label}>COURSES I OWN</Text>
-          {owned.length ? (
-            owned.map((c) => {
-              const listeners = courseMembers
-                .filter((m) => m.courseId === c.id)
-                .map((m) => getUser(m.userId)?.name ?? 'Unknown user')
-                .sort((a, b) => a.localeCompare(b));
-              return (
-                <View key={c.id} style={{ gap: 2 }}>
-                  <Text style={[styles.title, { fontSize: 15 }]} numberOfLines={2} onPress={() => openCourse(c.id)}>
-                    {c.title}
-                  </Text>
-                  <Text style={styles.muted}>{listeners.length ? listeners.join(', ') : 'No listeners yet'}</Text>
-                </View>
-              );
-            })
-          ) : (
-            <Text style={styles.muted}>You do not own any courses yet.</Text>
-          )}
-        </Card>
-      )}
-
+      {/* ARU-98: no course cards here; courses are listed on the Courses tab. */}
       <TelegramCard />
       {/* ARU-65: accountants and the teacher. */}
       <AccountantSection />
