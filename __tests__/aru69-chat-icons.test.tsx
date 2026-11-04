@@ -6,6 +6,7 @@ import { StyleSheet } from 'react-native';
 
 import ProfileScreen from '@/app/(tabs)/profile';
 import CourseDetailScreen from '@/app/courses/[id]';
+import EditCourseScreen from '@/app/courses/[id]/edit';
 import { colors } from '@/lib/theme';
 
 import { fakeStore, member, users } from './helpers/fakeStore';
@@ -79,9 +80,9 @@ describe('AC6: other buttons keep their text', () => {
     expect(screen.getByText('Sign out')).toBeTruthy();
   });
 
-  it('Change owner stays a text button on course details', async () => {
+  it('Change owner stays a text row (ARU-103: on Edit course)', async () => {
     setStore(fakeStore('T', { courseMembers: members }));
-    await render(<CourseDetailScreen />);
+    await render(<EditCourseScreen />);
     expect(screen.getByText('Change owner')).toBeTruthy();
   });
 });

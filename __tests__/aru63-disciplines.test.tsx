@@ -6,6 +6,7 @@ import { router } from 'expo-router';
 
 import CoursesScreen from '@/app/(tabs)/courses';
 import CourseDetailScreen from '@/app/courses/[id]';
+import EditCourseScreen from '@/app/courses/[id]/edit';
 import NewCourseScreen from '@/app/courses/new';
 import DisciplineScreen from '@/app/disciplines/[id]';
 import NewDisciplineScreen from '@/app/disciplines/new';
@@ -310,30 +311,18 @@ describe('AC4: New course picker', () => {
   });
 });
 
-describe('AC5: the owner changes the discipline on course details', () => {
-  // ARU-70: the list is collapsed behind a pencil; each test opens it first. Time moves on between taps so the
-  // pencil's double-tap guard never swallows a deliberate tap.
-  let now = 0;
-  beforeEach(() => {
-    jest.spyOn(Date, 'now').mockImplementation(() => (now += 1000));
-  });
-  afterEach(() => jest.restoreAllMocks());
-  const openList = () => fireEvent.press(screen.getByRole('button', { name: 'Change discipline' }));
-
+describe('AC5: the owner changes the discipline (ARU-103: on Edit course)', () => {
   it('M (owner of A) picks another discipline or "No discipline"; tapping the current one does nothing', async () => {
     params.id = 'A';
     const store = forRole('M');
     setStore(store);
-    await render(<CourseDetailScreen />);
-    // The label on the course and the section's current value.
-    expect(screen.getAllByLabelText('Discipline, Math')).toHaveLength(2);
-    await openList();
+    await render(<EditCourseScreen />);
+    expect(screen.getByLabelText('Discipline, Math')).toBeTruthy();
     await fireEvent.press(screen.getByRole('radio', { name: 'Math' }));
     expect(store.setCourseDiscipline).not.toHaveBeenCalled();
-    await openList();
     await fireEvent.press(screen.getByRole('radio', { name: 'Art' }));
     await waitFor(() => expect(store.setCourseDiscipline).toHaveBeenCalledWith('A', 'DA'));
-    await openList();
+    await waitFor(() => expect(screen.queryByText('Saving…')).toBeNull());
     await fireEvent.press(screen.getByRole('radio', { name: 'No discipline' }));
     await waitFor(() => expect(store.setCourseDiscipline).toHaveBeenLastCalledWith('A', null));
   });
@@ -342,26 +331,25 @@ describe('AC5: the owner changes the discipline on course details', () => {
     params.id = 'B';
     const store = forRole('N');
     setStore(store);
-    await render(<CourseDetailScreen />);
+    await render(<EditCourseScreen />);
     expect(screen.getByLabelText('Discipline, Hidden discipline')).toBeTruthy();
     expect(screen.queryByText('Discipline: Physics')).toBeNull();
-    await openList();
     expect(screen.getByRole('radio', { name: 'Hidden discipline', checked: true })).toBeTruthy();
     await fireEvent.press(screen.getByRole('radio', { name: 'Hidden discipline' }));
     expect(store.setCourseDiscipline).not.toHaveBeenCalled();
-    await openList();
     await fireEvent.press(screen.getByRole('radio', { name: 'Math' }));
     await waitFor(() => expect(store.setCourseDiscipline).toHaveBeenCalledWith('B', 'DM'));
   });
 
-  it('S1 (not the owner) has no section; ARU-70: the teacher has one on every course', async () => {
+  it('S1 (not the owner) is not allowed; ARU-70: the teacher has the section on every course', async () => {
     params.id = 'A';
     setStore(forRole('S1'));
-    const view = await render(<CourseDetailScreen />);
-    expect(screen.queryByRole('button', { name: 'Change discipline' })).toBeNull();
+    const view = await render(<EditCourseScreen />);
+    expect(screen.getByText('Not allowed')).toBeTruthy();
+    expect(screen.queryAllByRole('radio')).toEqual([]);
     setStore(forRole('T'));
-    await view.rerender(<CourseDetailScreen />);
-    expect(screen.getByRole('button', { name: 'Change discipline' })).toBeTruthy();
+    await view.rerender(<EditCourseScreen />);
+    expect(screen.getAllByRole('radio').length).toBeGreaterThan(0);
   });
 
   it('a refused change shows its error', async () => {
@@ -370,8 +358,7 @@ describe('AC5: the owner changes the discipline on course details', () => {
       throw new Error('Only the course owner can change its discipline.');
     });
     setStore(forRole('M', { setCourseDiscipline }));
-    await render(<CourseDetailScreen />);
-    await openList();
+    await render(<EditCourseScreen />);
     await fireEvent.press(screen.getByRole('radio', { name: 'Art' }));
     expect(await screen.findByText('Only the course owner can change its discipline.')).toBeTruthy();
   });

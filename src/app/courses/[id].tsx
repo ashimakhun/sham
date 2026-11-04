@@ -1,14 +1,14 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 
 import { CourseMaterialsSection } from '@/components/CourseMaterialsSection';
 import { DeleteCourseButton } from '@/components/DeleteCourseButton';
-import { CourseDisciplineSection, DisciplineLabel } from '@/components/Disciplines';
+import { canChangeCourseDiscipline, DisciplineLabel, EditCoursePencil } from '@/components/Disciplines';
 import { FeedbackSection } from '@/components/FeedbackSection';
 import { ListenersSection } from '@/components/ListenersSection';
 import { MeetingsSection } from '@/components/MeetingsSection';
 import { PaySection } from '@/components/PaySection';
-import { Button, Card, EmptyState, HiddenBadge, OwnerLine, styles } from '@/components/ui';
+import { Card, EmptyState, HiddenBadge, OwnerLine, styles } from '@/components/ui';
 import { canChangeOwner, seesOnlyCourseSummary } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { formatDate } from '@/lib/theme';
@@ -41,6 +41,9 @@ export default function CourseDetailScreen() {
     );
   }
 
+  // ARU-103 AC 1 / AC 2: the pencil for the teacher and mentors (a course owner is always one of them).
+  const canEdit = canChangeOwner(currentUser?.role) || canChangeCourseDiscipline(currentUser, course);
+
   // ARU-80: no homework list here any more (it lives on the Homework tab, with a course filter on Checked).
   return (
     <ScrollView
@@ -50,14 +53,14 @@ export default function CourseDetailScreen() {
       refreshControl={<RefreshControl refreshing={loading} onRefresh={() => refresh().catch(() => {})} />}>
         <View style={{ gap: 12 }}>
           <Card>
-            {course.hidden ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {/* ARU-103 AC 1: the title (and Hidden badge) wrap on the left; the Edit course pencil stays on the right. */}
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <Text style={[styles.h1, { flexShrink: 1 }]}>{course.title}</Text>
-                <HiddenBadge />
+                {course.hidden ? <HiddenBadge /> : null}
               </View>
-            ) : (
-              <Text style={styles.h1}>{course.title}</Text>
-            )}
+              {canEdit ? <EditCoursePencil courseId={course.id} /> : null}
+            </View>
             <OwnerLine name={getUser(course.createdById)?.name ?? 'Unknown'} date={formatDate(course.createdAt)} />
             {/* ARU-63 AC 6: only a discipline the viewer can see. */}
             <DisciplineLabel course={course} />
@@ -65,15 +68,7 @@ export default function CourseDetailScreen() {
           </Card>
           {/* ARU-99 AC 1: Pay (or "request sent") for an unpaid listener of a paid course in its payment period. */}
           <PaySection course={course} />
-          {/* ARU-63 AC 5 / ARU-70: the teacher (any course) or the current owner changes the discipline here. */}
-          <CourseDisciplineSection course={course} />
-          {canChangeOwner(currentUser?.role) && (
-            <Button
-              title="Change owner"
-              variant="secondary"
-              onPress={() => router.push({ pathname: '/courses/[id]/owner', params: { id: course.id } })}
-            />
-          )}
+          {/* ARU-103 AC 8: the discipline and the owner are changed from Edit course (the pencil above). */}
           <MeetingsSection course={course} />
           <ListenersSection course={course} />
           <CourseMaterialsSection course={course} />
