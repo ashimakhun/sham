@@ -2,7 +2,7 @@
 // and the "everyone else is a listener" edge case. Rules are tested in supabase/tests/aru9_course_owner*.test.sql.
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
-import ProfileScreen from '@/app/(tabs)/profile';
+import CoursesScreen from '@/app/(tabs)/courses';
 import ChangeOwnerScreen from '@/app/courses/[id]/owner';
 import NewHomeworkScreen from '@/app/homework/new';
 
@@ -35,23 +35,24 @@ describe('AC 11: a listener sees the new owner as the course mentor', () => {
     params.assignmentId = undefined;
   });
 
-  it('the Profile tab lists the course with "Mentor: <new owner>"', async () => {
+  // ARU-98 removed the course cards from Profile: these checks now look at the Courses tab, where courses are listed.
+  it('the Courses tab lists the course under "Courses I\'m in" with "Owner: <new owner>"', async () => {
     setStore(fakeStore('S1', { courses: [handedOver], courseMembers: [member('A', 'S1')] }));
-    await render(<ProfileScreen />);
-    expect(screen.getByText('Mentor: Mentor Nina')).toBeTruthy();
-    expect(screen.queryByText('Mentor: Mentor Max')).toBeNull();
+    await render(<CoursesScreen />);
+    expect(screen.getByText("COURSES I'M IN")).toBeTruthy();
+    expect(screen.getByText(/^Mentor Nina · /)).toBeTruthy();
+    expect(screen.queryByText(/^Mentor Max · /)).toBeNull();
   });
 
-  it('the new owner sees the course under "Courses I own" on Profile; the former owner no longer does', async () => {
+  it('the new owner sees the course under "Courses I own" on the Courses tab; the former owner no longer does', async () => {
     setStore(fakeStore('N', { courses: [handedOver], courseMembers: [member('A', 'S1')] }));
-    const { unmount } = await render(<ProfileScreen />);
+    const { unmount } = await render(<CoursesScreen />);
+    expect(screen.getByText('COURSES I OWN')).toBeTruthy();
     expect(screen.getByText('Algebra')).toBeTruthy();
-    expect(screen.getByText('Student Sam')).toBeTruthy();
     await unmount();
     setStore(fakeStore('M', { courses: [handedOver], courseMembers: [member('A', 'S1')] }));
-    await render(<ProfileScreen />);
-    expect(screen.queryByText('Algebra')).toBeNull();
-    expect(screen.getByText('You do not own any courses yet.')).toBeTruthy();
+    await render(<CoursesScreen />);
+    expect(screen.queryByText('COURSES I OWN')).toBeNull();
   });
 });
 
