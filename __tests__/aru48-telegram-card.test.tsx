@@ -133,8 +133,8 @@ describe('Coming back from Telegram (AC 4)', () => {
 
 describe('Switches (AC 5)', () => {
   it.each([
-    ['S1', ['Meeting started', 'New homework', 'Homework reviewed', 'Chat messages', 'General chat']],
-    ['M', ['Meeting started', 'New homework', 'Homework reviewed', 'Homework submitted', 'Chat messages', 'General chat']],
+    ['S1', ['Meeting started', 'New homework', 'Homework reviewed', 'Chat messages', 'General chat', 'New materials']],
+    ['M', ['Meeting started', 'New homework', 'Homework reviewed', 'Homework submitted', 'Chat messages', 'General chat', 'New materials']],
   ] as const)('%s sees the listener switches (mentors also Homework submitted, ARU-89; General chat, ARU-87), as saved', async (who, labels) => {
     setStore(fakeStore(who, { telegram: linked({ new_homework: false }) }));
     await render(<ProfileScreen />);
@@ -146,7 +146,7 @@ describe('Switches (AC 5)', () => {
   it('the teacher sees Homework submitted (ARU-89), Chat messages, General chat (ARU-87), New accounts (ARU-84)', async () => {
     setStore(fakeStore('T', { telegram: linked() }));
     await render(<ProfileScreen />);
-    expect(switches()).toEqual(['Homework submitted', 'Chat messages', 'General chat', 'New accounts']);
+    expect(switches()).toEqual(['Homework submitted', 'Chat messages', 'General chat', 'New materials', 'New accounts']);
   });
 
   it('flipping a switch saves it', async () => {

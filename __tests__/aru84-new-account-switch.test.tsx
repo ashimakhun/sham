@@ -30,7 +30,7 @@ afterEach(() => {
 describe('telegramSwitchesFor', () => {
   it('teacher: New accounts next to the chat switches (Chat messages, then General chat since ARU-87)', () => {
     const labels = telegramSwitchesFor('teacher').map((s) => s.label);
-    expect(labels.slice(labels.indexOf('Chat messages'))).toEqual(['Chat messages', 'General chat', 'New accounts']);
+    expect(labels.slice(labels.indexOf('Chat messages'))).toEqual(['Chat messages', 'General chat', 'New materials', 'New accounts']);
   });
 
   it.each(['mentor', 'student'] as const)('%s: never New accounts', (role) => {
@@ -45,7 +45,7 @@ describe('the card', () => {
     setStore(fakeStore('T', { telegram: linked() }));
     await render(<ProfileScreen />);
     const labels = switches();
-    expect(labels.slice(labels.indexOf('Chat messages'))).toEqual(['Chat messages', 'General chat', 'New accounts']);
+    expect(labels.slice(labels.indexOf('Chat messages'))).toEqual(['Chat messages', 'General chat', 'New materials', 'New accounts']);
     expect(screen.getByLabelText('New accounts').props.value).toBe(true);
   });
 

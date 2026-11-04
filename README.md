@@ -156,7 +156,13 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    adds the table `course_payment_requests` (in realtime), the private bucket `payment-proofs` (photos and PDFs, 10 MB)
    with its policies (own folder; accountants and the teacher read current listeners' proofs; the teacher reads and
    deletes every proof), `course_payment_proofs()` / `discipline_payment_proofs()` for course and discipline deletion,
-   and replaces `account_storage_objects()` to include the new bucket; deletes nothing; needs 0039, 0040 and 0042).
+   and replaces `account_storage_objects()` to include the new bucket; deletes nothing; needs 0039, 0040 and 0042),
+   `0048_new_material_notifications.sql` (ARU-102: Telegram message when a new Blog post or Knowledge base PDF is
+   shared; adds `telegram_links.notify_new_material` (default true), the kind `new_material` in
+   `set_telegram_notification()` (keeps 0044/0045/0046's kinds), `new_material_recipients()` and after-insert
+   triggers on `materials` and `material_files`, turns on `pg_net` if the server offers it; no policy changes,
+   deletes nothing; needs 0046. Works without the Vault secrets (it then sends nothing), see
+   [Telegram notifications](#telegram-notifications) → New materials).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
@@ -426,6 +432,38 @@ of this; a failed send is dropped, never retried.
 
 To change a Vault value later: `select vault.update_secret((select id from vault.secrets where name = 'homework_submitted_notify_secret'), '<new>');`.
 
+#### New materials (ARU-102)
+
+When a teacher or mentor shares a new **Blog** post or **Knowledge base** PDF, everyone who can see it in the app
+(every Approved account; for a course-only PDF only the teacher, the course's owner and its listeners), except its
+author, gets "New blog post from <author name>: <post title>" or "New file in the knowledge base from <author name>:
+<file name>" within seconds, if they connected Telegram and left **New materials** on (every role sees this switch).
+After-insert triggers on `materials` and `material_files` queue one `pg_net` POST `{"type": "blog" | "file", "id":
+"<id>"}` with `Authorization: Bearer <secret>` to the Edge Function `new-material-notifications`, which asks
+`new_material_recipients()` (service role only) who gets it at that moment and sends. Edits and deletions send
+nothing; an item deleted before the call is processed sends nothing. Publishing never fails because of this; a
+failed send is dropped, never retried.
+
+1. Dashboard → **Database → Extensions**: make sure **pg_net** is on.
+2. Run `supabase/migrations/0048_new_material_notifications.sql` (after 0046).
+3. Make a random secret (`openssl rand -hex 24`) and set it as the function's secret:
+   ```bash
+   npx supabase secrets set NEW_MATERIAL_NOTIFY_SECRET=<secret>
+   ```
+4. Deploy the function (the triggers send `Authorization: Bearer <secret>`, not a Supabase JWT):
+   ```bash
+   npx supabase functions deploy new-material-notifications --no-verify-jwt
+   ```
+5. Store the URL and the same secret in Vault (SQL Editor). Until both exist the triggers send nothing:
+   ```sql
+   select vault.create_secret('https://<project-ref>.supabase.co/functions/v1/new-material-notifications', 'new_material_notify_url');
+   select vault.create_secret('<secret>', 'new_material_notify_secret');
+   ```
+6. Check: share a Blog post, then `select status_code, content from net._http_response order by created desc limit 5;`
+   shows `200` with `{"recipients":…,"sent":…}`. A `401` means the two secrets differ.
+
+To change a Vault value later: `select vault.update_secret((select id from vault.secrets where name = 'new_material_notify_secret'), '<new>');`.
+
 ### Delete account (ARU-75)
 
 The Delete account screen calls the Edge Function `delete-account` with the user's access token and password. It
@@ -568,6 +606,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Get "New homework" Telegram messages (ARU-50) | courses they're in | courses they're in (not their own) |  |
 | Get "New account waiting for your approval" in Telegram (ARU-84; linked, **New accounts** on) |  |  | ✓ (every new sign-up) |
 | Get "New homework to check" in Telegram (ARU-89; linked, **Homework submitted** on) | never | courses they own | courses they own |
+| Get "New blog post" / "New file in the knowledge base" in Telegram (ARU-102; linked, **New materials** on) | items they can see, not their own | items they can see, not their own | items they can see, not their own |
 | Turn Accountant on / off for a mentor (ARU-65) | |         | ✓       |
 | Select / unselect paid courses |         | accountants (any course they can see) |  |
 | See paid courses, change their payment period | | accountants (all they can see) | ✓ (all) |

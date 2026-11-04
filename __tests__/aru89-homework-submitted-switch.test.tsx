@@ -33,6 +33,7 @@ describe('telegramSwitchesFor', () => {
       'homework_submitted',
       'chat_message',
       'general_chat',
+      'new_material',
       'new_account',
     ]);
   });
@@ -45,6 +46,7 @@ describe('telegramSwitchesFor', () => {
       'Homework submitted',
       'Chat messages',
       'General chat',
+      'New materials',
     ]);
   });
 
@@ -55,6 +57,7 @@ describe('telegramSwitchesFor', () => {
       'Homework reviewed',
       'Chat messages',
       'General chat',
+      'New materials',
     ]);
   });
 });
