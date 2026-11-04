@@ -15,12 +15,19 @@ type CardProps = {
    * element, so VoiceOver could not focus a nested button (ARU-27).
    */
   accessible?: boolean;
+  testID?: string;
 };
 
-export function Card({ children, onPress, style, accessible }: CardProps) {
-  if (!onPress) return <View style={[styles.card, style]}>{children}</View>;
+export function Card({ children, onPress, style, accessible, testID }: CardProps) {
+  if (!onPress)
+    return (
+      <View testID={testID} style={[styles.card, style]}>
+        {children}
+      </View>
+    );
   return (
     <Pressable
+      testID={testID}
       onPress={onPress}
       accessible={accessible}
       style={({ pressed }) => [styles.card, pressed && { opacity: 0.7 }, style]}>
