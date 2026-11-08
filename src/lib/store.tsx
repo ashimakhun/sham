@@ -7,7 +7,7 @@ import { periodProblem } from './billing';
 import { ACCOUNT_DELETED, DELETE_FAILED, DELETE_OFFLINE } from './deleteAccount';
 import { FEEDBACK_MAX } from './feedback';
 import { fileFieldsError, isAllowedPdf, PDF_MAX_BYTES, PDF_RULE } from './files';
-import { translate } from '@/i18n';
+import { phoneLanguage, translate } from '@/i18n';
 
 import { PHOTO_TOO_LARGE } from './compressPhoto';
 import { newId } from './id';
@@ -281,6 +281,8 @@ type ProfileRow = {
   access_status?: User['accessStatus'] | null;
   is_accountant?: boolean | null;
   language?: string | null;
+  /** ARU-110: the phone language the app last saved (0051); absent before that migration runs. */
+  device_language?: string | null;
 };
 type BillingRow = { course_id: string; start_day: number; end_day: number; selected_by: string | null; selected_at: string };
 type PaymentRow = { course_id: string; user_id: string; month: string; marked_by: string | null; marked_at: string };
@@ -776,6 +778,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // the own profile is missing, ask Auth whether the user still exists. If it was deleted (e.g. on another device),
   // sign out here and say so. Network and other errors change nothing.
   const verifiedFor = useRef<string | null>(null);
+  // ARU-110: the user whose phone language was last checked (once per sign-in).
+  const deviceLanguageFor = useRef<string | null>(null);
   const verifyUser = useCallback(async (): Promise<boolean> => {
     try {
       const { data, error } = await supabase.auth.getUser();
@@ -889,6 +893,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       ]);
       const all = rows<ProfileRow>(profileRows).map(toUser);
       const me = all.find((u) => u.id === userId);
+      // ARU-110 AC 2: once per sign-in (app start), save the phone language for Telegram messages of a user who never
+      // chose one. Only once 0051 has added the column; never blocks or shows an error (retried on the next start).
+      const myRow = rows<ProfileRow>(profileRows).find((r) => r.id === userId);
+      if (myRow && deviceLanguageFor.current !== userId) {
+        deviceLanguageFor.current = userId;
+        const phone = phoneLanguage();
+        if ('device_language' in myRow && myRow.language == null && myRow.device_language !== phone) {
+          Promise.resolve(supabase.from('profiles').update({ device_language: phone }).eq('id', userId)).catch(() => {});
+        }
+      }
       // ARU-75 AC 9: once per sign-in (app start), and whenever the own profile is missing (the account may have been
       // deleted on another device), check the user with the server.
       if (!me || verifiedFor.current !== userId) {

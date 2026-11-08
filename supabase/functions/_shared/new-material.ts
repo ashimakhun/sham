@@ -5,7 +5,8 @@
 // name>: <post title>" or "New file in the knowledge base from <author name>: <file name>" through the ARU-48 helper
 // in one call, with kind new_material. Nothing is retried. No Deno-only imports, so Jest can test it.
 
-import type { SendResult, TelegramMessage } from './telegram.ts';
+import { localizedMessage, type SendResult, type TelegramMessage } from './telegram.ts';
+import { telegramText, telegramTexts } from './telegram-texts.ts';
 import { timingSafeEqual } from './telegram-bot.ts';
 
 export type NewMaterialType = 'blog' | 'file';
@@ -27,18 +28,18 @@ export type NewMaterialReport = { recipients: number } & SendResult;
 /** The message text, exactly as the story sets it (plain text: names and titles as typed; never the body, link,
  *  description or the PDF). */
 export function newMaterialText(type: NewMaterialType, authorName: string, title: string) {
-  return type === 'blog'
-    ? `New blog post from ${authorName}: ${title}`
-    : `New file in the knowledge base from ${authorName}: ${title}`;
+  return telegramText('en', type === 'blog' ? 'newBlogPost' : 'newKnowledgeFile', { name: authorName, title });
 }
 
 /** One message per recipient row. */
 export function newMaterialMessages(type: NewMaterialType, rows: NewMaterialRecipient[]): TelegramMessage[] {
-  return rows.map((r) => ({
-    userId: r.user_id,
-    kind: 'new_material' as const,
-    text: newMaterialText(type, r.author_name, r.item_title),
-  }));
+  return rows.map((r) =>
+    localizedMessage(
+      r.user_id,
+      'new_material',
+      telegramTexts(type === 'blog' ? 'newBlogPost' : 'newKnowledgeFile', { name: r.author_name, title: r.item_title }),
+    ),
+  );
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

@@ -3,7 +3,8 @@
 // new_homework_recipients() for the course's current Approved listeners and sends each one
 // "New homework assigned to you in <course title>" through the ARU-48 helper. No Deno-only imports, so Jest can test it.
 
-import type { SendResult, TelegramMessage } from './telegram.ts';
+import { localizedMessage, type SendResult, type TelegramMessage } from './telegram.ts';
+import { telegramText, telegramTexts } from './telegram-texts.ts';
 import { timingSafeEqual } from './telegram-bot.ts';
 
 /** One row of new_homework_recipients(). */
@@ -24,12 +25,12 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** The message text, exactly as the product owner set it (plain text: the title is shown as typed). */
 export function newHomeworkText(courseTitle: string) {
-  return `New homework assigned to you in ${courseTitle}`;
+  return telegramText('en', 'newHomework', { course: courseTitle });
 }
 
 /** One message per recipient (AC 1, AC 8). */
 export function newHomeworkMessages(recipients: NewHomeworkRecipient[]): TelegramMessage[] {
-  return recipients.map((r) => ({ userId: r.user_id, kind: 'new_homework' as const, text: newHomeworkText(r.course_title) }));
+  return recipients.map((r) => localizedMessage(r.user_id, 'new_homework', telegramTexts('newHomework', { course: r.course_title })));
 }
 
 const json = (body: unknown, status = 200) =>
