@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { PHOTO_ERROR, photoFileName } from '@/lib/photo';
+import { useI18n } from '@/i18n/context';
+import { photoFileName } from '@/lib/photo';
 import { useStore } from '@/lib/store';
 
 type UrlLoader = (path: string, options?: { expiresIn?: number; download?: string }) => Promise<string>;
@@ -33,6 +34,7 @@ type Props = {
 /** Full-screen photo with Download (ARU-18; ARU-99 for payment proofs). Close with ✕, Android back or Esc on web. */
 export function PhotoPreview({ path, homeworkId, title, loadUrl, fileName, errorText, onClose }: Props) {
   const { getPhotoUrl: homeworkUrl } = useStore();
+  const { t } = useI18n();
   const getPhotoUrl: UrlLoader = loadUrl ?? homeworkUrl;
   const downloadName = fileName ?? photoFileName(title ?? '', homeworkId ?? '');
   const insets = useSafeAreaInsets();
@@ -81,13 +83,13 @@ export function PhotoPreview({ path, homeworkId, title, loadUrl, fileName, error
     <Modal visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View testID="photo-preview" style={[s.backdrop, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <View style={s.bar}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} hitSlop={12} style={s.close}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('homework.photoClose')} onPress={onClose} hitSlop={12} style={s.close}>
             <Text style={s.closeText}>✕</Text>
           </Pressable>
         </View>
         <View style={s.body}>
           {failed ? (
-            <Text style={s.error}>{errorText ?? PHOTO_ERROR}</Text>
+            <Text style={s.error}>{errorText ?? t('photo.loadError')}</Text>
           ) : (
             <>
               {url && (
@@ -107,12 +109,12 @@ export function PhotoPreview({ path, homeworkId, title, loadUrl, fileName, error
         <View style={s.bar}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Download"
+            accessibilityLabel={t('homework.photoDownload')}
             accessibilityState={{ disabled: downloading }}
             disabled={downloading}
             onPress={download}
             style={({ pressed }) => [s.download, (pressed || downloading) && { opacity: 0.6 }]}>
-            <Text style={s.downloadText}>{downloading ? 'Preparing…' : 'Download'}</Text>
+            <Text style={s.downloadText}>{downloading ? t('homework.photoPreparing') : t('homework.photoDownload')}</Text>
           </Pressable>
         </View>
       </View>

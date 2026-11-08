@@ -5,6 +5,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { DisciplineLabel } from '@/components/Disciplines';
 import { Card, HiddenBadge, OwnerLine, UnreadBadge, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { paymentDueText } from '@/lib/billing';
 import { feedbackFor, ratingSummary, ratingSummaryLabel } from '@/lib/feedback';
 import { inCourseChat, seesOnlyCourseSummary } from '@/lib/roles';
@@ -29,6 +30,7 @@ const TAP_GUARD_MS = 800;
 
 export function CourseCard({ course, tag, onOpen, paymentDue }: Props) {
   const { getUser, currentUser, courseMembers, unreadCount, courseFeedback } = useStore();
+  const { t, lang } = useI18n();
   // A student who is not a listener sees only the title and description (ARU-24).
   const summaryOnly = seesOnlyCourseSummary(currentUser, course, courseMembers);
   // The chat icon shows only to people in the course chat; it follows live store updates (ARU-25).
@@ -37,7 +39,7 @@ export function CourseCard({ course, tag, onOpen, paymentDue }: Props) {
   const unread = showChat ? unreadCount(course.id) : 0;
   // Average rating and count (ARU-53); nothing when the course has no feedback.
   const feedback = feedbackFor(courseFeedback, course.id);
-  const rating = ratingSummary(feedback);
+  const rating = ratingSummary(feedback, lang);
   const lastTap = useRef(0);
 
   const open = (pathname: '/courses/[id]' | '/courses/[id]/chat') => {
@@ -77,17 +79,17 @@ export function CourseCard({ course, tag, onOpen, paymentDue }: Props) {
         </Text>
       ) : null}
       {!summaryOnly && (
-        <OwnerLine name={getUser(course.createdById)?.name ?? 'Unknown'} date={formatDate(course.createdAt)} />
+        <OwnerLine name={getUser(course.createdById)?.name ?? t('common.unknown')} date={formatDate(course.createdAt)} />
       )}
       {rating ? (
-        <Text style={styles.muted} accessibilityLabel={ratingSummaryLabel(feedback)}>
+        <Text style={styles.muted} accessibilityLabel={ratingSummaryLabel(feedback, lang)}>
           {rating}
         </Text>
       ) : null}
       {/* ARU-66 AC 7: read with the card's other text by screen readers. */}
       {paymentDue ? (
         <Text testID={`payment-due-${course.id}`} style={{ color: colors.danger, fontSize: 14, fontWeight: '600' }}>
-          {paymentDueText(paymentDue)}
+          {paymentDueText(paymentDue, lang)}
         </Text>
       ) : null}
     </>
@@ -120,7 +122,7 @@ export function CourseCard({ course, tag, onOpen, paymentDue }: Props) {
       <Pressable
         accessibilityRole="button"
         // The count is only in the icon's label, never the content's (ARU-34): unchanged at 0 (ARU-31 AC 11).
-        accessibilityLabel={withUnreadLabel(`Open chat for ${course.title}`, unread)}
+        accessibilityLabel={withUnreadLabel(t('courses.openChat', { title: course.title }), unread, lang)}
         onPress={() => open('/courses/[id]/chat')}
         hitSlop={4}
         style={({ pressed }) => ({

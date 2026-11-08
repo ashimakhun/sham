@@ -563,8 +563,15 @@ All texts live in one catalog: `src/i18n/en.json` and `src/i18n/ru.json` (the sa
 `formatDate` / `formatWeekdayDate` / `formatDateTime` from the same hook, in the chosen language. `npm test` fails when
 an ID is missing from one file, a Russian text or a note is empty, or the `{placeholders}` differ.
 Moved to the catalog so far (part 1): sign-in and create account, Reset and Change password, the waiting / declined
-screens, the tab bar and the Profile tab. The other screens are still English (ARU-109, ARU-113); Telegram messages
+screens, the tab bar and the Profile tab; (part 2, ARU-109) the Homework and Courses tabs, homework, course, listener,
+feedback, meeting and discipline screens. The remaining screens are still English (ARU-113); Telegram messages
 (ARU-110) and database errors (ARU-111) come later.
+
+Shared pieces follow the chosen language too: `ErrorText` shows an app message the catalog knows in that language and
+any other text (a database error) as it came (`translateKnown`, with the app's messages listed in `APP_MESSAGE_IDS` in
+`src/i18n/index.ts`); `formatDate` / `formatDateTime` in `src/lib/theme.ts`, the shared confirmation's Cancel and the
+"Deleted account" fallback read the current language (`currentLanguage()`, set by `LanguageProvider`). Shared
+components import the hook from `src/i18n/context.tsx`, which doesn't load the store.
 
 ## Project structure
 

@@ -35,24 +35,30 @@ function AppStack() {
           }}>
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="homework/new" options={{ title: 'Add homework', presentation: 'modal' }} />
-          <Stack.Screen name="homework/[id]" options={{ title: 'Homework' }} />
-          <Stack.Screen name="homework/photos" options={{ title: 'Download by course', presentation: 'modal' }} />
-          <Stack.Screen name="courses/new" options={{ title: 'New course', presentation: 'modal' }} />
-          <Stack.Screen name="courses/[id]" options={{ title: 'Course' }} />
+          <Stack.Screen name="homework/new" options={{ title: t('homework.addTitle'), presentation: 'modal' }} />
+          <Stack.Screen name="homework/[id]" options={{ title: t('homework.detailTitle') }} />
+          <Stack.Screen name="homework/photos" options={{ title: t('homework.photosByCourseTitle'), presentation: 'modal' }} />
+          <Stack.Screen name="courses/new" options={{ title: t('courses.newTitle'), presentation: 'modal' }} />
+          <Stack.Screen name="courses/[id]" options={{ title: t('courses.detailTitle') }} />
           <Stack.Screen name="courses/[id]/chat" options={{ title: 'Chat' }} />
-          <Stack.Screen name="courses/[id]/edit" options={{ title: 'Edit course', presentation: 'modal' }} />
-          <Stack.Screen name="courses/[id]/owner" options={{ title: 'Change owner', presentation: 'modal' }} />
-          <Stack.Screen name="courses/[id]/feedback" options={{ title: 'Feedback', presentation: 'modal' }} />
-          <Stack.Screen name="courses/[id]/members" options={{ title: 'Listeners' }} />
+          <Stack.Screen name="courses/[id]/edit" options={{ title: t('courses.editTitle'), presentation: 'modal' }} />
+          <Stack.Screen name="courses/[id]/owner" options={{ title: t('courses.changeOwner'), presentation: 'modal' }} />
+          <Stack.Screen name="courses/[id]/feedback" options={{ title: t('feedback.title'), presentation: 'modal' }} />
+          <Stack.Screen name="courses/[id]/members" options={{ title: t('listeners.title') }} />
           <Stack.Screen name="courses/[id]/pay" options={{ title: 'Pay', presentation: 'modal' }} />
-          <Stack.Screen name="courses/[id]/listeners" options={{ title: 'Add listeners', presentation: 'modal' }} />
-          <Stack.Screen name="courses/[id]/meetings/new" options={{ title: 'Schedule meeting', presentation: 'modal' }} />
-          <Stack.Screen name="courses/[id]/meetings/[meetingId]" options={{ title: 'Edit meeting', presentation: 'modal' }} />
-          <Stack.Screen name="courses/[id]/meetings/[meetingId]/notes" options={{ title: 'Notes' }} />
+          <Stack.Screen name="courses/[id]/listeners" options={{ title: t('listeners.addTitle'), presentation: 'modal' }} />
+          <Stack.Screen
+            name="courses/[id]/meetings/new"
+            options={{ title: t('meetings.scheduleTitle'), presentation: 'modal' }}
+          />
+          <Stack.Screen
+            name="courses/[id]/meetings/[meetingId]"
+            options={{ title: t('meetings.editTitle'), presentation: 'modal' }}
+          />
+          <Stack.Screen name="courses/[id]/meetings/[meetingId]/notes" options={{ title: t('notes.title') }} />
           <Stack.Screen
             name="courses/[id]/meetings/[meetingId]/assign-homework"
-            options={{ title: 'Assign homework', presentation: 'modal' }}
+            options={{ title: t('meetings.assignHomework'), presentation: 'modal' }}
           />
           <Stack.Screen name="materials/new" options={{ title: 'New material', presentation: 'modal' }} />
           <Stack.Screen name="materials/[id]" options={{ title: 'Material' }} />
@@ -68,8 +74,8 @@ function AppStack() {
           <Stack.Screen name="telegram" options={{ title: 'Telegram notifications' }} />
           <Stack.Screen name="change-password" options={{ title: t('changePassword.title'), presentation: 'modal' }} />
           <Stack.Screen name="reset-password" options={{ title: t('reset.title') }} />
-          <Stack.Screen name="disciplines/new" options={{ title: 'New discipline', presentation: 'modal' }} />
-          <Stack.Screen name="disciplines/[id]" options={{ title: 'Discipline' }} />
+          <Stack.Screen name="disciplines/new" options={{ title: t('disciplines.newTitle'), presentation: 'modal' }} />
+          <Stack.Screen name="disciplines/[id]" options={{ title: t('disciplines.detailTitle') }} />
         </Stack>
       </AccessGate>
     </>

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Redirect, Tabs } from 'expo-router';
 
-import { useI18n } from '@/i18n/LanguageProvider';
+import { useI18n } from '@/i18n/context';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 

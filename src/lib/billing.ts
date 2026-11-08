@@ -1,3 +1,5 @@
+import { currentLanguage, type Language, translate } from '@/i18n';
+
 import { formatDate } from './theme';
 import type { Course, CourseBilling, CourseMember, CoursePayment, PaymentExemption, PaymentRequest, User } from './types';
 
@@ -56,9 +58,9 @@ export function formatDay(day: string) {
   return formatDate(new Date(y, m - 1, d).toISOString());
 }
 
-/** "Payment due by 5 Nov 2026" (AC 7). */
-export function paymentDueText(deadline: string) {
-  return `Payment due by ${formatDay(deadline)}`;
+/** "Payment due by 5 Nov 2026" (AC 7), in the app's language (ARU-109: shown on the Courses tab's card). */
+export function paymentDueText(deadline: string, lang: Language = currentLanguage()) {
+  return translate(lang, 'courses.paymentDueBy', { date: formatDay(deadline) });
 }
 
 export type PaymentStatus = { kind: 'exempt' } | { kind: 'paid'; payment: CoursePayment } | { kind: 'unpaid' };

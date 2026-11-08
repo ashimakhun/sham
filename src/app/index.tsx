@@ -4,7 +4,7 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Text, Vi
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, ErrorText, Field, Segmented, styles } from '@/components/ui';
-import { useI18n } from '@/i18n/LanguageProvider';
+import { useI18n } from '@/i18n/context';
 import { PASSWORD_MIN } from '@/lib/password';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
