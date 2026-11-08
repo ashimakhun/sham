@@ -1,5 +1,6 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { ActivityIndicator, SectionList, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, SectionList, Switch, Text, TextInput, View } from 'react-native';
 
 import { Button, EmptyState, ErrorText, RoleBadge, styles } from '@/components/ui';
 import { confirmDestructive } from '@/lib/confirm';
@@ -15,7 +16,21 @@ const SECTIONS: { role: Role; title: string }[] = [
   { role: 'student', title: 'Students' },
 ];
 
-type Row = { kind: 'user'; user: User } | { kind: 'request'; request: AccessRequest };
+// ARU-114: request icons sit in 36 pt circles 8 pt apart; hit slop 4 makes each touch area 44×44 pt, and
+// 4 + 4 = the 8 pt gap, so the two touch areas meet but never overlap.
+const ICON_SIZE = 36;
+const ICON_GAP = 8;
+const ICON_HIT_SLOP = 4;
+const DANGER_SOFT = '#FEF2F2'; // as the danger Button's background
+const iconCircle = {
+  width: ICON_SIZE,
+  height: ICON_SIZE,
+  borderRadius: ICON_SIZE / 2,
+  alignItems: 'center',
+  justifyContent: 'center',
+} as const;
+
+type Row ={ kind: 'user'; user: User } | { kind: 'request'; request: AccessRequest };
 
 /**
  * The teacher accepts or declines new accounts (ARU-43: Requests first, Declined last) and switches users between
@@ -153,13 +168,61 @@ export default function RolesScreen() {
                   {r.email}
                 </Text>
                 <Text style={styles.muted}>Signed up {formatDate(r.createdAt)}</Text>
-              </View>
-              <View style={{ gap: 6 }}>
-                <Button title="Accept" disabled={busy} onPress={() => accept(r)} />
-                {r.status === 'pending' && (
-                  <Button title="Reject" variant="danger" disabled={busy} onPress={() => decline(r)} />
+                {r.status === 'rejected' && (
+                  <View style={[styles.badge, { backgroundColor: DANGER_SOFT, alignSelf: 'flex-start' }]}>
+                    <Text style={[styles.badgeText, { color: colors.danger }]}>Declined</Text>
+                  </View>
                 )}
               </View>
+              {/* ARU-114: icons instead of text buttons; disabled for every row while any action runs. */}
+              {r.status === 'pending' ? (
+                <View style={{ flexDirection: 'row', gap: ICON_GAP }}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Accept ${r.name}`}
+                    accessibilityState={{ disabled: busy }}
+                    disabled={busy}
+                    hitSlop={ICON_HIT_SLOP}
+                    testID={`accept-request-${r.id}`}
+                    style={[iconCircle, { backgroundColor: colors.successSoft, opacity: busy ? 0.4 : 1 }]}
+                    onPress={() => accept(r)}>
+                    <Ionicons name="checkmark" size={20} color={colors.success} />
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Reject ${r.name}`}
+                    accessibilityState={{ disabled: busy }}
+                    disabled={busy}
+                    hitSlop={ICON_HIT_SLOP}
+                    testID={`reject-request-${r.id}`}
+                    style={[iconCircle, { backgroundColor: DANGER_SOFT, opacity: busy ? 0.4 : 1 }]}
+                    onPress={() => decline(r)}>
+                    <Ionicons name="close" size={20} color={colors.danger} />
+                  </Pressable>
+                </View>
+              ) : (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Accept ${r.name}`}
+                  accessibilityState={{ disabled: busy }}
+                  disabled={busy}
+                  hitSlop={6}
+                  testID={`accept-request-${r.id}`}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                    minHeight: 32,
+                    paddingHorizontal: 12,
+                    borderRadius: 16,
+                    backgroundColor: colors.successSoft,
+                    opacity: busy ? 0.4 : 1,
+                  }}
+                  onPress={() => accept(r)}>
+                  <Ionicons name="checkmark" size={16} color={colors.success} />
+                  <Text style={{ color: colors.success, fontSize: 14, fontWeight: '600' }}>Accept</Text>
+                </Pressable>
+              )}
             </View>
           );
         }

@@ -113,7 +113,7 @@ describe('Requests on Manage roles (AC 5–7)', () => {
     const store = fakeStore('T', { accessRequests: requests });
     setStore(store);
     await render(<RolesScreen />);
-    await fireEvent.press(screen.getAllByRole('button', { name: 'Accept' })[0]);
+    await fireEvent.press(screen.getByRole('button', { name: 'Accept Pending Pat' }));
     expect(store.setAccessStatus).toHaveBeenCalledWith('P', 'approved');
   });
 
@@ -122,7 +122,7 @@ describe('Requests on Manage roles (AC 5–7)', () => {
     setStore(store);
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     await render(<RolesScreen />);
-    await fireEvent.press(screen.getAllByRole('button', { name: 'Reject' })[1]);
+    await fireEvent.press(screen.getByRole('button', { name: 'Reject Pending Quinn' }));
     expect(alert).toHaveBeenCalledWith(
       'Reject request',
       "Reject Pending Quinn? They won't be able to use Sham.",
@@ -139,15 +139,15 @@ describe('Requests on Manage roles (AC 5–7)', () => {
     const store = fakeStore('T', { accessRequests: [requests[2]] });
     setStore(store);
     await render(<RolesScreen />);
-    expect(screen.queryByRole('button', { name: 'Reject' })).toBeNull();
-    await fireEvent.press(screen.getByRole('button', { name: 'Accept' }));
+    expect(screen.queryByRole('button', { name: /^Reject/ })).toBeNull();
+    await fireEvent.press(screen.getByRole('button', { name: 'Accept Rejected Rae' }));
     expect(store.setAccessStatus).toHaveBeenCalledWith('R', 'approved');
   });
 
   it('a failed accept shows the error', async () => {
     setStore(fakeStore('T', { accessRequests: requests, setAccessStatus: jest.fn().mockRejectedValue(new Error('Network request failed')) }));
     await render(<RolesScreen />);
-    await fireEvent.press(screen.getAllByRole('button', { name: 'Accept' })[0]);
+    await fireEvent.press(screen.getByRole('button', { name: 'Accept Pending Pat' }));
     expect(screen.getByText('Network request failed')).toBeTruthy();
   });
 
