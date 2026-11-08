@@ -34,8 +34,16 @@ export function isDueToday(assignment: Pick<HomeworkAssignment, 'dueAt'>, now: n
   );
 }
 
-/** The thin red border of a card that needs attention today, as on the "Payment due" course card (ARU-66). */
-const dueTodayBorder = { borderWidth: 1, borderColor: colors.danger };
+/**
+ * Whether a New-list card gets the thin red border: due on `now`'s local day (ARU-95), or overdue from an earlier day
+ * until the homework is sent (ARU-121). No deadline or a later day: no border.
+ */
+export function needsAttention(assignment: Pick<HomeworkAssignment, 'dueAt'>, now: number) {
+  return isDueToday(assignment, now) || isOverdue(assignment, now);
+}
+
+/** The thin red border of a card that needs attention, as on the "Payment due" course card (ARU-66). */
+const attentionBorder = { borderWidth: 1, borderColor: colors.danger };
 
 export function OverdueBadge() {
   const { t } = useI18n();
@@ -52,10 +60,11 @@ export function AssignmentCard({ item, now }: { item: HomeworkAssignment; now: n
   const { t, lang } = useI18n();
   const meeting = meetings.find((m) => m.id === item.meetingId);
   const dueToday = isDueToday(item, now);
+  const highlight = needsAttention(item, now);
+  // One flag drives both the border and the testID: "due-today" for today's cards, "overdue" for earlier days.
+  const testID = highlight ? `assignment-${dueToday ? 'due-today' : 'overdue'}-${item.id}` : undefined;
   return (
-    <Card
-      testID={dueToday ? `assignment-due-today-${item.id}` : undefined}
-      style={dueToday ? dueTodayBorder : undefined}>
+    <Card testID={testID} style={highlight ? attentionBorder : undefined}>
       <View style={[styles.row, { alignItems: 'flex-start' }]}>
         <Text style={[styles.title, { flex: 1 }]} numberOfLines={2}>
           {item.title}
