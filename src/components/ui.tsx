@@ -135,7 +135,7 @@ export function StatusBadge({ status }: { status: HomeworkStatus }) {
   );
 }
 
-/** `label` overrides the English role name (ARU-108: Profile passes the translated one). */
+/** The role in the app's language (ARU-109: role badges on Listeners, Change owner and attendance); `label` overrides it. */
 export function RoleBadge({ role, label }: { role: Role; label?: string }) {
   const { t } = useI18n();
   return (
