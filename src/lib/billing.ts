@@ -14,9 +14,9 @@ export function canSeeBilling(user: User | null | undefined) {
 }
 
 /** "Pays 1–5 of each month" (one day: "Pays 5 of each month"). */
-export function periodText(b: Pick<CourseBilling, 'startDay' | 'endDay'>) {
+export function periodText(b: Pick<CourseBilling, 'startDay' | 'endDay'>, lang: Language = currentLanguage()) {
   const days = b.startDay === b.endDay ? `${b.startDay}` : `${b.startDay}–${b.endDay}`;
-  return `Pays ${days} of each month`;
+  return translate(lang, 'billing.period', { days });
 }
 
 export const DEFAULT_PERIOD = { startDay: 1, endDay: 5 };
@@ -82,7 +82,7 @@ export function paymentStatus(
 export function listenersOf(courseId: string, members: CourseMember[], getUser: (id: string) => User | undefined) {
   return members
     .filter((m) => m.courseId === courseId)
-    .map((m) => ({ id: m.userId, name: getUser(m.userId)?.name ?? 'Unknown' }))
+    .map((m) => ({ id: m.userId, name: getUser(m.userId)?.name ?? translate(currentLanguage(), 'common.unknown') }))
     .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
 }
 

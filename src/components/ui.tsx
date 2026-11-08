@@ -3,7 +3,7 @@ import type { ComponentProps, ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
 
 import { useI18n } from '@/i18n/context';
-import { colors, roleColor, roleLabel } from '@/lib/theme';
+import { colors, roleColor } from '@/lib/theme';
 import type { HomeworkStatus, Role } from '@/lib/types';
 import { formatUnread, withUnreadLabel } from '@/lib/unread';
 
@@ -137,9 +137,10 @@ export function StatusBadge({ status }: { status: HomeworkStatus }) {
 
 /** `label` overrides the English role name (ARU-108: Profile passes the translated one). */
 export function RoleBadge({ role, label }: { role: Role; label?: string }) {
+  const { t } = useI18n();
   return (
     <View style={[styles.badge, { backgroundColor: roleColor[role] + '1A' }]}>
-      <Text style={[styles.badgeText, { color: roleColor[role] }]}>{label ?? roleLabel[role]}</Text>
+      <Text style={[styles.badgeText, { color: roleColor[role] }]}>{label ?? t(`role.${role}`)}</Text>
     </View>
   );
 }
