@@ -9,6 +9,7 @@ import { FEEDBACK_MAX } from './feedback';
 import { fileFieldsError, isAllowedPdf, PDF_MAX_BYTES, PDF_RULE } from './files';
 import { PHOTO_TOO_LARGE } from './compressPhoto';
 import { newId } from './id';
+import { PHOTOS_ZIP_ERROR } from './photoRetention';
 import { isAllowedProof, PROOF_MAX_BYTES, PROOF_RULE, proofFormat } from './paymentProof';
 import { NOTES_MAX } from './markdown';
 import {
@@ -211,6 +212,12 @@ export type Store = {
   setTelegramNotification: (kind: TelegramKind, enabled: boolean) => Promise<void>;
   /** Removes the Telegram link and its switches. */
   disconnectTelegram: () => Promise<void>;
+  /** ARU-107 AC 2: the app-wide deletion start date (YYYY-MM-DD, UTC), or null until ARU-112's daily job first runs.
+   *  While null, no homework photo has a deletion date. */
+  photoDeletionStart: string | null;
+  /** ARU-107 AC 5–6: a one-time link (60 s) to a ZIP of the signed-in user's own stored homework photos: all of them,
+   *  or one course's part of at most 50. Throws PHOTOS_ZIP_ERROR when no link can be made. */
+  requestPhotoZip: (input?: { courseId?: string; part?: number }) => Promise<string>;
   /** ARU-65: paid courses with their periods. Only loaded for accountants and the teacher (empty for everyone else). */
   courseBilling: CourseBilling[];
   /** Teacher only (ARU-65): turn Accountant on or off for an approved mentor. Takes effect on their next refresh. */
@@ -750,6 +757,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [courseFeedback, setCourseFeedback] = useState<CourseFeedback[]>([]);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
   const [courseBilling, setCourseBilling] = useState<CourseBilling[]>([]);
+  const [photoDeletionStart, setPhotoDeletionStart] = useState<string | null>(null);
   const [coursePayments, setCoursePayments] = useState<CoursePayment[]>([]);
   const [paymentExemptions, setPaymentExemptions] = useState<PaymentExemption[]>([]);
   const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([]);
@@ -821,6 +829,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setMaterialLikes([]);
         setCourseFeedback([]);
         setCourseBilling([]);
+        setPhotoDeletionStart(null);
         setCoursePayments([]);
         setPaymentExemptions([]);
         setUnread({});
@@ -900,6 +909,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // Before 0031_disciplines.sql runs there is no table: no disciplines, and the rest of the app keeps working.
       setDisciplines(discs.error ? [] : ((discs.data as DisciplineRow[] | null) ?? []).map(toDiscipline));
       if (me?.accessStatus !== 'approved') {
+        setPhotoDeletionStart(null);
         setAccessRequests([]);
         setUnread({});
         setGeneralUnread(0);
@@ -909,6 +919,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setPaymentRequests([]);
         return;
       }
+      // ARU-107 AC 2: the deletion start date. Before 0050 runs there is no table: no date, so no deletion dates.
+      const settings = await supabase.from('app_settings').select('photo_deletion_start');
+      setPhotoDeletionStart(
+        settings.error ? null : ((settings.data as { photo_deletion_start: string | null }[] | null)?.[0]?.photo_deletion_start ?? null),
+      );
       // ARU-65: paid courses, only for those who may read them (students and other mentors make no request).
       // ARU-66: the same people read Paid marks and exemptions (RLS: current listeners of paid courses only).
       if (seesBilling(me)) {
@@ -1337,7 +1352,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           .update({
             status: 'checked',
             checked_by: mentor.id,
-            checked_at: new Date().toISOString(),
+            // checked_at is set by the server (ARU-107 AC 1, migration 0050).
             mentor_comment: comment.trim() || null,
           })
           .eq('id', id),
@@ -1697,6 +1712,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return () => {
         supabase.removeChannel(channel);
       };
+    },
+    photoDeletionStart,
+    requestPhotoZip: async (input = {}) => {
+      // The function checks the caller's token itself and only ever links the caller's own photos (ARU-107 AC 7).
+      let url: unknown;
+      try {
+        const { data, error } = await supabase.functions.invoke('homework-photos-zip', { body: input });
+        if (error) throw error;
+        url = (data as { url?: unknown } | null)?.url;
+      } catch {
+        throw new Error(PHOTOS_ZIP_ERROR);
+      }
+      if (typeof url !== 'string' || !url) throw new Error(PHOTOS_ZIP_ERROR);
+      return url;
     },
     courseBilling,
     setAccountant: async (userId, on) => {
