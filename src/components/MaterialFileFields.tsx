@@ -1,6 +1,7 @@
 import { Pressable, Text, View } from 'react-native';
 
 import { Field, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 
@@ -15,21 +16,26 @@ type Props = {
   onCourseOnly: (v: boolean) => void;
 };
 
-export const VISIBILITY_HINT = 'People in the course are its owner and listeners. The teacher always sees it.';
-
 /**
  * Name, Description (optional), Course (optional) and, once a course is picked, Who can see it (ARU-42) of a
  * Knowledge base PDF (ARU-30): upload and edit screens.
  */
 export function MaterialFileFields(props: Props) {
   const { name, onName, description, onDescription, courseId, onCourse, courseOnly, onCourseOnly } = props;
+  const { t } = useI18n();
   return (
     <>
-      <Field label="Name" accessibilityLabel="Name" placeholder="e.g. Algebra workbook" value={name} onChangeText={onName} />
       <Field
-        label="Description (optional)"
-        accessibilityLabel="Description (optional)"
-        placeholder="What is in it, which chapters to read…"
+        label={t('files.nameLabel')}
+        accessibilityLabel={t('files.nameLabel')}
+        placeholder={t('files.namePlaceholder')}
+        value={name}
+        onChangeText={onName}
+      />
+      <Field
+        label={t('files.descriptionLabel')}
+        accessibilityLabel={t('files.descriptionLabel')}
+        placeholder={t('files.descriptionPlaceholder')}
         value={description}
         onChangeText={onDescription}
         multiline
@@ -38,11 +44,11 @@ export function MaterialFileFields(props: Props) {
       {/* Only with a course: "No course" is always Everyone (the store saves it so). */}
       {courseId !== undefined && (
         <RadioGroup
-          label="Who can see it"
-          hint={VISIBILITY_HINT}
+          label={t('files.visibilityLabel')}
+          hint={t('files.visibilityHint')}
           options={[
-            { value: 'everyone', label: 'Everyone' },
-            { value: 'course', label: 'Only people in the course' },
+            { value: 'everyone', label: t('files.visibilityEveryone') },
+            { value: 'course', label: t('files.visibilityCourse') },
           ]}
           value={courseOnly ? 'course' : 'everyone'}
           onChange={(v) => onCourseOnly(v === 'course')}
@@ -61,10 +67,11 @@ const CURRENT = '__current__';
  */
 export function CoursePicker({ value, onChange }: { value: string | undefined; onChange: (id: string | undefined) => void }) {
   const { courses } = useStore();
+  const { t } = useI18n();
   const listed = value === undefined || courses.some((c) => c.id === value);
   const options = [
-    { value: NONE, label: 'No course' },
-    ...(listed ? [] : [{ value: CURRENT, label: 'Current course' }]),
+    { value: NONE, label: t('files.noCourse') },
+    ...(listed ? [] : [{ value: CURRENT, label: t('files.currentCourse') }]),
     ...[...courses]
       .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }) || a.id.localeCompare(b.id))
       .map((c) => ({ value: c.id, label: c.title })),
@@ -72,7 +79,7 @@ export function CoursePicker({ value, onChange }: { value: string | undefined; o
   const selected = value === undefined ? NONE : listed ? value : CURRENT;
   return (
     <RadioGroup
-      label="Course (optional)"
+      label={t('files.courseLabel')}
       options={options}
       value={selected}
       onChange={(v) => {

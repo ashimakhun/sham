@@ -1,5 +1,6 @@
 // ARU-95: on the Homework tab's New list, an assignment due on today's local date gets a thin red border
-// (the ARU-66 "Payment due" style). Earlier days, later days and "No deadline" keep the normal border.
+// (the ARU-66 "Payment due" style). Later days and "No deadline" keep the normal border. Since ARU-121, overdue
+// cards from earlier days keep the border too (see aru121-overdue-border.test.tsx).
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
@@ -95,15 +96,22 @@ describe.each(['S1', 'M2'] as const)('New list for %s', (who) => {
     expect(screen.getAllByText('Overdue').length).toBe(3); // passed, midnight, yesterday
   });
 
-  it('AC3/AC4/AC5: tomorrow, yesterday and no deadline keep the normal border', async () => {
+  it('AC3/AC5: tomorrow and no deadline keep the normal border', async () => {
     await open();
-    for (const id of ['tomorrow', 'yesterday', 'none']) {
+    for (const id of ['tomorrow', 'none']) {
       expect(isRed(id)).toBe(false);
       expect(screen.queryByTestId(`assignment-due-today-${id}`)).toBeNull();
     }
   });
 
-  it('AC6: after midnight the border moves to the new day on the next tick', async () => {
+  it('AC4 (changed by ARU-121): yesterday keeps the red border as overdue, not as due today', async () => {
+    await open();
+    expect(isRed('yesterday')).toBe(true);
+    expect(screen.queryByTestId('assignment-due-today-yesterday')).toBeNull();
+    expect(screen.getByTestId('assignment-overdue-yesterday')).toBeTruthy();
+  });
+
+  it("AC6 (changed by ARU-121): after midnight the new day gets the border and yesterday's cards keep it", async () => {
     await open();
     expect(isRed('tomorrow')).toBe(false);
     await act(async () => {
@@ -111,7 +119,11 @@ describe.each(['S1', 'M2'] as const)('New list for %s', (who) => {
       jest.advanceTimersByTime(30_000);
     });
     expect(isRed('tomorrow')).toBe(true);
-    expect(isRed('later')).toBe(false);
+    expect(screen.getByTestId('assignment-due-today-tomorrow')).toBeTruthy();
+    // 'later' was due yesterday 20:00: now it's overdue and keeps the border.
+    expect(isRed('later')).toBe(true);
+    expect(screen.queryByTestId('assignment-due-today-later')).toBeNull();
+    expect(screen.getByTestId('assignment-overdue-later')).toBeTruthy();
   });
 });
 
@@ -125,5 +137,5 @@ it('AC7: the mentor Owner tab shows no red border', async () => {
     }),
   );
   await render(<HomeworkScreen />);
-  expect(screen.queryByTestId(/^assignment-due-today-/)).toBeNull();
+  expect(screen.queryByTestId(/^assignment-(due-today|overdue)-/)).toBeNull();
 });

@@ -4,13 +4,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DeleteAccountForm } from '@/components/DeleteAccountForm';
 import { Button, ErrorText, styles } from '@/components/ui';
+import { translate } from '@/i18n';
+import { useI18n } from '@/i18n/context';
 import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
 
-export const WAITING_TITLE = 'Waiting for approval';
-export const WAITING_TEXT = 'Your request to join has been sent to the teacher. You can use Sham once it is accepted.';
-export const DECLINED_TITLE = 'Request declined';
-export const DECLINED_TEXT = 'The teacher declined your request to join.';
+// ARU-108: the English texts (tests and other screens use them); the screen shows them in the chosen language.
+export const WAITING_TITLE = translate('en', 'gate.waitingTitle');
+export const WAITING_TEXT = translate('en', 'gate.waitingText');
+export const DECLINED_TITLE = translate('en', 'gate.declinedTitle');
+export const DECLINED_TEXT = translate('en', 'gate.declinedText');
 
 /**
  * ARU-43: an account that isn't approved sees only this screen, whatever route it opens (deep links included).
@@ -25,6 +28,7 @@ export function AccessGate({ children }: { children: ReactNode }) {
 
 function AccessScreen({ declined }: { declined: boolean }) {
   const { loading, refresh, signOut } = useStore();
+  const { t, tm } = useI18n();
   const { busy, error, run } = useAction();
   // ARU-75 AC 10: the same Delete account screen, in place (this screen replaces every route).
   const [deleting, setDeleting] = useState(false);
@@ -45,14 +49,18 @@ function AccessScreen({ declined }: { declined: boolean }) {
         }>
         <View style={{ gap: 8 }}>
           <Text style={[styles.h1, { textAlign: 'center' }]} accessibilityRole="header">
-            {declined ? DECLINED_TITLE : WAITING_TITLE}
+            {declined ? t('gate.declinedTitle') : t('gate.waitingTitle')}
           </Text>
-          <Text style={[styles.body, { textAlign: 'center' }]}>{declined ? DECLINED_TEXT : WAITING_TEXT}</Text>
+          <Text style={[styles.body, { textAlign: 'center' }]}>
+            {declined ? t('gate.declinedText') : t('gate.waitingText')}
+          </Text>
         </View>
-        <ErrorText error={error} />
-        {!declined && <Button title={busy ? 'Checking…' : 'Check again'} onPress={() => run(refresh)} disabled={busy} />}
-        <Button title="Sign out" variant="secondary" onPress={() => run(signOut)} disabled={busy} />
-        <Button title="Delete account" variant="danger" onPress={() => setDeleting(true)} disabled={busy} />
+        <ErrorText error={tm(error)} />
+        {!declined && (
+          <Button title={busy ? t('gate.checking') : t('gate.checkAgain')} onPress={() => run(refresh)} disabled={busy} />
+        )}
+        <Button title={t('common.signOut')} variant="secondary" onPress={() => run(signOut)} disabled={busy} />
+        <Button title={t('common.deleteAccount')} variant="danger" onPress={() => setDeleting(true)} disabled={busy} />
       </ScrollView>
     </SafeAreaView>
   );

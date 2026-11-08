@@ -166,7 +166,21 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `0049_homework_photo_limits.sql` (ARU-105: the `homework` bucket accepts only JPEG files up to 10 MB (the app
    resizes and compresses photos when they're picked); adds `homework_photo_in_use()` and two storage policies that
    let a sender read and delete their own photo in their own folder while no homework row points to it, so a failed
-   send leaves no photo behind; existing files and policies are unchanged, deletes nothing).
+   send leaves no photo behind; existing files and policies are unchanged, deletes nothing),
+   `0050_homework_photo_rule.sql` (ARU-107: the 6-month rule for homework photos, without deleting anything yet;
+   a trigger makes `homework.checked_at` server-set (set when checked, cleared when unchecked, any client value
+   overwritten; checked homework without one gets the migration's time), adds the one-row `app_settings` table
+   (`photo_deletion_start`, null until ARU-112's daily job runs), `photo_deletion_date()`, the `photo_zip_links` table
+   and the service-role functions `homework_photos_for_zip()` and `claim_photo_zip_link()` for **Download my photos**;
+   deletes nothing. Then deploy the `homework-photos-zip` Edge Function, see
+   [Download my photos](#download-my-photos-aru-107)),
+   `0051_profile_language.sql` (ARU-108: Russian version, part 1; adds `profiles.language` ('en', 'ru' or null =
+   follow the phone; existing accounts get null) and puts it in the profile update grant next to `full_name`, so users
+   change only their own; no other policy changes, deletes nothing),
+   `0052_profile_device_language.sql` (ARU-110: Russian version, part 4; adds `profiles.device_language` ('en', 'ru'
+   or null), the phone language the app saves for a user who never chose one, so Telegram notifications follow it;
+   in the profile update grant next to `full_name` and `language`, so users change only their own; existing accounts
+   get null; no other policy changes, deletes nothing).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
@@ -487,6 +501,27 @@ the foreground (it asks Auth whether the user still exists).
 3. Check: sign in as a test student and delete the account from Profile → **Delete account**; the user disappears
    from **Authentication → Users** and from `profiles`, and its files from the `homework` bucket.
 
+### Download my photos (ARU-107)
+
+Homework photos are kept for 6 months after the homework is checked (the deletion itself is ARU-112's daily job;
+nothing is deleted yet). A sender downloads their own stored photos as a ZIP from the Homework tab's **Checked** list
+(students; mentors on the Listener side), or from the warning banner. The app asks the Edge Function
+`homework-photos-zip` (POST, with the user's token) for a one-time link valid for 60 seconds, and opens it like a photo's
+Download. The link (GET) streams `sham-homework-photos-<date>.zip` with at most 50 photos; more than 50 are offered by
+course on **Download by course**. Only a hash of each link is stored (`photo_zip_links`); no ZIP is stored.
+
+1. Run `supabase/migrations/0050_homework_photo_rule.sql`.
+2. Deploy the function without JWT verification (the link is opened without an auth header; the POST checks the
+   user's token itself and the GET accepts only an unused, unexpired link). It needs no secrets of its own:
+   ```bash
+   npx supabase functions deploy homework-photos-zip --no-verify-jwt
+   ```
+3. Check: as a student with a homework photo, tap **Download my photos** on Checked; a ZIP downloads. Opening the same
+   link again shows "This download link has expired or was already used".
+
+The warning banner ("<N> homework photos will be deleted on <date>") stays hidden until ARU-112's job sets
+`app_settings.photo_deletion_start`.
+
 ## Run it
 
 ```bash
@@ -520,6 +555,36 @@ npm run test:db    # applies supabase/migrations to a throwaway Postgres and tes
 
 GitHub Actions runs both on every pull request and on pushes to `main` (`.github/workflows/ci.yml`).
 
+## Languages (ARU-108)
+
+Sham is in English and Russian. The app starts in the phone's (or browser's) language: Russian for any `ru-*` locale,
+English otherwise. **Profile → Language** overrides it and is saved on the account (`profiles.language`), so it is the
+same on every device; the sign-in screen uses the language last shown on the device.
+
+All texts live in one catalog: `src/i18n/en.json` and `src/i18n/ru.json` (the same text IDs, grouped by screen) and
+`src/i18n/notes.json` (where each text appears, for the product owner's spreadsheet). Screens read them with
+`useI18n().t('<id>', { …params })`; counts use plural forms (`<id>_one` / `_few` / `_many` / `_other`); dates use
+`formatDate` / `formatWeekdayDate` / `formatDateTime` from the same hook, in the chosen language. `npm test` fails when
+an ID is missing from one file, a Russian text or a note is empty, or the `{placeholders}` differ.
+Moved to the catalog so far (part 1): sign-in and create account, Reset and Change password, the waiting / declined
+screens, the tab bar and the Profile tab; (part 2, ARU-109) the Homework and Courses tabs, homework, course, listener,
+feedback, meeting and discipline screens; (part 3, ARU-113) Materials, the chats, Pay, the accountant screens, Manage
+roles, the Telegram notifications page and Delete account. Every screen is now in both languages; the only app English
+left in Russian is the Telegram page's **Connect Telegram** / **Disconnect** buttons, which match the bot's English
+replies (product owner decision). Database errors (ARU-111) come later.
+
+Telegram notifications (ARU-110) go out in each recipient's language: the one they chose in Profile, else the phone
+language the app saved on their account at start (`profiles.device_language`), else English. Their texts are in
+`supabase/functions/_shared/telegram-texts.ts` (English, Russian and a note each, checked by
+`telegram-i18n.test.ts`); a new notification kind adds its texts there and builds its messages with
+`localizedMessage()`. The bot's own `/start` / `/stop` replies stay English (product owner decision).
+
+Shared pieces follow the chosen language too: `ErrorText` shows an app message the catalog knows in that language and
+any other text (a database error) as it came (`translateKnown`, with the app's messages listed in `APP_MESSAGE_IDS` in
+`src/i18n/index.ts`); `formatDate` / `formatDateTime` in `src/lib/theme.ts`, the shared confirmation's Cancel and the
+"Deleted account" fallback read the current language (`currentLanguage()`, set by `LanguageProvider`). Shared
+components import the hook from `src/i18n/context.tsx`, which doesn't load the store.
+
 ## Project structure
 
 ```
@@ -528,6 +593,7 @@ src/app/                  screens (Expo Router — every file is a route)
   (tabs)/                 Homework · Courses (My courses / All courses) · Materials · Profile tabs
   homework/new.tsx        a listener sends homework for an assignment (opened from New)
   homework/[id].tsx       homework details; mentor marks it checked
+  homework/photos.tsx     Download by course: a sender's homework photos as ZIPs of at most 50 (ARU-107)
   courses/new.tsx         teacher or mentor creates a course (visible or hidden)
   courses/[id].tsx        course details, meetings, a Listeners row, linked Knowledge base PDFs, feedback and homework
   courses/[id]/feedback.tsx  a listener adds or edits their feedback (stars + review)
@@ -565,6 +631,8 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Assign homework to a completed meeting | | own courses        | any course |
 | Send homework (for an assignment) | courses they're in | courses they're in |  |
 | Remove own leftover photo of a failed send (own folder, no homework points to it; ARU-105) | ✓ | ✓ |  |
+| Download own homework photos as a ZIP (one-time link, ARU-107) | own photos | own photos (sent as a listener) |  |
+| Set `homework.checked_at` directly (ARU-107: the server sets it when checking) | (nobody) | (nobody) | (nobody) |
 | Mark homework checked      |           | any (not their own) | any (not their own) |
 | See courses (database)     | all except hidden ones they're not in (title and description only unless they're in it) | all except hidden ones they don't own or attend | all |
 | Courses list (Courses tab, ARU-63) | courses they're in + courses with no discipline | own and attended courses + courses with no discipline | own courses + courses with no discipline (hidden ones too); every course through a discipline card |
@@ -622,6 +690,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Send / replace own payment request with a proof (ARU-99; unpaid, in the period) | as a listener | as a listener |  |
 | See payment requests and proofs, request count (ARU-99) | own only | accountants (current listeners of paid courses they can see) | ✓ (all) |
 | Delete payment proofs (only by deleting a course or discipline, ARU-99) | | | ✓ |
+| Choose the app language (Profile → Language, saved in `profiles.language`, ARU-108) | own | own | own |
 | Change own password (Supabase Auth, current password required, ARU-76) | own | own | own |
 | Reset a forgotten password with an emailed code (signed out, any approval state, ARU-77) | own | own | own |
 | Become / stop being teacher |          |                    | (nobody) |

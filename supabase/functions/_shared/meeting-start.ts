@@ -3,7 +3,8 @@
 // which marks them first, so a meeting is announced at most once) and only then sends "<course title> meeting has
 // started" to each Approved listener through the ARU-48 helper. No Deno-only imports, so Jest can test it.
 
-import type { SendResult, TelegramMessage } from './telegram.ts';
+import { localizedMessage, type SendResult, type TelegramMessage } from './telegram.ts';
+import { telegramText, telegramTexts } from './telegram-texts.ts';
 import { timingSafeEqual } from './telegram-bot.ts';
 
 /** One meeting claimed by claim_started_meetings(). */
@@ -22,17 +23,16 @@ export type MeetingStartReport = { meetings: number } & SendResult;
 
 /** The message text, exactly as the product owner set it (plain text: the title is shown as typed). */
 export function meetingStartedText(courseTitle: string) {
-  return `${courseTitle} meeting has started`;
+  return telegramText('en', 'meetingStarted', { course: courseTitle });
 }
 
 /** One message per listener per claimed meeting (AC 1, AC 8). */
 export function meetingStartMessages(meetings: ClaimedMeeting[]): TelegramMessage[] {
   return meetings.flatMap((m) =>
-    (m.listener_ids ?? []).map((userId) => ({
-      userId,
-      kind: 'meeting_started' as const,
-      text: meetingStartedText(m.course_title),
-    })),
+    // ARU-110: each listener gets it in their own language.
+    (m.listener_ids ?? []).map((userId) =>
+      localizedMessage(userId, 'meeting_started', telegramTexts('meetingStarted', { course: m.course_title })),
+    ),
   );
 }
 

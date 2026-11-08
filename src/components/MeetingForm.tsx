@@ -4,6 +4,7 @@ import { Text } from 'react-native';
 import { DateTimeField } from '@/components/DateTimeField';
 import { KeyboardForm } from '@/components/KeyboardForm';
 import { Button, ErrorText, Field } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { colors } from '@/lib/theme';
 import { useNow } from '@/lib/useNow';
 
@@ -33,6 +34,7 @@ export function nextFullHour(now = new Date()) {
  *  (ARU-15). The start must be in the future (device clock here; the database checks again with its own); when
  *  editing, only if it was changed. */
 export function MeetingForm({ initial, submitTitle, busyTitle, busy, error, onSubmit, checkTimeOnlyWhenChanged }: Props) {
+  const { t } = useI18n();
   const [startsAt, setStartsAt] = useState(initial.startsAt);
   const [topic, setTopic] = useState(initial.topic);
   const [location, setLocation] = useState(initial.location);
@@ -42,12 +44,18 @@ export function MeetingForm({ initial, submitTitle, busyTitle, busy, error, onSu
 
   return (
     <KeyboardForm>
-      <DateTimeField label="Date and start time" value={startsAt} onChange={setStartsAt} />
-      {!timeOk && <Text style={{ color: colors.warning, fontSize: 14 }}>Pick a time in the future</Text>}
-      <Field label="Topic (optional)" placeholder="Meeting" value={topic} onChangeText={setTopic} maxLength={200} />
+      <DateTimeField label={t('meetings.dateTimeLabel')} value={startsAt} onChange={setStartsAt} />
+      {!timeOk && <Text style={{ color: colors.warning, fontSize: 14 }}>{t('meetings.pickFuture')}</Text>}
       <Field
-        label="Link or place (optional)"
-        placeholder="https://… or Room 12"
+        label={t('meetings.topicLabel')}
+        placeholder={t('meetings.topicPlaceholder')}
+        value={topic}
+        onChangeText={setTopic}
+        maxLength={200}
+      />
+      <Field
+        label={t('meetings.locationLabel')}
+        placeholder={t('meetings.locationPlaceholder')}
         value={location}
         onChangeText={setLocation}
         autoCapitalize="none"
