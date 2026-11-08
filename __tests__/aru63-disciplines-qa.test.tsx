@@ -7,6 +7,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 
 import CoursesScreen from '@/app/(tabs)/courses';
 import CourseDetailScreen from '@/app/courses/[id]';
+import EditCourseScreen from '@/app/courses/[id]/edit';
 import NewCourseScreen from '@/app/courses/new';
 import DisciplineScreen from '@/app/disciplines/[id]';
 import NewDisciplineScreen from '@/app/disciplines/new';
@@ -149,16 +150,18 @@ it('edge: a long discipline name wraps to two lines on the course card and the D
   expect(screen.getByText(long.name).props.numberOfLines).toBe(2);
 });
 
-it('edge ARU-9: an owner who loses the course loses the picker on the next update', async () => {
+it('edge ARU-9: an owner who loses the course loses the discipline picker in Edit course on the next update', async () => {
   params.id = 'A';
   setStore(fakeStore('M', { courses: [A], disciplines: [math] }));
-  const view = await render(<CourseDetailScreen />);
-  // ARU-70: the list opens from the pencil.
-  await fireEvent.press(screen.getByRole('button', { name: 'Change discipline' }));
+  const view = await render(<EditCourseScreen />);
+  // ARU-103: the list is on Edit course (always open).
   expect(screen.getByRole('radio', { name: 'Math', checked: true })).toBeTruthy();
   setStore(fakeStore('M', { courses: [{ ...A, createdById: 'N' }], disciplines: [math] }));
-  await view.rerender(<CourseDetailScreen />);
+  await view.rerender(<EditCourseScreen />);
   expect(screen.queryByRole('radio', { name: 'Math' })).toBeNull();
-  expect(screen.queryByRole('button', { name: 'Change discipline' })).toBeNull();
+  // Mentors can still change the owner.
+  expect(screen.getByRole('button', { name: 'Change owner' })).toBeTruthy();
+  await view.unmount();
+  await render(<CourseDetailScreen />);
   expect(screen.getByText('Discipline: Math')).toBeTruthy();
 });
