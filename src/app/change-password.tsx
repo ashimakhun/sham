@@ -5,7 +5,8 @@ import { KeyboardForm } from '@/components/KeyboardForm';
 import { NewPasswordFields } from '@/components/NewPasswordFields';
 import { Button, ErrorText, Field } from '@/components/ui';
 import { notify } from '@/lib/confirm';
-import { newPasswordReady, PASSWORD_CHANGED } from '@/lib/password';
+import { useI18n } from '@/i18n/LanguageProvider';
+import { newPasswordReady } from '@/lib/password';
 import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
 
@@ -18,6 +19,7 @@ function leave() {
 export default function ChangePasswordScreen() {
   const { currentUser, changePassword } = useStore();
   const { busy, error, run } = useAction();
+  const { t, tm } = useI18n();
   const [current, setCurrent] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -31,9 +33,9 @@ export default function ChangePasswordScreen() {
 
   useEffect(() => {
     if (!done) return;
-    notify(PASSWORD_CHANGED);
+    notify(t('password.changed'));
     leave();
-  }, [done]);
+  }, [done, t]);
 
   if (!currentUser) return null;
 
@@ -56,7 +58,7 @@ export default function ChangePasswordScreen() {
     <KeyboardForm>
       <Field
         testID="current-password"
-        label="Current password"
+        label={t('password.current')}
         value={current}
         onChangeText={setCurrent}
         secureTextEntry
@@ -66,10 +68,10 @@ export default function ChangePasswordScreen() {
         textContentType="password"
       />
       <NewPasswordFields password={password} onPassword={setPassword} confirm={confirm} onConfirm={setConfirm} />
-      <ErrorText error={error} />
-      <Button title={busy ? 'Saving…' : 'Save'} onPress={save} disabled={!canSave || busy || done} />
+      <ErrorText error={tm(error)} />
+      <Button title={busy ? t('common.saving') : t('common.save')} onPress={save} disabled={!canSave || busy || done} />
       {/* Back to Profile without saving (also the swipe-down / Android back); not while saving (AC 10). */}
-      <Button title="Cancel" variant="secondary" onPress={leave} disabled={busy || done} />
+      <Button title={t('common.cancel')} variant="secondary" onPress={leave} disabled={busy || done} />
     </KeyboardForm>
   );
 }

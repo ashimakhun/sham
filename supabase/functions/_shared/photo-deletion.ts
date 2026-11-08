@@ -1,4 +1,4 @@
-// ARU-112: the photo-deletion Edge Function's logic. Called once a day by a pg_cron job (migration 0051) with the
+// ARU-112: the photo-deletion Edge Function's logic. Called once a day by a pg_cron job (migration 0052) with the
 // secret in the x-cron-secret header. One run:
 //   1. sets the deletion start date if it is still empty (start_photo_deletion(): today + 30 days, AC 1);
 //   2. deletes leftover files from failed sends (unreferenced, older than 24 hours; every run, the first included, AC 7);
