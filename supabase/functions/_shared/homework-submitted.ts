@@ -5,7 +5,8 @@
 // through the ARU-48 helper, which skips an unlinked owner or one with Homework submitted off. Nothing is retried.
 // No Deno-only imports, so Jest can test it.
 
-import type { SendResult, TelegramMessage } from './telegram.ts';
+import { localizedMessage, type SendResult, type TelegramMessage } from './telegram.ts';
+import { telegramText, telegramTexts } from './telegram-texts.ts';
 import { timingSafeEqual } from './telegram-bot.ts';
 
 /** One row of homework_submitted_recipient(). */
@@ -29,16 +30,18 @@ export type HomeworkSubmittedReport = { recipients: number } & SendResult;
 
 /** The message text, exactly as the story sets it (plain text: names and titles are shown as typed). */
 export function homeworkSubmittedText(senderName: string, courseTitle: string, assignmentTitle: string) {
-  return `New homework to check from ${senderName} in ${courseTitle}: ${assignmentTitle}`;
+  return telegramText('en', 'homeworkSubmitted', { name: senderName, course: courseTitle, assignment: assignmentTitle });
 }
 
 /** One message per recipient row (in practice zero or one: the owner). */
 export function homeworkSubmittedMessages(rows: HomeworkSubmittedRecipient[]): TelegramMessage[] {
-  return rows.map((r) => ({
-    userId: r.user_id,
-    kind: 'homework_submitted' as const,
-    text: homeworkSubmittedText(r.sender_name, r.course_title, r.assignment_title),
-  }));
+  return rows.map((r) =>
+    localizedMessage(
+      r.user_id,
+      'homework_submitted',
+      telegramTexts('homeworkSubmitted', { name: r.sender_name, course: r.course_title, assignment: r.assignment_title }),
+    ),
+  );
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

@@ -2,6 +2,8 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
+import { currentLanguage, translate } from '@/i18n';
+
 import { type Store, useStore } from './store';
 import type { ChatMessage, CourseMessage } from './types';
 
@@ -88,7 +90,8 @@ export function useChat<M extends ChatMessage>(source: ChatSource<M>, enabled: b
       }
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load messages.');
+      // ARU-113: the fallback in the app's language (a callback, so not useI18n); ChatView shows it through ErrorText.
+      setError(e instanceof Error ? e.message : translate(currentLanguage(), 'chat.loadError'));
     } finally {
       setLoaded(true);
     }
@@ -103,7 +106,7 @@ export function useChat<M extends ChatMessage>(source: ChatSource<M>, enabled: b
       setMessages((list) => mergeMessages(list, page.messages));
       setHasMore(page.hasMore);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load older messages.');
+      setError(e instanceof Error ? e.message : translate(currentLanguage(), 'chat.loadOlderError'));
     } finally {
       setLoadingOlder(false);
     }

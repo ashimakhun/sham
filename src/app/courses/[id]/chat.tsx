@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { AppState, Text, View } from 'react-native';
 
 import { ChatView } from '@/components/ChatView';
+import { useI18n } from '@/i18n/context';
 import { EmptyState, styles } from '@/components/ui';
 import { inCourseChat } from '@/lib/roles';
 import { useStore } from '@/lib/store';
@@ -13,18 +14,19 @@ import { useCourseChat } from '@/lib/useCourseChat';
 export default function CourseChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { currentUser, courseMembers, getCourse } = useStore();
+  const { t } = useI18n();
   const course = getCourse(id);
   // Recomputed on every live store update, so removal or an owner change closes the chat (AC 8 / AC 10).
   const inChat = !!course && inCourseChat(currentUser, course, courseMembers);
 
-  if (!course) return <EmptyState title="Course not found" />;
+  if (!course) return <EmptyState title={t('courses.notFound')} />;
   return (
     <>
       <Stack.Screen options={{ title: course.title }} />
       {inChat ? (
         <Chat course={course} />
       ) : (
-        <EmptyState title="You are no longer in this course" hint="Only the course owner, its listeners and the teacher can use this chat." />
+        <EmptyState title={t('chat.leftCourseTitle')} hint={t('chat.leftCourseHint')} />
       )}
     </>
   );
@@ -61,18 +63,19 @@ function useMarkChatRead(courseId: string, newestId: string | undefined) {
 }
 
 function Chat({ course }: { course: Course }) {
+  const { t } = useI18n();
   const chat = useCourseChat(course.id, true);
   useMarkChatRead(course.id, chat.messages[0]?.id);
   return (
     <ChatView
       chat={chat}
-      emptyText="No messages yet — start the discussion"
-      unknownAuthor="Former member"
+      emptyText={t('chat.courseEmpty')}
+      unknownAuthor={t('chat.formerMember')}
       badges={(message: CourseMessage) =>
         // A deleted author (null, ARU-75) is never the owner.
         message.authorId != null && message.authorId === course.createdById ? (
           <View style={[styles.badge, { backgroundColor: colors.primarySoft }]}>
-            <Text style={[styles.badgeText, { color: colors.primary }]}>Owner</Text>
+            <Text style={[styles.badgeText, { color: colors.primary }]}>{t('chat.owner')}</Text>
           </View>
         ) : null
       }

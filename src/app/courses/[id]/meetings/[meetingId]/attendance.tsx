@@ -2,6 +2,7 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 
 import { Card, EmptyState, RoleBadge, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { meetingAttendance } from '@/lib/attendance';
 import { isOpenForAttendance } from '@/lib/meetings';
 import { canSeeAttendance, canSeeMeetings } from '@/lib/roles';
@@ -16,15 +17,16 @@ export default function MeetingAttendanceScreen() {
   const { id: courseId, meetingId } = useLocalSearchParams<{ id: string; meetingId: string }>();
   const { currentUser, courseMembers, getCourse, getUser, meetings, attendance, loading, refresh } = useStore();
   const now = useNow();
+  const { t } = useI18n();
 
   const course = getCourse(courseId);
   const meeting = meetings.find((m) => m.id === meetingId && m.courseId === courseId);
-  const title = <Stack.Screen options={{ title: 'Attendance' }} />;
+  const title = <Stack.Screen options={{ title: t('meetings.attendanceTitle') }} />;
   if (!course || !meeting || !canSeeMeetings(currentUser, course, courseMembers)) {
     return (
       <>
         {title}
-        <EmptyState title="Meeting not found" />
+        <EmptyState title={t('meetings.notFound')} />
       </>
     );
   }
@@ -32,7 +34,7 @@ export default function MeetingAttendanceScreen() {
     return (
       <>
         {title}
-        <EmptyState title="Only the course owner, the teacher and mentors can see attendance." />
+        <EmptyState title={t('meetings.attendanceNotAllowed')} />
       </>
     );
   }
@@ -51,9 +53,7 @@ export default function MeetingAttendanceScreen() {
         {header}
         <EmptyState
           title={
-            meeting.status === 'canceled'
-              ? 'This meeting was canceled.'
-              : 'Attendance is available once the meeting has started.'
+            meeting.status === 'canceled' ? t('meetings.wasCanceled') : t('meetings.attendanceNotStarted')
           }
         />
       </ScrollView>
@@ -76,11 +76,11 @@ export default function MeetingAttendanceScreen() {
       {title}
       {header}
       {total === 0 ? (
-        <EmptyState title="This course has no listeners." />
+        <EmptyState title={t('meetings.noListeners')} />
       ) : (
         [
-          { heading: 'Attended', people: byName(attended) },
-          { heading: 'Not marked', people: byName(notMarked) },
+          { heading: t('meetings.attended'), people: byName(attended) },
+          { heading: t('meetings.notMarked'), people: byName(notMarked) },
         ]
           .filter((g) => g.people.length > 0)
           .map((g) => (
