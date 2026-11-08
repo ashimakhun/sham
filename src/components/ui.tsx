@@ -82,7 +82,7 @@ export function Button({ title, onPress, variant = 'primary', disabled, unread =
         // Same size as the course card's chat icon (ARU-25); the button keeps its full-width, 46 pt target.
         <Ionicons name={icon} size={24} color={textColor} style={{ marginVertical: -3 }} accessibilityElementsHidden importantForAccessibility="no" />
       ) : (
-        <Text style={[styles.buttonText, { color: textColor }]}>{title}</Text>
+        <Text style={[styles.buttonText, { color: textColor, textAlign: 'center' }]}>{title}</Text>
       )}
       {unread > 0 && !(icon && badgeOnIcon) && <UnreadBadge count={unread} style={{ position: 'absolute', right: 12, top: 11 }} />}
     </Pressable>
@@ -239,11 +239,17 @@ export const styles = StyleSheet.create({
   },
   // Side padding keeps the label inside the background when the button sits in a row and sizes to its text (ARU-22).
   button: { borderRadius: 10, paddingVertical: 13, paddingHorizontal: 16, alignItems: 'center' },
-  buttonText: { fontSize: 15, fontWeight: '600' },
+  // ARU-122: controls and states are upper case by style only (the source text and screen reader labels stay as
+  // written), Medium 500, slightly spaced and 1 pt smaller than before so they don't get wider. Text is never cut
+  // with numberOfLines, so a long Russian label wraps inside the button.
+  caps: { textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '500' },
+  buttonText: { fontSize: 14, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase' },
   // ARU-78: same 18 pt layout height as the plain icon (24 pt glyph, -3 margins), so the button height is unchanged.
   buttonIconBox: { width: 24, height: 24, marginVertical: -3 },
   badge: { alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
-  badgeText: { fontSize: 12, fontWeight: '600' },
+  badgeText: { fontSize: 11, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase' },
+  // ARU-122: a tappable text action (View proof, Set exempt, Unselect, Edit…): upper case, 1 pt under the default 14.
+  linkText: { fontSize: 13, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase' },
   unread: {
     minWidth: 20,
     height: 20,
@@ -262,5 +268,5 @@ export const styles = StyleSheet.create({
   segmented: { flexDirection: 'row', backgroundColor: '#E9EAF0', borderRadius: 10, padding: 3 },
   segment: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
   segmentActive: { backgroundColor: colors.card },
-  segmentText: { fontSize: 13, fontWeight: '600', color: colors.muted },
+  segmentText: { fontSize: 12, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase', color: colors.muted },
 });
