@@ -6,6 +6,7 @@ import { DateTimeField } from '@/components/DateTimeField';
 import { KeyboardForm } from '@/components/KeyboardForm';
 import { nextFullHour } from '@/components/MeetingForm';
 import { Button, EmptyState, ErrorText, Field, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { newId } from '@/lib/id';
 import { canManageMeetings } from '@/lib/roles';
 import { useStore } from '@/lib/store';
@@ -25,6 +26,7 @@ export default function AssignHomeworkScreen() {
   const [description, setDescription] = useState('');
   const [dueAt, setDueAt] = useState<Date>();
   const { busy, error, run } = useAction();
+  const { t } = useI18n();
   const saving = useRef(false);
   const now = useNow(15_000);
 
@@ -33,14 +35,14 @@ export default function AssignHomeworkScreen() {
   // An assignment this form saved itself doesn't count: the screen is closing.
   const existing = assignments.find((a) => a.meetingId === meetingId && a.id !== id);
 
-  if (!course || !meeting) return <EmptyState title="Meeting not found" />;
+  if (!course || !meeting) return <EmptyState title={t('meetings.notFound')} />;
   if (currentUser && !canManageMeetings(currentUser, course)) {
-    return <EmptyState title="Not allowed" hint="Only the course owner or the teacher can assign homework." />;
+    return <EmptyState title={t('meetings.notAllowed')} hint={t('meetings.onlyAssignHint')} />;
   }
   if (meeting.status !== 'completed') {
-    return <EmptyState title="Can't assign homework" hint="Homework can be assigned only to completed meetings." />;
+    return <EmptyState title={t('meetings.cantAssign')} hint={t('meetings.cantAssignHint')} />;
   }
-  if (existing) return <EmptyState title="Already assigned" hint="This meeting already has homework." />;
+  if (existing) return <EmptyState title={t('meetings.alreadyAssigned')} hint={t('errors.meetingHasHomework')} />;
 
   const dueOk = !dueAt || dueAt.getTime() > now;
   const titleOk = title.trim().length > 0 && title.trim().length <= TITLE_MAX;
@@ -72,34 +74,34 @@ export default function AssignHomeworkScreen() {
         {course.title} · {meeting.topic} · {formatDateTime(meeting.startsAt)}
       </Text>
       <Field
-        label="Title"
-        placeholder="e.g. Exercises 1–10"
+        label={t('meetings.hwTitleLabel')}
+        placeholder={t('meetings.hwTitlePlaceholder')}
         value={title}
         onChangeText={setTitle}
         maxLength={TITLE_MAX}
       />
       <Field
-        label="Description (optional)"
-        placeholder="What should listeners do?"
+        label={t('meetings.hwDescriptionLabel')}
+        placeholder={t('meetings.hwDescriptionPlaceholder')}
         value={description}
         onChangeText={setDescription}
         multiline
       />
       {dueAt ? (
         <>
-          <DateTimeField label="Deadline" value={dueAt} onChange={setDueAt} />
-          {!dueOk && <Text style={{ color: colors.warning, fontSize: 14 }}>The deadline must be in the future.</Text>}
-          <Button title="Remove deadline" variant="secondary" onPress={() => setDueAt(undefined)} />
+          <DateTimeField label={t('meetings.deadline')} value={dueAt} onChange={setDueAt} />
+          {!dueOk && <Text style={{ color: colors.warning, fontSize: 14 }}>{t('errors.deadlinePast')}</Text>}
+          <Button title={t('meetings.removeDeadline')} variant="secondary" onPress={() => setDueAt(undefined)} />
         </>
       ) : (
         <Button
-          title="Add deadline"
+          title={t('meetings.addDeadline')}
           variant="secondary" // Default: tomorrow, on the next full hour.
           onPress={() => setDueAt(new Date(nextFullHour(new Date(now)).getTime() + 24 * 60 * 60 * 1000))}
         />
       )}
       <ErrorText error={error} />
-      <Button title={busy ? 'Saving…' : 'Save'} onPress={save} disabled={!titleOk || !dueOk || busy} />
+      <Button title={t(busy ? 'common.saving' : 'common.save')} onPress={save} disabled={!titleOk || !dueOk || busy} />
     </KeyboardForm>
   );
 }

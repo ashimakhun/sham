@@ -107,3 +107,14 @@ describe('AC 6: after removal', () => {
     expect(screen.queryByText(/📎 photo/)).toBeNull();
   });
 });
+
+describe('ARU-133: in Russian', () => {
+  it('the switch and the removed-photo note come from the catalog', async () => {
+    const { telegramSwitchesFor: forRole } = jest.requireActual('@/lib/telegram') as typeof import('@/lib/telegram');
+    expect(forRole('student', 'ru').find((s) => s.kind === 'photo_deletion')?.label).toBe('Удаление фото');
+    expect(forRole('student', 'en').find((s) => s.kind === 'photo_deletion')?.label).toBe('Photo deletion');
+    const { translate } = jest.requireActual('@/i18n') as typeof import('@/i18n');
+    expect(translate('ru', 'homework.photoRemoved')).toBe('Фото удалено через 6 месяцев после проверки');
+    expect(translate('en', 'homework.photoRemoved')).toBe(PHOTO_REMOVED);
+  });
+});

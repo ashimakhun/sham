@@ -3,6 +3,8 @@ import { useRef } from 'react';
 import { View } from 'react-native';
 
 import { Button, ErrorText } from '@/components/ui';
+import { currentLanguage, type Language, translate } from '@/i18n';
+import { useI18n } from '@/i18n/context';
 import { confirmDestructive } from '@/lib/confirm';
 import { canManageDisciplines, coursesInDiscipline } from '@/lib/disciplines';
 import { useStore } from '@/lib/store';
@@ -10,14 +12,10 @@ import type { Discipline } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
 
 /** The confirmation text (ARU-83 AC 2, word for word, "course(s)" included), with the number of courses the delete
- *  takes with it. */
-export function deleteDisciplineMessage(name: string, courseCount: number) {
-  if (courseCount === 0) return `Delete "${name}"? It has no courses. This can't be undone.`;
-  return (
-    `Delete "${name}" and its ${courseCount} course(s)? Each course's meetings, ` +
-    "notes, attendance, homework and photos, chat, listeners, feedback and payment settings are deleted too. This " +
-    "can't be undone."
-  );
+ *  takes with it. ARU-109: a plural text, so Russian says "2 курса" / "5 курсов". */
+export function deleteDisciplineMessage(name: string, courseCount: number, lang: Language = currentLanguage()) {
+  if (courseCount === 0) return translate(lang, 'disciplines.deleteMessageEmpty', { name });
+  return translate(lang, 'disciplines.deleteMessage', { name, count: courseCount });
 }
 
 /** ARU-83: the teacher's "Delete discipline", below the COURSES list. After a confirmation it deletes the discipline
@@ -25,6 +23,7 @@ export function deleteDisciplineMessage(name: string, courseCount: number) {
 export function DeleteDisciplineButton({ discipline }: { discipline: Discipline }) {
   const { currentUser, courses, deleteDiscipline } = useStore();
   const { busy, error, run } = useAction();
+  const { t, lang } = useI18n();
   // Set from the first tap until the delete ends, so a double tap opens one confirmation and sends one request.
   const pending = useRef(false);
   if (!canManageDisciplines(currentUser)) return null;
@@ -35,7 +34,11 @@ export function DeleteDisciplineButton({ discipline }: { discipline: Discipline 
     const target = discipline;
     // The teacher's list has every course, hidden ones too, so N counts all the courses the delete removes.
     const count = coursesInDiscipline(target.id, courses).length;
-    confirmDestructive('Delete discipline', deleteDisciplineMessage(target.name, count), 'Delete')
+    confirmDestructive(
+      t('disciplines.deleteTitle'),
+      deleteDisciplineMessage(target.name, count, lang),
+      t('disciplines.deleteConfirm'),
+    )
       .then(async (ok) => {
         if (!ok) return;
         await run(async () => {
@@ -53,7 +56,7 @@ export function DeleteDisciplineButton({ discipline }: { discipline: Discipline 
   return (
     <View style={{ gap: 8, marginTop: 12 }}>
       <ErrorText error={error} />
-      <Button title={busy ? 'Deleting…' : 'Delete discipline'} variant="danger" disabled={busy} onPress={onPress} />
+      <Button title={busy ? t('disciplines.deleting') : t('disciplines.deleteTitle')} variant="danger" disabled={busy} onPress={onPress} />
     </View>
   );
 }

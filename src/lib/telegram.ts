@@ -1,4 +1,6 @@
 // Telegram notifications (ARU-48): the bot's username and the switches shown per role.
+import { currentLanguage, type Language, translate } from '@/i18n';
+
 import type { Role, TelegramKind } from './types';
 
 /** The bot's username from EXPO_PUBLIC_TELEGRAM_BOT_USERNAME (without "@"); empty means Telegram is off in the app. */
@@ -56,6 +58,10 @@ const KINDS_FOR: Record<Role, TelegramKind[]> = {
   ],
 };
 
-export function telegramSwitchesFor(role: Role) {
-  return TELEGRAM_SWITCHES.filter((s) => KINDS_FOR[role].includes(s.kind));
+/** ARU-113 AC 6: the switches a role sees, with their labels in the app's language. */
+export function telegramSwitchesFor(role: Role, lang: Language = currentLanguage()) {
+  return TELEGRAM_SWITCHES.filter((s) => KINDS_FOR[role].includes(s.kind)).map((s) => ({
+    ...s,
+    label: translate(lang, `telegram.switch.${s.kind}`),
+  }));
 }

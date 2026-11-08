@@ -5,7 +5,8 @@
 // helper, which skips an unlinked teacher or one with New accounts off. Nothing is retried by a later call.
 // No Deno-only imports, so Jest can test it.
 
-import type { SendResult, TelegramMessage } from './telegram.ts';
+import { localizedMessage, type SendResult, type TelegramMessage } from './telegram.ts';
+import { telegramText, telegramTexts } from './telegram-texts.ts';
 import { timingSafeEqual } from './telegram-bot.ts';
 
 /** One row of new_account_notification(): the waiting account's name and the teacher's id. */
@@ -24,12 +25,12 @@ export type NewAccountReport = { recipients: number } & SendResult;
 
 /** The message text, exactly as the story sets it (plain text: the name is shown as typed). */
 export function newAccountText(name: string) {
-  return `New account waiting for your approval: ${name}. Open Sham → Manage roles to accept or decline.`;
+  return telegramText('en', 'newAccount', { name });
 }
 
 /** One message per recipient row (in practice zero or one: the teacher). */
 export function newAccountMessages(rows: NewAccountRecipient[]): TelegramMessage[] {
-  return rows.map((r) => ({ userId: r.user_id, kind: 'new_account' as const, text: newAccountText(r.account_name) }));
+  return rows.map((r) => localizedMessage(r.user_id, 'new_account', telegramTexts('newAccount', { name: r.account_name })));
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

@@ -1,5 +1,5 @@
 // ARU-112: deletes homework photos 6 months after checking, warns their senders on Telegram 30 and 7 days before, and
-// removes leftover photos from failed sends. Called once a day by the pg_cron job from migration 0052 (through
+// removes leftover photos from failed sends. Called once a day by the pg_cron job from migration 0053 (through
 // pg_net, with the secret in x-cron-secret). The logic is in ../_shared/photo-deletion.ts (tested with Jest); this
 // file only wires it to Supabase, Storage and Telegram.
 //

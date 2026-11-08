@@ -1,5 +1,5 @@
 -- ARU-112: the daily photo-deletion job's database side.
--- Rules under test: supabase/migrations/0052_homework_photo_deletion.sql (on top of 0050's photo_deletion_date()).
+-- Rules under test: supabase/migrations/0053_homework_photo_deletion.sql (on top of 0050's photo_deletion_date()).
 -- Fixture (t.seed): S1 sent HW_A1 (A, photo S1/a1.jpg, submitted) and HW_B1 (B, photo S1/b1.jpg, submitted); S2 and S3
 -- are students. Below, extra homework is made as the admin with checked_at relative to now.
 select t.seed();

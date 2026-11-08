@@ -1,9 +1,11 @@
 // ARU-107 (part a): the 6-month rule for homework photos. Nothing is deleted yet (ARU-112 is the daily job); the app
 // shows each photo's deletion date, warns 30 days before and lets the sender download their photos as a ZIP.
+import { currentLanguage, formatDateIn, type Language, translate } from '@/i18n';
+
 import type { Homework } from './types';
 
 export const PHOTO_RULE = 'Photos are kept for 6 months after the homework is checked, then deleted.';
-/** ARU-112 AC 6: shown in place of a photo the daily job removed. */
+/** ARU-112 AC 6: the English text shown in place of a removed photo (the screen reads catalog homework.photoRemoved). */
 export const PHOTO_REMOVED = 'Photo removed 6 months after checking';
 export const PHOTOS_ZIP_ERROR = "Couldn't prepare your photos. Check your connection and try again.";
 /** At most this many photos in one ZIP (the server's PHOTO_ZIP_MAX); more opens Download by course (AC 6). */
@@ -37,14 +39,9 @@ export function photoDeletionDate(checkedAt: string | undefined, start: string |
   return date < start ? start : date;
 }
 
-/** A UTC date (YYYY-MM-DD) in the app's usual date format, unchanged by the device's time zone. */
-export function formatUtcDate(day: string) {
-  return new Date(`${day}T00:00:00Z`).toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
+/** A UTC date (YYYY-MM-DD) in the app's language (ARU-109), unchanged by the device's time zone: "12 May 2027". */
+export function formatUtcDate(day: string, lang: Language = currentLanguage()) {
+  return formatDateIn(lang, `${day}T00:00:00Z`, 'UTC');
 }
 
 /** Homework the user sent whose photo is still stored (a missing file has no signed URL). */
@@ -68,8 +65,8 @@ export function deletionWarning(
   return dates.length ? { count: dates.length, date: dates[0] } : null;
 }
 
-export function deletionWarningText({ count, date }: { count: number; date: string }) {
-  return `${count} homework ${count === 1 ? 'photo' : 'photos'} will be deleted on ${formatUtcDate(date)}. Download them now.`;
+export function deletionWarningText({ count, date }: { count: number; date: string }, lang: Language = currentLanguage()) {
+  return translate(lang, 'homework.photoDeletionWarning', { count, date: formatUtcDate(date, lang) });
 }
 
 export type ZipEntry = { key: string; courseId: string; title: string; part: number; parts: number; count: number };
@@ -79,7 +76,7 @@ export function zipEntries(photos: Homework[], courseTitle: (courseId: string) =
   const byCourse = new Map<string, number>();
   for (const h of photos) if (h.courseId) byCourse.set(h.courseId, (byCourse.get(h.courseId) ?? 0) + 1);
   return [...byCourse]
-    .map(([courseId, n]) => ({ courseId, n, title: courseTitle(courseId) ?? 'Course' }))
+    .map(([courseId, n]) => ({ courseId, n, title: courseTitle(courseId) ?? translate(currentLanguage(), 'homework.photosCourseFallback') }))
     .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }) || a.courseId.localeCompare(b.courseId))
     .flatMap(({ courseId, n, title }) => {
       const parts = Math.ceil(n / PHOTO_ZIP_MAX);

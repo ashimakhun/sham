@@ -9,7 +9,32 @@ export type NotificationKind = 'meeting_started' | 'chat_message' | 'homework_re
   | 'new_material'
   | 'photo_deletion';
 
-export type TelegramMessage = { userId: string; kind: NotificationKind; text: string };
+import { recipientLanguage, type TelegramLanguage } from './telegram-texts.ts';
+
+/**
+ * `text` is the English text. ARU-110: a message built from the catalog also carries `texts` (every language), and
+ * each recipient gets the one for their language (AC 1, AC 4); without it, `text` is sent as before.
+ */
+export type TelegramMessage = {
+  userId: string;
+  kind: NotificationKind;
+  text: string;
+  readonly texts?: Partial<Record<TelegramLanguage, string>>;
+};
+
+/**
+ * ARU-110: a message in every language. `texts` is attached as a non-enumerable property, so the message still reads,
+ * logs and compares as { userId, kind, text } (the English text, exactly as before); a copy without it is English.
+ */
+export function localizedMessage(
+  userId: string,
+  kind: NotificationKind,
+  texts: Record<TelegramLanguage, string>,
+): TelegramMessage {
+  const message: TelegramMessage = { userId, kind, text: texts.en };
+  Object.defineProperty(message, 'texts', { value: texts, enumerable: false });
+  return message;
+}
 
 export type SendResult = {
   /** Messages Telegram accepted. */
@@ -40,11 +65,40 @@ type DbResult = { data: unknown; error: { message: string } | null };
 
 /** The bits of a supabase-js client (service role) this helper uses. */
 export type ServiceClient = {
-  from(table: 'telegram_links'): {
+  from(table: 'telegram_links' | 'profiles'): {
     select(columns: string): { in(column: string, values: string[]): PromiseLike<DbResult> };
     delete(): { eq(column: string, value: unknown): { eq(column: string, value: unknown): PromiseLike<DbResult> } };
   };
 };
+
+type ProfileLanguageRow = { id: string; language?: unknown; device_language?: unknown };
+
+/**
+ * ARU-110 AC 1: each recipient's language (profiles.language, then device_language, then English), read with the
+ * service role in the same pass as the links. Only when a message has a Russian text; a failed read sends English,
+ * so a language problem never stops a notification (AC 7).
+ */
+async function recipientLanguages(client: ServiceClient, messages: TelegramMessage[]) {
+  const languages = new Map<string, TelegramLanguage>();
+  const ids = [...new Set(messages.filter((m) => m.texts?.ru).map((m) => m.userId))];
+  if (!ids.length) return languages;
+  try {
+    const { data, error } = await client.from('profiles').select('id, language, device_language').in('id', ids);
+    if (error) return languages;
+    for (const row of (data as ProfileLanguageRow[] | null) ?? []) {
+      if (typeof row?.id === 'string') languages.set(row.id, recipientLanguage(row));
+    }
+  } catch {
+    // English for everyone.
+  }
+  return languages;
+}
+
+/** The text a message is sent with: the recipient's language when the message has it, else English. */
+function textFor(m: TelegramMessage, languages: Map<string, TelegramLanguage>) {
+  const lang = languages.get(m.userId) ?? 'en';
+  return m.texts?.[lang] || m.text;
+}
 
 export type SendOptions = {
   /** At most this many sends start in any 1-second window (Telegram allows about 30 per second per bot). */
@@ -115,6 +169,7 @@ export async function sendTelegramMessages(
     return result;
   }
   const links = new Map(((data as LinkRow[] | null) ?? []).map((l) => [l.user_id, l]));
+  const languages = await recipientLanguages(client, messages);
 
   // Start times of recent sends, for the per-second limit.
   const starts: number[] = [];
@@ -140,7 +195,7 @@ export async function sendTelegramMessages(
     let done = false;
     for (let attempt = 1; attempt <= maxTries && !done; attempt++) {
       await throttle();
-      const outcome = await sendOnce(fetchFn, token, link.chat_id, m.text);
+      const outcome = await sendOnce(fetchFn, token, link.chat_id, textFor(m, languages));
       if (outcome.kind === 'ok') {
         result.sent++;
         done = true;

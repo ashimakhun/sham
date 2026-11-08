@@ -177,7 +177,11 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `0051_profile_language.sql` (ARU-108: Russian version, part 1; adds `profiles.language` ('en', 'ru' or null =
    follow the phone; existing accounts get null) and puts it in the profile update grant next to `full_name`, so users
    change only their own; no other policy changes, deletes nothing),
-   `0052_homework_photo_deletion.sql` (ARU-112: the daily photo-deletion job; adds `homework.photo_removed_at`, the
+   `0052_profile_device_language.sql` (ARU-110: Russian version, part 4; adds `profiles.device_language` ('en', 'ru'
+   or null), the phone language the app saves for a user who never chose one, so Telegram notifications follow it;
+   in the profile update grant next to `full_name` and `language`, so users change only their own; existing accounts
+   get null; no other policy changes, deletes nothing),
+   `0053_homework_photo_deletion.sql` (ARU-112: the daily photo-deletion job; adds `homework.photo_removed_at`, the
    service-role-only `photo_deletion_warnings` table, `telegram_links.notify_photo_deletion` (on for existing links),
    the kind `photo_deletion` in `set_telegram_notification()`, five service-role functions and a daily `pg_cron` job;
    needs **pg_cron** and **pg_net**; deletes nothing until the Edge Function is deployed and its URL and secret are in
@@ -546,7 +550,7 @@ Until the steps below are done, nothing is deleted, no warning is sent and the s
 
 1. Dashboard → **Database → Extensions**: turn on **pg_cron** and **pg_net** (already on if you set up
    [Meeting started](#meeting-started-aru-41)).
-2. Run `supabase/migrations/0052_homework_photo_deletion.sql` (it stops with a message if step 1 is missing).
+2. Run `supabase/migrations/0053_homework_photo_deletion.sql` (it stops with a message if step 1 is missing).
 3. Make a random secret (`openssl rand -hex 24`) and set it as the function's secret:
    ```bash
    npx supabase secrets set PHOTO_DELETION_SECRET=<secret>
@@ -615,8 +619,23 @@ All texts live in one catalog: `src/i18n/en.json` and `src/i18n/ru.json` (the sa
 `formatDate` / `formatWeekdayDate` / `formatDateTime` from the same hook, in the chosen language. `npm test` fails when
 an ID is missing from one file, a Russian text or a note is empty, or the `{placeholders}` differ.
 Moved to the catalog so far (part 1): sign-in and create account, Reset and Change password, the waiting / declined
-screens, the tab bar and the Profile tab. The other screens are still English (ARU-109, ARU-113); Telegram messages
-(ARU-110) and database errors (ARU-111) come later.
+screens, the tab bar and the Profile tab; (part 2, ARU-109) the Homework and Courses tabs, homework, course, listener,
+feedback, meeting and discipline screens; (part 3, ARU-113) Materials, the chats, Pay, the accountant screens, Manage
+roles, the Telegram notifications page and Delete account. Every screen is now in both languages; the only app English
+left in Russian is the Telegram page's **Connect Telegram** / **Disconnect** buttons, which match the bot's English
+replies (product owner decision). Database errors (ARU-111) come later.
+
+Telegram notifications (ARU-110) go out in each recipient's language: the one they chose in Profile, else the phone
+language the app saved on their account at start (`profiles.device_language`), else English. Their texts are in
+`supabase/functions/_shared/telegram-texts.ts` (English, Russian and a note each, checked by
+`telegram-i18n.test.ts`); a new notification kind adds its texts there and builds its messages with
+`localizedMessage()`. The bot's own `/start` / `/stop` replies stay English (product owner decision).
+
+Shared pieces follow the chosen language too: `ErrorText` shows an app message the catalog knows in that language and
+any other text (a database error) as it came (`translateKnown`, with the app's messages listed in `APP_MESSAGE_IDS` in
+`src/i18n/index.ts`); `formatDate` / `formatDateTime` in `src/lib/theme.ts`, the shared confirmation's Cancel and the
+"Deleted account" fallback read the current language (`currentLanguage()`, set by `LanguageProvider`). Shared
+components import the hook from `src/i18n/context.tsx`, which doesn't load the store.
 
 ## Project structure
 
