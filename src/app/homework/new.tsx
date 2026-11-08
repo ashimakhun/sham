@@ -6,6 +6,7 @@ import { Image, Text, View } from 'react-native';
 import { dueText } from '@/components/AssignmentCard';
 import { KeyboardForm } from '@/components/KeyboardForm';
 import { Button, EmptyState, ErrorText, Field, styles } from '@/components/ui';
+import { preparePhoto } from '@/lib/compressPhoto';
 import { newId } from '@/lib/id';
 import { PHOTO_RULE } from '@/lib/photoRetention';
 import { useStore } from '@/lib/store';
@@ -20,6 +21,8 @@ export default function NewHomeworkScreen() {
   const [title, setTitle] = useState(assignment?.title ?? '');
   const [description, setDescription] = useState('');
   const [photoUri, setPhotoUri] = useState<string>();
+  const [preparing, setPreparing] = useState(false);
+  const [pickError, setPickError] = useState<string | null>(null);
   // One id per form: a retry after a network error cannot save the homework twice.
   const [id] = useState(newId);
   const { busy, error, run } = useAction();
@@ -35,8 +38,25 @@ export default function NewHomeworkScreen() {
   const owner = getUser(course.createdById);
 
   async function pickPhoto() {
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
-    if (!result.canceled) setPhotoUri(result.assets[0].uri);
+    // iOS: "Compatible" hands over HEIC as JPEG. Full quality here: the one compression is preparePhoto's (ARU-105).
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 1,
+      preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+    });
+    if (result.canceled || !result.assets?.length) return;
+    setPickError(null);
+    setPreparing(true);
+    try {
+      // ARU-105 AC 1–3: resized and compressed now, so the preview is exactly what is uploaded.
+      const photo = await preparePhoto(result.assets[0].uri);
+      setPhotoUri(photo.uri);
+    } catch (e) {
+      // AC 6: nothing new is attached; an earlier photo stays.
+      setPickError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPreparing(false);
+    }
   }
 
   function submit() {
@@ -73,14 +93,27 @@ export default function NewHomeworkScreen() {
         <Text style={styles.label}>Photo (optional)</Text>
         {/* ARU-107 AC 8 */}
         <Text style={styles.muted}>{PHOTO_RULE}</Text>
-        {photoUri && <Image source={{ uri: photoUri }} style={{ width: '100%', height: 220, borderRadius: 10 }} />}
-        <Button title={photoUri ? 'Change photo' : 'Attach a photo'} variant="secondary" onPress={pickPhoto} />
+        {photoUri && (
+          <Image
+            testID="homework-photo-preview"
+            accessibilityLabel="Attached photo"
+            source={{ uri: photoUri }}
+            style={{ width: '100%', height: 220, borderRadius: 10 }}
+          />
+        )}
+        <Button
+          title={preparing ? 'Preparing photo…' : photoUri ? 'Change photo' : 'Attach a photo'}
+          variant="secondary"
+          onPress={pickPhoto}
+          disabled={preparing || busy}
+        />
+        <ErrorText error={pickError} />
       </View>
       <ErrorText error={error} />
       <Button
         title={busy ? 'Sending…' : 'Send to mentor'}
         onPress={submit}
-        disabled={!title.trim() || busy}
+        disabled={!title.trim() || busy || preparing}
       />
       <Text style={[styles.muted, { textAlign: 'center' }]}>
         {/* The course owner is its mentor; any mentor or the teacher may check (ARU-14), so no "will check it". */}

@@ -1,5 +1,5 @@
 -- ARU-107 (part a): server-set checked_at, the deletion start date and date, and the ZIP functions.
--- Rules under test: supabase/migrations/0049_homework_photo_rule.sql.
+-- Rules under test: supabase/migrations/0050_homework_photo_rule.sql.
 -- Fixture (t.seed): S1 has HW_A1 (A, photo S1/a1.jpg, submitted), HW_A2 (A, no photo, checked by M) and HW_B1
 -- (B, photo S1/b1.jpg, submitted). Below S1 is a listener of A; S2 is a listener of A with one photo.
 select t.seed();

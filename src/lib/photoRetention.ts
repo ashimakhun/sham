@@ -26,7 +26,7 @@ export function addDays(day: string, days: number) {
 }
 
 /**
- * AC 3, the same rule as photo_deletion_date() in migration 0049: the UTC date of the check + 6 months, never before
+ * AC 3, the same rule as photo_deletion_date() in migration 0050: the UTC date of the check + 6 months, never before
  * the deletion start date. Null while the start date is empty (AC 2) or for homework that isn't checked.
  */
 export function photoDeletionDate(checkedAt: string | undefined, start: string | null | undefined): string | null {

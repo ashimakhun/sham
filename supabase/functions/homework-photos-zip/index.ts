@@ -3,7 +3,7 @@
 // The logic is in ../_shared/homework-photos-zip.ts (tested with Jest); this file only wires it to Supabase.
 //
 // No secrets to set: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase.
-// Needs migration 0049_homework_photo_rule.sql (homework_photos_for_zip, claim_photo_zip_link, photo_zip_links).
+// Needs migration 0050_homework_photo_rule.sql (homework_photos_for_zip, claim_photo_zip_link, photo_zip_links).
 //
 // Deploy without JWT verification, because the GET link is opened without an auth header. The POST checks the user's
 // token itself, and the GET accepts only a valid one-time token:

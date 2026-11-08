@@ -7,7 +7,7 @@
 --     photo_deletion_start; null while the start date is empty (AC 3). The app mirrors it in src/lib/photoRetention.ts.
 --   * photo_zip_links + homework_photos_for_zip() + claim_photo_zip_link(): the one-time ZIP links of
 --     "Download my photos" (AC 5–7), used only by the homework-photos-zip Edge Function (service role).
--- Deletes no file and no row (AC 10). Renumber to the next free number if another 0049 lands first.
+-- Deletes no file and no row (AC 10). Needs 0049 (ARU-105) only for the number.
 
 -- AC 1: existing checked homework keeps its time; checked rows without one get now(). Before the trigger exists.
 update homework set checked_at = now() where status = 'checked' and checked_at is null;
