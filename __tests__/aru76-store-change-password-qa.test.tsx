@@ -85,13 +85,15 @@ it('AC5: the older code-less reply "Invalid login credentials" (400) is a wrong 
   expect(mockAuth.updateUser).not.toHaveBeenCalled();
 });
 
+// ARU-108 AC 7a: "Email not confirmed" now comes through as the catalog text, still never as a wrong password.
 it.each([
-  ['a server error', { message: 'Database error querying schema', code: 'unexpected_failure', status: 500 }],
-  ['email not confirmed', { message: 'Email not confirmed', code: 'email_not_confirmed', status: 400 }],
-])('%s on the check is shown as it is, never as a wrong password; nothing updated', async (_k, error) => {
+  ['a server error', { message: 'Database error querying schema', code: 'unexpected_failure', status: 500 }, 'Database error querying schema'],
+  ['email not confirmed', { message: 'Email not confirmed', code: 'email_not_confirmed', status: 400 }, 'Confirm your email first: open the link we sent you.'],
+])('%s on the check is not shown as a wrong password; nothing updated', async (_k, error, shown) => {
   mockAuth.signInWithPassword.mockResolvedValue({ data: {}, error });
   await mount();
-  await expect(store.changePassword('oldpass', 'secret6')).rejects.toThrow(error.message);
+  await expect(store.changePassword('oldpass', 'secret6')).rejects.toThrow(shown);
+  await expect(store.changePassword('oldpass', 'secret6')).rejects.not.toThrow('Current password is incorrect');
   expect(mockAuth.updateUser).not.toHaveBeenCalled();
 });
 
