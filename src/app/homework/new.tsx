@@ -7,6 +7,7 @@ import { dueText } from '@/components/AssignmentCard';
 import { KeyboardForm } from '@/components/KeyboardForm';
 import { Button, EmptyState, ErrorText, Field, styles } from '@/components/ui';
 import { newId } from '@/lib/id';
+import { PHOTO_RULE } from '@/lib/photoRetention';
 import { useStore } from '@/lib/store';
 import { formatDateTime } from '@/lib/theme';
 import { useAction } from '@/lib/useAction';
@@ -70,6 +71,8 @@ export default function NewHomeworkScreen() {
       />
       <View style={{ gap: 8 }}>
         <Text style={styles.label}>Photo (optional)</Text>
+        {/* ARU-107 AC 8 */}
+        <Text style={styles.muted}>{PHOTO_RULE}</Text>
         {photoUri && <Image source={{ uri: photoUri }} style={{ width: '100%', height: 220, borderRadius: 10 }} />}
         <Button title={photoUri ? 'Change photo' : 'Attach a photo'} variant="secondary" onPress={pickPhoto} />
       </View>

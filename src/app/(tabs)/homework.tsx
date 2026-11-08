@@ -4,7 +4,9 @@ import { FlatList, Pressable, Text, View } from 'react-native';
 import { AssignmentCard } from '@/components/AssignmentCard';
 import { AuthorFilter } from '@/components/AuthorFilter';
 import { HomeworkCard } from '@/components/HomeworkCard';
+import { DownloadMyPhotosButton, PhotoDeletionBanner } from '@/components/PhotoDownload';
 import { EmptyState, Segmented, styles, UnreadBadge } from '@/components/ui';
+import { deletionWarning, storedOwnPhotos } from '@/lib/photoRetention';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import type { Homework, HomeworkAssignment, HomeworkStatus } from '@/lib/types';
@@ -36,7 +38,8 @@ const emptyText: Record<string, { title: string; hint: string }> = {
 };
 
 export default function HomeworkScreen() {
-  const { currentUser, courses, courseMembers, loading, refresh, visibleHomework, assignments, getCourse } = useStore();
+  const { currentUser, courses, courseMembers, loading, refresh, visibleHomework, assignments, getCourse, photoDeletionStart } =
+    useStore();
   const role = currentUser?.role ?? 'student';
   const me = currentUser?.id;
   const now = useNow();
@@ -124,6 +127,11 @@ export default function HomeworkScreen() {
         { value: 'checked', label: 'Checked' },
       ];
 
+  // ARU-107: the user's own stored photos (any status), the 30-day warning (AC 4) and Download my photos (AC 5). Only
+  // in the sender's views: students' lists, and mentors' Listener side. All courses, whatever the course filter.
+  const myPhotos = listenerView ? storedOwnPhotos(visibleHomework, me) : [];
+  const warning = listenerView ? deletionWarning(visibleHomework, me, photoDeletionStart, new Date(now)) : null;
+
   const empty =
     shown === 'new'
       ? emptyText[inLoadedCourse ? 'new' : 'newNoCourse']
@@ -151,7 +159,9 @@ export default function HomeworkScreen() {
       ListHeaderComponent={
         <View style={{ gap: 12 }}>
           {showSwitcher && <TabSwitch value={tab} onChange={switchTab} newCount={fresh.length} />}
+          {warning && <PhotoDeletionBanner warning={warning} totalPhotos={myPhotos.length} />}
           <Segmented<Filter> value={shown} onChange={setFilter} options={options} />
+          {listenerView && shown === 'checked' && <DownloadMyPhotosButton totalPhotos={myPhotos.length} />}
           {filterByCourse && (
             <AuthorFilter
               noun="course"

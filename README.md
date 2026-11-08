@@ -162,7 +162,14 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `set_telegram_notification()` (keeps 0044/0045/0046's kinds), `new_material_recipients()` and after-insert
    triggers on `materials` and `material_files`, turns on `pg_net` if the server offers it; no policy changes,
    deletes nothing; needs 0046. Works without the Vault secrets (it then sends nothing), see
-   [Telegram notifications](#telegram-notifications) → New materials).
+   [Telegram notifications](#telegram-notifications) → New materials),
+   `0049_homework_photo_rule.sql` (ARU-107: the 6-month rule for homework photos, without deleting anything yet;
+   a trigger makes `homework.checked_at` server-set (set when checked, cleared when unchecked, any client value
+   overwritten; checked homework without one gets the migration's time), adds the one-row `app_settings` table
+   (`photo_deletion_start`, null until ARU-112's daily job runs), `photo_deletion_date()`, the `photo_zip_links` table
+   and the service-role functions `homework_photos_for_zip()` and `claim_photo_zip_link()` for **Download my photos**;
+   deletes nothing. Then deploy the `homework-photos-zip` Edge Function, see
+   [Download my photos](#download-my-photos-aru-107)).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
@@ -483,6 +490,27 @@ the foreground (it asks Auth whether the user still exists).
 3. Check: sign in as a test student and delete the account from Profile → **Delete account**; the user disappears
    from **Authentication → Users** and from `profiles`, and its files from the `homework` bucket.
 
+### Download my photos (ARU-107)
+
+Homework photos are kept for 6 months after the homework is checked (the deletion itself is ARU-112's daily job;
+nothing is deleted yet). A sender downloads their own stored photos as a ZIP from the Homework tab's **Checked** list
+(students; mentors on the Listener side), or from the warning banner. The app asks the Edge Function
+`homework-photos-zip` (POST, with the user's token) for a one-time link valid for 60 seconds, and opens it like a photo's
+Download. The link (GET) streams `sham-homework-photos-<date>.zip` with at most 50 photos; more than 50 are offered by
+course on **Download by course**. Only a hash of each link is stored (`photo_zip_links`); no ZIP is stored.
+
+1. Run `supabase/migrations/0049_homework_photo_rule.sql`.
+2. Deploy the function without JWT verification (the link is opened without an auth header; the POST checks the
+   user's token itself and the GET accepts only an unused, unexpired link). It needs no secrets of its own:
+   ```bash
+   npx supabase functions deploy homework-photos-zip --no-verify-jwt
+   ```
+3. Check: as a student with a homework photo, tap **Download my photos** on Checked; a ZIP downloads. Opening the same
+   link again shows "This download link has expired or was already used".
+
+The warning banner ("<N> homework photos will be deleted on <date>") stays hidden until ARU-112's job sets
+`app_settings.photo_deletion_start`.
+
 ## Run it
 
 ```bash
@@ -524,6 +552,7 @@ src/app/                  screens (Expo Router — every file is a route)
   (tabs)/                 Homework · Courses (My courses / All courses) · Materials · Profile tabs
   homework/new.tsx        a listener sends homework for an assignment (opened from New)
   homework/[id].tsx       homework details; mentor marks it checked
+  homework/photos.tsx     Download by course: a sender's homework photos as ZIPs of at most 50 (ARU-107)
   courses/new.tsx         teacher or mentor creates a course (visible or hidden)
   courses/[id].tsx        course details, meetings, a Listeners row, linked Knowledge base PDFs, feedback and homework
   courses/[id]/feedback.tsx  a listener adds or edits their feedback (stars + review)
@@ -560,6 +589,8 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | See homework assignments   | courses they're in | ✓ (all courses) | ✓    |
 | Assign homework to a completed meeting | | own courses        | any course |
 | Send homework (for an assignment) | courses they're in | courses they're in |  |
+| Download own homework photos as a ZIP (one-time link, ARU-107) | own photos | own photos (sent as a listener) |  |
+| Set `homework.checked_at` directly (ARU-107: the server sets it when checking) | (nobody) | (nobody) | (nobody) |
 | Mark homework checked      |           | any (not their own) | any (not their own) |
 | See courses (database)     | all except hidden ones they're not in (title and description only unless they're in it) | all except hidden ones they don't own or attend | all |
 | Courses list (Courses tab, ARU-63) | courses they're in + courses with no discipline | own and attended courses + courses with no discipline | own courses + courses with no discipline (hidden ones too); every course through a discipline card |
