@@ -162,7 +162,11 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `set_telegram_notification()` (keeps 0044/0045/0046's kinds), `new_material_recipients()` and after-insert
    triggers on `materials` and `material_files`, turns on `pg_net` if the server offers it; no policy changes,
    deletes nothing; needs 0046. Works without the Vault secrets (it then sends nothing), see
-   [Telegram notifications](#telegram-notifications) → New materials).
+   [Telegram notifications](#telegram-notifications) → New materials),
+   `0049_homework_photo_limits.sql` (ARU-105: the `homework` bucket accepts only JPEG files up to 10 MB (the app
+   resizes and compresses photos when they're picked); adds `homework_photo_in_use()` and two storage policies that
+   let a sender read and delete their own photo in their own folder while no homework row points to it, so a failed
+   send leaves no photo behind; existing files and policies are unchanged, deletes nothing).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
@@ -560,6 +564,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | See homework assignments   | courses they're in | ✓ (all courses) | ✓    |
 | Assign homework to a completed meeting | | own courses        | any course |
 | Send homework (for an assignment) | courses they're in | courses they're in |  |
+| Remove own leftover photo of a failed send (own folder, no homework points to it; ARU-105) | ✓ | ✓ |  |
 | Mark homework checked      |           | any (not their own) | any (not their own) |
 | See courses (database)     | all except hidden ones they're not in (title and description only unless they're in it) | all except hidden ones they don't own or attend | all |
 | Courses list (Courses tab, ARU-63) | courses they're in + courses with no discipline | own and attended courses + courses with no discipline | own courses + courses with no discipline (hidden ones too); every course through a discipline card |
