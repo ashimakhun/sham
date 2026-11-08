@@ -8,6 +8,7 @@ import { KeyboardForm } from '@/components/KeyboardForm';
 import { Button, EmptyState, ErrorText, Field, styles } from '@/components/ui';
 import { preparePhoto } from '@/lib/compressPhoto';
 import { newId } from '@/lib/id';
+import { PHOTO_RULE } from '@/lib/photoRetention';
 import { useStore } from '@/lib/store';
 import { formatDateTime } from '@/lib/theme';
 import { useAction } from '@/lib/useAction';
@@ -90,6 +91,8 @@ export default function NewHomeworkScreen() {
       />
       <View style={{ gap: 8 }}>
         <Text style={styles.label}>Photo (optional)</Text>
+        {/* ARU-107 AC 8 */}
+        <Text style={styles.muted}>{PHOTO_RULE}</Text>
         {photoUri && (
           <Image
             testID="homework-photo-preview"
