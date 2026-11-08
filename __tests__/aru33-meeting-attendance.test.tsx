@@ -79,7 +79,7 @@ describe('listener marks attendance (AC1–AC5)', () => {
     await render(<CourseDetailScreen />);
     for (const id of ['C', 'ST']) expect(inMeeting(id).getByRole('button', { name: 'I attended' })).toBeTruthy();
     for (const id of ['S', 'X']) expect(inMeeting(id).queryByRole('button', { name: 'I attended' })).toBeNull();
-    expect(screen.queryByText(/Attended: /)).toBeNull();
+    expect(screen.queryByRole('link', { name: /^Attended / })).toBeNull();
   });
 
   it('AC2: tapping marks the meeting', async () => {
@@ -158,13 +158,13 @@ describe('listener marks attendance (AC1–AC5)', () => {
 });
 
 describe('owner, teacher and mentors see attendance (AC6, AC8)', () => {
-  it.each(['M', 'T', 'N'] as const)('AC6: %s sees "Attended: X of Y" on the completed and started meetings only (ARU-45)', async (who) => {
+  it.each(['M', 'T', 'N'] as const)('AC6: %s sees the attendance count on the completed and started meetings only (ARU-45)', async (who) => {
     setStore(store(who, { attendance: [mark('C', 'S1')] }));
     await render(<CourseDetailScreen />);
-    expect(inMeeting('C').getByText('Attended: 1 of 3')).toBeTruthy();
     expect(inMeeting('C').getByRole('link', { name: 'Attended 1 of 3' })).toBeTruthy();
-    expect(inMeeting('ST').getByText('Attended: 0 of 3')).toBeTruthy();
-    for (const id of ['S', 'X']) expect(inMeeting(id).queryByText(/Attended/)).toBeNull();
+    expect(inMeeting('C').getByRole('link', { name: 'Attended 1 of 3' })).toBeTruthy();
+    expect(inMeeting('ST').getByRole('link', { name: 'Attended 0 of 3' })).toBeTruthy();
+    for (const id of ['S', 'X']) expect(inMeeting(id).queryByRole('link', { name: /^Attended / })).toBeNull();
   });
 
   it('AC6: tapping the count opens the Attendance screen', async () => {
@@ -180,7 +180,7 @@ describe('owner, teacher and mentors see attendance (AC6, AC8)', () => {
   it('AC8: a mentor listener sees only their own mark, no count', async () => {
     setStore(store('M2', { attendance: [mark('C', 'S1')] }));
     await render(<CourseDetailScreen />);
-    expect(screen.queryByText(/Attended: /)).toBeNull();
+    expect(screen.queryByRole('link', { name: /^Attended / })).toBeNull();
     expect(inMeeting('C').getByRole('button', { name: 'I attended' })).toBeTruthy();
   });
 });

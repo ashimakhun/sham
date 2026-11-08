@@ -658,7 +658,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Edit / reschedule a scheduled meeting | | own courses           | any course |
 | Read meeting notes         | courses they're in | ✓ (all courses)  | ✓       |
 | Add / edit / clear notes on a completed meeting | | own courses | any course |
-| Mark a completed meeting's homework checked / undo | | any course they can see, not one they're a listener of | any course |
+| Mark a completed meeting's homework checked (ARU-126: no undo in the app) | | any course they can see, not one they're a listener of | any course |
 | Mark / undo own attendance of a started meeting | courses they're in | courses they're in |  |
 | See who attended a meeting | own marks only | ✓ (own courses and courses they don't listen to; own marks only where a listener) | ✓ |
 | See materials              | ✓         | ✓                  | ✓       |

@@ -1,5 +1,6 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { type ComponentProps, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Card, ErrorText, styles } from '@/components/ui';
@@ -25,7 +26,7 @@ import {
   canSeeMeetings,
 } from '@/lib/roles';
 import { useStore } from '@/lib/store';
-import { colors, formatDate, formatDateTime } from '@/lib/theme';
+import { colors, formatDateTime } from '@/lib/theme';
 import type { Course, Meeting, MeetingStatus } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
 import { useNow } from '@/lib/useNow';
@@ -53,36 +54,58 @@ export function MeetingBadge({ meeting, now }: { meeting: Pick<Meeting, 'status'
 /** Pills are about 30 pt tall; the vertical hit slop makes the tap target at least 44 pt (ARU-88 AC 6). */
 const PILL_HIT_SLOP = { top: 8, bottom: 8, left: 4, right: 4 };
 
-/** ARU-88: a compact action pill in a meeting tile's footer. Red (`danger`) for Mark canceled / Cancel meeting and
- *  attendance Undo. `disabled` is passed only by actions that were disabled while saving before. */
+/** ARU-126: a round icon-only pill is 30 pt across; this slop makes its tap target 44 × 44 pt. */
+const ICON_HIT_SLOP = { top: 7, bottom: 7, left: 7, right: 7 };
+
+const TONE = {
+  primary: { fg: colors.primary, bg: colors.primarySoft },
+  success: { fg: colors.success, bg: colors.successSoft },
+  danger: { fg: colors.danger, bg: '#FEF2F2' },
+} as const;
+
+/** ARU-88: a compact action pill in a meeting tile's footer. Red (`danger`) for Cancel meeting and attendance Undo.
+ *  `disabled` is passed only by actions that were disabled while saving before.
+ *  ARU-126: with an `icon` and no `title` it's a round icon-only pill (✓, ✕, pencil); with both, the icon comes before
+ *  the text (the people count). `label` is what screen readers say. */
 function ActionPill({
   title,
   label = title,
+  icon,
   role = 'button',
   tone = 'primary',
   disabled,
   onPress,
+  testID,
 }: {
-  title: string;
+  title?: string;
   label?: string;
+  icon?: ComponentProps<typeof Ionicons>['name'];
   role?: 'button' | 'link';
-  tone?: 'primary' | 'danger';
+  tone?: keyof typeof TONE;
   disabled?: boolean;
   onPress: () => void;
+  testID?: string;
 }) {
-  const danger = tone === 'danger';
+  const { fg, bg } = TONE[tone];
+  const round = !!icon && !title;
   return (
     <Pressable
+      testID={testID}
       accessibilityRole={role}
       accessibilityLabel={label}
       accessibilityState={disabled === undefined ? undefined : { disabled }}
       disabled={disabled}
-      hitSlop={PILL_HIT_SLOP}
+      hitSlop={round ? ICON_HIT_SLOP : PILL_HIT_SLOP}
       onPress={onPress}
-      style={({ pressed }) => [tile.pill, danger && tile.pillDanger, pressed && { opacity: 0.7 }]}>
-      <Text style={[tile.pillText, { color: danger ? colors.danger : colors.primary, opacity: disabled ? 0.4 : 1 }]}>
-        {title}
-      </Text>
+      style={({ pressed }) => [
+        tile.pill,
+        { backgroundColor: bg },
+        round && tile.iconPill,
+        !!icon && !!title && tile.iconTextPill,
+        pressed && { opacity: 0.7 },
+      ]}>
+      {icon ? <Ionicons name={icon} size={round ? 18 : 15} color={fg} style={{ opacity: disabled ? 0.4 : 1 }} /> : null}
+      {title ? <Text style={[tile.pillText, { color: fg, opacity: disabled ? 0.4 : 1 }]}>{title}</Text> : null}
     </Pressable>
   );
 }
@@ -101,7 +124,6 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
     meetings,
     assignments,
     attendance,
-    getUser,
     setMeetingStatus,
     setMeetingHomeworkChecked,
     markAttendance,
@@ -147,20 +169,21 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
     });
   }
 
-  // ARU-60: mark a Completed meeting's homework checked (moves it to MEETING HISTORY), or undo that.
-  function setChecked(meeting: Meeting, checked: boolean) {
+  // ARU-60: mark a Completed meeting's homework checked (moves it to MEETING HISTORY). ARU-126 AC 8: there is no
+  // undo in the app any more, which is why the confirmation stays.
+  function markChecked(meeting: Meeting) {
     run(async () => {
       const values = { topic: meeting.topic, when: formatDateTime(meeting.startsAt) };
       const confirmed = await confirmAction(
-        t(checked ? 'meetings.markHomeworkChecked' : 'meetings.undoCheck'),
-        t(checked ? 'meetings.confirmChecked' : 'meetings.confirmUndoCheck', values),
-        t(checked ? 'meetings.markChecked' : 'meetings.undoCheck'),
+        t('meetings.markHomeworkChecked'),
+        t('meetings.confirmChecked', values),
+        t('meetings.markChecked'),
         { cancelText: t('meetings.notNow') },
       );
       if (!confirmed) return;
       setChanging(meeting.id);
       try {
-        await setMeetingHomeworkChecked(meeting.id, checked);
+        await setMeetingHomeworkChecked(meeting.id, true);
       } finally {
         setChanging(undefined);
       }
@@ -251,21 +274,23 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
   function renderMeeting(m: Meeting, group: MeetingGroup) {
     const started = hasStarted(m, now);
     const canEdit = canManage && m.status === 'scheduled';
-    const actions: { title: string; status: Target }[] =
+    // ARU-126 AC 9 / 10: Mark completed (once started) is a ✓ icon; Cancel meeting / Mark canceled one ✕ icon.
+    const actions: { label: string; status: Target }[] =
       !canManage || m.status !== 'scheduled'
         ? []
         : started
           ? [
-              { title: t('meetings.markCompleted'), status: 'completed' },
-              { title: t('meetings.markCanceled'), status: 'canceled' },
+              { label: t('meetings.markCompleted'), status: 'completed' },
+              { label: t('meetings.cancelMeeting'), status: 'canceled' },
             ]
-          : [{ title: t('meetings.cancelMeeting'), status: 'canceled' }];
+          : [{ label: t('meetings.cancelMeeting'), status: 'canceled' }];
     // Notes (ARU-28): everyone who sees a completed meeting reads them; the owner and the teacher add or edit.
     const notesActions: { title: string; edit: boolean }[] =
       m.status !== 'completed'
         ? []
         : [
             ...(m.notes ? [{ title: t('notes.title'), edit: false }] : []),
+            // ARU-126 AC 5: the owner and the teacher get a pencil right after Notes (or alone without notes).
             ...(canManage ? [{ title: t(m.notes ? 'notes.edit' : 'notes.add'), edit: true }] : []),
           ];
     // Homework (ARU-32): one assignment per completed meeting, shown to everyone who sees the meeting.
@@ -275,23 +300,8 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
     // From the start time until the meeting is canceled (ARU-45); `now` ticks, so it appears without a refresh.
     const canMark = canMarkAttendance(currentUser, course, courseMembers, m, now);
     const attended = canMark && attendance.some((a) => a.meetingId === m.id && a.userId === currentUser?.id);
-    // ARU-60: completed meetings only; the line shows who marked it once it's in MEETING HISTORY.
-    const checkAction =
-      canCheck && m.status === 'completed'
-        ? m.homeworkCheckedAt
-          ? { title: t('meetings.undoCheck'), checked: false }
-          : { title: t('meetings.markHomeworkChecked'), checked: true }
-        : null;
-    const checkedLine =
-      m.status === 'completed' && m.homeworkCheckedAt
-        ? // ARU-75: no checker any more means they deleted their account.
-          t('meetings.checkedBy', {
-            name: m.homeworkCheckedById
-              ? getUser(m.homeworkCheckedById)?.name || t('common.unknown')
-              : t('common.deletedAccount'),
-            date: formatDate(m.homeworkCheckedAt),
-          })
-        : null;
+    // ARU-60: completed meetings awaiting the check only (ARU-126 AC 8: no undo, so nothing once it's in history).
+    const canMarkChecked = canCheck && m.status === 'completed' && !m.homeworkCheckedAt;
     const counts =
       seesAttendance && isOpenForAttendance(m, now)
         ? meetingAttendance(m.id, course.id, courseMembers, attendance)
@@ -304,7 +314,8 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
         ? [
             <ActionPill
               key="edit"
-              title={t('meetings.edit')}
+              icon="create-outline"
+              label={t('meetings.editMeeting')}
               disabled={busy}
               onPress={() =>
                 router.push({ pathname: '/courses/[id]/meetings/[meetingId]', params: { id: course.id, meetingId: m.id } })
@@ -312,9 +323,13 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
             />,
           ]
         : []),
-      ...notesActions.map((a) => (
-        <ActionPill key={a.title} title={a.title} role={a.edit ? 'button' : 'link'} onPress={() => openNotes(m, a.edit)} />
-      )),
+      ...notesActions.map((a) =>
+        a.edit ? (
+          <ActionPill key="notes-edit" icon="create-outline" label={a.title} onPress={() => openNotes(m, true)} />
+        ) : (
+          <ActionPill key="notes" title={a.title} role="link" onPress={() => openNotes(m, false)} />
+        ),
+      ),
       ...(canAssign
         ? [
             <ActionPill
@@ -345,7 +360,8 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
             <ActionPill
               key="count"
               role="link"
-              title={t('meetings.attendedCount', { n: counts.attended.length, total: counts.total })}
+              icon="people-outline"
+              title={t('meetings.attendedOf', { n: counts.attended.length, total: counts.total })}
               label={t('meetings.attendedCountLabel', { n: counts.attended.length, total: counts.total })}
               onPress={() =>
                 router.push({
@@ -356,19 +372,30 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
             />,
           ]
         : []),
-      ...(checkAction
+      ...(canMarkChecked
         ? [
             <ActionPill
               key="check"
-              title={checkAction.title}
+              icon="checkmark"
+              tone="success"
+              label={t('meetings.markHomeworkChecked')}
               disabled={busy}
-              onPress={() => setChecked(m, checkAction.checked)}
+              onPress={() => markChecked(m)}
             />,
           ]
         : []),
       ...actions
         .filter((a) => a.status === 'completed')
-        .map((a) => <ActionPill key={a.title} title={a.title} disabled={busy} onPress={() => changeStatus(m, a.status)} />),
+        .map((a) => (
+          <ActionPill
+            key="complete"
+            icon="checkmark"
+            tone="success"
+            label={a.label}
+            disabled={busy}
+            onPress={() => changeStatus(m, a.status)}
+          />
+        )),
       ...(attended
         ? [
             <ActionPill
@@ -384,7 +411,14 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
       ...actions
         .filter((a) => a.status === 'canceled')
         .map((a) => (
-          <ActionPill key={a.title} title={a.title} tone="danger" disabled={busy} onPress={() => changeStatus(m, a.status)} />
+          <ActionPill
+            key="cancel"
+            icon="close"
+            tone="danger"
+            label={a.label}
+            disabled={busy}
+            onPress={() => changeStatus(m, a.status)}
+          />
         )),
     ];
 
@@ -418,21 +452,18 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
             </Text>
           )
         ) : null}
-        {assignment ? (
-          <Text style={styles.muted} numberOfLines={2} testID={`assignment-${m.id}`}>
-            <Text style={{ fontWeight: '600', color: colors.text }}>
+        {/* ARU-126 AC 1 / AC 7: "Homework: <title>", then Due on its own line; history tiles show neither. */}
+        {assignment && group !== 'history' ? (
+          <View testID={`assignment-${m.id}`}>
+            <Text style={[styles.muted, { fontWeight: '600', color: colors.text }]} numberOfLines={2}>
               {t('meetings.homeworkLine', { title: assignment.title })}
             </Text>
-            {' · '}
-            {assignment.dueAt
-              ? t('meetings.due', { when: formatDateTime(assignment.dueAt) })
-              : t('meetings.noDeadline')}
-          </Text>
-        ) : null}
-        {checkedLine ? (
-          <Text style={styles.muted} testID={`checked-${m.id}`}>
-            {checkedLine}
-          </Text>
+            <Text style={styles.muted} numberOfLines={1} testID={`assignment-due-${m.id}`}>
+              {assignment.dueAt
+                ? t('meetings.due', { when: formatDateTime(assignment.dueAt) })
+                : t('meetings.noDeadline')}
+            </Text>
+          </View>
         ) : null}
         {/* AC 6: no divider and no footer when the meeting has no actions. "Saving…" replaces the footer. */}
         {footer.length > 0 && (
@@ -477,6 +508,9 @@ const tile = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.primarySoft,
   },
-  pillDanger: { backgroundColor: '#FEF2F2' },
+  // ARU-126: round icon-only pills (✓, ✕, pencil), the same 30 pt height as the text pills.
+  iconPill: { width: 30, minWidth: 30, paddingHorizontal: 0, alignItems: 'center' },
+  // The people count: icon then "7 of 8".
+  iconTextPill: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   pillText: { fontSize: 13, fontWeight: '600' },
 });

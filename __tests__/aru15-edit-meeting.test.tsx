@@ -62,11 +62,11 @@ describe('Edit action', () => {
     const list = all.map((m) => ({ ...m, courseId }));
     setStore(fakeStore(who, { courses: [courseA, courseT1], courseMembers: members, meetings: list }));
     await render(<CourseDetailScreen />);
-    expect(inMeeting('F').getByRole('button', { name: 'Edit' })).toBeTruthy();
-    expect(inMeeting('P').getByRole('button', { name: 'Edit' })).toBeTruthy(); // past but not yet marked
-    expect(inMeeting('C').queryByRole('button', { name: 'Edit' })).toBeNull();
-    expect(inMeeting('X').queryByRole('button', { name: 'Edit' })).toBeNull();
-    await fireEvent.press(inMeeting('F').getByRole('button', { name: 'Edit' }));
+    expect(inMeeting('F').getByRole('button', { name: 'Edit meeting' })).toBeTruthy();
+    expect(inMeeting('P').getByRole('button', { name: 'Edit meeting' })).toBeTruthy(); // past but not yet marked
+    expect(inMeeting('C').queryByRole('button', { name: 'Edit meeting' })).toBeNull();
+    expect(inMeeting('X').queryByRole('button', { name: 'Edit meeting' })).toBeNull();
+    await fireEvent.press(inMeeting('F').getByRole('button', { name: 'Edit meeting' }));
     expect(router.push).toHaveBeenCalledWith({
       pathname: '/courses/[id]/meetings/[meetingId]',
       params: { id: courseId, meetingId: 'F' },
@@ -76,7 +76,7 @@ describe('Edit action', () => {
   it.each(['N', 'S1'] as const)('AC1: %s (mentor not owning it, student listener) sees no Edit', async (who) => {
     setStore(fakeStore(who, { courseMembers: members, meetings: all }));
     await render(<CourseDetailScreen />);
-    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Edit meeting' })).toBeNull();
   });
 
   it('AC5: "Rescheduled" shows only on meetings whose time was changed', async () => {

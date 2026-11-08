@@ -198,14 +198,22 @@ describe('AC7: reading notes', () => {
   });
 
   it('the owner sees Edit notes, which replaces the view with the editor', async () => {
-    params.meetingId = 'CN';
-    setStore(fakeStore('M', { courseMembers: members, meetings: [CN] }));
-    await render(<MeetingNotesScreen />);
-    await fireEvent.press(screen.getByRole('button', { name: 'Edit notes' }));
-    expect(router.replace).toHaveBeenCalledWith({
-      pathname: '/courses/[id]/meetings/[meetingId]/notes',
-      params: { id: 'A', meetingId: 'CN', edit: '1' },
-    });
+    // ARU-126 AC 6: the pencil is in the header's right; render the Stack header's headerRight for this test.
+    const { Stack } = jest.requireMock('expo-router') as { Stack: { Screen: unknown } };
+    const original = Stack.Screen;
+    Stack.Screen = ({ options }: { options?: { headerRight?: () => React.ReactNode } }) => options?.headerRight?.() ?? null;
+    try {
+      params.meetingId = 'CN';
+      setStore(fakeStore('M', { courseMembers: members, meetings: [CN] }));
+      await render(<MeetingNotesScreen />);
+      await fireEvent.press(screen.getByRole('button', { name: 'Edit notes' }));
+      expect(router.replace).toHaveBeenCalledWith({
+        pathname: '/courses/[id]/meetings/[meetingId]/notes',
+        params: { id: 'A', meetingId: 'CN', edit: '1' },
+      });
+    } finally {
+      Stack.Screen = original;
+    }
   });
 
   it('a meeting the user can no longer see shows "Meeting not found"', async () => {
