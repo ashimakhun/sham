@@ -137,6 +137,7 @@ const APP_MESSAGE_IDS: [TextId, Params?][] = [
   ['photo.tooLarge'],
   ['disciplines.hidden'],
   ['common.deletedAccount'],
+  ['homework.photosZipError'],
 ];
 const byEnglish = new Map<string, readonly [TextId, Params | undefined]>();
 const register = (entries: [TextId, Params?][]) => {

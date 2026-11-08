@@ -115,6 +115,8 @@ export function fakeStore(who: keyof typeof users | null, over: Partial<Store> =
     subscribeToGeneralMessages: jest.fn(() => () => {}),
     setUserRole: jest.fn(async () => {}),
     courseBilling: [],
+    photoDeletionStart: null,
+    requestPhotoZip: jest.fn(async () => 'https://zip.example/link'),
     setAccountant: jest.fn(async () => {}),
     selectPaidCourse: jest.fn(async () => {}),
     setBillingPeriod: jest.fn(async () => {}),

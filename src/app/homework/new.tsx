@@ -97,6 +97,8 @@ export default function NewHomeworkScreen() {
       />
       <View style={{ gap: 8 }}>
         <Text style={styles.label}>{t('homework.photoLabel')}</Text>
+        {/* ARU-107 AC 8 */}
+        <Text style={styles.muted}>{t('homework.photoRule')}</Text>
         {photoUri && (
           <Image
             testID="homework-photo-preview"
