@@ -130,7 +130,7 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
   function changeStatus(meeting: Meeting, status: Target) {
     const completed = status === 'completed';
     run(async () => {
-      const values = { topic: meeting.topic, when: formatDateTime(meeting.startsAt) };
+      const values = { when: formatDateTime(meeting.startsAt) };
       const confirmed = await confirmAction(
         t(completed ? 'meetings.markCompleted' : 'meetings.cancelMeeting'),
         t(completed ? 'meetings.confirmCompleted' : 'meetings.confirmCanceled', values),
@@ -150,7 +150,7 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
   // ARU-60: mark a Completed meeting's homework checked (moves it to MEETING HISTORY), or undo that.
   function setChecked(meeting: Meeting, checked: boolean) {
     run(async () => {
-      const values = { topic: meeting.topic, when: formatDateTime(meeting.startsAt) };
+      const values = { when: formatDateTime(meeting.startsAt) };
       const confirmed = await confirmAction(
         t(checked ? 'meetings.markHomeworkChecked' : 'meetings.undoCheck'),
         t(checked ? 'meetings.confirmChecked' : 'meetings.confirmUndoCheck', values),
@@ -183,7 +183,7 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
     run(async () => {
       const confirmed = await confirmAction(
         t('meetings.undoAttendance'),
-        t('meetings.confirmUndoAttendance', { topic: meeting.topic, when: formatDateTime(meeting.startsAt) }),
+        t('meetings.confirmUndoAttendance', { when: formatDateTime(meeting.startsAt) }),
         t('meetings.remove'),
         { destructive: true, cancelText: t('meetings.notNow') },
       );
@@ -392,17 +392,17 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
     // readers still reach each action (ARU-27).
     return (
       <View key={m.id} testID={`meeting-${m.id}`} style={[tile.tile, { borderLeftColor: meetingAccent[group] }]}>
-        {/* AC 4: the topic first, with the badge on the right that never gets squeezed off. */}
+        {/* ARU-129 AC 4: the date and time is the title (no topic), with the badge on the right that never gets
+            squeezed off; a long localized date wraps. "Rescheduled" has its own small grey line. */}
         <View style={[styles.row, { alignItems: 'flex-start' }]}>
-          <Text style={tile.topic} numberOfLines={2}>
-            {m.topic}
-          </Text>
+          <Text style={tile.title}>{formatDateTime(m.startsAt)}</Text>
           <MeetingBadge meeting={m} now={now} />
         </View>
-        <Text style={styles.muted}>
-          {formatDateTime(m.startsAt)}
-          {m.rescheduledAt ? <Text style={styles.muted}>{'  '}{t('meetings.rescheduled')}</Text> : null}
-        </Text>
+        {m.rescheduledAt ? (
+          <Text style={tile.rescheduled} testID={`rescheduled-${m.id}`}>
+            {t('meetings.rescheduled')}
+          </Text>
+        ) : null}
         {m.location ? (
           isLink(m.location) ? (
             <Text
@@ -457,7 +457,8 @@ const tile = StyleSheet.create({
     padding: 12,
     gap: 4,
   },
-  topic: { flex: 1, fontSize: 16, fontWeight: '700', color: colors.text },
+  title: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.text },
+  rescheduled: { fontSize: 12, color: colors.muted },
   // AC 6: a thin divider above the actions, which wrap in rows with 8 pt gaps.
   footer: {
     flexDirection: 'row',

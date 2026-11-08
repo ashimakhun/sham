@@ -71,7 +71,7 @@ export default function AssignHomeworkScreen() {
   return (
     <KeyboardForm>
       <Text style={styles.muted} numberOfLines={2}>
-        {course.title} · {meeting.topic} · {formatDateTime(meeting.startsAt)}
+        {course.title} · {formatDateTime(meeting.startsAt)}
       </Text>
       <Field
         label={t('meetings.hwTitleLabel')}

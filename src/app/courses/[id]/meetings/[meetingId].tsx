@@ -24,7 +24,9 @@ export default function EditMeetingScreen() {
       ? {
           status: meeting.status,
           startsAt: meeting.startsAt,
-          values: { startsAt: new Date(meeting.startsAt), topic: meeting.topic, location: meeting.location ?? '' },
+          // ARU-129: no Topic field; the stored topic is sent back unchanged so an old one isn't overwritten.
+          topic: meeting.topic,
+          values: { startsAt: new Date(meeting.startsAt), location: meeting.location ?? '' },
         }
       : undefined,
   );
@@ -50,7 +52,7 @@ export default function EditMeetingScreen() {
           await updateMeeting(meetingId, {
             // Unchanged time: send back exactly what was loaded, so it isn't treated as a reschedule.
             startsAt: values.timeChanged ? values.startsAt.toISOString() : opened.startsAt,
-            topic: values.topic,
+            topic: opened.topic,
             location: values.location,
           });
           if (router.canGoBack()) router.back();

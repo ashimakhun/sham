@@ -250,8 +250,9 @@ export type NewAssignment = {
 };
 export type NewCourse = { id: string; title: string; description: string; hidden?: boolean; disciplineId?: string };
 export type NewMaterial = Pick<Material, 'title' | 'body' | 'link'>;
-export type NewMeeting = { id: string; courseId: string; startsAt: string; topic: string; location: string };
+export type NewMeeting = { id: string; courseId: string; startsAt: string; location: string };
 /** `startsAt` is sent back exactly as loaded when the time wasn't changed, so it doesn't count as a reschedule. */
+/** `topic` is the stored one, sent back unchanged: there is no Topic field (ARU-129). */
 export type MeetingEdit = { startsAt: string; topic: string; location: string };
 /** A PDF picked on the device, before upload (ARU-30). `size` and `mimeType` may be missing on some platforms. */
 export type PickedFile = { uri: string; name: string; size?: number; mimeType?: string };
