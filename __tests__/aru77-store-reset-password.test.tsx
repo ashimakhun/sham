@@ -136,7 +136,7 @@ it.each([
 });
 
 it.each([
-  ['server rule', { message: 'Password should be at least 8 characters.', code: 'weak_password', status: 422 }, 'Password should be at least 8 characters.'],
+  ['server rule', { message: 'Password should be at least 8 characters.', code: 'weak_password', status: 422 }, 'The password is too weak. Use at least 8 characters.'], // ARU-108 AC 7a
   ['same password', { message: 'New password should be different from the old password.', code: 'same_password', status: 422 }, 'The new password must be different from the current one'],
   ['offline', { message: 'Failed to fetch', name: 'AuthRetryableFetchError', status: 0 }, 'Could not reach the server. Check your connection and try again.'],
 ])('AC8: when saving fails (%s) the user is signed out locally and never enters the app', async (_c, error, message) => {
