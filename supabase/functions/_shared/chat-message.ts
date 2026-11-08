@@ -8,7 +8,8 @@
 //     chat switch).
 // The ARU-48 helper skips people who aren't linked or have that switch off. No Deno-only imports, so Jest can test it.
 
-import type { SendResult, TelegramMessage } from './telegram.ts';
+import { localizedMessage, type SendResult, type TelegramMessage } from './telegram.ts';
+import { telegramText, telegramTexts } from './telegram-texts.ts';
 import { timingSafeEqual } from './telegram-bot.ts';
 
 /** What chat_message_recipients() returns for a known message; null for an unknown (or deleted) one. */
@@ -34,23 +35,25 @@ export type GeneralMessageReport = { general_message_id: string; recipients: num
 
 /** The message text, exactly as the product owner set it (plain text: the title is shown as typed). */
 export function chatMessageText(courseTitle: string) {
-  return `New message in the ${courseTitle} chat`;
+  return telegramText('en', 'chatMessage', { course: courseTitle });
 }
 
 /** One chat_message message per recipient (AC 1). Never includes the chat text or its author. */
 export function chatMessageMessages(found: ChatMessageRecipients | null): TelegramMessage[] {
   if (!found) return [];
-  const text = chatMessageText(found.course_title);
-  return (found.recipient_ids ?? []).map((userId) => ({ userId, kind: 'chat_message' as const, text }));
+  // ARU-110: each recipient gets it in their own language.
+  const texts = telegramTexts('chatMessage', { course: found.course_title });
+  return (found.recipient_ids ?? []).map((userId) => localizedMessage(userId, 'chat_message', texts));
 }
 
 /** The general chat text (ARU-87): no message body, no author. */
-export const GENERAL_CHAT_TEXT = 'New message in the general chat';
+export const GENERAL_CHAT_TEXT = telegramText('en', 'generalChat');
 
 /** One general_chat message per recipient (ARU-87 AC 4). */
 export function generalMessageMessages(found: GeneralMessageRecipients | null): TelegramMessage[] {
   if (!found) return [];
-  return (found.recipient_ids ?? []).map((userId) => ({ userId, kind: 'general_chat' as const, text: GENERAL_CHAT_TEXT }));
+  const texts = telegramTexts('generalChat');
+  return (found.recipient_ids ?? []).map((userId) => localizedMessage(userId, 'general_chat', texts));
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

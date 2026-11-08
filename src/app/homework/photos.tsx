@@ -2,6 +2,7 @@ import { FlatList, Pressable, Text, View } from 'react-native';
 
 import { usePhotoZipDownload } from '@/components/PhotoDownload';
 import { EmptyState, ErrorText, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { storedOwnPhotos, zipEntries, type ZipEntry } from '@/lib/photoRetention';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
@@ -15,6 +16,7 @@ export default function DownloadByCourseScreen() {
   const { currentUser, visibleHomework, getCourse } = useStore();
   const photos = storedOwnPhotos(visibleHomework, currentUser?.id);
   const entries = zipEntries(photos, (id) => getCourse(id)?.title);
+  const { t } = useI18n();
 
   return (
     <FlatList
@@ -24,10 +26,10 @@ export default function DownloadByCourseScreen() {
       data={entries}
       keyExtractor={(e) => e.key}
       ListHeaderComponent={
-        <Text style={styles.muted}>Your homework photos, one ZIP per course (at most 50 photos each).</Text>
+        <Text style={styles.muted}>{t('homework.photosByCourseIntro')}</Text>
       }
       renderItem={({ item }) => <EntryRow entry={item} />}
-      ListEmptyComponent={<EmptyState title="No photos to download" />}
+      ListEmptyComponent={<EmptyState title={t('homework.photosNone')} />}
     />
   );
 }
@@ -35,14 +37,15 @@ export default function DownloadByCourseScreen() {
 function EntryRow({ entry }: { entry: ZipEntry }) {
   // Part entries are never a total over 50: the course and part are always passed.
   const { busy, error, download } = usePhotoZipDownload(entry.count);
-  const label =
-    `${entry.title}${entry.parts > 1 ? ` · Part ${entry.part} of ${entry.parts}` : ''} · ` +
-    `${entry.count} ${entry.count === 1 ? 'photo' : 'photos'}`;
+  const { t } = useI18n();
+  const part = entry.parts > 1 ? t('homework.photosPart', { part: entry.part, parts: entry.parts }) : '';
+  const count = t('homework.photoCount', { count: entry.count });
+  const label = `${entry.title}${part ? ` · ${part}` : ''} · ${count}`;
   return (
     <View style={{ gap: 4 }}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Download ${label}`}
+        accessibilityLabel={t('homework.photosDownloadLabel', { label })}
         accessibilityState={{ disabled: busy, busy }}
         disabled={busy}
         onPress={() => void download({ courseId: entry.courseId, part: entry.part })}
@@ -56,11 +59,10 @@ function EntryRow({ entry }: { entry: ZipEntry }) {
             {entry.title}
           </Text>
           <Text style={styles.muted}>
-            {entry.parts > 1 ? `Part ${entry.part} of ${entry.parts} · ` : ''}
-            {entry.count} {entry.count === 1 ? 'photo' : 'photos'}
+            {part ? `${part} · ${count}` : count}
           </Text>
         </View>
-        <Text style={{ color: colors.primary, fontWeight: '600' }}>{busy ? 'Preparing…' : 'Download'}</Text>
+        <Text style={[styles.linkText, { color: colors.primary }]}>{busy ? t('homework.photosPreparing') : t('homework.photoDownload')}</Text>
       </Pressable>
       <ErrorText error={error} />
     </View>

@@ -4,6 +4,7 @@ import { Switch, Text, View } from 'react-native';
 
 import { KeyboardForm } from '@/components/KeyboardForm';
 import { Button, EmptyState, ErrorText, Field, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { canManageDisciplines } from '@/lib/disciplines';
 import { newId } from '@/lib/id';
 import { DISCIPLINE_NAME_MAX, useStore } from '@/lib/store';
@@ -17,9 +18,10 @@ export default function NewDisciplineScreen() {
   // One id per form; a retry of a create that went through gets the duplicate-name message, never a second one.
   const [id] = useState(newId);
   const { busy, error, run } = useAction();
+  const { t } = useI18n();
 
   if (currentUser && !canManageDisciplines(currentUser)) {
-    return <EmptyState title="Not allowed" hint="Only the teacher can create disciplines." />;
+    return <EmptyState title={t('disciplines.notAllowedTitle')} hint={t('disciplines.notAllowedHint')} />;
   }
 
   function submit() {
@@ -33,27 +35,27 @@ export default function NewDisciplineScreen() {
   return (
     <KeyboardForm>
       <Field
-        label="Name"
-        placeholder="e.g. Mathematics"
+        label={t('disciplines.nameLabel')}
+        placeholder={t('disciplines.namePlaceholder')}
         value={name}
         onChangeText={setName}
         maxLength={DISCIPLINE_NAME_MAX + 20}
       />
       <View style={[styles.row, { alignItems: 'flex-start' }]}>
         <View style={{ flex: 1, gap: 4 }}>
-          <Text style={styles.body}>Hidden discipline</Text>
-          <Text style={styles.muted}>Only the teacher will see this discipline.</Text>
+          <Text style={styles.body}>{t('disciplines.hidden')}</Text>
+          <Text style={styles.muted}>{t('disciplines.hiddenHint')}</Text>
         </View>
         <Switch
-          accessibilityLabel="Hidden discipline"
-          accessibilityHint="Only the teacher will see this discipline."
+          accessibilityLabel={t('disciplines.hidden')}
+          accessibilityHint={t('disciplines.hiddenHint')}
           value={hidden}
           onValueChange={setHidden}
           disabled={busy}
         />
       </View>
       <ErrorText error={error} />
-      <Button title={busy ? 'Creating…' : 'Create discipline'} onPress={submit} disabled={!name.trim() || busy} />
+      <Button title={busy ? t('disciplines.creating') : t('disciplines.create')} onPress={submit} disabled={!name.trim() || busy} />
     </KeyboardForm>
   );
 }

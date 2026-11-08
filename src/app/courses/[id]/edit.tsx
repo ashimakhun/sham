@@ -5,6 +5,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { EditCourseDisciplineSection } from '@/components/Disciplines';
 import { Card, EmptyState, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { canChangeOwner } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
@@ -21,15 +22,17 @@ const TAP_GUARD_MS = 800;
 export default function EditCourseScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { currentUser, getCourse, getUser } = useStore();
+  const { t } = useI18n();
   const lastTap = useRef(0);
 
   const course = getCourse(id);
   if (currentUser && !canChangeOwner(currentUser.role)) {
-    return <EmptyState title="Not allowed" hint="Only the teacher or a mentor can edit a course." />;
+    return <EmptyState title={t('courses.notAllowed')} hint={t('courses.editNotAllowedHint')} />;
   }
-  if (!course) return <EmptyState title="Course not found" />;
+  if (!course) return <EmptyState title={t('courses.notFound')} />;
 
-  const ownerName = getUser(course.createdById)?.name ?? 'Unknown';
+  const ownerName = getUser(course.createdById)?.name ?? t('common.unknown');
+  const ownerLabel = t('courses.ownerA11y', { name: ownerName });
   const openOwnerPicker = () => {
     const now = Date.now();
     if (now - lastTap.current < TAP_GUARD_MS) return;
@@ -41,22 +44,22 @@ export default function EditCourseScreen() {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic">
       <EditCourseDisciplineSection course={course} />
       <Card style={{ gap: 8 }}>
-        <View style={{ gap: 2 }} accessible accessibilityLabel={`Owner, ${ownerName}`}>
-          <Text style={styles.label}>Owner</Text>
+        <View style={{ gap: 2 }} accessible accessibilityLabel={ownerLabel}>
+          <Text style={styles.label}>{t('courses.ownerLabel')}</Text>
           <Text style={styles.body} numberOfLines={2}>
             {ownerName}
           </Text>
         </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Change owner"
+          accessibilityLabel={t('courses.changeOwner')}
           onPress={openOwnerPicker}
           style={({ pressed }) => [
             styles.input,
             { flexDirection: 'row', alignItems: 'center', minHeight: 44, gap: 8 },
             pressed && { opacity: 0.7 },
           ]}>
-          <Text style={[styles.body, { flex: 1, color: colors.primary, fontWeight: '600' }]}>Change owner</Text>
+          <Text style={[styles.caps, { fontSize: 14, flex: 1, color: colors.primary }]}>{t('courses.changeOwner')}</Text>
           <Ionicons name="chevron-forward" size={20} color={colors.muted} />
         </Pressable>
       </Card>

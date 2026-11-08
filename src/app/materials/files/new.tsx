@@ -5,6 +5,7 @@ import { Text } from 'react-native';
 import { KeyboardForm } from '@/components/KeyboardForm';
 import { MaterialFileFields } from '@/components/MaterialFileFields';
 import { Button, Card, EmptyState, ErrorText, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { confirmAction } from '@/lib/confirm';
 import { formatSize, nameFromFile } from '@/lib/files';
 import { newId } from '@/lib/id';
@@ -17,6 +18,7 @@ type Params = { uri?: string; name?: string; size?: string; mimeType?: string };
 export default function UploadMaterialFileScreen() {
   const params = useLocalSearchParams<Params>();
   const { addMaterialFile } = useStore();
+  const { t, lang } = useI18n();
   const { busy, error, run } = useAction();
   // One id per screen: a retry after an error reuses the uploaded file and never saves the item twice.
   const [id] = useState(newId);
@@ -37,9 +39,9 @@ export default function UploadMaterialFileScreen() {
   }, [leaving]);
 
   usePreventRemove(busy && !leaving, ({ repeat }) => {
-    confirmAction('Discard upload?', 'The file will not be added to the Knowledge base.', 'Discard', {
+    confirmAction(t('files.discardTitle'), t('files.discardMessage'), t('files.discard'), {
       destructive: true,
-      cancelText: 'Keep uploading',
+      cancelText: t('files.keepUploading'),
     }).then((discard) => {
       if (!discard) return;
       cancelled.current = true;
@@ -48,7 +50,7 @@ export default function UploadMaterialFileScreen() {
     });
   });
 
-  if (!params.uri) return <EmptyState title="No file selected" hint="Pick a PDF on the Knowledge base." />;
+  if (!params.uri) return <EmptyState title={t('files.noFileSelected')} hint={t('files.noFileSelectedHint')} />;
   const file = { uri: params.uri, name: params.name ?? '', size, mimeType: params.mimeType || undefined };
 
   function upload() {
@@ -71,8 +73,8 @@ export default function UploadMaterialFileScreen() {
   return (
     <KeyboardForm>
       <Card>
-        <Text style={styles.title}>{params.name || 'Untitled'}</Text>
-        <Text style={styles.muted}>PDF · {formatSize(size)}</Text>
+        <Text style={styles.title}>{params.name || t('files.untitled')}</Text>
+        <Text style={styles.muted}>PDF · {formatSize(size, lang)}</Text>
       </Card>
       <MaterialFileFields
         name={name}
@@ -85,7 +87,7 @@ export default function UploadMaterialFileScreen() {
         onCourseOnly={setCourseOnly}
       />
       <ErrorText error={error} />
-      <Button title={busy ? 'Uploading…' : 'Upload'} onPress={upload} disabled={busy || !name.trim()} />
+      <Button title={busy ? t('files.uploading') : t('files.upload')} onPress={upload} disabled={busy || !name.trim()} />
     </KeyboardForm>
   );
 }

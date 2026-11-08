@@ -1,3 +1,5 @@
+import { currentLanguage, type Language, translate } from '@/i18n';
+
 import { formatDate } from './theme';
 import type { Course, CourseBilling, CourseMember, CoursePayment, PaymentExemption, PaymentRequest, User } from './types';
 
@@ -12,9 +14,9 @@ export function canSeeBilling(user: User | null | undefined) {
 }
 
 /** "Pays 1–5 of each month" (one day: "Pays 5 of each month"). */
-export function periodText(b: Pick<CourseBilling, 'startDay' | 'endDay'>) {
+export function periodText(b: Pick<CourseBilling, 'startDay' | 'endDay'>, lang: Language = currentLanguage()) {
   const days = b.startDay === b.endDay ? `${b.startDay}` : `${b.startDay}–${b.endDay}`;
-  return `Pays ${days} of each month`;
+  return translate(lang, 'billing.period', { days });
 }
 
 export const DEFAULT_PERIOD = { startDay: 1, endDay: 5 };
@@ -56,9 +58,9 @@ export function formatDay(day: string) {
   return formatDate(new Date(y, m - 1, d).toISOString());
 }
 
-/** "Payment due by 5 Nov 2026" (AC 7). */
-export function paymentDueText(deadline: string) {
-  return `Payment due by ${formatDay(deadline)}`;
+/** "Payment due by 5 Nov 2026" (AC 7), in the app's language (ARU-109: shown on the Courses tab's card). */
+export function paymentDueText(deadline: string, lang: Language = currentLanguage()) {
+  return translate(lang, 'courses.paymentDueBy', { date: formatDay(deadline) });
 }
 
 export type PaymentStatus = { kind: 'exempt' } | { kind: 'paid'; payment: CoursePayment } | { kind: 'unpaid' };
@@ -80,7 +82,7 @@ export function paymentStatus(
 export function listenersOf(courseId: string, members: CourseMember[], getUser: (id: string) => User | undefined) {
   return members
     .filter((m) => m.courseId === courseId)
-    .map((m) => ({ id: m.userId, name: getUser(m.userId)?.name ?? 'Unknown' }))
+    .map((m) => ({ id: m.userId, name: getUser(m.userId)?.name ?? translate(currentLanguage(), 'common.unknown') }))
     .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
 }
 
@@ -138,7 +140,7 @@ export function waitingRequests(input: {
   );
 }
 
-/** "1 request" / "2 requests" (AC 6). */
-export function requestCountText(n: number) {
-  return `${n} ${n === 1 ? 'request' : 'requests'}`;
+/** "1 request" / "2 requests" (AC 6); "2 запроса" in Russian (ARU-113 AC 4). */
+export function requestCountText(n: number, lang: Language = currentLanguage()) {
+  return translate(lang, 'accountant.requestCount', { count: n });
 }

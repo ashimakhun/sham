@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 
 import { Card, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { formatSize } from '@/lib/files';
 import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
@@ -14,13 +15,14 @@ import type { Course } from '@/lib/types';
  */
 export function CourseMaterialsSection({ course }: { course: Course }) {
   const { materialFiles, getUser } = useStore();
+  const { t, lang } = useI18n();
   const items = materialFiles.filter((f) => f.courseId === course.id);
   if (!items.length) return null;
 
   return (
     <Card style={{ gap: 4 }}>
       <Text style={styles.label} accessibilityRole="header">
-        MATERIALS ({items.length})
+        {t('files.courseMaterials', { n: items.length })}
       </Text>
       {items.map((item, i) => (
         <Pressable
@@ -38,7 +40,7 @@ export function CourseMaterialsSection({ course }: { course: Course }) {
           </Text>
           <View>
             <Text style={styles.muted} numberOfLines={1}>
-              {getUser(item.authorId)?.name ?? 'Unknown'} · {formatDate(item.createdAt)} · {formatSize(item.sizeBytes)}
+              {getUser(item.authorId)?.name ?? t('common.unknown')} · {formatDate(item.createdAt)} · {formatSize(item.sizeBytes, lang)}
             </Text>
           </View>
         </Pressable>
