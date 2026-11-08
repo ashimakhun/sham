@@ -1,5 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { MarkdownText } from '@/components/MarkdownText';
 import { Button, Card, EmptyState, ErrorText, styles } from '@/components/ui';

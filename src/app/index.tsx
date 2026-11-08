@@ -1,6 +1,8 @@
 import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, ErrorText, Field, Segmented, styles } from '@/components/ui';
@@ -9,6 +11,7 @@ import { PASSWORD_MIN } from '@/lib/password';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import { useAction } from '@/lib/useAction';
+import { font } from '@/lib/fonts';
 
 type Mode = 'signIn' | 'signUp';
 
@@ -108,7 +111,7 @@ export default function SignInScreen() {
             // ARU-77: reset a forgotten password with a code sent by email.
             <Text
               accessibilityRole="link"
-              style={{ color: colors.primary, fontSize: 15, fontWeight: '600', alignSelf: 'flex-start', paddingVertical: 4 }}
+              style={{ color: colors.primary, fontSize: 15, ...font(500), alignSelf: 'flex-start', paddingVertical: 4 }}
               onPress={() => router.push({ pathname: '/reset-password', params: { email: email.trim() } })}>
               {t('signIn.forgotPassword')}
             </Text>

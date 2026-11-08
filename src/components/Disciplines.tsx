@@ -1,7 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useRef } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { Card, ErrorText, HiddenBadge, styles } from '@/components/ui';
 import { disciplineFeedback, HIDDEN_DISCIPLINE } from '@/lib/disciplines';
@@ -10,6 +12,7 @@ import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import type { Course, Discipline, User } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
+import { font } from '@/lib/fonts';
 
 /** ARU-63 AC 6: "Discipline: <name>" when the course has a discipline the viewer can see; nothing otherwise. */
 export function DisciplineLabel({ course }: { course: Course }) {
@@ -71,7 +74,7 @@ function DisciplineOptions({
               selected && { borderColor: colors.primary, backgroundColor: colors.primarySoft },
               pressed && { opacity: 0.7 },
             ]}>
-            <Text style={[styles.body, { flexShrink: 1 }, selected && { color: colors.primary, fontWeight: '600' }]}>
+            <Text style={[styles.body, { flexShrink: 1 }, selected && { color: colors.primary, ...font(500) }]}>
               {o.label}
             </Text>
             {o.hidden ? <HiddenBadge /> : null}

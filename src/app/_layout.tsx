@@ -1,12 +1,28 @@
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 
 import { AccessGate } from '@/components/AccessGate';
 import { LanguageProvider, useI18n } from '@/i18n/LanguageProvider';
+import { font, INTER_FONTS } from '@/lib/fonts';
 import { StoreProvider } from '@/lib/store';
 import { colors } from '@/lib/theme';
 
+// ARU-119 AC 5: keep the splash screen up until the fonts are ready, so text never flashes in the system font.
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
 export default function RootLayout() {
+  // The Inter faces ship with the app (no download); they load from the bundle at start.
+  const [fontsLoaded, fontError] = useFonts(INTER_FONTS);
+  const ready = fontsLoaded || !!fontError;
+  useEffect(() => {
+    // AC 6: if they can't load, open anyway; text then uses the system font, with no error shown.
+    if (ready) SplashScreen.hideAsync().catch(() => {});
+  }, [ready]);
+  if (!ready) return null;
+
   return (
     <StoreProvider>
       {/* ARU-108: the app's language (account choice, else the phone's); every screen below reads it. */}
@@ -30,7 +46,7 @@ function AppStack() {
             headerBackButtonDisplayMode: 'minimal',
             // Solid header on iOS so screen content starts below it instead of underneath.
             headerTransparent: false,
-            headerTitleStyle: { color: colors.text },
+            headerTitleStyle: { color: colors.text, ...font(600) },
             contentStyle: { backgroundColor: colors.bg },
           }}>
           <Stack.Screen name="index" options={{ headerShown: false }} />

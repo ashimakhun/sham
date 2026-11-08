@@ -1,6 +1,8 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Pressable, Text, View } from 'react-native';
+import { AppState, Pressable, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { Button, Card } from '@/components/ui';
 import { localMonth } from '@/lib/billing';
@@ -9,6 +11,7 @@ import { colors, formatDate } from '@/lib/theme';
 import type { Course, PaymentRequest } from '@/lib/types';
 import { useNow } from '@/lib/useNow';
 import { usePaymentDues } from '@/lib/usePaymentDues';
+import { font } from '@/lib/fonts';
 
 /** "Payment request sent 5 Nov 2026 · waiting for the accountant" (AC 3). */
 export function requestSentText(r: Pick<PaymentRequest, 'sentAt'>) {
@@ -58,7 +61,7 @@ export function PaySection({ course }: { course: Course }) {
   return (
     <View testID="payment-request-sent">
       <Card style={{ gap: 8 }}>
-        <Text style={{ color: colors.text, fontWeight: '600' }}>{requestSentText(request)}</Text>
+        <Text style={{ color: colors.text, ...font(500) }}>{requestSentText(request)}</Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Send again"
@@ -66,7 +69,7 @@ export function PaySection({ course }: { course: Course }) {
           hitSlop={8}
           onPress={openPay}
           style={{ minHeight: 32, justifyContent: 'center', alignSelf: 'flex-start' }}>
-          <Text style={{ color: colors.primary, fontWeight: '600' }}>Send again</Text>
+          <Text style={{ color: colors.primary, ...font(500) }}>Send again</Text>
         </Pressable>
       </Card>
     </View>

@@ -1,7 +1,9 @@
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Image, Text, View } from 'react-native';
+import { Image, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { dueText } from '@/components/AssignmentCard';
 import { KeyboardForm } from '@/components/KeyboardForm';

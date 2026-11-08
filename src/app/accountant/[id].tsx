@@ -1,6 +1,8 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Linking, Pressable, RefreshControl, Text, View } from 'react-native';
+import { FlatList, Linking, Pressable, RefreshControl, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { PeriodEditor } from '@/components/Accountant';
 import { PhotoPreview } from '@/components/PhotoPreview';
@@ -22,6 +24,7 @@ import { colors, formatDate } from '@/lib/theme';
 import type { CourseBilling, PaymentRequest } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
 import { useNow } from '@/lib/useNow';
+import { font } from '@/lib/fonts';
 
 /**
  * ARU-66 AC 1 / AC 2 / AC 6: a paid course's current listeners for the current (device-local) month, each Unpaid,
@@ -118,7 +121,7 @@ function CourseHeader({ billing, title, hidden }: { billing: CourseBilling; titl
       ) : (
         <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap' }}>
           <Pressable accessibilityRole="button" accessibilityLabel="Change period" hitSlop={8} onPress={() => setEditing(true)}>
-            <Text style={{ color: colors.primary, fontWeight: '600' }}>Change period</Text>
+            <Text style={{ color: colors.primary, ...font(500) }}>Change period</Text>
           </Pressable>
           {accountant && (
             <Pressable
@@ -138,7 +141,7 @@ function CourseHeader({ billing, title, hidden }: { billing: CourseBilling; titl
                   if (ok) await unselectPaidCourse(billing.courseId);
                 })
               }>
-              <Text style={{ color: colors.danger, fontWeight: '600', opacity: busy ? 0.4 : 1 }}>Unselect</Text>
+              <Text style={{ color: colors.danger, ...font(500), opacity: busy ? 0.4 : 1 }}>Unselect</Text>
             </Pressable>
           )}
         </View>
@@ -149,12 +152,12 @@ function CourseHeader({ billing, title, hidden }: { billing: CourseBilling; titl
 }
 
 function StatusLabel({ status }: { status: PaymentStatus }) {
-  if (status.kind === 'exempt') return <Text style={[styles.muted, { fontWeight: '600' }]}>Exempt</Text>;
+  if (status.kind === 'exempt') return <Text style={[styles.muted, { ...font(500) }]}>Exempt</Text>;
   if (status.kind === 'paid')
     return (
-      <Text style={{ color: colors.success, fontWeight: '600' }}>Paid · {formatDate(status.payment.markedAt)}</Text>
+      <Text style={{ color: colors.success, ...font(500) }}>Paid · {formatDate(status.payment.markedAt)}</Text>
     );
-  return <Text style={{ color: colors.danger, fontWeight: '600' }}>Unpaid</Text>;
+  return <Text style={{ color: colors.danger, ...font(500) }}>Unpaid</Text>;
 }
 
 /** A text button; `label` (with the listener's name) is what screen readers read. */
@@ -180,7 +183,7 @@ function Action({
       hitSlop={8}
       onPress={onPress}
       style={{ minHeight: 32, justifyContent: 'center' }}>
-      <Text style={{ color: danger ? colors.danger : colors.primary, fontWeight: '600', opacity: disabled ? 0.4 : 1 }}>
+      <Text style={{ color: danger ? colors.danger : colors.primary, ...font(500), opacity: disabled ? 0.4 : 1 }}>
         {text}
       </Text>
     </Pressable>

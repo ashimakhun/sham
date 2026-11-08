@@ -1,7 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useRef } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { DisciplineLabel } from '@/components/Disciplines';
 import { Card, HiddenBadge, OwnerLine, UnreadBadge, styles } from '@/components/ui';
@@ -12,6 +14,7 @@ import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
 import type { Course } from '@/lib/types';
 import { withUnreadLabel } from '@/lib/unread';
+import { font } from '@/lib/fonts';
 
 type Props = {
   course: Course;
@@ -86,7 +89,7 @@ export function CourseCard({ course, tag, onOpen, paymentDue }: Props) {
       ) : null}
       {/* ARU-66 AC 7: read with the card's other text by screen readers. */}
       {paymentDue ? (
-        <Text testID={`payment-due-${course.id}`} style={{ color: colors.danger, fontSize: 14, fontWeight: '600' }}>
+        <Text testID={`payment-due-${course.id}`} style={{ color: colors.danger, fontSize: 14, ...font(500) }}>
           {paymentDueText(paymentDue)}
         </Text>
       ) : null}

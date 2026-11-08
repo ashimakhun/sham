@@ -1,6 +1,8 @@
 import { router, Stack, useLocalSearchParams, usePreventRemove } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { KeyboardForm } from '@/components/KeyboardForm';
 import { MarkdownEditor } from '@/components/MarkdownEditor';
@@ -13,6 +15,7 @@ import { useStore } from '@/lib/store';
 import { colors, formatDateTime } from '@/lib/theme';
 import type { Course, Meeting } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
+import { font } from '@/lib/fonts';
 
 /** Notes on a completed meeting (ARU-28): read view for everyone who sees the meeting; `?edit=1` is the editor for
  *  the course's current owner or the teacher. */
@@ -156,7 +159,7 @@ function HeaderSave({ busy, onPress }: { busy: boolean; onPress: () => void }) {
       hitSlop={8}
       onPress={onPress}
       style={{ paddingHorizontal: 8, minHeight: 44, justifyContent: 'center' }}>
-      <Text style={{ fontSize: 17, fontWeight: '600', color: busy ? colors.muted : colors.primary }}>
+      <Text style={{ fontSize: 17, ...font(500), color: busy ? colors.muted : colors.primary }}>
         {busy ? 'Saving…' : 'Save'}
       </Text>
     </Pressable>

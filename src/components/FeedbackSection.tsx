@@ -1,5 +1,7 @@
 import { router } from 'expo-router';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { Button, Card, ErrorText, styles } from '@/components/ui';
 import { confirmDestructive } from '@/lib/confirm';

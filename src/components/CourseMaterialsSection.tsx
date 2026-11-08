@@ -1,5 +1,7 @@
 import { router } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { Card, styles } from '@/components/ui';
 import { formatSize } from '@/lib/files';

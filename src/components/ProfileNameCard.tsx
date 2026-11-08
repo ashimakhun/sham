@@ -1,6 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRef, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { Button, Card, ErrorText, Field, RoleBadge, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/LanguageProvider';

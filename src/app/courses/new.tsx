@@ -1,6 +1,8 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Switch, Text, View } from 'react-native';
+import { Switch, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { DisciplinePicker } from '@/components/Disciplines';
 import { KeyboardForm } from '@/components/KeyboardForm';

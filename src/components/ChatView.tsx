@@ -6,10 +6,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from 'react-native';
+
+import { Text, TextInput } from '@/components/AppText';
 
 import { Button, EmptyState, ErrorText, RoleBadge, styles } from '@/components/ui';
 import { newId } from '@/lib/id';

@@ -1,6 +1,8 @@
 import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef } from 'react';
-import { AppState, Text, View } from 'react-native';
+import { AppState, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { ChatView } from '@/components/ChatView';
 import { EmptyState, styles } from '@/components/ui';

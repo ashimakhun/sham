@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { KeyboardForm } from '@/components/KeyboardForm';
 import { Button, Card, ErrorText, Field, styles } from '@/components/ui';
@@ -13,6 +15,7 @@ import {
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import { useAction } from '@/lib/useAction';
+import { font } from '@/lib/fonts';
 
 /**
  * ARU-75: the Delete account screen's body, shared by the route (opened from the Profile tab) and the waiting /
@@ -57,7 +60,7 @@ export function DeleteAccountForm({ onCancel, showTitle = false }: { onCancel: (
       <Card>
         <Text style={styles.body} testID="delete-account-explanation">
           {DELETE_EXPLANATION_BEFORE}
-          <Text style={{ fontWeight: '700' }}>{DELETED_ACCOUNT}</Text>
+          <Text style={{ ...font(600) }}>{DELETED_ACCOUNT}</Text>
           {DELETE_EXPLANATION_AFTER}
         </Text>
       </Card>

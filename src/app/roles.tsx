@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { ActivityIndicator, SectionList, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, SectionList, Switch, View } from 'react-native';
+
+import { Text, TextInput } from '@/components/AppText';
 
 import { Button, EmptyState, ErrorText, RoleBadge, styles } from '@/components/ui';
 import { confirmDestructive } from '@/lib/confirm';

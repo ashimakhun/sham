@@ -1,10 +1,13 @@
 import { useRef, useState } from 'react';
-import { Keyboard, Pressable, Text, TextInput, type TextInputInstance, useWindowDimensions, View } from 'react-native';
+import { Keyboard, Pressable, type TextInputInstance, useWindowDimensions, View } from 'react-native';
+
+import { Text, TextInput } from '@/components/AppText';
 
 import { ErrorText, styles } from '@/components/ui';
 import { type Edit, NOTES_MAX, notesCounter, type Selection, toggleList, toggleWrap } from '@/lib/markdown';
 import { colors } from '@/lib/theme';
 import { useKeyboardHeight } from '@/lib/useKeyboardHeight';
+import { font } from '@/lib/fonts';
 
 type Props = {
   value: string;
@@ -18,7 +21,7 @@ type Props = {
 };
 
 const TOOLS = [
-  { key: 'bold', label: 'Bold', glyph: 'B', glyphStyle: { fontWeight: '800' as const } },
+  { key: 'bold', label: 'Bold', glyph: 'B', glyphStyle: { ...font(600) } },
   { key: 'italic', label: 'Italic', glyph: 'I', glyphStyle: { fontStyle: 'italic' as const, fontFamily: 'serif' } },
   { key: 'bullets', label: 'Bulleted list', glyph: '•', glyphStyle: { fontSize: 22 } },
   { key: 'numbers', label: 'Numbered list', glyph: '1.', glyphStyle: {} },
@@ -124,7 +127,7 @@ export function MarkdownEditor({
               marginLeft: 'auto',
               backgroundColor: pressed ? colors.primarySoft : 'transparent',
             })}>
-            <Text style={{ fontSize: 16, color: colors.primary, fontWeight: '600' }}>Done</Text>
+            <Text style={{ fontSize: 16, color: colors.primary, ...font(500) }}>Done</Text>
           </Pressable>
         )}
       </View>

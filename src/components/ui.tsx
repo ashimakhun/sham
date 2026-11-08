@@ -1,10 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ComponentProps, ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, View, type TextInputProps, type ViewStyle } from 'react-native';
+
+import { Text, TextInput } from '@/components/AppText';
 
 import { colors, roleColor, roleLabel } from '@/lib/theme';
 import type { HomeworkStatus, Role } from '@/lib/types';
 import { formatUnread, withUnreadLabel } from '@/lib/unread';
+import { font } from '@/lib/fonts';
 
 type CardProps = {
   children: ReactNode;
@@ -145,7 +148,7 @@ export function RoleBadge({ role, label }: { role: Role; label?: string }) {
 export function OwnerLine({ name, date }: { name: string; date: string }) {
   return (
     <Text style={styles.muted} numberOfLines={1}>
-      <Text style={{ fontWeight: '600' }}>Owner: </Text>
+      <Text style={{ ...font(500) }}>Owner: </Text>
       <Text>
         {name} · {date}
       </Text>
@@ -214,11 +217,11 @@ export const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
   },
-  title: { fontSize: 17, fontWeight: '600', color: colors.text },
-  h1: { fontSize: 26, fontWeight: '700', color: colors.text },
+  title: { fontSize: 17, ...font(500), color: colors.text },
+  h1: { fontSize: 26, ...font(600), color: colors.text },
   body: { fontSize: 15, lineHeight: 22, color: colors.text },
   muted: { fontSize: 13, color: colors.muted },
-  label: { fontSize: 13, fontWeight: '600', color: colors.muted },
+  label: { fontSize: 13, ...font(500), color: colors.muted },
   input: {
     backgroundColor: colors.card,
     borderWidth: 1,
@@ -231,11 +234,11 @@ export const styles = StyleSheet.create({
   },
   // Side padding keeps the label inside the background when the button sits in a row and sizes to its text (ARU-22).
   button: { borderRadius: 10, paddingVertical: 13, paddingHorizontal: 16, alignItems: 'center' },
-  buttonText: { fontSize: 15, fontWeight: '600' },
+  buttonText: { fontSize: 15, ...font(500) },
   // ARU-78: same 18 pt layout height as the plain icon (24 pt glyph, -3 margins), so the button height is unchanged.
   buttonIconBox: { width: 24, height: 24, marginVertical: -3 },
   badge: { alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
-  badgeText: { fontSize: 12, fontWeight: '600' },
+  badgeText: { fontSize: 12, ...font(500) },
   unread: {
     minWidth: 20,
     height: 20,
@@ -247,12 +250,12 @@ export const styles = StyleSheet.create({
   },
   // Grows by the ring's width so the number keeps the same room inside it (ARU-57).
   unreadRing: { minWidth: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: colors.card },
-  unreadText: { fontSize: 11, fontWeight: '700', color: '#fff' },
+  unreadText: { fontSize: 11, ...font(600), color: '#fff' },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   empty: { alignItems: 'center', paddingVertical: 48, gap: 6 },
-  emptyTitle: { fontSize: 16, fontWeight: '600', color: colors.text },
+  emptyTitle: { fontSize: 16, ...font(500), color: colors.text },
   segmented: { flexDirection: 'row', backgroundColor: '#E9EAF0', borderRadius: 10, padding: 3 },
   segment: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
   segmentActive: { backgroundColor: colors.card },
-  segmentText: { fontSize: 13, fontWeight: '600', color: colors.muted },
+  segmentText: { fontSize: 13, ...font(500), color: colors.muted },
 });

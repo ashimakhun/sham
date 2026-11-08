@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { FlatList, RefreshControl, Text, View } from 'react-native';
+import { FlatList, RefreshControl, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { PeriodEditor } from '@/components/Accountant';
 import { Button, Card, EmptyState, ErrorText, HiddenBadge, styles } from '@/components/ui';

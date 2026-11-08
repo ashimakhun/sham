@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Text } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { DateTimeField } from '@/components/DateTimeField';
 import { KeyboardForm } from '@/components/KeyboardForm';

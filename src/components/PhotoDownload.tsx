@@ -1,6 +1,8 @@
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Linking, Text, View } from 'react-native';
+import { Linking, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { Button, ErrorText, styles } from '@/components/ui';
 import { deletionWarningText, PHOTO_ZIP_MAX, PHOTOS_ZIP_ERROR } from '@/lib/photoRetention';

@@ -1,13 +1,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { EditCourseDisciplineSection } from '@/components/Disciplines';
 import { Card, EmptyState, styles } from '@/components/ui';
 import { canChangeOwner } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
+import { font } from '@/lib/fonts';
 
 /** A second tap within this window is ignored, so a double tap opens the Change owner picker only once. */
 const TAP_GUARD_MS = 800;
@@ -56,7 +59,7 @@ export default function EditCourseScreen() {
             { flexDirection: 'row', alignItems: 'center', minHeight: 44, gap: 8 },
             pressed && { opacity: 0.7 },
           ]}>
-          <Text style={[styles.body, { flex: 1, color: colors.primary, fontWeight: '600' }]}>Change owner</Text>
+          <Text style={[styles.body, { flex: 1, color: colors.primary, ...font(500) }]}>Change owner</Text>
           <Ionicons name="chevron-forward" size={20} color={colors.muted} />
         </Pressable>
       </Card>

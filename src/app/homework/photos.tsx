@@ -1,10 +1,13 @@
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { FlatList, Pressable, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { usePhotoZipDownload } from '@/components/PhotoDownload';
 import { EmptyState, ErrorText, styles } from '@/components/ui';
 import { storedOwnPhotos, zipEntries, type ZipEntry } from '@/lib/photoRetention';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
+import { font } from '@/lib/fonts';
 
 /**
  * ARU-107 AC 6: Download by course, for a sender with more photos than one ZIP holds. One entry per course with its
@@ -60,7 +63,7 @@ function EntryRow({ entry }: { entry: ZipEntry }) {
             {entry.count} {entry.count === 1 ? 'photo' : 'photos'}
           </Text>
         </View>
-        <Text style={{ color: colors.primary, fontWeight: '600' }}>{busy ? 'Preparing…' : 'Download'}</Text>
+        <Text style={{ color: colors.primary, ...font(500) }}>{busy ? 'Preparing…' : 'Download'}</Text>
       </Pressable>
       <ErrorText error={error} />
     </View>

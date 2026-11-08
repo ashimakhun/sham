@@ -1,4 +1,6 @@
-import { ScrollView, Text } from 'react-native';
+import { ScrollView } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { TelegramSettings } from '@/components/Telegram';
 import { styles } from '@/components/ui';
