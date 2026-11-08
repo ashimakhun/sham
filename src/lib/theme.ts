@@ -1,3 +1,5 @@
+import { currentLanguage, formatDateIn, formatDateTimeIn } from '@/i18n';
+
 import type { Role } from './types';
 
 export const colors = {
@@ -16,6 +18,10 @@ export const colors = {
   dangerSoft: '#FEF2F2',
   /** Light grey behind muted badges (Hidden, Exempt). */
   mutedSoft: '#F3F4F6',
+  /** ARU-123: rating stars (filled, review stars and summaries) use the theme colour. */
+  star: '#4F46E5',
+  /** ARU-123: unselected stars in the rating form. */
+  starEmpty: '#C7D2FE',
 };
 
 export const roleLabel: Record<Role, string> = {
@@ -30,17 +36,12 @@ export const roleColor: Record<Role, string> = {
   student: '#4F46E5',
 };
 
+/** A date in the app's language (ARU-109 AC 5): "12 May 2026" / "12 мая 2026", whatever the phone's locale. */
 export function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  return formatDateIn(currentLanguage(), iso);
 }
 
-/** Date and time (device time zone), e.g. for chat messages where several share a day. */
+/** Date and time (device time zone), e.g. for chat messages where several share a day: "12 May 2026, 14:05". */
 export function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatDateTimeIn(currentLanguage(), iso);
 }

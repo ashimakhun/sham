@@ -7,7 +7,9 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {},
+      "bundleIdentifier": "com.ashimakhun.sham"
     },
     "android": {
       "adaptiveIcon": {
@@ -16,7 +18,11 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.ashimakhun.sham"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -36,6 +42,16 @@
     "scheme": "sham",
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "e8530336-5f9e-4177-96d7-853d95d227cc"
+      }
     }
   }
 }

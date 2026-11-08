@@ -82,10 +82,10 @@ it('AC7: the Waiting and Checked lists never show the red border, even for work 
   await open();
   await fireEvent.press(screen.getByRole('tab', { name: /^Waiting/ }));
   expect(screen.getByText('Sent work')).toBeTruthy();
-  expect(screen.queryByTestId(/^assignment-due-today-/)).toBeNull();
+  expect(screen.queryByTestId(/^assignment-(due-today|overdue)-/)).toBeNull();
   await fireEvent.press(screen.getByRole('tab', { name: /^Checked/ }));
   expect(screen.getByText('Checked work')).toBeTruthy();
-  expect(screen.queryByTestId(/^assignment-due-today-/)).toBeNull();
+  expect(screen.queryByTestId(/^assignment-(due-today|overdue)-/)).toBeNull();
 });
 
 it('going to Waiting and back to New keeps the border', async () => {

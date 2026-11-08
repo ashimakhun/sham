@@ -5,6 +5,7 @@ import { FlatList, Linking, Pressable, RefreshControl, Text, View } from 'react-
 import { PeriodEditor } from '@/components/Accountant';
 import { PhotoPreview } from '@/components/PhotoPreview';
 import { Card, EmptyState, ErrorText, HiddenBadge, IconButton, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import {
   canSeeBilling,
   isAccountant,
@@ -44,14 +45,15 @@ export default function CoursePaymentsScreen() {
     loading,
     refresh,
   } = useStore();
+  const { t } = useI18n();
   const month = localMonth(useNow());
   if (!canSeeBilling(currentUser)) {
-    return <EmptyState title="Not allowed" hint="Only accountants and the teacher see payments." />;
+    return <EmptyState title={t('courses.notAllowed')} hint={t('accountant.paymentsNotAllowedHint')} />;
   }
   const course = getCourse(id);
   const billing = courseBilling.find((b) => b.courseId === id);
   if (!course || !billing) {
-    return <EmptyState title="Not a paid course" hint="This course isn't a paid course (any more)." />;
+    return <EmptyState title={t('accountant.notPaidTitle')} hint={t('accountant.notPaidHint')} />;
   }
   const waiting = waitingRequests({
     courseId: course.id,
@@ -85,7 +87,7 @@ export default function CoursePaymentsScreen() {
           request={requestOf.get(item.id)}
         />
       )}
-      ListEmptyComponent={<EmptyState title="No listeners yet" />}
+      ListEmptyComponent={<EmptyState title={t('accountant.noListeners')} />}
     />
   );
 }
@@ -95,6 +97,7 @@ function CourseHeader({ billing, title, hidden }: { billing: CourseBilling; titl
   const { currentUser, setBillingPeriod, unselectPaidCourse } = useStore();
   const [editing, setEditing] = useState(false);
   const { busy, error, run } = useAction();
+  const { t, lang } = useI18n();
   const accountant = isAccountant(currentUser);
   return (
     <View style={{ gap: 4 }} testID="payments-header">
@@ -104,11 +107,11 @@ function CourseHeader({ billing, title, hidden }: { billing: CourseBilling; titl
         </Text>
         {hidden ? <HiddenBadge /> : null}
       </View>
-      <Text style={styles.muted}>{periodText(billing)}</Text>
+      <Text style={styles.muted}>{periodText(billing, lang)}</Text>
       {editing ? (
         <PeriodEditor
           initial={billing}
-          saveTitle="Save period"
+          saveTitle={t('accountant.savePeriod')}
           onCancel={() => setEditing(false)}
           onSave={async (s, e) => {
             await setBillingPeriod(billing.courseId, s, e);
@@ -117,28 +120,32 @@ function CourseHeader({ billing, title, hidden }: { billing: CourseBilling; titl
         />
       ) : (
         <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap' }}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Change period" hitSlop={8} onPress={() => setEditing(true)}>
-            <Text style={{ color: colors.primary, fontWeight: '600' }}>Change period</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('accountant.changePeriod')}
+            hitSlop={8}
+            onPress={() => setEditing(true)}>
+            <Text style={[styles.linkText, { color: colors.primary }]}>{t('accountant.changePeriod')}</Text>
           </Pressable>
           {accountant && (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Unselect"
+              accessibilityLabel={t('accountant.unselect')}
               accessibilityState={{ disabled: busy }}
               disabled={busy}
               hitSlop={8}
               onPress={() =>
                 run(async () => {
                   const ok = await confirmAction(
-                    'Unselect paid course',
-                    `${title} will stop being a paid course for everyone.`,
-                    'Unselect',
-                    { destructive: true, cancelText: 'Keep' },
+                    t('accountant.unselectTitle'),
+                    t('accountant.unselectMessage', { title }),
+                    t('accountant.unselect'),
+                    { destructive: true, cancelText: t('accountant.keep') },
                   );
                   if (ok) await unselectPaidCourse(billing.courseId);
                 })
               }>
-              <Text style={{ color: colors.danger, fontWeight: '600', opacity: busy ? 0.4 : 1 }}>Unselect</Text>
+              <Text style={[styles.linkText, { color: colors.danger, opacity: busy ? 0.4 : 1 }]}>{t('accountant.unselect')}</Text>
             </Pressable>
           )}
         </View>
@@ -150,12 +157,13 @@ function CourseHeader({ billing, title, hidden }: { billing: CourseBilling; titl
 
 /** ARU-118 AC 1: the status as a small rounded badge (read as text, not a button). */
 function StatusBadge({ status }: { status: PaymentStatus }) {
+  const { t } = useI18n();
   const [text, color, backgroundColor] =
     status.kind === 'exempt'
-      ? ['Exempt', colors.muted, colors.mutedSoft]
+      ? [t('billing.exempt'), colors.muted, colors.mutedSoft]
       : status.kind === 'paid'
-        ? [`Paid · ${formatDate(status.payment.markedAt)}`, colors.success, colors.successSoft]
-        : ['Unpaid', colors.danger, colors.dangerSoft];
+        ? [t('billing.paidOn', { date: formatDate(status.payment.markedAt) }), colors.success, colors.successSoft]
+        : [t('billing.unpaid'), colors.danger, colors.dangerSoft];
   return (
     <View style={[styles.badge, { backgroundColor }]} testID="status-badge">
       <Text style={[styles.badgeText, { color }]}>{text}</Text>
@@ -186,7 +194,7 @@ function Action({
       hitSlop={8}
       onPress={onPress}
       style={{ minHeight: 32, justifyContent: 'center' }}>
-      <Text style={{ color: danger ? colors.danger : colors.primary, fontWeight: '600', opacity: disabled ? 0.4 : 1 }}>
+      <Text style={[styles.linkText, { color: danger ? colors.danger : colors.primary, opacity: disabled ? 0.4 : 1 }]}>
         {text}
       </Text>
     </Pressable>
@@ -242,6 +250,7 @@ function ListenerRow({
   request?: PaymentRequest;
 }) {
   const { markPaid, undoPaid, setExempt } = useStore();
+  const { t } = useI18n();
   const { busy, error, run } = useAction();
   const proof = useProofViewer(request);
   return (
@@ -253,31 +262,31 @@ function ListenerRow({
             <StatusBadge status={status} />
             {request ? (
               <Text testID={`request-${request.userId}`} style={{ color: colors.text }}>
-                Payment request · {formatDate(request.sentAt)}
+                {t('accountant.requestLine', { date: formatDate(request.sentAt) })}
               </Text>
             ) : null}
             {/* AC 7: View proof and Set / Clear exempt on one row; Set exempt only for Unpaid listeners. */}
             <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap' }}>
               {request ? (
                 <Action
-                  text={proof.opening ? 'Opening…' : 'View proof'}
-                  label={`View payment proof from ${name}`}
+                  text={proof.opening ? t('accountant.opening') : t('accountant.viewProof')}
+                  label={t('accountant.viewProofLabel', { name })}
                   disabled={proof.opening}
                   onPress={proof.view}
                 />
               ) : null}
               {status.kind === 'exempt' && (
                 <Action
-                  text="Clear exempt"
-                  label={`Clear exempt for ${name}`}
+                  text={t('accountant.clearExempt')}
+                  label={t('accountant.clearExemptLabel', { name })}
                   disabled={busy}
                   onPress={() => run(() => setExempt(courseId, userId, false))}
                 />
               )}
               {status.kind === 'unpaid' && (
                 <Action
-                  text="Set exempt"
-                  label={`Set ${name} exempt`}
+                  text={t('accountant.setExempt')}
+                  label={t('accountant.setExemptLabel', { name })}
                   disabled={busy}
                   onPress={() => run(() => setExempt(courseId, userId, true))}
                 />
@@ -289,7 +298,7 @@ function ListenerRow({
             <IconButton
               icon="checkmark"
               tone="success"
-              label={`Mark ${name} paid`}
+              label={t('accountant.markPaidLabel', { name })}
               testID={`mark-paid-${userId}`}
               disabled={busy}
               onPress={() => run(() => markPaid(courseId, userId, month))}
@@ -299,15 +308,15 @@ function ListenerRow({
             <IconButton
               icon="close"
               tone="danger"
-              label={`Undo paid for ${name}`}
+              label={t('accountant.undoPaidLabel', { name })}
               testID={`undo-paid-${userId}`}
               disabled={busy}
               onPress={() =>
                 run(async () => {
                   const ok = await confirmDestructive(
-                    'Undo paid',
-                    `Undo paid for ${name} for this month? They will show as Unpaid.`,
-                    'Undo paid',
+                    t('accountant.undoPaid'),
+                    t('accountant.undoPaidMessage', { name }),
+                    t('accountant.undoPaid'),
                   );
                   if (ok) await undoPaid(courseId, userId, month);
                 })
@@ -322,7 +331,7 @@ function ListenerRow({
             path={request.proofPath}
             loadUrl={proof.getPaymentProofUrl}
             fileName={proofFileName(courseTitle, name)}
-            errorText={PROOF_LOAD_ERROR}
+            errorText={t('payments.proofLoadError')}
             onClose={proof.closePreview}
           />
         )}

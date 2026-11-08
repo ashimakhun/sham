@@ -3,7 +3,7 @@ import { useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { Button, Card, ErrorText, Field, RoleBadge, styles } from '@/components/ui';
-import { useI18n } from '@/i18n/LanguageProvider';
+import { useI18n } from '@/i18n/context';
 import { NAME_MAX } from '@/lib/profileName';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
