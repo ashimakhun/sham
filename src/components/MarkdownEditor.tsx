@@ -132,7 +132,7 @@ export function MarkdownEditor({
               marginLeft: 'auto',
               backgroundColor: pressed ? colors.primarySoft : 'transparent',
             })}>
-            <Text style={{ fontSize: 16, color: colors.primary, fontWeight: '600' }}>{t('notes.done')}</Text>
+            <Text style={[styles.caps, { fontSize: 15, color: colors.primary }]}>{t('notes.done')}</Text>
           </Pressable>
         )}
       </View>

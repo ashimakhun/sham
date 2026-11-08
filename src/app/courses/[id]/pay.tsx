@@ -132,7 +132,7 @@ export default function PayScreen() {
               hitSlop={8}
               onPress={() => setProof(null)}
               style={{ alignSelf: 'flex-start', minHeight: 32, justifyContent: 'center' }}>
-              <Text style={{ color: colors.danger, fontWeight: '600', opacity: busy ? 0.4 : 1 }}>{t('payments.remove')}</Text>
+              <Text style={[styles.linkText, { color: colors.danger, opacity: busy ? 0.4 : 1 }]}>{t('payments.remove')}</Text>
             </Pressable>
           </View>
         ) : (
