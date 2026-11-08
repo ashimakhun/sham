@@ -4,7 +4,7 @@ import { FlatList, Linking, Pressable, RefreshControl, Text, View } from 'react-
 
 import { PeriodEditor } from '@/components/Accountant';
 import { PhotoPreview } from '@/components/PhotoPreview';
-import { Card, EmptyState, ErrorText, HiddenBadge, styles } from '@/components/ui';
+import { Card, EmptyState, ErrorText, HiddenBadge, IconButton, styles } from '@/components/ui';
 import {
   canSeeBilling,
   isAccountant,
@@ -15,7 +15,7 @@ import {
   waitingRequests,
   type PaymentStatus,
 } from '@/lib/billing';
-import { confirmAction } from '@/lib/confirm';
+import { confirmAction, confirmDestructive } from '@/lib/confirm';
 import { PROOF_LOAD_ERROR, proofFileName } from '@/lib/paymentProof';
 import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
@@ -148,13 +148,19 @@ function CourseHeader({ billing, title, hidden }: { billing: CourseBilling; titl
   );
 }
 
-function StatusLabel({ status }: { status: PaymentStatus }) {
-  if (status.kind === 'exempt') return <Text style={[styles.muted, { fontWeight: '600' }]}>Exempt</Text>;
-  if (status.kind === 'paid')
-    return (
-      <Text style={{ color: colors.success, fontWeight: '600' }}>Paid · {formatDate(status.payment.markedAt)}</Text>
-    );
-  return <Text style={{ color: colors.danger, fontWeight: '600' }}>Unpaid</Text>;
+/** ARU-118 AC 1: the status as a small rounded badge (read as text, not a button). */
+function StatusBadge({ status }: { status: PaymentStatus }) {
+  const [text, color, backgroundColor] =
+    status.kind === 'exempt'
+      ? ['Exempt', colors.muted, colors.mutedSoft]
+      : status.kind === 'paid'
+        ? [`Paid · ${formatDate(status.payment.markedAt)}`, colors.success, colors.successSoft]
+        : ['Unpaid', colors.danger, colors.dangerSoft];
+  return (
+    <View style={[styles.badge, { backgroundColor }]} testID="status-badge">
+      <Text style={[styles.badgeText, { color }]}>{text}</Text>
+    </View>
+  );
 }
 
 /** A text button; `label` (with the listener's name) is what screen readers read. */
@@ -187,14 +193,18 @@ function Action({
   );
 }
 
-/** AC 9: "Payment request · <date>" and View proof: a photo full-screen (with Download), a PDF in the browser. */
-function RequestLine({ request, courseTitle, name }: { request: PaymentRequest; courseTitle: string; name: string }) {
+/**
+ * ARU-99 AC 9: View proof opens a photo full-screen (with Download), a PDF in the browser. ARU-118 AC 7: the link
+ * sits in the row's links row; it has its own `opening` state, separate from the row's busy state.
+ */
+function useProofViewer(request: PaymentRequest | undefined) {
   const { getPaymentProofUrl } = useStore();
   const [preview, setPreview] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
 
   async function view() {
+    if (!request) return;
     setError(null);
     if (request.proofType === 'image') {
       setPreview(true);
@@ -211,27 +221,7 @@ function RequestLine({ request, courseTitle, name }: { request: PaymentRequest; 
     }
   }
 
-  return (
-    <View testID={`request-${request.userId}`} style={{ gap: 2 }}>
-      <Text style={{ color: colors.text }}>Payment request · {formatDate(request.sentAt)}</Text>
-      <Action
-        text={opening ? 'Opening…' : 'View proof'}
-        label={`View payment proof from ${name}`}
-        disabled={opening}
-        onPress={view}
-      />
-      <ErrorText error={error} />
-      {preview && (
-        <PhotoPreview
-          path={request.proofPath}
-          loadUrl={getPaymentProofUrl}
-          fileName={proofFileName(courseTitle, name)}
-          errorText={PROOF_LOAD_ERROR}
-          onClose={() => setPreview(false)}
-        />
-      )}
-    </View>
-  );
+  return { preview, closePreview: () => setPreview(false), error, opening, view, getPaymentProofUrl };
 }
 
 function ListenerRow({
@@ -253,47 +243,89 @@ function ListenerRow({
 }) {
   const { markPaid, undoPaid, setExempt } = useStore();
   const { busy, error, run } = useAction();
+  const proof = useProofViewer(request);
   return (
     <View testID={`payment-${userId}`}>
       <Card style={{ gap: 6 }}>
-        <Text style={[styles.title, { fontSize: 15 }]}>{name}</Text>
-        <StatusLabel status={status} />
-        {request ? <RequestLine request={request} courseTitle={courseTitle} name={name} /> : null}
-        <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ flex: 1, gap: 6 }}>
+            <Text style={[styles.title, { fontSize: 15 }]}>{name}</Text>
+            <StatusBadge status={status} />
+            {request ? (
+              <Text testID={`request-${request.userId}`} style={{ color: colors.text }}>
+                Payment request · {formatDate(request.sentAt)}
+              </Text>
+            ) : null}
+            {/* AC 7: View proof and Set / Clear exempt on one row; Set exempt only for Unpaid listeners. */}
+            <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap' }}>
+              {request ? (
+                <Action
+                  text={proof.opening ? 'Opening…' : 'View proof'}
+                  label={`View payment proof from ${name}`}
+                  disabled={proof.opening}
+                  onPress={proof.view}
+                />
+              ) : null}
+              {status.kind === 'exempt' && (
+                <Action
+                  text="Clear exempt"
+                  label={`Clear exempt for ${name}`}
+                  disabled={busy}
+                  onPress={() => run(() => setExempt(courseId, userId, false))}
+                />
+              )}
+              {status.kind === 'unpaid' && (
+                <Action
+                  text="Set exempt"
+                  label={`Set ${name} exempt`}
+                  disabled={busy}
+                  onPress={() => run(() => setExempt(courseId, userId, true))}
+                />
+              )}
+            </View>
+          </View>
+          {/* AC 2-5: a green check mark marks Paid at once; a red X undoes Paid after a confirmation. */}
           {status.kind === 'unpaid' && (
-            <Action
-              text="Mark paid"
+            <IconButton
+              icon="checkmark"
+              tone="success"
               label={`Mark ${name} paid`}
+              testID={`mark-paid-${userId}`}
               disabled={busy}
               onPress={() => run(() => markPaid(courseId, userId, month))}
             />
           )}
           {status.kind === 'paid' && (
-            <Action
-              text="Undo paid"
+            <IconButton
+              icon="close"
+              tone="danger"
               label={`Undo paid for ${name}`}
-              danger
+              testID={`undo-paid-${userId}`}
               disabled={busy}
-              onPress={() => run(() => undoPaid(courseId, userId, month))}
-            />
-          )}
-          {status.kind === 'exempt' ? (
-            <Action
-              text="Clear exempt"
-              label={`Clear exempt for ${name}`}
-              disabled={busy}
-              onPress={() => run(() => setExempt(courseId, userId, false))}
-            />
-          ) : (
-            <Action
-              text="Set exempt"
-              label={`Set ${name} exempt`}
-              disabled={busy}
-              onPress={() => run(() => setExempt(courseId, userId, true))}
+              onPress={() =>
+                run(async () => {
+                  const ok = await confirmDestructive(
+                    'Undo paid',
+                    `Undo paid for ${name} for this month? They will show as Unpaid.`,
+                    'Undo paid',
+                  );
+                  if (ok) await undoPaid(courseId, userId, month);
+                })
+              }
             />
           )}
         </View>
+        <ErrorText error={proof.error} />
         <ErrorText error={error} />
+        {proof.preview && request && (
+          <PhotoPreview
+            path={request.proofPath}
+            loadUrl={proof.getPaymentProofUrl}
+            fileName={proofFileName(courseTitle, name)}
+            errorText={PROOF_LOAD_ERROR}
+            onClose={proof.closePreview}
+          />
+        )}
       </Card>
     </View>
   );

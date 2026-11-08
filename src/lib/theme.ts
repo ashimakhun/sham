@@ -13,6 +13,9 @@ export const colors = {
   warning: '#B45309',
   warningSoft: '#FFFBEB',
   danger: '#DC2626',
+  dangerSoft: '#FEF2F2',
+  /** Light grey behind muted badges (Hidden, Exempt). */
+  mutedSoft: '#F3F4F6',
 };
 
 export const roleLabel: Record<Role, string> = {
