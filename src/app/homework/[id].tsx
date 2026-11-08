@@ -41,11 +41,20 @@ export default function HomeworkDetailScreen() {
           <Text style={styles.h1}>{item.title}</Text>
           <Text style={[styles.label, { color: colors.primary }]}>{getCourse(item.courseId)?.title ?? 'No course'}</Text>
           {assignment ? (
-            <Text style={styles.muted} testID="homework-assignment">
-              Assignment: {assignment.title}
-              {meeting ? ` · Meeting ${formatDateTime(meeting.startsAt)}` : ''}
-              {assignment.dueAt ? `\n${dueText(assignment)}` : ''}
-            </Text>
+            // ARU-117: one row each, so a long title wraps on its own and never splits the meeting date.
+            <View testID="homework-assignment">
+              <Text style={styles.muted}>Assignment: {assignment.title}</Text>
+              {meeting ? (
+                <Text style={styles.muted} testID="homework-assignment-meeting">
+                  Meeting {formatDateTime(meeting.startsAt)}
+                </Text>
+              ) : null}
+              {assignment.dueAt ? (
+                <Text style={styles.muted} testID="homework-assignment-due">
+                  {dueText(assignment)}
+                </Text>
+              ) : null}
+            </View>
           ) : null}
           <Text style={styles.muted}>
             {student?.name} · {formatDate(item.createdAt)}
