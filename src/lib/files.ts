@@ -1,4 +1,6 @@
 // Knowledge base PDFs (ARU-30): limits and helpers shared by the screens and the store.
+import { currentLanguage, formatNumberIn, type Language, translate } from '@/i18n';
+
 import type { MaterialFileEdit, PickedFile } from './types';
 
 /** 25 MB, the same limit as the "materials" bucket (0018_material_files.sql). */
@@ -18,18 +20,27 @@ export function isAllowedPdf(file: Pick<PickedFile, 'name' | 'mimeType' | 'size'
 /** The prefilled name: the file name without ".pdf", or "Untitled" when the picker gives none. */
 export function nameFromFile(fileName: string | undefined) {
   const name = (fileName ?? '').trim().replace(/\.pdf$/i, '').trim().slice(0, FILE_NAME_MAX);
-  return name || 'Untitled';
+  return name || translate(currentLanguage(), 'files.untitled');
 }
 
-/** "—" when unknown; otherwise bytes, KB or MB (one decimal under 10). */
-export function formatSize(bytes: number | undefined) {
+/**
+ * "—" when unknown; otherwise bytes, KB or MB (one decimal under 10), in the app's language (ARU-113 AC 4):
+ * "1.2 MB" / "1,2 МБ".
+ */
+export function formatSize(bytes: number | undefined, lang: Language = currentLanguage()) {
   if (bytes === undefined || !Number.isFinite(bytes) || bytes < 0) return '—';
-  if (bytes < 1024) return `${bytes} B`;
+  const size = (value: number, unit: 'b' | 'kb' | 'mb') => {
+    const n = unit !== 'b' && value < 10 ? value.toFixed(1) : String(Math.round(value));
+    return translate(lang, `files.size.${unit}`, { n: lang === 'ru' ? n.replace('.', ',') : n });
+  };
+  if (bytes < 1024) return size(bytes, 'b');
   const kb = bytes / 1024;
-  if (kb < 1024) return `${kb < 10 ? kb.toFixed(1) : Math.round(kb)} KB`;
-  const mb = kb / 1024;
-  return `${mb < 10 ? mb.toFixed(1) : Math.round(mb)} MB`;
+  if (kb < 1024) return size(kb, 'kb');
+  return size(kb / 1024, 'mb');
 }
+
+/** ARU-113 AC 4: a limit such as "2,000" / "2 000". */
+export const formatLimit = (n: number, lang: Language = currentLanguage()) => formatNumberIn(lang, n);
 
 /** Characters as Postgres counts them (code points), so an emoji counts once. */
 const chars = (s: string) => [...s].length;

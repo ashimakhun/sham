@@ -137,7 +137,40 @@ const APP_MESSAGE_IDS: [TextId, Params?][] = [
   ['photo.tooLarge'],
   ['disciplines.hidden'],
   ['common.deletedAccount'],
+  ['files.pdfRule'],
+  ['files.openFailed'],
+  ['files.nameEmpty'],
+  ['files.nameTooLong'],
+  ['files.descriptionTooLong'],
+  ['billing.daysRange'],
+  ['billing.daysOrder'],
+  ['payments.proofRule'],
+  ['payments.proofLoadError'],
+  ['payments.photoPermission'],
+  ['payments.noLongerPaid'],
+  ['payments.invalidMonth'],
+  ['payments.noProofLink'],
+  ['deleteAccount.wrongPassword'],
+  ['deleteAccount.offline'],
+  ['deleteAccount.failed'],
+  ['deleteAccount.teacherCant'],
+  ['errors.notSignedIn'],
+  ['materials.cantDeleteMaterial'],
+  ['materials.cantEditFile'],
+  ['materials.notFound'],
+  ['materials.cantDeleteFile'],
+  ['materials.noFileLink'],
+  ['telegram.linkFailed'],
+  ['chat.loadError'],
+  ['chat.loadOlderError'],
   ['homework.photosZipError'],
+];
+/**
+ * ARU-113: app messages that carry a value only known at run time; the named groups fill the text's placeholders.
+ * The English text must match what the app (and account_deletion_problem() in 0040) builds.
+ */
+const APP_MESSAGE_PATTERNS: [RegExp, TextId][] = [
+  [/^You own courses: (?<titles>.+)\. Ask the teacher or a mentor to change their owner first\.$/s, 'deleteAccount.ownedCourses'],
 ];
 const byEnglish = new Map<string, readonly [TextId, Params | undefined]>();
 const register = (entries: [TextId, Params?][]) => {
@@ -152,7 +185,12 @@ register(APP_MESSAGE_IDS);
  */
 export function translateKnown(lang: Language, message: string): string {
   const known = byEnglish.get(message);
-  return known ? translate(lang, known[0], known[1]) : message;
+  if (known) return translate(lang, known[0], known[1]);
+  for (const [pattern, id] of APP_MESSAGE_PATTERNS) {
+    const match = pattern.exec(message);
+    if (match) return translate(lang, id, match.groups);
+  }
+  return message;
 }
 
 /**
