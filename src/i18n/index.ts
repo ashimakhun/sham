@@ -161,6 +161,8 @@ const APP_MESSAGE_IDS: [TextId, Params?][] = [
   ['materials.cantDeleteFile'],
   ['materials.noFileLink'],
   ['telegram.linkFailed'],
+  ['chat.loadError'],
+  ['chat.loadOlderError'],
 ];
 /**
  * ARU-113: app messages that carry a value only known at run time; the named groups fill the text's placeholders.

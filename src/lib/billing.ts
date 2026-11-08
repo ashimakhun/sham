@@ -140,7 +140,7 @@ export function waitingRequests(input: {
   );
 }
 
-/** "1 request" / "2 requests" (AC 6). */
-export function requestCountText(n: number) {
-  return `${n} ${n === 1 ? 'request' : 'requests'}`;
+/** "1 request" / "2 requests" (AC 6); "2 запроса" in Russian (ARU-113 AC 4). */
+export function requestCountText(n: number, lang: Language = currentLanguage()) {
+  return translate(lang, 'accountant.requestCount', { count: n });
 }
