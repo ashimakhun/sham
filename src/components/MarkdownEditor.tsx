@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Keyboard, Pressable, Text, TextInput, type TextInputInstance, useWindowDimensions, View } from 'react-native';
 
 import { ErrorText, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { type Edit, NOTES_MAX, notesCounter, type Selection, toggleList, toggleWrap } from '@/lib/markdown';
 import { colors } from '@/lib/theme';
 import { useKeyboardHeight } from '@/lib/useKeyboardHeight';
@@ -17,11 +18,17 @@ type Props = {
   limitMessage?: string;
 };
 
+// ARU-109: `label` is a catalog ID, translated when rendered.
 const TOOLS = [
-  { key: 'bold', label: 'Bold', glyph: 'B', glyphStyle: { fontWeight: '800' as const } },
-  { key: 'italic', label: 'Italic', glyph: 'I', glyphStyle: { fontStyle: 'italic' as const, fontFamily: 'serif' } },
-  { key: 'bullets', label: 'Bulleted list', glyph: '•', glyphStyle: { fontSize: 22 } },
-  { key: 'numbers', label: 'Numbered list', glyph: '1.', glyphStyle: {} },
+  { key: 'bold', label: 'notes.bold', glyph: 'B', glyphStyle: { fontWeight: '800' as const } },
+  {
+    key: 'italic',
+    label: 'notes.italic',
+    glyph: 'I',
+    glyphStyle: { fontStyle: 'italic' as const, fontFamily: 'serif' },
+  },
+  { key: 'bullets', label: 'notes.bullets', glyph: '•', glyphStyle: { fontSize: 22 } },
+  { key: 'numbers', label: 'notes.numbers', glyph: '1.', glyphStyle: {} },
 ] as const;
 type Tool = (typeof TOOLS)[number]['key'];
 
@@ -41,10 +48,11 @@ export function MarkdownEditor({
   onChange,
   placeholder,
   maxLength = NOTES_MAX,
-  accessibilityLabel = 'Notes',
+  accessibilityLabel,
   limitMessage,
 }: Props) {
-  const tooLong = limitMessage ?? `Notes can be at most ${maxLength.toLocaleString('en-US')} characters.`;
+  const { t, formatNumber } = useI18n();
+  const tooLong = limitMessage ?? t('notes.tooLong', { max: formatNumber(maxLength) });
   const selection = useRef<Selection>({ start: value.length, end: value.length });
   // Set only right after a toolbar edit, so the cursor lands where the edit put it; cleared on the next change.
   const [forced, setForced] = useState<Selection>();
@@ -87,14 +95,14 @@ export function MarkdownEditor({
     <View style={{ gap: 8 }}>
       <View
         accessibilityRole="toolbar"
-        accessibilityLabel="Formatting"
+        accessibilityLabel={t('notes.formatting')}
         style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
-        {TOOLS.map((t) => (
+        {TOOLS.map((tool) => (
           <Pressable
-            key={t.key}
+            key={tool.key}
             accessibilityRole="button"
-            accessibilityLabel={t.label}
-            onPress={() => onTool(t.key)}
+            accessibilityLabel={t(tool.label)}
+            onPress={() => onTool(tool.key)}
             style={({ pressed }) => ({
               minWidth: 44,
               height: 44,
@@ -106,14 +114,14 @@ export function MarkdownEditor({
               borderColor: colors.border,
               backgroundColor: pressed ? colors.primarySoft : colors.card,
             })}>
-            <Text style={[{ fontSize: 16, color: colors.text }, t.glyphStyle]}>{t.glyph}</Text>
+            <Text style={[{ fontSize: 16, color: colors.text }, tool.glyphStyle]}>{tool.glyph}</Text>
           </Pressable>
         ))}
         {/* Return adds a line in a multiline field, so this is the explicit way out while typing (ARU-58). */}
         {keyboardHeight > 0 && (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Hide keyboard"
+            accessibilityLabel={t('notes.hideKeyboard')}
             onPress={() => Keyboard.dismiss()}
             style={({ pressed }) => ({
               height: 44,
@@ -124,14 +132,14 @@ export function MarkdownEditor({
               marginLeft: 'auto',
               backgroundColor: pressed ? colors.primarySoft : 'transparent',
             })}>
-            <Text style={{ fontSize: 16, color: colors.primary, fontWeight: '600' }}>Done</Text>
+            <Text style={{ fontSize: 16, color: colors.primary, fontWeight: '600' }}>{t('notes.done')}</Text>
           </Pressable>
         )}
       </View>
 
       <TextInput
         ref={input}
-        accessibilityLabel={accessibilityLabel}
+        accessibilityLabel={accessibilityLabel ?? t('notes.title')}
         multiline
         value={value}
         placeholder={placeholder}
@@ -156,12 +164,13 @@ export function MarkdownEditor({
       />
       {counter && (
         <Text
-          accessibilityLabel={`${value.length} of ${maxLength} characters`}
+          accessibilityLabel={t('notes.counterLabel', { n: value.length, max: maxLength })}
           style={[
             styles.muted,
             { textAlign: 'right', color: value.length >= maxLength ? colors.danger : colors.muted },
           ]}>
-          {counter}
+          {/* ARU-109: notesCounter's "9,500 / 10,000" with the numbers in the app language ("9 500 / 10 000"). */}
+          {`${formatNumber(value.length)} / ${formatNumber(NOTES_MAX)}`}
         </Text>
       )}
       <ErrorText error={error} />

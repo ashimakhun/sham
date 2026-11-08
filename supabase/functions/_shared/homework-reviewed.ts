@@ -5,7 +5,8 @@
 // helper, which skips unlinked users and those with Homework reviewed off. Nothing is retried by a later call.
 // No Deno-only imports, so Jest can test it.
 
-import type { SendResult, TelegramMessage } from './telegram.ts';
+import { localizedMessage, type SendResult, type TelegramMessage } from './telegram.ts';
+import { telegramText, telegramTexts } from './telegram-texts.ts';
 import { timingSafeEqual } from './telegram-bot.ts';
 
 /** One row of homework_reviewed_recipient(). */
@@ -24,12 +25,12 @@ export type HomeworkReviewedReport = { recipients: number } & SendResult;
 
 /** The message text, exactly as the product owner set it (plain text: the title is shown as typed). */
 export function homeworkReviewedText(courseTitle: string) {
-  return `Your homework for ${courseTitle} was reviewed`;
+  return telegramText('en', 'homeworkReviewed', { course: courseTitle });
 }
 
 /** One message per recipient row (in practice zero or one: the sender). */
 export function homeworkReviewedMessages(rows: HomeworkRecipient[]): TelegramMessage[] {
-  return rows.map((r) => ({ userId: r.user_id, kind: 'homework_reviewed' as const, text: homeworkReviewedText(r.course_title) }));
+  return rows.map((r) => localizedMessage(r.user_id, 'homework_reviewed', telegramTexts('homeworkReviewed', { course: r.course_title })));
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

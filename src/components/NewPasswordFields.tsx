@@ -1,7 +1,8 @@
 import { Text, View } from 'react-native';
 
 import { Field } from '@/components/ui';
-import { PASSWORD_PLACEHOLDER, PASSWORDS_DONT_MATCH, passwordsMismatch } from '@/lib/password';
+import { useI18n } from '@/i18n/context';
+import { PASSWORD_MIN, passwordsMismatch } from '@/lib/password';
 import { colors } from '@/lib/theme';
 
 /**
@@ -22,13 +23,14 @@ export function NewPasswordFields({
   onConfirm: (v: string) => void;
   editable?: boolean;
 }) {
+  const { t } = useI18n();
   const mismatch = passwordsMismatch(password, confirm);
   return (
     <>
       <Field
         testID="new-password"
-        label="New password"
-        placeholder={PASSWORD_PLACEHOLDER}
+        label={t('password.new')}
+        placeholder={t('password.placeholder', { min: PASSWORD_MIN })}
         value={password}
         onChangeText={onPassword}
         secureTextEntry
@@ -41,7 +43,7 @@ export function NewPasswordFields({
       <View style={{ gap: 6 }}>
         <Field
           testID="confirm-password"
-          label="Confirm new password"
+          label={t('password.confirm')}
           value={confirm}
           onChangeText={onConfirm}
           secureTextEntry
@@ -53,7 +55,7 @@ export function NewPasswordFields({
         />
         {mismatch && (
           <Text testID="passwords-mismatch" style={{ color: colors.danger, fontSize: 14 }}>
-            {PASSWORDS_DONT_MATCH}
+            {t('password.mismatch')}
           </Text>
         )}
       </View>

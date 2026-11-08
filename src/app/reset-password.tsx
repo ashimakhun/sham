@@ -6,14 +6,8 @@ import { KeyboardForm } from '@/components/KeyboardForm';
 import { NewPasswordFields } from '@/components/NewPasswordFields';
 import { Button, ErrorText, Field, styles } from '@/components/ui';
 import { notify } from '@/lib/confirm';
-import {
-  cleanCode,
-  codeReady,
-  codeSentMessage,
-  newPasswordReady,
-  PASSWORD_CHANGED,
-  RESEND_COOLDOWN_S,
-} from '@/lib/password';
+import { useI18n } from '@/i18n/context';
+import { cleanCode, codeReady, newPasswordReady, RESEND_COOLDOWN_S } from '@/lib/password';
 import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
 
@@ -46,6 +40,7 @@ export default function ResetPasswordScreen() {
   const params = useLocalSearchParams<{ email?: string }>();
   const { requestPasswordReset, resetPasswordWithCode } = useStore();
   const { busy, error, run, clearError } = useAction();
+  const { t, tm } = useI18n();
   const [email, setEmail] = useState(() => (typeof params.email === 'string' ? params.email : ''));
   // The trimmed address the code went to; set once a code was sent (the code step).
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -64,10 +59,10 @@ export default function ResetPasswordScreen() {
 
   useEffect(() => {
     if (!done) return;
-    notify(PASSWORD_CHANGED);
+    notify(t('password.changed'));
     // The sign-in screen underneath now opens the app (Homework, or the waiting / declined screen).
     backToSignIn();
-  }, [done]);
+  }, [done, t]);
 
   function request(kind: Exclude<Pending, null>, action: () => Promise<void>) {
     if (inFlight.current) return;
@@ -90,31 +85,31 @@ export default function ResetPasswordScreen() {
       setSentAt(Date.now());
     });
 
-  const label = (kind: Exclude<Pending, null>, title: string) => (pending === kind ? 'Please wait…' : title);
+  const label = (kind: Exclude<Pending, null>, title: string) => (pending === kind ? t('common.pleaseWait') : title);
 
   if (sentTo === null) {
     return (
       <KeyboardForm>
         <Text style={styles.muted}>
-          {"Enter the email you signed up with. We'll send you a code to set a new password."}
+          {t('reset.intro')}
         </Text>
         <Field
           testID="reset-email"
-          label="Email"
-          placeholder="you@example.com"
+          label={t('signIn.email')}
+          placeholder={t('signIn.emailPlaceholder')}
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
           autoComplete="email"
           keyboardType="email-address"
         />
-        <ErrorText error={error} />
+        <ErrorText error={tm(error)} />
         <Button
-          title={label('send', 'Send code')}
+          title={label('send', t('reset.sendCode'))}
           disabled={!email.trim() || busy}
           onPress={() => send('send', email.trim())}
         />
-        <Button title="Back to sign in" variant="secondary" onPress={backToSignIn} />
+        <Button title={t('reset.backToSignIn')} variant="secondary" onPress={backToSignIn} />
       </KeyboardForm>
     );
   }
@@ -123,10 +118,10 @@ export default function ResetPasswordScreen() {
 
   return (
     <KeyboardForm>
-      <Text style={styles.body}>{codeSentMessage(sentTo)}</Text>
+      <Text style={styles.body}>{t('reset.codeSent', { email: sentTo })}</Text>
       <Field
         testID="reset-code"
-        label="Code"
+        label={t('reset.code')}
         placeholder="123456"
         value={code}
         onChangeText={(t) => setCode(cleanCode(t))}
@@ -137,9 +132,9 @@ export default function ResetPasswordScreen() {
         textContentType="oneTimeCode"
       />
       <NewPasswordFields password={password} onPassword={setPassword} confirm={confirm} onConfirm={setConfirm} />
-      <ErrorText error={error} />
+      <ErrorText error={tm(error)} />
       <Button
-        title={label('reset', 'Reset password')}
+        title={label('reset', t('reset.submit'))}
         disabled={!canReset || busy || done}
         onPress={() =>
           request('reset', async () => {
@@ -149,7 +144,13 @@ export default function ResetPasswordScreen() {
         }
       />
       <Button
-        title={pending === 'resend' ? 'Please wait…' : secondsLeft > 0 ? `Send a new code (${secondsLeft}s)` : 'Send a new code'}
+        title={
+          pending === 'resend'
+            ? t('common.pleaseWait')
+            : secondsLeft > 0
+              ? t('reset.resendIn', { seconds: secondsLeft })
+              : t('reset.resend')
+        }
         variant="secondary"
         disabled={secondsLeft > 0 || busy || done}
         onPress={() => {
@@ -157,7 +158,12 @@ export default function ResetPasswordScreen() {
           send('resend', sentTo);
         }}
       />
-      <Button title="Back to sign in" variant="secondary" disabled={pending === 'reset' || done} onPress={backToSignIn} />
+      <Button
+        title={t('reset.backToSignIn')}
+        variant="secondary"
+        disabled={pending === 'reset' || done}
+        onPress={backToSignIn}
+      />
     </KeyboardForm>
   );
 }
