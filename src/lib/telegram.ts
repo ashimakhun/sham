@@ -20,19 +20,29 @@ export const TELEGRAM_SWITCHES: { kind: TelegramKind; label: string }[] = [
   { kind: 'chat_message', label: 'Chat messages' },
   // ARU-87: every role, right below Chat messages.
   { kind: 'general_chat', label: 'General chat' },
+  // ARU-102: every role, right below General chat (for the teacher, before New accounts).
+  { kind: 'new_material', label: 'New materials' },
   // ARU-84: only the teacher accepts accounts, so only the teacher sees it (right after Chat messages).
   { kind: 'new_account', label: 'New accounts' },
 ];
 
 /**
- * The teacher is never a listener and never sends homework: chat messages, the general chat (ARU-87), homework
- * submitted to courses they own (ARU-89) and new accounts (ARU-84). Mentors: everything but new accounts. Students:
- * also no homework submitted.
+ * The teacher is never a listener and never sends homework: chat messages, the general chat (ARU-87), new materials
+ * (ARU-102), homework submitted to courses they own (ARU-89) and new accounts (ARU-84). Mentors: everything but new
+ * accounts. Students: also no homework submitted.
  */
 const KINDS_FOR: Record<Role, TelegramKind[]> = {
-  teacher: ['homework_submitted', 'chat_message', 'general_chat', 'new_account'],
-  mentor: ['meeting_started', 'new_homework', 'homework_reviewed', 'homework_submitted', 'chat_message', 'general_chat'],
-  student: ['meeting_started', 'new_homework', 'homework_reviewed', 'chat_message', 'general_chat'],
+  teacher: ['homework_submitted', 'chat_message', 'general_chat', 'new_material', 'new_account'],
+  mentor: [
+    'meeting_started',
+    'new_homework',
+    'homework_reviewed',
+    'homework_submitted',
+    'chat_message',
+    'general_chat',
+    'new_material',
+  ],
+  student: ['meeting_started', 'new_homework', 'homework_reviewed', 'chat_message', 'general_chat', 'new_material'],
 };
 
 export function telegramSwitchesFor(role: Role) {
