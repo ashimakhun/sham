@@ -5,7 +5,8 @@ import { Pressable, Text, View } from 'react-native';
 
 import { RatingSummary } from '@/components/RatingSummary';
 import { Card, ErrorText, HiddenBadge, styles } from '@/components/ui';
-import { disciplineFeedback, HIDDEN_DISCIPLINE } from '@/lib/disciplines';
+import { useI18n } from '@/i18n/context';
+import { disciplineFeedback } from '@/lib/disciplines';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import type { Course, Discipline, User } from '@/lib/types';
@@ -14,11 +15,12 @@ import { useAction } from '@/lib/useAction';
 /** ARU-63 AC 6: "Discipline: <name>" when the course has a discipline the viewer can see; nothing otherwise. */
 export function DisciplineLabel({ course }: { course: Course }) {
   const { getDiscipline } = useStore();
+  const { t } = useI18n();
   const discipline = getDiscipline(course.disciplineId);
   if (!discipline) return null;
   return (
-    <Text style={styles.muted} numberOfLines={2} accessibilityLabel={`Discipline, ${discipline.name}`}>
-      Discipline: {discipline.name}
+    <Text style={styles.muted} numberOfLines={2} accessibilityLabel={t('disciplines.a11yLabel', { name: discipline.name })}>
+      {t('disciplines.courseLine', { name: discipline.name })}
     </Text>
   );
 }
@@ -31,10 +33,11 @@ type DisciplineOption = { id: string | undefined; label: string; hidden?: boolea
  */
 function useDisciplineOptions(value: string | undefined) {
   const { disciplines, getDiscipline } = useStore();
+  const { t } = useI18n();
   const hiddenFromMe = !!value && !getDiscipline(value);
   const options: DisciplineOption[] = [
-    { id: undefined, label: 'No discipline' },
-    ...(hiddenFromMe ? [{ id: value, label: HIDDEN_DISCIPLINE }] : []),
+    { id: undefined, label: t('disciplines.none') },
+    ...(hiddenFromMe ? [{ id: value, label: t('disciplines.hidden') }] : []),
     ...disciplines.map((d) => ({ id: d.id, label: d.name, hidden: d.hidden })),
   ];
   const current = options.find((o) => o.id === value) ?? options[0];
@@ -93,10 +96,11 @@ export function DisciplinePicker({
   disabled?: boolean;
 }) {
   const { options, current } = useDisciplineOptions(value);
+  const { t } = useI18n();
   return (
     <View style={{ gap: 6 }}>
-      <Text style={styles.label} accessibilityLabel={`Discipline, ${current.label}`}>
-        Discipline
+      <Text style={styles.label} accessibilityLabel={t('disciplines.a11yLabel', { name: current.label })}>
+        {t('disciplines.fieldLabel')}
       </Text>
       <DisciplineOptions options={options} value={value} onChange={onChange} disabled={disabled} />
     </View>
@@ -119,6 +123,7 @@ export const TOGGLE_GUARD_MS = 500;
  * Edit course modal; a double tap opens it only once.
  */
 export function EditCoursePencil({ courseId }: { courseId: string }) {
+  const { t } = useI18n();
   const lastTap = useRef(0);
   const open = () => {
     const now = Date.now();
@@ -129,7 +134,7 @@ export function EditCoursePencil({ courseId }: { courseId: string }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Edit course"
+      accessibilityLabel={t('disciplines.editCourse')}
       onPress={open}
       style={({ pressed }) => [
         { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
@@ -151,6 +156,7 @@ export function EditCourseDisciplineSection({ course }: { course: Course }) {
   const { busy, error, run } = useAction();
   const saving = useRef(false);
   const { options, current } = useDisciplineOptions(course.disciplineId);
+  const { t } = useI18n();
   if (!canChangeCourseDiscipline(currentUser, course)) return null;
   // Nothing to pick and nothing set: no section (as on the Create course form); it appears once a discipline exists.
   if (disciplines.length === 0 && !course.disciplineId) return null;
@@ -170,8 +176,8 @@ export function EditCourseDisciplineSection({ course }: { course: Course }) {
 
   return (
     <Card style={{ gap: 8 }}>
-      <View style={{ gap: 2 }} accessible accessibilityLabel={`Discipline, ${current.label}`}>
-        <Text style={styles.label}>Discipline</Text>
+      <View style={{ gap: 2 }} accessible accessibilityLabel={t('disciplines.a11yLabel', { name: current.label })}>
+        <Text style={styles.label}>{t('disciplines.fieldLabel')}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Text style={[styles.body, { flexShrink: 1 }]} numberOfLines={2}>
             {current.label}
@@ -180,7 +186,7 @@ export function EditCourseDisciplineSection({ course }: { course: Course }) {
         </View>
       </View>
       <DisciplineOptions options={options} value={course.disciplineId} onChange={pick} disabled={busy} />
-      {busy ? <Text style={styles.muted}>Saving…</Text> : null}
+      {busy ? <Text style={styles.muted}>{t('common.saving')}</Text> : null}
       <ErrorText error={error} />
     </Card>
   );

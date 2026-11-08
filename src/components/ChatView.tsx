@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 
 import { Button, EmptyState, ErrorText, RoleBadge, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { newId } from '@/lib/id';
 import { personName } from '@/lib/deleteAccount';
 import { useStore } from '@/lib/store';
@@ -50,6 +51,7 @@ export function ChatView<M extends ChatMessage>({
   badges?: (message: M) => ReactNode;
 }) {
   const { currentUser } = useStore();
+  const { t } = useI18n();
   const headerHeight = useHeaderHeight();
   const [text, setText] = useState('');
   // One id per message, kept across retries so a retry never posts twice; renewed after a send.
@@ -105,8 +107,8 @@ export function ChatView<M extends ChatMessage>({
         <ErrorText error={error ?? chat.error} />
         <View style={chatStyles.row}>
           <TextInput
-            accessibilityLabel="Message"
-            placeholder="Write a message…"
+            accessibilityLabel={t('chat.messageLabel')}
+            placeholder={t('chat.placeholder')}
             placeholderTextColor={colors.muted}
             value={text}
             onChangeText={setText}
@@ -115,7 +117,7 @@ export function ChatView<M extends ChatMessage>({
             style={[styles.input, chatStyles.input]}
           />
           <View style={chatStyles.send}>
-            <Button title={busy ? '…' : 'Send'} onPress={send} disabled={!text.trim() || busy} />
+            <Button title={busy ? '…' : t('chat.send')} onPress={send} disabled={!text.trim() || busy} />
           </View>
         </View>
       </View>

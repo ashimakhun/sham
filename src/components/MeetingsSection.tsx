@@ -3,10 +3,12 @@ import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Card, ErrorText, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
+import type { TextId } from '@/i18n';
 import { meetingAttendance } from '@/lib/attendance';
 import { confirmAction } from '@/lib/confirm';
-import { DELETED_ACCOUNT } from '@/lib/deleteAccount';
 import {
+  type MeetingBadgeInfo,
   groupMeetings,
   hasStarted,
   isLink,
@@ -28,13 +30,22 @@ import type { Course, Meeting, MeetingStatus } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
 import { useNow } from '@/lib/useNow';
 
+/** ARU-109: `meetingBadge` gives the English label; the badge shows the catalog text for it. */
+const BADGE_TEXT: Record<MeetingBadgeInfo['label'], TextId> = {
+  'In progress': 'meetings.badgeInProgress',
+  Scheduled: 'meetings.badgeScheduled',
+  Completed: 'meetings.badgeCompleted',
+  Canceled: 'meetings.badgeCanceled',
+};
+
 /** ARU-88: the meeting's display state; a started Scheduled meeting reads "In progress" (see `meetingBadge`). Read
  *  by screen readers as plain text. */
 export function MeetingBadge({ meeting, now }: { meeting: Pick<Meeting, 'status' | 'startsAt'>; now: number }) {
+  const { t } = useI18n();
   const { label, bg, fg } = meetingBadge(meeting, now);
   return (
     <View testID="status-badge" style={[styles.badge, { backgroundColor: bg, flexShrink: 0 }]}>
-      <Text style={[styles.badgeText, { color: fg }]}>{label}</Text>
+      <Text style={[styles.badgeText, { color: fg }]}>{t(BADGE_TEXT[label])}</Text>
     </View>
   );
 }
@@ -97,6 +108,7 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
     unmarkAttendance,
   } = useStore();
   const { busy, error, run } = useAction();
+  const { t } = useI18n();
   const [changing, setChanging] = useState<string>();
   const now = useNow();
 
@@ -116,13 +128,14 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
     });
 
   function changeStatus(meeting: Meeting, status: Target) {
-    const verb = status === 'completed' ? 'completed' : 'canceled';
+    const completed = status === 'completed';
     run(async () => {
+      const values = { topic: meeting.topic, when: formatDateTime(meeting.startsAt) };
       const confirmed = await confirmAction(
-        status === 'completed' ? 'Mark completed' : 'Cancel meeting',
-        `Mark ${meeting.topic} on ${formatDateTime(meeting.startsAt)} as ${verb}?`,
-        `Mark ${verb}`,
-        { destructive: status === 'canceled', cancelText: 'Not now' },
+        t(completed ? 'meetings.markCompleted' : 'meetings.cancelMeeting'),
+        t(completed ? 'meetings.confirmCompleted' : 'meetings.confirmCanceled', values),
+        t(completed ? 'meetings.markCompleted' : 'meetings.markCanceled'),
+        { destructive: status === 'canceled', cancelText: t('meetings.notNow') },
       );
       if (!confirmed) return;
       setChanging(meeting.id);
@@ -137,14 +150,12 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
   // ARU-60: mark a Completed meeting's homework checked (moves it to MEETING HISTORY), or undo that.
   function setChecked(meeting: Meeting, checked: boolean) {
     run(async () => {
-      const when = formatDateTime(meeting.startsAt);
+      const values = { topic: meeting.topic, when: formatDateTime(meeting.startsAt) };
       const confirmed = await confirmAction(
-        checked ? 'Mark homework checked' : 'Undo check',
-        checked
-          ? `Mark homework for ${meeting.topic} on ${when} as checked?`
-          : `Move ${meeting.topic} on ${when} back to Awaiting homework check?`,
-        checked ? 'Mark checked' : 'Undo check',
-        { cancelText: 'Not now' },
+        t(checked ? 'meetings.markHomeworkChecked' : 'meetings.undoCheck'),
+        t(checked ? 'meetings.confirmChecked' : 'meetings.confirmUndoCheck', values),
+        t(checked ? 'meetings.markChecked' : 'meetings.undoCheck'),
+        { cancelText: t('meetings.notNow') },
       );
       if (!confirmed) return;
       setChanging(meeting.id);
@@ -171,10 +182,10 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
   function undoAttended(meeting: Meeting) {
     run(async () => {
       const confirmed = await confirmAction(
-        'Undo attendance',
-        `Remove your attendance for ${meeting.topic} on ${formatDateTime(meeting.startsAt)}?`,
-        'Remove',
-        { destructive: true, cancelText: 'Not now' },
+        t('meetings.undoAttendance'),
+        t('meetings.confirmUndoAttendance', { topic: meeting.topic, when: formatDateTime(meeting.startsAt) }),
+        t('meetings.remove'),
+        { destructive: true, cancelText: t('meetings.notNow') },
       );
       if (!confirmed) return;
       setChanging(meeting.id);
@@ -192,7 +203,7 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
       <View testID="meeting-history" style={{ paddingTop: 12 }}>
         <Card style={{ gap: 12 }}>
           <Text accessibilityRole="header" style={styles.label}>
-            MEETING HISTORY ({history.length})
+            {t('meetings.historyHeading', { n: history.length })}
           </Text>
           <View style={tile.list}>{history.map((m) => renderMeeting(m, 'history'))}</View>
           <ErrorText error={error} />
@@ -203,15 +214,15 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
 
   return (
     <Card style={{ gap: 12 }}>
-      <Text style={styles.label}>MEETINGS ({current.length})</Text>
+      <Text style={styles.label}>{t('meetings.heading', { n: current.length })}</Text>
       {current.length === 0 ? (
-        <Text style={styles.muted}>{history.length > 0 ? 'No current meetings' : 'No meetings scheduled yet'}</Text>
+        <Text style={styles.muted}>{t(history.length > 0 ? 'meetings.noCurrent' : 'meetings.noneYet')}</Text>
       ) : (
         (
           [
-            { group: 'inProgress', heading: 'In progress', items: inProgress },
-            { group: 'upcoming', heading: 'Upcoming', items: upcoming },
-            { group: 'awaitingCheck', heading: 'Awaiting homework check', items: awaitingCheck },
+            { group: 'inProgress', heading: t('meetings.groupInProgress'), items: inProgress },
+            { group: 'upcoming', heading: t('meetings.groupUpcoming'), items: upcoming },
+            { group: 'awaitingCheck', heading: t('meetings.groupAwaitingCheck'), items: awaitingCheck },
           ] as const
         )
           .filter((g) => g.items.length > 0)
@@ -229,7 +240,7 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
       <ErrorText error={error} />
       {canManage && (
         <Button
-          title="+ Schedule meeting"
+          title={t('meetings.scheduleButton')}
           variant="secondary"
           onPress={() => router.push({ pathname: '/courses/[id]/meetings/new', params: { id: course.id } })}
         />
@@ -245,17 +256,17 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
         ? []
         : started
           ? [
-              { title: 'Mark completed', status: 'completed' },
-              { title: 'Mark canceled', status: 'canceled' },
+              { title: t('meetings.markCompleted'), status: 'completed' },
+              { title: t('meetings.markCanceled'), status: 'canceled' },
             ]
-          : [{ title: 'Cancel meeting', status: 'canceled' }];
+          : [{ title: t('meetings.cancelMeeting'), status: 'canceled' }];
     // Notes (ARU-28): everyone who sees a completed meeting reads them; the owner and the teacher add or edit.
     const notesActions: { title: string; edit: boolean }[] =
       m.status !== 'completed'
         ? []
         : [
-            ...(m.notes ? [{ title: 'Notes', edit: false }] : []),
-            ...(canManage ? [{ title: m.notes ? 'Edit notes' : 'Add notes', edit: true }] : []),
+            ...(m.notes ? [{ title: t('notes.title'), edit: false }] : []),
+            ...(canManage ? [{ title: t(m.notes ? 'notes.edit' : 'notes.add'), edit: true }] : []),
           ];
     // Homework (ARU-32): one assignment per completed meeting, shown to everyone who sees the meeting.
     const assignment = assignments.find((a) => a.meetingId === m.id);
@@ -268,13 +279,18 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
     const checkAction =
       canCheck && m.status === 'completed'
         ? m.homeworkCheckedAt
-          ? { title: 'Undo check', checked: false }
-          : { title: 'Mark homework checked', checked: true }
+          ? { title: t('meetings.undoCheck'), checked: false }
+          : { title: t('meetings.markHomeworkChecked'), checked: true }
         : null;
     const checkedLine =
       m.status === 'completed' && m.homeworkCheckedAt
         ? // ARU-75: no checker any more means they deleted their account.
-          `Homework checked by ${m.homeworkCheckedById ? getUser(m.homeworkCheckedById)?.name || 'Unknown' : DELETED_ACCOUNT} · ${formatDate(m.homeworkCheckedAt)}`
+          t('meetings.checkedBy', {
+            name: m.homeworkCheckedById
+              ? getUser(m.homeworkCheckedById)?.name || t('common.unknown')
+              : t('common.deletedAccount'),
+            date: formatDate(m.homeworkCheckedAt),
+          })
         : null;
     const counts =
       seesAttendance && isOpenForAttendance(m, now)
@@ -288,7 +304,7 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
         ? [
             <ActionPill
               key="edit"
-              title="Edit"
+              title={t('meetings.edit')}
               disabled={busy}
               onPress={() =>
                 router.push({ pathname: '/courses/[id]/meetings/[meetingId]', params: { id: course.id, meetingId: m.id } })
@@ -303,7 +319,7 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
         ? [
             <ActionPill
               key="assign"
-              title="Assign homework"
+              title={t('meetings.assignHomework')}
               onPress={() =>
                 router.push({
                   pathname: '/courses/[id]/meetings/[meetingId]/assign-homework',
@@ -314,13 +330,13 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
           ]
         : []),
       ...(canMark && !attended
-        ? [<ActionPill key="attend" title="I attended" disabled={busy} onPress={() => markAttended(m)} />]
+        ? [<ActionPill key="attend" title={t('meetings.iAttended')} disabled={busy} onPress={() => markAttended(m)} />]
         : []),
       // ARU-88 AC 7: a status chip, not a button, so it doesn't look tappable.
       ...(attended
         ? [
             <View key="attended" style={[tile.pill, { backgroundColor: colors.successSoft }]}>
-              <Text style={[tile.pillText, { color: colors.success }]}>✓ You attended</Text>
+              <Text style={[tile.pillText, { color: colors.success }]}>{t('meetings.youAttended')}</Text>
             </View>,
           ]
         : []),
@@ -329,8 +345,8 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
             <ActionPill
               key="count"
               role="link"
-              title={`Attended: ${counts.attended.length} of ${counts.total}`}
-              label={`Attended ${counts.attended.length} of ${counts.total}`}
+              title={t('meetings.attendedCount', { n: counts.attended.length, total: counts.total })}
+              label={t('meetings.attendedCountLabel', { n: counts.attended.length, total: counts.total })}
               onPress={() =>
                 router.push({
                   pathname: '/courses/[id]/meetings/[meetingId]/attendance',
@@ -357,8 +373,8 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
         ? [
             <ActionPill
               key="undo"
-              title="Undo"
-              label="Undo attendance"
+              title={t('meetings.undo')}
+              label={t('meetings.undoAttendance')}
               tone="danger"
               disabled={busy}
               onPress={() => undoAttended(m)}
@@ -385,7 +401,7 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
         </View>
         <Text style={styles.muted}>
           {formatDateTime(m.startsAt)}
-          {m.rescheduledAt ? <Text style={styles.muted}>{'  '}Rescheduled</Text> : null}
+          {m.rescheduledAt ? <Text style={styles.muted}>{'  '}{t('meetings.rescheduled')}</Text> : null}
         </Text>
         {m.location ? (
           isLink(m.location) ? (
@@ -404,9 +420,13 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
         ) : null}
         {assignment ? (
           <Text style={styles.muted} numberOfLines={2} testID={`assignment-${m.id}`}>
-            <Text style={{ fontWeight: '600', color: colors.text }}>Homework: {assignment.title}</Text>
+            <Text style={{ fontWeight: '600', color: colors.text }}>
+              {t('meetings.homeworkLine', { title: assignment.title })}
+            </Text>
             {' · '}
-            {assignment.dueAt ? `Due ${formatDateTime(assignment.dueAt)}` : 'No deadline'}
+            {assignment.dueAt
+              ? t('meetings.due', { when: formatDateTime(assignment.dueAt) })
+              : t('meetings.noDeadline')}
           </Text>
         ) : null}
         {checkedLine ? (
@@ -417,7 +437,7 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
         {/* AC 6: no divider and no footer when the meeting has no actions. "Saving…" replaces the footer. */}
         {footer.length > 0 && (
           <View testID={`actions-${m.id}`} style={tile.footer}>
-            {changing === m.id ? <Text style={styles.muted}>Saving…</Text> : footer}
+            {changing === m.id ? <Text style={styles.muted}>{t('common.saving')}</Text> : footer}
           </View>
         )}
       </View>

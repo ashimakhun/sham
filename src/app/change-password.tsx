@@ -5,7 +5,7 @@ import { KeyboardForm } from '@/components/KeyboardForm';
 import { NewPasswordFields } from '@/components/NewPasswordFields';
 import { Button, ErrorText, Field } from '@/components/ui';
 import { notify } from '@/lib/confirm';
-import { useI18n } from '@/i18n/LanguageProvider';
+import { useI18n } from '@/i18n/context';
 import { newPasswordReady } from '@/lib/password';
 import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';

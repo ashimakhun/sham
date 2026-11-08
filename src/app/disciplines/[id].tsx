@@ -5,6 +5,7 @@ import { CourseCard } from '@/components/CourseCard';
 import { DeleteDisciplineButton } from '@/components/DeleteDisciplineButton';
 import { RatingSummary } from '@/components/RatingSummary';
 import { Card, EmptyState, ErrorText, HiddenBadge, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { canManageDisciplines, coursesInDiscipline, disciplineFeedback } from '@/lib/disciplines';
 import { isEdited, stars, starsLabel } from '@/lib/feedback';
 import { useStore } from '@/lib/store';
@@ -20,8 +21,9 @@ export default function DisciplineScreen() {
   const { getDiscipline, courses, courseFeedback, getUser, getCourse, currentUser, loading, refresh, setDisciplineHidden } =
     useStore();
   const { busy, error, run } = useAction();
+  const { t, lang } = useI18n();
   const discipline = getDiscipline(id);
-  if (!discipline) return <EmptyState title="Discipline not found" />;
+  if (!discipline) return <EmptyState title={t('disciplines.notFound')} />;
 
   const teacher = canManageDisciplines(currentUser);
   const reviews = disciplineFeedback(discipline.id, courses, courseFeedback);
@@ -44,11 +46,11 @@ export default function DisciplineScreen() {
         {teacher && (
           <View style={[styles.row, { alignItems: 'flex-start', paddingTop: 4 }]}>
             <View style={{ flex: 1, gap: 4 }}>
-              <Text style={styles.body}>Hidden discipline</Text>
-              <Text style={styles.muted}>Only the teacher will see this discipline.</Text>
+              <Text style={styles.body}>{t('disciplines.hidden')}</Text>
+              <Text style={styles.muted}>{t('disciplines.hiddenHint')}</Text>
             </View>
             <Switch
-              accessibilityLabel="Hidden discipline"
+              accessibilityLabel={t('disciplines.hidden')}
               value={discipline.hidden}
               disabled={busy}
               onValueChange={(value) => run(() => setDisciplineHidden(discipline.id, value))}
@@ -59,23 +61,23 @@ export default function DisciplineScreen() {
       </Card>
 
       <Card style={{ gap: 8 }}>
-        <Text style={styles.label}>REVIEWS</Text>
-        {reviews.length === 0 ? <Text style={styles.muted}>No reviews yet</Text> : null}
+        <Text style={styles.label}>{t('disciplines.reviews')}</Text>
+        {reviews.length === 0 ? <Text style={styles.muted}>{t('disciplines.noReviews')}</Text> : null}
         {reviews.map((f, i) => (
           <View
             key={f.id}
             testID={`review-${f.id}`}
             style={[{ gap: 2, paddingTop: 8 }, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
             <Text style={[styles.label, { color: colors.primary }]} numberOfLines={2}>
-              {getCourse(f.courseId)?.title ?? 'Course'}
+              {getCourse(f.courseId)?.title ?? t('disciplines.courseFallback')}
             </Text>
-            <Text style={styles.body}>{getUser(f.userId)?.name ?? 'Unknown'}</Text>
-            <Text style={{ color: colors.star, fontSize: 16 }} accessibilityLabel={starsLabel(f.rating)}>
+            <Text style={styles.body}>{getUser(f.userId)?.name ?? t('common.unknown')}</Text>
+            <Text style={{ color: colors.star, fontSize: 16 }} accessibilityLabel={starsLabel(f.rating, lang)}>
               {stars(f.rating)}
             </Text>
             <Text style={styles.body}>{f.body}</Text>
             <Text style={styles.muted}>
-              {isEdited(f) ? `edited ${formatDate(f.updatedAt)}` : formatDate(f.createdAt)}
+              {isEdited(f) ? t('disciplines.edited', { date: formatDate(f.updatedAt) }) : formatDate(f.createdAt)}
             </Text>
           </View>
         ))}
@@ -83,9 +85,9 @@ export default function DisciplineScreen() {
 
       {teacher && (
         <View style={{ gap: 12 }} testID="discipline-courses">
-          <Text style={styles.label}>COURSES</Text>
+          <Text style={styles.label}>{t('disciplines.courses')}</Text>
           {assigned.length === 0 ? (
-            <Text style={styles.muted}>No courses in this discipline yet</Text>
+            <Text style={styles.muted}>{t('disciplines.noCourses')}</Text>
           ) : (
             assigned.map((c) => <CourseCard key={c.id} course={c} />)
           )}
