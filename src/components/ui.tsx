@@ -132,10 +132,11 @@ export function StatusBadge({ status }: { status: HomeworkStatus }) {
   );
 }
 
-export function RoleBadge({ role }: { role: Role }) {
+/** `label` overrides the English role name (ARU-108: Profile passes the translated one). */
+export function RoleBadge({ role, label }: { role: Role; label?: string }) {
   return (
     <View style={[styles.badge, { backgroundColor: roleColor[role] + '1A' }]}>
-      <Text style={[styles.badgeText, { color: roleColor[role] }]}>{roleLabel[role]}</Text>
+      <Text style={[styles.badgeText, { color: roleColor[role] }]}>{label ?? roleLabel[role]}</Text>
     </View>
   );
 }
