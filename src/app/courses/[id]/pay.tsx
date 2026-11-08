@@ -16,7 +16,6 @@ import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import type { PickedProof } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
-import { font } from '@/lib/fonts';
 
 /**
  * ARU-99 AC 2 / AC 3: a listener attaches one proof of payment (a photo or a PDF, up to 10 MB) and sends it to the
@@ -135,7 +134,7 @@ export default function PayScreen() {
               hitSlop={8}
               onPress={() => setProof(null)}
               style={{ alignSelf: 'flex-start', minHeight: 32, justifyContent: 'center' }}>
-              <Text style={{ color: colors.danger, ...font(500), opacity: busy ? 0.4 : 1 }}>{t('payments.remove')}</Text>
+              <Text style={[styles.linkText, { color: colors.danger, opacity: busy ? 0.4 : 1 }]}>{t('payments.remove')}</Text>
             </Pressable>
           </View>
         ) : (

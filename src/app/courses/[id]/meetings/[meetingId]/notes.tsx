@@ -15,7 +15,6 @@ import { useStore } from '@/lib/store';
 import { colors, formatDateTime } from '@/lib/theme';
 import type { Course, Meeting } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
-import { font } from '@/lib/fonts';
 
 /** Notes on a completed meeting (ARU-28): read view for everyone who sees the meeting; `?edit=1` is the editor for
  *  the course's current owner or the teacher. */
@@ -163,7 +162,7 @@ function HeaderSave({ busy, onPress }: { busy: boolean; onPress: () => void }) {
       hitSlop={8}
       onPress={onPress}
       style={{ paddingHorizontal: 8, minHeight: 44, justifyContent: 'center' }}>
-      <Text style={{ fontSize: 17, ...font(500), color: busy ? colors.muted : colors.primary }}>
+      <Text style={[styles.caps, { fontSize: 16, color: busy ? colors.muted : colors.primary }]}>
         {t(busy ? 'common.saving' : 'common.save')}
       </Text>
     </Pressable>

@@ -8,7 +8,6 @@ import { useI18n } from '@/i18n/context';
 import { storedOwnPhotos, zipEntries, type ZipEntry } from '@/lib/photoRetention';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
-import { font } from '@/lib/fonts';
 
 /**
  * ARU-107 AC 6: Download by course, for a sender with more photos than one ZIP holds. One entry per course with its
@@ -65,7 +64,7 @@ function EntryRow({ entry }: { entry: ZipEntry }) {
             {part ? `${part} · ${count}` : count}
           </Text>
         </View>
-        <Text style={{ color: colors.primary, ...font(500) }}>{busy ? t('homework.photosPreparing') : t('homework.photoDownload')}</Text>
+        <Text style={[styles.linkText, { color: colors.primary }]}>{busy ? t('homework.photosPreparing') : t('homework.photoDownload')}</Text>
       </Pressable>
       <ErrorText error={error} />
     </View>

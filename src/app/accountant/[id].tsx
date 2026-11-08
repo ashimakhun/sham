@@ -25,7 +25,6 @@ import { colors, formatDate } from '@/lib/theme';
 import type { CourseBilling, PaymentRequest } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
 import { useNow } from '@/lib/useNow';
-import { font } from '@/lib/fonts';
 
 /**
  * ARU-66 AC 1 / AC 2 / AC 6: a paid course's current listeners for the current (device-local) month, each Unpaid,
@@ -128,7 +127,7 @@ function CourseHeader({ billing, title, hidden }: { billing: CourseBilling; titl
             accessibilityLabel={t('accountant.changePeriod')}
             hitSlop={8}
             onPress={() => setEditing(true)}>
-            <Text style={{ color: colors.primary, ...font(500) }}>{t('accountant.changePeriod')}</Text>
+            <Text style={[styles.linkText, { color: colors.primary }]}>{t('accountant.changePeriod')}</Text>
           </Pressable>
           {accountant && (
             <Pressable
@@ -148,7 +147,7 @@ function CourseHeader({ billing, title, hidden }: { billing: CourseBilling; titl
                   if (ok) await unselectPaidCourse(billing.courseId);
                 })
               }>
-              <Text style={{ color: colors.danger, ...font(500), opacity: busy ? 0.4 : 1 }}>{t('accountant.unselect')}</Text>
+              <Text style={[styles.linkText, { color: colors.danger, opacity: busy ? 0.4 : 1 }]}>{t('accountant.unselect')}</Text>
             </Pressable>
           )}
         </View>
@@ -160,14 +159,14 @@ function CourseHeader({ billing, title, hidden }: { billing: CourseBilling; titl
 
 function StatusLabel({ status }: { status: PaymentStatus }) {
   const { t } = useI18n();
-  if (status.kind === 'exempt') return <Text style={[styles.muted, { ...font(500) }]}>{t('billing.exempt')}</Text>;
+  if (status.kind === 'exempt') return <Text style={[styles.muted, styles.caps, { fontSize: 12 }]}>{t('billing.exempt')}</Text>;
   if (status.kind === 'paid')
     return (
-      <Text style={{ color: colors.success, ...font(500) }}>
+      <Text style={[styles.linkText, { color: colors.success }]}>
         {t('billing.paidOn', { date: formatDate(status.payment.markedAt) })}
       </Text>
     );
-  return <Text style={{ color: colors.danger, ...font(500) }}>{t('billing.unpaid')}</Text>;
+  return <Text style={[styles.linkText, { color: colors.danger }]}>{t('billing.unpaid')}</Text>;
 }
 
 /** A text button; `label` (with the listener's name) is what screen readers read. */
@@ -193,7 +192,7 @@ function Action({
       hitSlop={8}
       onPress={onPress}
       style={{ minHeight: 32, justifyContent: 'center' }}>
-      <Text style={{ color: danger ? colors.danger : colors.primary, ...font(500), opacity: disabled ? 0.4 : 1 }}>
+      <Text style={[styles.linkText, { color: danger ? colors.danger : colors.primary, opacity: disabled ? 0.4 : 1 }]}>
         {text}
       </Text>
     </Pressable>

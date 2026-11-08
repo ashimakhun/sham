@@ -94,7 +94,8 @@ it('AC6: title above the body; author · date, link marker and likes below it', 
   const order = screen.getAllByText(/^(Post A|Body)$|^Teacher Tess · /);
   expect(order).toEqual([screen.getByText('Post A'), screen.getByText('Body'), screen.getByText(/^Teacher Tess · /)]);
   expect(screen.getByText(/Teacher Tess · .* · 🔗 link/)).toBeTruthy();
-  expect(screen.getByLabelText('1 like')).toBeTruthy();
+  // ARU-120: the likes are the heart at the right of that line.
+  expect(screen.getByRole('button', { name: 'Unlike, 1 like' })).toBeTruthy();
 });
 
 it('AC8: the title is its own button and links are separate elements (the card is not grouped)', async () => {

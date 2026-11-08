@@ -4,7 +4,7 @@ import { AppState, Pressable, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 
-import { Button, Card } from '@/components/ui';
+import { Button, Card, styles } from '@/components/ui';
 import { currentLanguage, formatDateIn, type Language, translate } from '@/i18n';
 import { useI18n } from '@/i18n/context';
 import { localMonth } from '@/lib/billing';
@@ -72,7 +72,7 @@ export function PaySection({ course }: { course: Course }) {
           hitSlop={8}
           onPress={openPay}
           style={{ minHeight: 32, justifyContent: 'center', alignSelf: 'flex-start' }}>
-          <Text style={{ color: colors.primary, ...font(500) }}>{t('payments.sendAgain')}</Text>
+          <Text style={[styles.linkText, { color: colors.primary }]}>{t('payments.sendAgain')}</Text>
         </Pressable>
       </Card>
     </View>

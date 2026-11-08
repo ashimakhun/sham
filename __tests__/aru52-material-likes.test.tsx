@@ -1,5 +1,5 @@
-// ARU-52: likes on Blog posts. The post screen has Like / Liked, the count and "Liked by" (newest first); Blog cards
-// show "♥ N" when someone liked the post. Database rules: supabase/tests/aru52_material_likes.test.sql.
+// ARU-52: likes on Blog posts, updated for ARU-120 (a heart with its count on the post page and the Blog cards; the
+// likers card lists names newest first and is hidden at 0 likes). Database rules: supabase/tests/aru52_material_likes.test.sql.
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 
 import MaterialsScreen from '@/app/(tabs)/materials';
@@ -36,21 +36,18 @@ describe('post screen', () => {
     const s = store(who);
     setStore(s);
     await render(<MaterialDetailScreen />);
-    expect(screen.getByText('No likes yet')).toBeTruthy();
-    expect(screen.getByText('0 likes')).toBeTruthy();
     expect(screen.queryByTestId('liked-by')).toBeNull();
     await fireEvent.press(screen.getByRole('button', { name: 'Like' }));
     expect(s.likeMaterial).toHaveBeenCalledWith('A');
     expect(s.unlikeMaterial).not.toHaveBeenCalled();
   });
 
-  it('AC2 a liked post shows Liked, and tapping it unlikes', async () => {
+  it('AC2 a liked post shows the filled heart, and tapping it unlikes', async () => {
     const s = store('S1', [like('A', 'S1', 1)]);
     setStore(s);
     await render(<MaterialDetailScreen />);
-    expect(screen.getByText('♥ Liked')).toBeTruthy();
-    expect(screen.getByText('1 like')).toBeTruthy();
-    await fireEvent.press(screen.getByRole('button', { name: 'Unlike, liked' }));
+    expect(screen.getByRole('button', { name: 'Unlike, 1 like' })).toBeSelected();
+    await fireEvent.press(screen.getByRole('button', { name: 'Unlike, 1 like' }));
     expect(s.unlikeMaterial).toHaveBeenCalledWith('A');
     expect(s.likeMaterial).not.toHaveBeenCalled();
   });
@@ -58,10 +55,8 @@ describe('post screen', () => {
   it('AC3 shows the count and the names, newest like first; only this post\'s likes', async () => {
     setStore(store('S2', [like('A', 'S1', 1), like('A', 'T', 3), like('A', 'M', 2), like('B', 'N', 4)]));
     await render(<MaterialDetailScreen />);
-    expect(screen.getByText('3 likes')).toBeTruthy();
     expect(likedBy()).toEqual(['Teacher Tess', 'Mentor Max', 'Student Sam']);
-    expect(screen.queryByText('No likes yet')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Like' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Like, 3 likes' })).toBeTruthy();
   });
 
   it('AC5 the author likes their own post', async () => {
@@ -75,17 +70,17 @@ describe('post screen', () => {
   it('AC6 a like arriving live updates the open screen', async () => {
     setStore(store('S2'));
     const view = await render(<MaterialDetailScreen />);
-    expect(screen.getByText('No likes yet')).toBeTruthy();
+    expect(screen.queryByTestId('liked-by')).toBeNull();
     setStore(store('S2', [like('A', 'S1', 1)]));
     await view.rerender(<MaterialDetailScreen />);
-    expect(screen.getByText('1 like')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Like, 1 like' })).toBeTruthy();
     expect(likedBy()).toEqual(['Student Sam']);
   });
 
   it('AC8 likes of accounts that are not loaded (waiting or declined) are not shown or counted', async () => {
     setStore(store('S2', [like('A', 'S1', 1), like('A', 'P-pending', 2)]));
     await render(<MaterialDetailScreen />);
-    expect(screen.getByText('1 like')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Like, 1 like' })).toBeTruthy();
     expect(likedBy()).toEqual(['Student Sam']);
   });
 
@@ -95,7 +90,7 @@ describe('post screen', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Like' }));
     expect(await screen.findByText('Network request failed')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Like' })).toBeTruthy();
-    expect(screen.getByText('No likes yet')).toBeTruthy();
+    expect(screen.queryByTestId('liked-by')).toBeNull();
   });
 
   it('AC10 the button is disabled while the like is saving, so a double tap saves once', async () => {
@@ -113,12 +108,12 @@ describe('post screen', () => {
 });
 
 describe('Blog list (AC 4, 9)', () => {
-  it('cards show "♥ N" when liked and nothing when not', async () => {
+  it('cards show the heart with the count when liked, and the heart alone when not', async () => {
     setStore(store('S1', [like('A', 'S1', 1), like('A', 'T', 2), like('A', 'P-pending', 3)]));
     await render(<MaterialsScreen />);
-    expect(screen.getByLabelText('2 likes')).toBeTruthy();
-    expect(screen.getByText(/♥ 2/)).toBeTruthy();
-    expect(screen.queryAllByText(/♥/)).toHaveLength(1);
+    expect(screen.getByTestId('like-A')).toHaveAccessibleName('Unlike, 2 likes');
+    expect(screen.getByTestId('like-B')).toHaveAccessibleName('Like');
+    expect(screen.queryAllByText(/♥/)).toHaveLength(0);
   });
 
   it('tapping a card still opens the post', async () => {
@@ -132,6 +127,7 @@ describe('Blog list (AC 4, 9)', () => {
   it('likes of a deleted post are ignored', async () => {
     setStore(store('S1', [like('gone', 'S1', 1)]));
     await render(<MaterialsScreen />);
-    expect(screen.queryAllByText(/♥/)).toHaveLength(0);
+    expect(screen.getByTestId('like-A')).toHaveAccessibleName('Like');
+    expect(screen.getByTestId('like-B')).toHaveAccessibleName('Like');
   });
 });

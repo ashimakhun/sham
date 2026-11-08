@@ -11,7 +11,6 @@ import { useI18n } from '@/i18n/context';
 import { canChangeOwner } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
-import { font } from '@/lib/fonts';
 
 /** A second tap within this window is ignored, so a double tap opens the Change owner picker only once. */
 const TAP_GUARD_MS = 800;
@@ -62,7 +61,7 @@ export default function EditCourseScreen() {
             { flexDirection: 'row', alignItems: 'center', minHeight: 44, gap: 8 },
             pressed && { opacity: 0.7 },
           ]}>
-          <Text style={[styles.body, { flex: 1, color: colors.primary, ...font(500) }]}>{t('courses.changeOwner')}</Text>
+          <Text style={[styles.caps, { fontSize: 14, flex: 1, color: colors.primary }]}>{t('courses.changeOwner')}</Text>
           <Ionicons name="chevron-forward" size={20} color={colors.muted} />
         </Pressable>
       </Card>

@@ -11,7 +11,6 @@ import { PASSWORD_MIN } from '@/lib/password';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import { useAction } from '@/lib/useAction';
-import { font } from '@/lib/fonts';
 
 type Mode = 'signIn' | 'signUp';
 
@@ -111,7 +110,7 @@ export default function SignInScreen() {
             // ARU-77: reset a forgotten password with a code sent by email.
             <Text
               accessibilityRole="link"
-              style={{ color: colors.primary, fontSize: 15, ...font(500), alignSelf: 'flex-start', paddingVertical: 4 }}
+              style={[styles.caps, { color: colors.primary, fontSize: 14, alignSelf: 'flex-start', paddingVertical: 4 }]}
               onPress={() => router.push({ pathname: '/reset-password', params: { email: email.trim() } })}>
               {t('signIn.forgotPassword')}
             </Text>
