@@ -23,6 +23,7 @@ import {
   canMarkAttendance,
   canSeeAttendance,
   canSeeMeetings,
+  canWriteListenerNotes,
 } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors, formatDate, formatDateTime } from '@/lib/theme';
@@ -101,6 +102,7 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
     meetings,
     assignments,
     attendance,
+    meetingListenerNotes,
     getUser,
     setMeetingStatus,
     setMeetingHomeworkChecked,
@@ -121,10 +123,16 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
     now,
   );
   const current = [...inProgress, ...upcoming, ...awaitingCheck];
-  const openNotes = (m: Meeting, edit: boolean) =>
+  // ARU-125: `mine` opens a listener's editor for their own notes.
+  const openNotes = (m: Meeting, mode: 'view' | 'edit' | 'mine') =>
     router.push({
       pathname: '/courses/[id]/meetings/[meetingId]/notes',
-      params: edit ? { id: course.id, meetingId: m.id, edit: '1' } : { id: course.id, meetingId: m.id },
+      params:
+        mode === 'edit'
+          ? { id: course.id, meetingId: m.id, edit: '1' }
+          : mode === 'mine'
+            ? { id: course.id, meetingId: m.id, mine: '1' }
+            : { id: course.id, meetingId: m.id },
     });
 
   function changeStatus(meeting: Meeting, status: Target) {
@@ -261,12 +269,18 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
             ]
           : [{ title: t('meetings.cancelMeeting'), status: 'canceled' }];
     // Notes (ARU-28): everyone who sees a completed meeting reads them; the owner and the teacher add or edit.
-    const notesActions: { title: string; edit: boolean }[] =
+    // ARU-125: Notes also shows when a listener added theirs; a current listener adds or edits their own.
+    const listenerNotes = (meetingListenerNotes ?? []).filter((n) => n.meetingId === m.id);
+    const hasMine = !!currentUser && listenerNotes.some((n) => n.authorId === currentUser.id);
+    const notesActions: { title: string; mode: 'view' | 'edit' | 'mine' }[] =
       m.status !== 'completed'
         ? []
         : [
-            ...(m.notes ? [{ title: t('notes.title'), edit: false }] : []),
-            ...(canManage ? [{ title: t(m.notes ? 'notes.edit' : 'notes.add'), edit: true }] : []),
+            ...(m.notes || listenerNotes.length > 0 ? [{ title: t('notes.title'), mode: 'view' as const }] : []),
+            ...(canManage ? [{ title: t(m.notes ? 'notes.edit' : 'notes.add'), mode: 'edit' as const }] : []),
+            ...(canWriteListenerNotes(currentUser, course, courseMembers, m)
+              ? [{ title: t(hasMine ? 'notes.editMine' : 'notes.addMine'), mode: 'mine' as const }]
+              : []),
           ];
     // Homework (ARU-32): one assignment per completed meeting, shown to everyone who sees the meeting.
     const assignment = assignments.find((a) => a.meetingId === m.id);
@@ -313,7 +327,12 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
           ]
         : []),
       ...notesActions.map((a) => (
-        <ActionPill key={a.title} title={a.title} role={a.edit ? 'button' : 'link'} onPress={() => openNotes(m, a.edit)} />
+        <ActionPill
+          key={a.title}
+          title={a.title}
+          role={a.mode === 'view' ? 'link' : 'button'}
+          onPress={() => openNotes(m, a.mode)}
+        />
       )),
       ...(canAssign
         ? [

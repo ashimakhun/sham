@@ -189,7 +189,13 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    service-role-only `photo_deletion_warnings` table, `telegram_links.notify_photo_deletion` (on for existing links),
    the kind `photo_deletion` in `set_telegram_notification()`, five service-role functions and a daily `pg_cron` job;
    needs **pg_cron** and **pg_net**; deletes nothing until the Edge Function is deployed and its URL and secret are in
-   Vault, see [Daily photo deletion](#daily-photo-deletion-aru-112)).
+   Vault, see [Daily photo deletion](#daily-photo-deletion-aru-112)),
+   `0055_meeting_listener_notes.sql` (ARU-125: a course's current listeners add their own signed notes to a completed
+   meeting, one entry each; adds the table `meeting_listener_notes` (in realtime; `author_id` nullable with
+   `on delete set null`, so a deleted account's notes stay as "Deleted account") with read access as course meetings
+   and the hidden-course policies of 0019, and the functions `add_meeting_listener_notes()`,
+   `update_meeting_listener_notes()` and `delete_meeting_listener_notes()`, the only way to write it; changes no
+   existing table or policy, deletes nothing; needs 0031 and, for its number, 0053 and 0054).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
@@ -497,7 +503,8 @@ The Delete account screen calls the Edge Function `delete-account` with the user
 only ever deletes the caller: it checks the password (a sign-in on a throwaway client), refuses the teacher and
 course owners (`account_deletion_problem()`), removes the caller's Storage files (`account_storage_objects()`:
 `homework/<id>/…`, `materials/<id>/…` and anything they own) and then deletes the Auth user, which removes the profile
-and every personal row and clears the shared references in one transaction. If a step fails, the account stays and
+and every personal row and clears the shared references in one transaction (set null: the references 0040 lists,
+plus listeners' meeting notes, `meeting_listener_notes.author_id`, from 0055). If a step fails, the account stays and
 tapping again continues. Other devices sign out with "Your account was deleted" when the app starts or comes back to
 the foreground (it asks Auth whether the user still exists).
 
@@ -718,6 +725,9 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Edit / reschedule a scheduled meeting | | own courses           | any course |
 | Read meeting notes         | courses they're in | ✓ (all courses)  | ✓       |
 | Add / edit / clear notes on a completed meeting | | own courses | any course |
+| Add / edit / delete own listener notes on a completed meeting (ARU-125; one each; edit only while a listener) | courses they're in | courses they're in | (uses the owner's notes) |
+| Read listeners' notes (ARU-125) | courses they're in | ✓ (all courses; hidden: only if in it) | ✓ |
+| Delete any listener's notes (ARU-125) | | own courses | any course |
 | Mark a completed meeting's homework checked / undo | | any course they can see, not one they're a listener of | any course |
 | Mark / undo own attendance of a started meeting | courses they're in | courses they're in |  |
 | See who attended a meeting | own marks only | ✓ (own courses and courses they don't listen to; own marks only where a listener) | ✓ |
