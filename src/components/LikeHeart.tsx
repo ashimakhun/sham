@@ -3,17 +3,22 @@ import type { ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { ErrorText, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
+import { type Language, translate } from '@/i18n';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import type { MaterialLike, User } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
 
-// User-visible texts of the like heart (ARU-120), kept together for the translation catalog.
+// User-visible texts of the like heart (ARU-120), from the EN/RU catalog (ARU-132), with Russian plurals.
 export const likeTexts = {
-  /** "1 like" / "N likes". */
-  count: (n: number) => `${n} ${n === 1 ? 'like' : 'likes'}`,
+  /** "1 like" / "N likes" ("1 лайк" / "2 лайка" / "5 лайков"). */
+  count: (n: number, lang: Language = 'en') => translate(lang, 'materials.likes', { count: n }),
   /** Screen reader label of the heart: "Like" at 0, else "Like, N likes" / "Unlike, N likes". */
-  label: (liked: boolean, n: number) => (n === 0 ? 'Like' : `${liked ? 'Unlike' : 'Like'}, ${likeTexts.count(n)}`),
+  label: (liked: boolean, n: number, lang: Language = 'en') =>
+    n === 0
+      ? translate(lang, 'materials.likeLabel')
+      : translate(lang, liked ? 'materials.heartUnlike' : 'materials.heartLike', { count: n }),
 };
 
 /**
@@ -53,6 +58,7 @@ export function LikeRow({
 }) {
   const { likeMaterial, unlikeMaterial } = useStore();
   const { busy, error, run } = useAction();
+  const { lang } = useI18n();
   const color = liked ? colors.primary : colors.muted;
 
   return (
@@ -62,7 +68,7 @@ export function LikeRow({
         <Pressable
           testID={`like-${materialId}`}
           accessibilityRole="button"
-          accessibilityLabel={likeTexts.label(liked, count)}
+          accessibilityLabel={likeTexts.label(liked, count, lang)}
           accessibilityState={{ selected: liked, disabled: busy }}
           hitSlop={12}
           onPress={() => {

@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { Text } from 'react-native';
 
 import { Card, StatusBadge, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
 import type { Homework } from '@/lib/types';
@@ -18,6 +19,7 @@ export function commentPreview(comment: string | null | undefined): string | nul
  */
 export function HomeworkCard({ item, showStatus = true }: { item: Homework; showStatus?: boolean }) {
   const { currentUser, getUser, getCourse } = useStore();
+  const { t } = useI18n();
   const showStudent = currentUser?.role !== 'student';
   const showComment = !showStatus && item.status === 'checked';
   const comment = showComment ? commentPreview(item.mentorComment) : null;
@@ -28,23 +30,23 @@ export function HomeworkCard({ item, showStatus = true }: { item: Homework; show
         {item.title}
       </Text>
       <Text style={[styles.label, { color: colors.primary }]} numberOfLines={2}>
-        {getCourse(item.courseId)?.title ?? 'No course'}
+        {getCourse(item.courseId)?.title ?? t('homework.noCourse')}
       </Text>
       <Text style={styles.muted}>
-        {showStudent ? `${getUser(item.studentId)?.name ?? 'Unknown student'} · ` : ''}
+        {showStudent ? `${getUser(item.studentId)?.name ?? t('homework.unknownStudent')} · ` : ''}
         {formatDate(item.createdAt)}
-        {item.photoUrl ? ' · 📎 photo' : ''}
+        {item.photoUrl ? ` · ${t('homework.withPhoto')}` : ''}
       </Text>
       {showComment &&
         (comment ? (
           // One Text with the name nested: the 2-line ellipsis covers both, and screen readers hear "Name: comment".
           <Text testID="homework-comment-preview" style={commentStyle} numberOfLines={2} ellipsizeMode="tail">
-            <Text style={{ fontWeight: '600' }}>{`${getUser(item.checkedById)?.name ?? 'Unknown'}:`}</Text>
+            <Text style={{ fontWeight: '600' }}>{`${getUser(item.checkedById)?.name ?? t('common.unknown')}:`}</Text>
             {` ${comment}`}
           </Text>
         ) : (
           <Text testID="homework-comment-preview" style={commentStyle} numberOfLines={2}>
-            Checked without a comment
+            {t('homework.checkedNoCommentCard')}
           </Text>
         ))}
       {showStatus && <StatusBadge status={item.status} />}

@@ -1,11 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Redirect, Tabs } from 'expo-router';
 
+import { useI18n } from '@/i18n/context';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 
 export default function TabLayout() {
   const { ready, currentUser } = useStore();
+  const { t } = useI18n();
   if (ready && !currentUser) return <Redirect href="/" />;
 
   return (
@@ -18,28 +20,28 @@ export default function TabLayout() {
       <Tabs.Screen
         name="homework"
         options={{
-          title: currentUser?.role === 'mentor' ? 'To check' : 'Homework',
+          title: currentUser?.role === 'mentor' ? t('tabs.toCheck') : t('tabs.homework'),
           tabBarIcon: ({ color, size }) => <Ionicons name="checkbox-outline" color={color as string} size={size} />,
         }}
       />
       <Tabs.Screen
         name="courses"
         options={{
-          title: 'Courses',
+          title: t('tabs.courses'),
           tabBarIcon: ({ color, size }) => <Ionicons name="school-outline" color={color as string} size={size} />,
         }}
       />
       <Tabs.Screen
         name="materials"
         options={{
-          title: 'Materials',
+          title: t('tabs.materials'),
           tabBarIcon: ({ color, size }) => <Ionicons name="book-outline" color={color as string} size={size} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: t('tabs.profile'),
           tabBarIcon: ({ color, size }) => <Ionicons name="person-circle-outline" color={color as string} size={size} />,
         }}
       />

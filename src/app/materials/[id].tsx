@@ -4,6 +4,7 @@ import { Linking, ScrollView, Text } from 'react-native';
 import { LikerRow, LikeRow, likesOf } from '@/components/LikeHeart';
 import { MarkdownText } from '@/components/MarkdownText';
 import { Button, Card, EmptyState, ErrorText, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
 import { formatDate } from '@/lib/theme';
@@ -12,9 +13,10 @@ export default function MaterialDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { materials, materialLikes, currentUser, getUser, deleteMaterial } = useStore();
   const { busy, error, run } = useAction();
+  const { t } = useI18n();
 
   const item = materials.find((m) => m.id === id);
-  if (!item) return <EmptyState title="Material not found" />;
+  if (!item) return <EmptyState title={t('materials.notFound')} />;
   // Only the author, and only while they are still a teacher or mentor (a mentor made student can't delete).
   const canDelete =
     currentUser?.id === item.teacherId && (currentUser.role === 'teacher' || currentUser.role === 'mentor');
@@ -45,11 +47,11 @@ export default function MaterialDetailScreen() {
           ))}
         </Card>
       )}
-      {item.link && <Button title="Open link" variant="secondary" onPress={() => Linking.openURL(item.link!)} />}
+      {item.link && <Button title={t('materials.openLink')} variant="secondary" onPress={() => Linking.openURL(item.link!)} />}
       <ErrorText error={error} />
       {canDelete && (
         <Button
-          title={busy ? 'Deleting…' : 'Delete material'}
+          title={busy ? t('materials.deleting') : t('materials.deleteMaterial')}
           variant="danger"
           disabled={busy}
           onPress={() =>

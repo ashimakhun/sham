@@ -7,6 +7,7 @@ import { AuthorFilter } from '@/components/AuthorFilter';
 import { LikeRow, likesOf } from '@/components/LikeHeart';
 import { MarkdownText } from '@/components/MarkdownText';
 import { Button, Card, EmptyState, ErrorText, Segmented, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { formatSize, isAllowedPdf, PDF_RULE } from '@/lib/files';
 import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
@@ -14,13 +15,15 @@ import { colors, formatDate } from '@/lib/theme';
 const ALL = 'all';
 
 type Section = 'blog' | 'kb';
-const SECTIONS: { value: Section; label: string }[] = [
-  { value: 'blog', label: 'Blog' },
-  { value: 'kb', label: 'Knowledge base' },
-];
 
 export default function MaterialsScreen() {
   const { currentUser, loading, refresh, materials, materialFiles, materialLikes, getUser, getCourse } = useStore();
+  const { t, lang } = useI18n();
+  // ARU-113: built on each render (not a module constant), so a language switch relabels it; the choice stays in state.
+  const sections: { value: Section; label: string }[] = [
+    { value: 'blog', label: t('materials.sectionBlog') },
+    { value: 'kb', label: t('materials.sectionKb') },
+  ];
   // Teachers and mentors share materials (ARU-26); students only read.
   const canShare = currentUser?.role === 'teacher' || currentUser?.role === 'mentor';
   // Author filter (ARU-29): kept while the tab stays mounted (tab switches, opening a material, sharing one);
@@ -54,11 +57,11 @@ export default function MaterialsScreen() {
         params: { uri: file.uri, name: file.name ?? '', size: file.size?.toString() ?? '', mimeType: file.mimeType ?? '' },
       });
     } catch (e) {
-      setPickError(e instanceof Error ? e.message : 'Could not open the file picker.');
+      setPickError(e instanceof Error ? e.message : t('materials.pickerFailed'));
     }
   }
 
-  const authorName = (id: string) => getUser(id)?.name ?? 'Unknown';
+  const authorName = (id: string) => getUser(id)?.name ?? t('common.unknown');
   // One entry per author of a currently loaded material, by name (case-insensitive); by id, so same names stay apart.
   const authors = [...new Set(materials.map((m) => m.teacherId))]
     .map((id) => ({ value: id, label: authorName(id) }))
@@ -77,13 +80,13 @@ export default function MaterialsScreen() {
 
   const header = (
     <View style={{ gap: 12 }}>
-      <Segmented<Section> options={SECTIONS} value={section} onChange={setSection} />
-      {blog && canShare && <Button title="+ Share material" onPress={() => router.push('/materials/new')} />}
+      <Segmented<Section> options={sections} value={section} onChange={setSection} />
+      {blog && canShare && <Button title={t('materials.shareButton')} onPress={() => router.push('/materials/new')} />}
       {/* ARU-62: one Filter button that opens the author list, in place of the ARU-29 chip row. */}
       {blog && materials.length > 0 && (
-        <AuthorFilter options={[{ value: ALL, label: 'All' }, ...authors]} value={filter} onChange={setSelected} />
+        <AuthorFilter options={[{ value: ALL, label: t('homework.filterAll') }, ...authors]} value={filter} onChange={setSelected} />
       )}
-      {!blog && canShare && <Button title="+ Upload PDF" onPress={uploadPdf} />}
+      {!blog && canShare && <Button title={t('materials.uploadPdfButton')} onPress={uploadPdf} />}
       {!blog && <ErrorText error={pickError} />}
     </View>
   );
@@ -104,7 +107,7 @@ export default function MaterialsScreen() {
             <Card onPress={() => router.push({ pathname: '/materials/files/[id]', params: { id: item.id } })}>
               {item.courseOnly && (
                 <View style={[styles.badge, { backgroundColor: '#F3F4F6' }]}>
-                  <Text style={[styles.badgeText, { color: colors.muted }]}>Course only</Text>
+                  <Text style={[styles.badgeText, { color: colors.muted }]}>{t('materials.courseOnly')}</Text>
                 </View>
               )}
               <Text style={styles.title} numberOfLines={2}>
@@ -116,18 +119,18 @@ export default function MaterialsScreen() {
                 </Text>
               )}
               <Text style={styles.muted} numberOfLines={1}>
-                {authorName(item.authorId)} · {formatDate(item.createdAt)} · {formatSize(item.sizeBytes)}
+                {authorName(item.authorId)} · {formatDate(item.createdAt)} · {formatSize(item.sizeBytes, lang)}
               </Text>
               {course && (
                 <Text style={styles.muted} numberOfLines={1}>
-                  Course: {course.title}
+                  {t('materials.courseLine', { title: course.title })}
                 </Text>
               )}
             </Card>
           );
         }}
         ListEmptyComponent={
-          <EmptyState title="No books or files yet" hint={canShare ? 'Upload a PDF for your class.' : undefined} />
+          <EmptyState title={t('materials.kbEmpty')} hint={canShare ? t('materials.kbEmptyHint') : undefined} />
         }
       />
     );
@@ -159,7 +162,7 @@ export default function MaterialsScreen() {
             <LikeRow materialId={item.id} liked={liked} count={count}>
               <Text style={styles.muted}>
                 {getUser(item.teacherId)?.name} · {formatDate(item.createdAt)}
-                {item.link ? ' · 🔗 link' : ''}
+                {item.link ? ` · ${t('materials.hasLink')}` : ''}
               </Text>
             </LikeRow>
           </Card>
@@ -167,11 +170,11 @@ export default function MaterialsScreen() {
       }}
       ListEmptyComponent={
         <EmptyState
-          title="No materials yet"
+          title={t('materials.empty')}
           hint={
             canShare
-              ? 'Share a lesson, notes or a link with your class.'
-              : 'Your teacher and mentors have not shared anything yet.'
+              ? t('materials.emptyHintShare')
+              : t('materials.emptyHintRead')
           }
         />
       }

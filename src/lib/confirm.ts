@@ -1,12 +1,18 @@
 import { Alert, Platform } from 'react-native';
 
-/** Asks the user to confirm an action: native Alert on iOS/Android, window.confirm on web. */
+import { currentLanguage, translate } from '@/i18n';
+
+/**
+ * Asks the user to confirm an action: native Alert on iOS/Android, window.confirm on web. Callers pass translated
+ * texts; the default Cancel is in the app's language (ARU-109 AC 2).
+ */
 export function confirmAction(
   title: string,
   message: string,
   confirmText: string,
-  { destructive = false, cancelText = 'Cancel' }: { destructive?: boolean; cancelText?: string } = {},
+  { destructive = false, cancelText }: { destructive?: boolean; cancelText?: string } = {},
 ): Promise<boolean> {
+  const cancel = cancelText ?? translate(currentLanguage(), 'common.cancel');
   if (Platform.OS === 'web') {
     const confirm = (globalThis as { confirm?: (text: string) => boolean }).confirm;
     return Promise.resolve(confirm?.(`${title}\n\n${message}`) ?? false);
@@ -16,7 +22,7 @@ export function confirmAction(
       title,
       message,
       [
-        { text: cancelText, style: 'cancel', onPress: () => resolve(false) },
+        { text: cancel, style: 'cancel', onPress: () => resolve(false) },
         { text: confirmText, style: destructive ? 'destructive' : 'default', onPress: () => resolve(true) },
       ],
       { cancelable: true, onDismiss: () => resolve(false) },
