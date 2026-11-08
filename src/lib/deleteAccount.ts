@@ -1,5 +1,6 @@
 // ARU-75: deleting your own account. Texts shared by the Delete account screen, the store and the screens that show
 // people.
+import { currentLanguage, translate } from '@/i18n';
 
 /** Shown wherever a person is referenced who deleted their account (the reference is empty in the database). */
 export const DELETED_ACCOUNT = 'Deleted account';
@@ -31,6 +32,6 @@ export function ownedCoursesProblem(titles: string[]): string | null {
  * A reference to a profile this device can't read keeps the screen's usual fallback.
  */
 export function personName(id: string | null | undefined, user: { name: string } | undefined, fallback: string) {
-  if (id == null) return DELETED_ACCOUNT;
+  if (id == null) return translate(currentLanguage(), 'common.deletedAccount');
   return user?.name ?? fallback;
 }

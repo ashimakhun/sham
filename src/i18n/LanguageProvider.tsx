@@ -6,11 +6,14 @@ import { useStore } from '@/lib/store';
 import {
   formatDateIn,
   formatDateTimeIn,
+  formatNumberIn,
   formatWeekdayDateIn,
   isLanguage,
   type Language,
   phoneLanguage,
+  setCurrentLanguage,
   translate,
+  translateKnown,
   translateMessage,
   type TextId,
 } from './index';
@@ -23,6 +26,9 @@ type I18n = {
   t: (id: TextId | string, params?: Record<string, string | number>) => string;
   /** AC 7a: an error message in the chosen language (see translateMessage). */
   tm: (message: string | null | undefined) => string | null;
+  /** ARU-109 AC 3: an app message in the chosen language; anything else (a database error) as it came. */
+  te: (message: string | null | undefined) => string | null;
+  formatNumber: (value: number) => string;
   formatDate: (value: Date | string) => string;
   formatWeekdayDate: (value: Date | string) => string;
   formatDateTime: (value: Date | string) => string;
@@ -32,6 +38,8 @@ const make = (lang: Language): I18n => ({
   lang,
   t: (id, params) => translate(lang, id, params),
   tm: (message) => (message == null ? null : translateMessage(lang, message)),
+  te: (message) => (message ? translateKnown(lang, message) : null),
+  formatNumber: (value) => formatNumberIn(lang, value),
   formatDate: (value) => formatDateIn(lang, value),
   formatWeekdayDate: (value) => formatWeekdayDateIn(lang, value),
   formatDateTime: (value) => formatDateTimeIn(lang, value),
@@ -77,6 +85,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     AsyncStorage.setItem(LAST_LANGUAGE_KEY, account).catch(() => {});
   }, [account]);
 
+  // Before the screens below render, so helpers outside components (confirmAction, formatDate) use the same language.
+  setCurrentLanguage(lang);
   const value = useMemo(() => make(lang), [lang]);
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }

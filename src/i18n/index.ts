@@ -19,6 +19,15 @@ const catalogs: Record<Language, Record<string, string>> = { en, ru };
 
 export const isLanguage = (value: unknown): value is Language => value === 'en' || value === 'ru';
 
+// ARU-109: the language the app shows right now, for helpers that run outside a component (the shared confirmation's
+// Cancel button, theme.ts's dates, the "Deleted account" fallback). LanguageProvider sets it while rendering, before
+// the screens below it render; English until then (and in tests without a provider).
+let current: Language = 'en';
+export const currentLanguage = (): Language => current;
+export function setCurrentLanguage(lang: Language) {
+  current = lang;
+}
+
 /** AC 2: Russian when the phone's (or browser's) first preferred language is Russian, any region; else English. */
 export function languageFromLocale(tag: string | null | undefined): Language {
   return /^ru(?:[-_]|$)/i.test(tag ?? '') ? 'ru' : 'en';
@@ -91,7 +100,59 @@ const MESSAGE_IDS: [TextId, Params?][] = [
   ['profile.languageSaveFailed'],
   ['signIn.accountDeleted'],
 ];
-const byEnglish = new Map(MESSAGE_IDS.map(([id, params]) => [translate('en', id, params), [id, params] as const]));
+/**
+ * ARU-109 AC 3: messages the app raises on the Homework, Courses, meetings and disciplines screens (the store's own
+ * checks and the shared photo texts), keyed by their English text like MESSAGE_IDS.
+ */
+const APP_MESSAGE_IDS: [TextId, Params?][] = [
+  ['errors.noLongerListener'],
+  ['errors.feedbackExists'],
+  ['errors.notListener'],
+  ['errors.alreadySent'],
+  ['errors.deadlinePast'],
+  ['errors.meetingHasHomework'],
+  ['errors.ownHomework'],
+  ['errors.disciplineNameEmpty'],
+  ['errors.disciplineNameTooLong', {'max': 100}],
+  ['errors.disciplineExists'],
+  ['errors.disciplineNotFound'],
+  ['errors.notesTooLong'],
+  ['errors.signInAgain'],
+  ['errors.chooseStars'],
+  ['errors.feedbackEmpty'],
+  ['errors.feedbackTooLong'],
+  ['errors.coursePhotosLeft'],
+  ['errors.coursePaymentProofsLeft'],
+  ['errors.disciplinePhotosLeft'],
+  ['errors.disciplinePaymentProofsLeft'],
+  ['errors.onlyTeacher'],
+  ['errors.onlyMentor'],
+  ['errors.onlyTeacherOrMentor'],
+  ['errors.onlyMentorOrTeacher'],
+  ['errors.onlyStudentOrMentor'],
+  ['photo.unavailable'],
+  ['photo.loadError'],
+  ['photo.noLink'],
+  ['photo.prepareError'],
+  ['photo.tooLarge'],
+  ['disciplines.hidden'],
+  ['common.deletedAccount'],
+];
+const byEnglish = new Map<string, readonly [TextId, Params | undefined]>();
+const register = (entries: [TextId, Params?][]) => {
+  for (const [id, params] of entries) byEnglish.set(translate('en', id, params), [id, params] as const);
+};
+register(MESSAGE_IDS);
+register(APP_MESSAGE_IDS);
+
+/**
+ * ARU-109 AC 3: an app message in the chosen language when the app knows it; any other message (a database error,
+ * until ARU-111) is shown exactly as it came. Used by ErrorText, so every screen's errors go through it.
+ */
+export function translateKnown(lang: Language, message: string): string {
+  const known = byEnglish.get(message);
+  return known ? translate(lang, known[0], known[1]) : message;
+}
 
 /**
  * AC 7a: an error message as the user should read it. A message the app knows is shown in the chosen language. Any
@@ -135,4 +196,9 @@ export function formatDateTimeIn(lang: Language, value: Date | string, timeZone?
   const date = typeof value === 'string' ? new Date(value) : value;
   const p = parts(lang, date, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone });
   return `${formatDateIn(lang, date, timeZone)}, ${p.hour}:${p.minute}`;
+}
+
+/** ARU-109 AC 4: a number in the chosen language: "10,000" / "10 000". */
+export function formatNumberIn(lang: Language, value: number) {
+  return new Intl.NumberFormat(LOCALE[lang]).format(value);
 }
