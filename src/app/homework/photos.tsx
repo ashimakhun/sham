@@ -62,7 +62,7 @@ function EntryRow({ entry }: { entry: ZipEntry }) {
             {part ? `${part} · ${count}` : count}
           </Text>
         </View>
-        <Text style={{ color: colors.primary, fontWeight: '600' }}>{busy ? t('homework.photosPreparing') : t('homework.photoDownload')}</Text>
+        <Text style={[styles.linkText, { color: colors.primary }]}>{busy ? t('homework.photosPreparing') : t('homework.photoDownload')}</Text>
       </Pressable>
       <ErrorText error={error} />
     </View>

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 
 import { AuthorFilter } from '@/components/AuthorFilter';
+import { LikeRow, likesOf } from '@/components/LikeHeart';
 import { MarkdownText } from '@/components/MarkdownText';
 import { Button, Card, EmptyState, ErrorText, Segmented, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
@@ -72,12 +73,6 @@ export default function MaterialsScreen() {
   // ...and stays on All, even if that author shares again later.
   // (Adjusting state while rendering, as React recommends instead of an effect.)
   if (filter !== selected) setSelected(ALL);
-
-  // Like counts per post (ARU-52), counting only likers whose profile loads, as the post screen does.
-  const likeCounts = new Map<string, number>();
-  for (const l of materialLikes) {
-    if (getUser(l.userId)) likeCounts.set(l.materialId, (likeCounts.get(l.materialId) ?? 0) + 1);
-  }
 
   const sorted = materials
     .filter((m) => filter === ALL || m.teacherId === filter)
@@ -151,7 +146,8 @@ export default function MaterialsScreen() {
       keyExtractor={(m) => m.id}
       ListHeaderComponent={header}
       renderItem={({ item }) => {
-        const likes = likeCounts.get(item.id) ?? 0;
+        // ARU-120: liked and count as on the post page (only likers whose profile loads).
+        const { liked, count } = likesOf(item.id, materialLikes, getUser, currentUser?.id);
         const open = () => router.push({ pathname: '/materials/[id]', params: { id: item.id } });
         return (
           // ARU-54: the whole post, formatted as on the post screen. The card doesn't group its content for screen
@@ -162,14 +158,13 @@ export default function MaterialsScreen() {
               <Text style={styles.title}>{item.title}</Text>
             </Pressable>
             <MarkdownText source={item.body} />
-            <Text style={styles.muted}>
-              {getUser(item.teacherId)?.name} · {formatDate(item.createdAt)}
-              {item.link ? ` · ${t('materials.hasLink')}` : ''}
-              {/* Hidden when no one liked it; read as "N likes" by screen readers. */}
-              {likes > 0 && (
-                <Text accessibilityLabel={t('materials.likes', { count: likes })}>{` · ♥ ${likes}`}</Text>
-              )}
-            </Text>
+            {/* ARU-120: the heart on the right likes or unlikes without opening the post. */}
+            <LikeRow materialId={item.id} liked={liked} count={count}>
+              <Text style={styles.muted}>
+                {getUser(item.teacherId)?.name} · {formatDate(item.createdAt)}
+                {item.link ? ` · ${t('materials.hasLink')}` : ''}
+              </Text>
+            </LikeRow>
           </Card>
         );
       }}
