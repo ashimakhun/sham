@@ -1,9 +1,9 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Switch, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { KeyboardForm } from '@/components/KeyboardForm';
-import { Button, EmptyState, ErrorText, Field, styles } from '@/components/ui';
+import { Button, EmptyState, ErrorText, Field, styles, ThemedSwitch } from '@/components/ui';
 import { canManageDisciplines } from '@/lib/disciplines';
 import { newId } from '@/lib/id';
 import { DISCIPLINE_NAME_MAX, useStore } from '@/lib/store';
@@ -44,7 +44,7 @@ export default function NewDisciplineScreen() {
           <Text style={styles.body}>Hidden discipline</Text>
           <Text style={styles.muted}>Only the teacher will see this discipline.</Text>
         </View>
-        <Switch
+        <ThemedSwitch
           accessibilityLabel="Hidden discipline"
           accessibilityHint="Only the teacher will see this discipline."
           value={hidden}

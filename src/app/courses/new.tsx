@@ -1,10 +1,10 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Switch, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { DisciplinePicker } from '@/components/Disciplines';
 import { KeyboardForm } from '@/components/KeyboardForm';
-import { Button, EmptyState, ErrorText, Field, styles } from '@/components/ui';
+import { Button, EmptyState, ErrorText, Field, styles, ThemedSwitch } from '@/components/ui';
 import { newId } from '@/lib/id';
 import { canCreateCourse } from '@/lib/roles';
 import { useStore } from '@/lib/store';
@@ -56,7 +56,7 @@ export default function NewCourseScreen() {
           <Text style={styles.body}>Hidden course</Text>
           <Text style={styles.muted}>Only the owner, listeners and the teacher will see this course.</Text>
         </View>
-        <Switch
+        <ThemedSwitch
           accessibilityLabel="Hidden course"
           accessibilityHint="Only the owner, listeners and the teacher will see this course."
           value={hidden}

@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { ActivityIndicator, SectionList, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, SectionList, Text, TextInput, View } from 'react-native';
 
-import { Button, EmptyState, ErrorText, RoleBadge, styles } from '@/components/ui';
+import { Button, EmptyState, ErrorText, RoleBadge, styles, ThemedSwitch } from '@/components/ui';
 import { confirmDestructive } from '@/lib/confirm';
 import { canManageRoles } from '@/lib/roles';
 import { useStore } from '@/lib/store';
@@ -182,7 +182,7 @@ export default function RolesScreen() {
                 {/* ARU-65: the teacher turns Accountant on or off for a mentor (set_accountant() checks it). */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Text style={styles.muted}>Accountant</Text>
-                  <Switch
+                  <ThemedSwitch
                     accessibilityLabel={`Accountant, ${item.name}`}
                     value={!!item.isAccountant}
                     disabled={busy}
