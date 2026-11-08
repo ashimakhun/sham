@@ -93,7 +93,7 @@ function FeedbackForm({ course, mine }: { course: Course; mine?: CourseFeedback 
               onPress={() => setRating(n)}
               hitSlop={4}
               style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontSize: 30, color: n <= rating ? '#F59E0B' : colors.border }}>★</Text>
+              <Text style={{ fontSize: 30, color: n <= rating ? colors.star : colors.starEmpty }}>★</Text>
             </Pressable>
           ))}
         </View>
