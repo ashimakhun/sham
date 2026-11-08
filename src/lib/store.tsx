@@ -288,7 +288,7 @@ type ProfileRow = {
   access_status?: User['accessStatus'] | null;
   is_accountant?: boolean | null;
   language?: string | null;
-  /** ARU-110: the phone language the app last saved (0051); absent before that migration runs. */
+  /** ARU-110: the phone language the app last saved (0052); absent before that migration runs. */
   device_language?: string | null;
 };
 type BillingRow = { course_id: string; start_day: number; end_day: number; selected_by: string | null; selected_at: string };
@@ -903,7 +903,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const all = rows<ProfileRow>(profileRows).map(toUser);
       const me = all.find((u) => u.id === userId);
       // ARU-110 AC 2: once per sign-in (app start), save the phone language for Telegram messages of a user who never
-      // chose one. Only once 0051 has added the column; never blocks or shows an error (retried on the next start).
+      // chose one. Only once 0052 has added the column; never blocks or shows an error (retried on the next start).
       const myRow = rows<ProfileRow>(profileRows).find((r) => r.id === userId);
       if (myRow && deviceLanguageFor.current !== userId) {
         deviceLanguageFor.current = userId;

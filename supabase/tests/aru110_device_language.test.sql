@@ -1,6 +1,6 @@
 -- ARU-110 (Russian version, part 4): profiles.device_language. Rules under test:
--- supabase/migrations/0051_profile_device_language.sql (and the "edit own profile" policy of 0001, the column grants
--- of 0021 / 0050, the read policy of 0021).
+-- supabase/migrations/0052_profile_device_language.sql (and the "edit own profile" policy of 0001, the column grants
+-- of 0021 / 0051, the read policy of 0021).
 select t.seed();
 create function pg_temp.dev(who text) returns text language sql security definer as $$
   select device_language from profiles where id = t.id(who)

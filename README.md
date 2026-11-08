@@ -177,7 +177,7 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `0051_profile_language.sql` (ARU-108: Russian version, part 1; adds `profiles.language` ('en', 'ru' or null =
    follow the phone; existing accounts get null) and puts it in the profile update grant next to `full_name`, so users
    change only their own; no other policy changes, deletes nothing),
-   `0051_profile_device_language.sql` (ARU-110: Russian version, part 4; adds `profiles.device_language` ('en', 'ru'
+   `0052_profile_device_language.sql` (ARU-110: Russian version, part 4; adds `profiles.device_language` ('en', 'ru'
    or null), the phone language the app saves for a user who never chose one, so Telegram notifications follow it;
    in the profile update grant next to `full_name` and `language`, so users change only their own; existing accounts
    get null; no other policy changes, deletes nothing).
