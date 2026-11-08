@@ -52,7 +52,7 @@ export default function SignInScreen() {
           <View style={{ gap: 4, marginVertical: 24 }}>
             <Image
               source={require('../../assets/logo.png')}
-              style={{ width: 72, height: 76, marginBottom: 12 }}
+              style={{ width: 72, height: 76, marginBottom: 12, alignSelf: 'center' }}
               resizeMode="contain"
               accessibilityIgnoresInvertColors
               accessible={false}
