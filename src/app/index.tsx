@@ -58,8 +58,8 @@ export default function SignInScreen() {
               accessible={false}
               testID="app-logo"
             />
-            <Text style={styles.h1}>Sham</Text>
-            <Text style={styles.muted}>{t('signIn.tagline')}</Text>
+            <Text style={[styles.h1, { textAlign: 'center' }]}>Sham</Text>
+            <Text style={[styles.muted, { textAlign: 'center' }]}>{t('signIn.tagline')}</Text>
           </View>
 
           {/* ARU-75: after this account was deleted (here or on another device). */}
