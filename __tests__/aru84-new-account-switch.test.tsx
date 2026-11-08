@@ -3,7 +3,7 @@
 // supabase/tests/aru84_new_account_notifications.test.sql.
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
-import ProfileScreen from '@/app/(tabs)/profile';
+import TelegramScreen from '@/app/telegram';
 import { telegramSwitchesFor } from '@/lib/telegram';
 import type { TelegramLink } from '@/lib/types';
 
@@ -43,7 +43,7 @@ describe('telegramSwitchesFor', () => {
 describe('the card', () => {
   it('the teacher sees New accounts after the chat switches, on by default (no saved value yet)', async () => {
     setStore(fakeStore('T', { telegram: linked() }));
-    await render(<ProfileScreen />);
+    await render(<TelegramScreen />);
     const labels = switches();
     expect(labels.slice(labels.indexOf('Chat messages'))).toEqual(['Chat messages', 'General chat', 'New materials', 'New accounts']);
     expect(screen.getByLabelText('New accounts').props.value).toBe(true);
@@ -51,21 +51,21 @@ describe('the card', () => {
 
   it('shows the saved value', async () => {
     setStore(fakeStore('T', { telegram: linked({ new_account: false }) }));
-    await render(<ProfileScreen />);
+    await render(<TelegramScreen />);
     expect(screen.getByLabelText('New accounts').props.value).toBe(false);
   });
 
   it('turning it off saves kind new_account', async () => {
     const store = fakeStore('T', { telegram: linked({ new_account: true }) });
     setStore(store);
-    await render(<ProfileScreen />);
+    await render(<TelegramScreen />);
     await fireEvent(screen.getByLabelText('New accounts'), 'valueChange', false);
     expect(store.setTelegramNotification).toHaveBeenCalledWith('new_account', false);
   });
 
   it.each(['M', 'S1'] as const)('%s never sees New accounts', async (who) => {
     setStore(fakeStore(who, { telegram: linked({ new_account: true }) }));
-    await render(<ProfileScreen />);
+    await render(<TelegramScreen />);
     expect(switches()).not.toContain('New accounts');
     expect(screen.queryByLabelText('New accounts')).toBeNull();
   });

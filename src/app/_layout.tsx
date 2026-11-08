@@ -49,6 +49,8 @@ export default function RootLayout() {
           <Stack.Screen name="accountant/courses" options={{ title: 'Select courses' }} />
           <Stack.Screen name="accountant/[id]" options={{ title: 'Payments' }} />
           <Stack.Screen name="general-chat" options={{ title: 'General chat' }} />
+          {/* ARU-101: a pushed page (not a modal), so iOS swipe-back and Android back return to Profile. */}
+          <Stack.Screen name="telegram" options={{ title: 'Telegram notifications' }} />
           <Stack.Screen name="change-password" options={{ title: 'Change password', presentation: 'modal' }} />
           <Stack.Screen name="reset-password" options={{ title: 'Reset password' }} />
           <Stack.Screen name="disciplines/new" options={{ title: 'New discipline', presentation: 'modal' }} />
