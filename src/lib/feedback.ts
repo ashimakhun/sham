@@ -1,3 +1,5 @@
+import { currentLanguage, formatNumberIn, type Language, translate } from '@/i18n';
+
 import type { CourseFeedback, Meeting } from './types';
 
 /** Longest feedback text, after trimming (the database checks it too: 0025_course_feedback.sql). */
@@ -13,23 +15,28 @@ export function feedbackFor(all: CourseFeedback[], courseId: string) {
   return all.filter((f) => f.courseId === courseId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-/** "★ 4.3 · 6 reviews" (one decimal), or undefined with no feedback. */
-export function ratingSummary(items: CourseFeedback[]) {
-  if (!items.length) return undefined;
+// One decimal, with the language's decimal mark ("4.3" / "4,3").
+const averageOf = (items: CourseFeedback[], lang: Language) => {
   const average = items.reduce((sum, f) => sum + f.rating, 0) / items.length;
-  return `★ ${average.toFixed(1)} · ${items.length} ${items.length === 1 ? 'review' : 'reviews'}`;
+  return lang === 'en' ? average.toFixed(1) : average.toFixed(1).replace('.', ',');
+};
+
+/** "★ 4.3 · 6 reviews" (one decimal), or undefined with no feedback. In the app's language (ARU-109). */
+export function ratingSummary(items: CourseFeedback[], lang: Language = currentLanguage()) {
+  if (!items.length) return undefined;
+  return translate(lang, 'feedback.summary', { average: averageOf(items, lang), count: items.length, n: formatNumberIn(lang, items.length) });
 }
 
 /** Screen reader text for a summary: "Rated 4.3 out of 5, 6 reviews". */
-export function ratingSummaryLabel(items: CourseFeedback[]) {
+export function ratingSummaryLabel(items: CourseFeedback[], lang: Language = currentLanguage()) {
   if (!items.length) return undefined;
-  const average = items.reduce((sum, f) => sum + f.rating, 0) / items.length;
-  return `Rated ${average.toFixed(1)} out of 5, ${items.length} ${items.length === 1 ? 'review' : 'reviews'}`;
+  return translate(lang, 'feedback.summaryLabel', { average: averageOf(items, lang), count: items.length, n: formatNumberIn(lang, items.length) });
 }
 
 /** "★★★★☆" for 4 stars. */
 export const stars = (rating: number) => '★'.repeat(rating) + '☆'.repeat(5 - rating);
-export const starsLabel = (rating: number) => `${rating} ${rating === 1 ? 'star' : 'stars'}`;
+export const starsLabel = (rating: number, lang: Language = currentLanguage()) =>
+  translate(lang, 'feedback.stars', { count: rating });
 
 /** Edited after it was first saved (the database sets updatedAt only on edits). */
 export const isEdited = (f: CourseFeedback) => f.updatedAt > f.createdAt;

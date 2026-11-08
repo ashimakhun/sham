@@ -4,6 +4,7 @@ import { AppState } from 'react-native';
 
 import { ChatView } from '@/components/ChatView';
 import { EmptyState } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { canUseGeneralChat } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { useGeneralChat } from '@/lib/useCourseChat';
@@ -37,17 +38,19 @@ function useMarkGeneralChatRead(newestId: string | undefined) {
 }
 
 function GeneralChat() {
+  const { t } = useI18n();
   const chat = useGeneralChat(true);
   useMarkGeneralChatRead(chat.messages[0]?.id);
-  return <ChatView chat={chat} emptyText="No messages yet. Say hello to everyone!" unknownAuthor="Unknown user" />;
+  return <ChatView chat={chat} emptyText={t('chat.generalEmpty')} unknownAuthor={t('chat.unknownUser')} />;
 }
 
 /** ARU-61: one chat for every approved user (any role), opened from the Profile tab. Waiting and declined accounts
  *  never get here (AccessGate, ARU-43); the database also returns them nothing (0029_general_chat.sql). */
 export default function GeneralChatScreen() {
   const { currentUser } = useStore();
+  const { t } = useI18n();
   if (!canUseGeneralChat(currentUser)) {
-    return <EmptyState title="Not available" hint="The general chat is for accepted accounts." />;
+    return <EmptyState title={t('chat.notAvailableTitle')} hint={t('chat.notAvailableHint')} />;
   }
   return <GeneralChat />;
 }

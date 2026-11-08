@@ -3,6 +3,7 @@ import { useState } from 'react';
 
 import { MeetingForm } from '@/components/MeetingForm';
 import { EmptyState } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { canManageMeetings } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
@@ -12,6 +13,7 @@ export default function EditMeetingScreen() {
   const { id: courseId, meetingId } = useLocalSearchParams<{ id: string; meetingId: string }>();
   const { currentUser, getCourse, meetings, updateMeeting } = useStore();
   const { busy, error, run } = useAction();
+  const { t } = useI18n();
 
   const course = getCourse(courseId);
   const meeting = meetings.find((m) => m.id === meetingId && m.courseId === courseId);
@@ -27,19 +29,19 @@ export default function EditMeetingScreen() {
       : undefined,
   );
 
-  if (!course || !opened) return <EmptyState title="Meeting not found" />;
+  if (!course || !opened) return <EmptyState title={t('meetings.notFound')} />;
   if (currentUser && !canManageMeetings(currentUser, course)) {
-    return <EmptyState title="Not allowed" hint="Only the course owner or the teacher can edit meetings." />;
+    return <EmptyState title={t('meetings.notAllowed')} hint={t('meetings.onlyEditHint')} />;
   }
   if (opened.status !== 'scheduled') {
-    return <EmptyState title="Can't edit this meeting" hint="Completed and canceled meetings can't be changed." />;
+    return <EmptyState title={t('meetings.cantEdit')} hint={t('meetings.cantEditHint')} />;
   }
 
   return (
     <MeetingForm
       initial={opened.values}
-      submitTitle="Save"
-      busyTitle="Saving…"
+      submitTitle={t('common.save')}
+      busyTitle={t('common.saving')}
       busy={busy}
       error={error}
       checkTimeOnlyWhenChanged

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { KeyboardForm } from '@/components/KeyboardForm';
 import { MaterialFileFields } from '@/components/MaterialFileFields';
 import { Button, EmptyState, ErrorText } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { useStore } from '@/lib/store';
 import type { MaterialFile } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
@@ -12,16 +13,18 @@ import { useAction } from '@/lib/useAction';
 export default function EditMaterialFileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { materialFiles, currentUser } = useStore();
+  const { t } = useI18n();
   const item = materialFiles.find((f) => f.id === id);
-  if (!item) return <EmptyState title="Material not found" />;
+  if (!item) return <EmptyState title={t('materials.notFound')} />;
   const isAuthor =
     currentUser?.id === item.authorId && (currentUser.role === 'teacher' || currentUser.role === 'mentor');
-  if (!isAuthor) return <EmptyState title="Only the author can edit this file." />;
+  if (!isAuthor) return <EmptyState title={t('files.onlyAuthorCanEdit')} />;
   return <EditForm item={item} />;
 }
 
 function EditForm({ item }: { item: MaterialFile }) {
   const { updateMaterialFile } = useStore();
+  const { t } = useI18n();
   const { busy, error, run } = useAction();
   // Prefilled once: a live update from another device doesn't overwrite what is being typed.
   const [name, setName] = useState(item.name);
@@ -53,7 +56,7 @@ function EditForm({ item }: { item: MaterialFile }) {
         onCourseOnly={setCourseOnly}
       />
       <ErrorText error={error} />
-      <Button title={busy ? 'Saving…' : 'Save'} onPress={save} disabled={busy || !name.trim()} />
+      <Button title={busy ? t('common.saving') : t('common.save')} onPress={save} disabled={busy || !name.trim()} />
     </KeyboardForm>
   );
 }

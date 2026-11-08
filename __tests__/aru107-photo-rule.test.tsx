@@ -62,9 +62,9 @@ describe('the deletion date (AC 2, AC 3)', () => {
   });
 
   it('shows a UTC date unchanged', () => {
-    expect(formatUtcDate('2027-05-12')).toBe(
-      new Date(Date.UTC(2027, 4, 12)).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }),
-    );
+    // ARU-109: in the app's language, not the device's locale.
+    expect(formatUtcDate('2027-05-12')).toBe('12 May 2027');
+    expect(formatUtcDate('2027-05-12', 'ru')).toBe('12 мая 2027');
   });
 });
 
