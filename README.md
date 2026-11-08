@@ -181,7 +181,11 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    or null), the phone language the app saves for a user who never chose one, so Telegram notifications follow it;
    in the profile update grant next to `full_name` and `language`, so users change only their own; existing accounts
    get null; no other policy changes, deletes nothing),
-   `0053_homework_photo_deletion.sql` (ARU-112: the daily photo-deletion job; adds `homework.photo_removed_at`, the
+   `0053_db_error_codes.sql` (ARU-111: Russian version, part 5; every message a database function raises for users
+   gets a stable code in its hint (`sham:<code>`, values in detail as JSON), so the app shows it in the user's
+   language; the English messages, errcodes, signatures and grants are unchanged; recreates the latest definition of
+   31 functions with `create or replace`; no table, column or policy changes, deletes nothing),
+   `0054_homework_photo_deletion.sql` (ARU-112: the daily photo-deletion job; adds `homework.photo_removed_at`, the
    service-role-only `photo_deletion_warnings` table, `telegram_links.notify_photo_deletion` (on for existing links),
    the kind `photo_deletion` in `set_telegram_notification()`, five service-role functions and a daily `pg_cron` job;
    needs **pg_cron** and **pg_net**; deletes nothing until the Edge Function is deployed and its URL and secret are in
@@ -550,7 +554,7 @@ Until the steps below are done, nothing is deleted, no warning is sent and the s
 
 1. Dashboard → **Database → Extensions**: turn on **pg_cron** and **pg_net** (already on if you set up
    [Meeting started](#meeting-started-aru-41)).
-2. Run `supabase/migrations/0053_homework_photo_deletion.sql` (it stops with a message if step 1 is missing).
+2. Run `supabase/migrations/0054_homework_photo_deletion.sql` (it stops with a message if step 1 is missing).
 3. Make a random secret (`openssl rand -hex 24`) and set it as the function's secret:
    ```bash
    npx supabase secrets set PHOTO_DELETION_SECRET=<secret>
@@ -623,7 +627,11 @@ screens, the tab bar and the Profile tab; (part 2, ARU-109) the Homework and Cou
 feedback, meeting and discipline screens; (part 3, ARU-113) Materials, the chats, Pay, the accountant screens, Manage
 roles, the Telegram notifications page and Delete account. Every screen is now in both languages; the only app English
 left in Russian is the Telegram page's **Connect Telegram** / **Disconnect** buttons, which match the bot's English
-replies (product owner decision). Database errors (ARU-111) come later.
+replies (product owner decision). Database errors (ARU-111): a function's `raise exception` carries `hint = 'sham:<code>'` (and its values in `detail`
+as JSON); `dbErrorMessage()` in `src/i18n/index.ts` shows the server's English message in English and the catalog
+text `db.<code>` in Russian, with "Нет доступа к этому действию." for an access refusal without a code and the
+generic text otherwise. A new user-facing `raise exception` needs a code and a `db.<code>` catalog entry
+(`supabase/tests/aru111_db_error_codes.test.sql` and `__tests__/aru111-db-errors.test.ts` check both).
 
 Telegram notifications (ARU-110) go out in each recipient's language: the one they chose in Profile, else the phone
 language the app saved on their account at start (`profiles.device_language`), else English. Their texts are in

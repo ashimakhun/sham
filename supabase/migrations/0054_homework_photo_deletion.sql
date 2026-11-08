@@ -63,10 +63,10 @@ create or replace function set_telegram_notification(kind text, enabled boolean)
   as $$
   begin
     if auth.uid() is null then
-      raise exception 'Please sign in again.' using errcode = '42501';
+      raise exception 'Please sign in again.' using errcode = '42501', hint = 'sham:sign_in_again';
     end if;
     if enabled is null then
-      raise exception 'Choose on or off.' using errcode = '22023';
+      raise exception 'Choose on or off.' using errcode = '22023', hint = 'sham:choose_on_off';
     end if;
     case kind
       when 'meeting_started' then

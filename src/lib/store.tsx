@@ -7,7 +7,7 @@ import { periodProblem } from './billing';
 import { ACCOUNT_DELETED, DELETE_FAILED, DELETE_OFFLINE } from './deleteAccount';
 import { FEEDBACK_MAX } from './feedback';
 import { fileFieldsError, isAllowedPdf, PDF_MAX_BYTES, PDF_RULE } from './files';
-import { phoneLanguage, translate } from '@/i18n';
+import { dbErrorMessage, phoneLanguage, translate } from '@/i18n';
 
 import { PHOTO_TOO_LARGE } from './compressPhoto';
 import { newId } from './id';
@@ -631,10 +631,11 @@ async function deleteErrorMessage(error: unknown): Promise<string> {
   return DELETE_FAILED;
 }
 
-type Result = { error: { message: string; code?: string } | null };
+type Result = { error: { message: string; code?: string; hint?: string | null; details?: string | null } | null };
 
+/** A failed database call: its message in the user's language (ARU-111; English unchanged). */
 function check(res: Result) {
-  if (res.error) throw new Error(res.error.message);
+  if (res.error) throw new Error(dbErrorMessage(res.error));
 }
 
 /** Like check(), but a duplicate primary key means an earlier attempt already saved this row. */
@@ -1136,7 +1137,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const loadTelegram = useCallback(async () => {
     if (!userId) return;
     const res = await supabase.from('telegram_links').select('*').eq('user_id', userId);
-    if (res.error) throw new Error(res.error.message);
+    check(res);
     const row = ((res.data as TelegramLinkRow[] | null) ?? [])[0];
     setTelegram(row ? toTelegramLink(row) : null);
   }, [userId]);
@@ -1892,7 +1893,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           if (res.error?.code === '23505') {
             // Sent from another device (or a double tap) meanwhile: replace that one instead.
             const other = await findMine();
-            if (!other) throw new Error(res.error.message);
+            if (!other) throw new Error(dbErrorMessage(res.error));
             oldPath = other.proof_path;
             check(await supabase.from('course_payment_requests').update(fields).eq('id', other.id));
           } else if (res.error?.code === '42501') {
