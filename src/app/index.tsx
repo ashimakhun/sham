@@ -1,6 +1,6 @@
 import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, ErrorText, Field, Segmented, styles } from '@/components/ui';
@@ -50,6 +50,14 @@ export default function SignInScreen() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={[styles.content, { gap: 16 }]} keyboardShouldPersistTaps="handled">
           <View style={{ gap: 4, marginVertical: 24 }}>
+            <Image
+              source={require('../../assets/logo.png')}
+              style={{ width: 72, height: 76, marginBottom: 12 }}
+              resizeMode="contain"
+              accessibilityIgnoresInvertColors
+              accessible={false}
+              testID="app-logo"
+            />
             <Text style={styles.h1}>Sham</Text>
             <Text style={styles.muted}>{t('signIn.tagline')}</Text>
           </View>
