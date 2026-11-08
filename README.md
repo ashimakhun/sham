@@ -174,7 +174,10 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    and the service-role functions `homework_photos_for_zip()` and `claim_photo_zip_link()` for **Download my photos**;
    deletes nothing. Then deploy the `homework-photos-zip` Edge Function, see
    [Download my photos](#download-my-photos-aru-107)),
-   `0051_homework_photo_deletion.sql` (ARU-112: the daily photo-deletion job; adds `homework.photo_removed_at`, the
+   `0051_profile_language.sql` (ARU-108: Russian version, part 1; adds `profiles.language` ('en', 'ru' or null =
+   follow the phone; existing accounts get null) and puts it in the profile update grant next to `full_name`, so users
+   change only their own; no other policy changes, deletes nothing),
+   `0052_homework_photo_deletion.sql` (ARU-112: the daily photo-deletion job; adds `homework.photo_removed_at`, the
    service-role-only `photo_deletion_warnings` table, `telegram_links.notify_photo_deletion` (on for existing links),
    the kind `photo_deletion` in `set_telegram_notification()`, five service-role functions and a daily `pg_cron` job;
    needs **pg_cron** and **pg_net**; deletes nothing until the Edge Function is deployed and its URL and secret are in
@@ -543,7 +546,7 @@ Until the steps below are done, nothing is deleted, no warning is sent and the s
 
 1. Dashboard → **Database → Extensions**: turn on **pg_cron** and **pg_net** (already on if you set up
    [Meeting started](#meeting-started-aru-41)).
-2. Run `supabase/migrations/0051_homework_photo_deletion.sql` (it stops with a message if step 1 is missing).
+2. Run `supabase/migrations/0052_homework_photo_deletion.sql` (it stops with a message if step 1 is missing).
 3. Make a random secret (`openssl rand -hex 24`) and set it as the function's secret:
    ```bash
    npx supabase secrets set PHOTO_DELETION_SECRET=<secret>
@@ -599,6 +602,21 @@ npm run test:db    # applies supabase/migrations to a throwaway Postgres and tes
 ```
 
 GitHub Actions runs both on every pull request and on pushes to `main` (`.github/workflows/ci.yml`).
+
+## Languages (ARU-108)
+
+Sham is in English and Russian. The app starts in the phone's (or browser's) language: Russian for any `ru-*` locale,
+English otherwise. **Profile → Language** overrides it and is saved on the account (`profiles.language`), so it is the
+same on every device; the sign-in screen uses the language last shown on the device.
+
+All texts live in one catalog: `src/i18n/en.json` and `src/i18n/ru.json` (the same text IDs, grouped by screen) and
+`src/i18n/notes.json` (where each text appears, for the product owner's spreadsheet). Screens read them with
+`useI18n().t('<id>', { …params })`; counts use plural forms (`<id>_one` / `_few` / `_many` / `_other`); dates use
+`formatDate` / `formatWeekdayDate` / `formatDateTime` from the same hook, in the chosen language. `npm test` fails when
+an ID is missing from one file, a Russian text or a note is empty, or the `{placeholders}` differ.
+Moved to the catalog so far (part 1): sign-in and create account, Reset and Change password, the waiting / declined
+screens, the tab bar and the Profile tab. The other screens are still English (ARU-109, ARU-113); Telegram messages
+(ARU-110) and database errors (ARU-111) come later.
 
 ## Project structure
 
@@ -705,6 +723,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Send / replace own payment request with a proof (ARU-99; unpaid, in the period) | as a listener | as a listener |  |
 | See payment requests and proofs, request count (ARU-99) | own only | accountants (current listeners of paid courses they can see) | ✓ (all) |
 | Delete payment proofs (only by deleting a course or discipline, ARU-99) | | | ✓ |
+| Choose the app language (Profile → Language, saved in `profiles.language`, ARU-108) | own | own | own |
 | Change own password (Supabase Auth, current password required, ARU-76) | own | own | own |
 | Reset a forgotten password with an emailed code (signed out, any approval state, ARU-77) | own | own | own |
 | Become / stop being teacher |          |                    | (nobody) |

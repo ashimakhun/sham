@@ -7,6 +7,8 @@ import { periodProblem } from './billing';
 import { ACCOUNT_DELETED, DELETE_FAILED, DELETE_OFFLINE } from './deleteAccount';
 import { FEEDBACK_MAX } from './feedback';
 import { fileFieldsError, isAllowedPdf, PDF_MAX_BYTES, PDF_RULE } from './files';
+import { translate } from '@/i18n';
+
 import { PHOTO_TOO_LARGE } from './compressPhoto';
 import { newId } from './id';
 import { PHOTOS_ZIP_ERROR } from './photoRetention';
@@ -19,9 +21,10 @@ import {
   isInvalidCredentials,
   NETWORK_ERROR,
   SAME_PASSWORD,
+  USER_EXISTS,
   WRONG_CURRENT_PASSWORD,
 } from './password';
-import { nameProblem } from './profileName';
+import { LANGUAGE_SAVE_FAILED, nameProblem } from './profileName';
 import { supabase } from './supabase';
 import type {
   AccessRequest,
@@ -122,6 +125,9 @@ export type Store = {
   /** Approved users change their own name (ARU-55): trimmed, not blank, at most NAME_MAX characters. The database
    *  allows only the own row and refuses blank names; the store's profiles are updated right after the save. */
   updateMyName: (name: string) => Promise<void>;
+  /** ARU-108 AC 3 / AC 4 / AC 10: saves the language on the signed-in user's own profile; shown at once on success.
+   *  Throws LANGUAGE_SAVE_FAILED (and changes nothing) when the save fails. */
+  setLanguage: (language: 'en' | 'ru') => Promise<void>;
   /** A listener sends homework for an assignment of their course (ARU-32): one per assignment. */
   addHomework: (input: NewHomework) => Promise<void>;
   /** Course owner or teacher, Completed meetings only, one per meeting (ARU-32). `id` makes a retry safe. */
@@ -281,6 +287,7 @@ type ProfileRow = {
   role: User['role'];
   access_status?: User['accessStatus'] | null;
   is_accountant?: boolean | null;
+  language?: string | null;
 };
 type BillingRow = { course_id: string; start_day: number; end_day: number; selected_by: string | null; selected_at: string };
 type PaymentRow = { course_id: string; user_id: string; month: string; marked_by: string | null; marked_at: string };
@@ -309,7 +316,7 @@ type HomeworkRow = {
   mentor_comment: string | null;
   created_at: string;
   assignment_id?: string | null;
-  /** ARU-112 (0051); undefined before that migration runs. */
+  /** ARU-112 (0052); undefined before that migration runs. */
   photo_removed_at?: string | null;
 };
 type AssignmentRow = {
@@ -392,7 +399,7 @@ type TelegramLinkRow = {
   notify_general_chat?: boolean;
   /** ARU-102 (0048); undefined before that migration runs. */
   notify_new_material?: boolean;
-  /** ARU-112 (0051); undefined before that migration runs. */
+  /** ARU-112 (0052); undefined before that migration runs. */
   notify_photo_deletion?: boolean;
 };
 const toTelegramLink = (r: TelegramLinkRow): TelegramLink => ({
@@ -425,6 +432,8 @@ const toUser = (r: ProfileRow): User => ({
   // No column yet (migration 0021 not run): everyone counts as approved.
   accessStatus: r.access_status ?? 'approved',
   isAccountant: !!r.is_accountant,
+  // ARU-108: before 0051 there is no column: never chose.
+  language: r.language === 'en' || r.language === 'ru' ? r.language : undefined,
 });
 
 const toBilling = (r: BillingRow): CourseBilling => ({
@@ -1170,17 +1179,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     getCourse,
     signIn: async (email, password) => {
       setAccountNotice(null);
-      check(await supabase.auth.signInWithPassword({ email: email.trim(), password }));
+      // ARU-108 AC 7a: Auth errors in the app's wording (translated on the screen).
+      const res = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (res.error) throw new Error(authErrorMessage(res.error));
     },
     signUp: async (name, email, password) => {
       setAccountNotice(null);
-      check(
-        await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: { data: { full_name: name.trim() } },
-        }),
-      );
+      const res = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: { data: { full_name: name.trim() } },
+      });
+      if (res.error) throw new Error(authErrorMessage(res.error));
+      // With email confirmation on, Supabase answers an existing email with a user that has no identities instead of
+      // an error (ARU-108 analysis note): the same message.
+      if (res.data.user && Array.isArray(res.data.user.identities) && res.data.user.identities.length === 0) {
+        throw new Error(USER_EXISTS);
+      }
     },
     signOut: async () => {
       check(await supabase.auth.signOut());
@@ -1208,7 +1223,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     changePassword: async (currentPassword, newPassword) => {
       const me = session?.user;
-      if (!me?.email || !currentUser) throw new Error('You are signed out. Please sign in again.');
+      if (!me?.email || !currentUser) throw new Error(translate('en', 'auth.signedOut'));
       // Checked before any request (AC 4), so it wins over a wrong current password.
       if (newPassword === currentPassword) throw new Error(SAME_PASSWORD);
       // A stolen unlocked phone isn't enough: the current password must be right. Signing in again also gives a
@@ -1217,7 +1232,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (verified.error) {
         throw new Error(isInvalidCredentials(verified.error) ? WRONG_CURRENT_PASSWORD : authErrorMessage(verified.error));
       }
-      if (verified.data.user?.id !== me.id) throw new Error('Something went wrong. Please sign in again.');
+      if (verified.data.user?.id !== me.id) throw new Error(translate('en', 'auth.signInAgain'));
       const updated = await supabase.auth.updateUser({ password: newPassword });
       if (updated.error) throw new Error(authErrorMessage(updated.error));
     },
@@ -1259,7 +1274,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     updateMyName: async (name) => {
       if (!currentUser || (currentUser.accessStatus && currentUser.accessStatus !== 'approved')) {
-        throw new Error('Your account is waiting for the teacher\'s approval.');
+        throw new Error(translate('en', 'profile.waitingApproval'));
       }
       const problem = nameProblem(name);
       if (problem) throw new Error(problem);
@@ -1267,10 +1282,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const me = currentUser.id;
       const res = await supabase.from('profiles').update({ full_name: fullName }).eq('id', me).select('id');
       check(res);
-      if (!res.data?.length) throw new Error('Your name could not be saved. Please try again.');
+      if (!res.data?.length) throw new Error(translate('en', 'profile.nameNotSaved'));
       // Every name on this device comes from profiles: show the new one right away, then refetch.
       setProfiles((all) => all.map((u) => (u.id === me ? { ...u, name: fullName } : u)));
       load().catch(() => {});
+    },
+    setLanguage: async (language) => {
+      if (!currentUser) throw new Error(LANGUAGE_SAVE_FAILED);
+      const me = currentUser.id;
+      let saved = false;
+      try {
+        const res = await supabase.from('profiles').update({ language }).eq('id', me).select('id');
+        saved = !res.error && !!res.data?.length;
+      } catch {
+        saved = false;
+      }
+      if (!saved) throw new Error(LANGUAGE_SAVE_FAILED);
+      // Profiles aren't in realtime: show the new language right away.
+      setProfiles((all) => all.map((u) => (u.id === me ? { ...u, language } : u)));
     },
     addHomework: async (input) => {
       // Students and mentors submit, only to courses they are a listener of, for an assignment of that course, once
