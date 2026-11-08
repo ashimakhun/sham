@@ -1,52 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { useStore } from '@/lib/store';
 
-import {
-  formatDateIn,
-  formatDateTimeIn,
-  formatNumberIn,
-  formatWeekdayDateIn,
-  isLanguage,
-  type Language,
-  phoneLanguage,
-  setCurrentLanguage,
-  translate,
-  translateKnown,
-  translateMessage,
-  type TextId,
-} from './index';
+import { I18nContext, make, useI18n } from './context';
+import { isLanguage, type Language, phoneLanguage, setCurrentLanguage } from './index';
+
+export { useI18n };
 
 /** The language last shown on this device (AC 6 and the "profile not loaded yet" edge case). */
 export const LAST_LANGUAGE_KEY = 'sham.language';
-
-type I18n = {
-  lang: Language;
-  t: (id: TextId | string, params?: Record<string, string | number>) => string;
-  /** AC 7a: an error message in the chosen language (see translateMessage). */
-  tm: (message: string | null | undefined) => string | null;
-  /** ARU-109 AC 3: an app message in the chosen language; anything else (a database error) as it came. */
-  te: (message: string | null | undefined) => string | null;
-  formatNumber: (value: number) => string;
-  formatDate: (value: Date | string) => string;
-  formatWeekdayDate: (value: Date | string) => string;
-  formatDateTime: (value: Date | string) => string;
-};
-
-const make = (lang: Language): I18n => ({
-  lang,
-  t: (id, params) => translate(lang, id, params),
-  tm: (message) => (message == null ? null : translateMessage(lang, message)),
-  te: (message) => (message ? translateKnown(lang, message) : null),
-  formatNumber: (value) => formatNumberIn(lang, value),
-  formatDate: (value) => formatDateIn(lang, value),
-  formatWeekdayDate: (value) => formatWeekdayDateIn(lang, value),
-  formatDateTime: (value) => formatDateTimeIn(lang, value),
-});
-
-// Outside a provider (tests of a single component, for example): English.
-const I18nContext = createContext<I18n>(make('en'));
 
 /**
  * ARU-108: which language the app shows.
@@ -91,9 +54,6 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
 
-export function useI18n() {
-  return useContext(I18nContext);
-}
 
 /** The Language switch (AC 3, AC 10): saves on the account; on failure the language stays as it was. */
 export function useLanguageSwitch() {

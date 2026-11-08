@@ -166,6 +166,9 @@ export function translateMessage(lang: Language, message: string | null | undefi
   return lang === 'en' ? message : translate(lang, 'common.genericError');
 }
 
+// A bad date reads "Invalid Date" as toLocaleDateString did, instead of throwing (Intl throws a RangeError).
+const INVALID = 'Invalid Date';
+
 const LOCALE: Record<Language, string> = { en: 'en-GB', ru: 'ru-RU' };
 
 function parts(lang: Language, date: Date, options: Intl.DateTimeFormatOptions) {
@@ -180,6 +183,7 @@ function parts(lang: Language, date: Date, options: Intl.DateTimeFormatOptions) 
  */
 export function formatDateIn(lang: Language, value: Date | string, timeZone?: string) {
   const date = typeof value === 'string' ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return INVALID;
   const p = parts(lang, date, { day: 'numeric', month: lang === 'ru' ? 'long' : 'short', year: 'numeric', timeZone });
   return `${p.day} ${p.month} ${p.year}`;
 }
@@ -187,6 +191,7 @@ export function formatDateIn(lang: Language, value: Date | string, timeZone?: st
 /** AC 9: a short weekday with the day: "Mon, 12 May" / "пн, 12 мая". */
 export function formatWeekdayDateIn(lang: Language, value: Date | string, timeZone?: string) {
   const date = typeof value === 'string' ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return INVALID;
   const p = parts(lang, date, { weekday: 'short', day: 'numeric', month: lang === 'ru' ? 'long' : 'short', timeZone });
   return `${p.weekday.replace(/\.$/, '')}, ${p.day} ${p.month}`;
 }
@@ -194,6 +199,7 @@ export function formatWeekdayDateIn(lang: Language, value: Date | string, timeZo
 /** AC 9: a date with the time: "12 May 2026, 14:05" / "12 мая 2026, 14:05" (24-hour in both). */
 export function formatDateTimeIn(lang: Language, value: Date | string, timeZone?: string) {
   const date = typeof value === 'string' ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return INVALID;
   const p = parts(lang, date, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone });
   return `${formatDateIn(lang, date, timeZone)}, ${p.hour}:${p.minute}`;
 }

@@ -5,6 +5,8 @@ import { AssignmentCard } from '@/components/AssignmentCard';
 import { AuthorFilter } from '@/components/AuthorFilter';
 import { HomeworkCard } from '@/components/HomeworkCard';
 import { EmptyState, Segmented, styles, UnreadBadge } from '@/components/ui';
+import type { TextId } from '@/i18n';
+import { useI18n } from '@/i18n/context';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import type { Homework, HomeworkAssignment, HomeworkStatus } from '@/lib/types';
@@ -22,21 +24,23 @@ const ALL_COURSES = 'all';
 const NO_COURSE = 'none';
 const courseKey = (h: Homework) => h.courseId ?? NO_COURSE;
 
-const NO_COURSE_HINT = 'You are not in any course yet — ask your teacher or mentor to add you.';
-const SENT_HINT = 'Homework you send will appear here.';
-const emptyText: Record<string, { title: string; hint: string }> = {
-  new: { title: 'No new homework', hint: 'Homework your mentor assigns after a meeting will appear here.' },
-  newNoCourse: { title: 'No new homework', hint: NO_COURSE_HINT },
-  student: { title: 'No homework yet', hint: SENT_HINT },
-  mentor: { title: 'Nothing to check', hint: 'Homework sent by course listeners will appear here.' },
-  teacher: { title: 'No homework yet', hint: 'Homework sent by course listeners will appear here.' },
-  mine: { title: 'No homework sent yet', hint: SENT_HINT },
-  studentNoCourse: { title: 'No homework yet', hint: NO_COURSE_HINT },
-  mineNoCourse: { title: 'No homework sent yet', hint: NO_COURSE_HINT },
+/** The empty-list texts by case; built per render in the app's language (ARU-109), never frozen at module load. */
+type Translate = ReturnType<typeof useI18n>['t'];
+const EMPTY_IDS: Record<string, { title: TextId; hint: TextId }> = {
+  new: { title: 'homework.emptyNewTitle', hint: 'homework.emptyNewHint' },
+  newNoCourse: { title: 'homework.emptyNewTitle', hint: 'homework.emptyNoCourseHint' },
+  student: { title: 'homework.emptyNoHomeworkTitle', hint: 'homework.emptySentHint' },
+  mentor: { title: 'homework.emptyToCheckTitle', hint: 'homework.emptyListenersHint' },
+  teacher: { title: 'homework.emptyNoHomeworkTitle', hint: 'homework.emptyListenersHint' },
+  mine: { title: 'homework.emptyMineTitle', hint: 'homework.emptySentHint' },
+  studentNoCourse: { title: 'homework.emptyNoHomeworkTitle', hint: 'homework.emptyNoCourseHint' },
+  mineNoCourse: { title: 'homework.emptyMineTitle', hint: 'homework.emptyNoCourseHint' },
 };
+const emptyText = (key: string, t: Translate) => ({ title: t(EMPTY_IDS[key].title), hint: t(EMPTY_IDS[key].hint) });
 
 export default function HomeworkScreen() {
   const { currentUser, courses, courseMembers, loading, refresh, visibleHomework, assignments, getCourse } = useStore();
+  const { t } = useI18n();
   const role = currentUser?.role ?? 'student';
   const me = currentUser?.id;
   const now = useNow();
@@ -102,7 +106,7 @@ export default function HomeworkScreen() {
   // the old course coming back later doesn't silently re-apply the filter.
   const checked = list.filter((h) => h.status === 'checked');
   const courseOptions = [...new Set(checked.map(courseKey))]
-    .map((id) => ({ value: id, label: (id === NO_COURSE ? undefined : getCourse(id)?.title) ?? 'No course' }))
+    .map((id) => ({ value: id, label: (id === NO_COURSE ? undefined : getCourse(id)?.title) ?? t('homework.noCourse') }))
     .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }) || a.value.localeCompare(b.value));
   const chosen = courseChoice[tab];
   const courseFilter = courseOptions.some((o) => o.value === chosen) ? chosen : ALL_COURSES;
@@ -115,21 +119,29 @@ export default function HomeworkScreen() {
 
   const options: { value: Filter; label: string }[] = listenerView
     ? [
-        { value: 'new', label: `New (${fresh.length})` },
-        { value: 'submitted', label: `Waiting (${waiting})` },
-        { value: 'checked', label: 'Checked' },
+        { value: 'new', label: t('homework.filterNew', { n: fresh.length }) },
+        { value: 'submitted', label: t('homework.filterWaiting', { n: waiting }) },
+        { value: 'checked', label: t('homework.filterChecked') },
       ]
     : [
-        { value: 'submitted', label: `To check (${waiting})` },
-        { value: 'checked', label: 'Checked' },
+        { value: 'submitted', label: t('homework.filterToCheck', { n: waiting }) },
+        { value: 'checked', label: t('homework.filterChecked') },
       ];
 
-  const empty =
+  const empty = emptyText(
     shown === 'new'
-      ? emptyText[inLoadedCourse ? 'new' : 'newNoCourse']
+      ? inLoadedCourse
+        ? 'new'
+        : 'newNoCourse'
       : onListener
-        ? emptyText[inLoadedCourse ? 'mine' : 'mineNoCourse']
-        : emptyText[role === 'student' && !inLoadedCourse ? 'studentNoCourse' : role];
+        ? inLoadedCourse
+          ? 'mine'
+          : 'mineNoCourse'
+        : role === 'student' && !inLoadedCourse
+          ? 'studentNoCourse'
+          : role,
+    t,
+  );
 
   return (
     <FlatList
@@ -155,7 +167,7 @@ export default function HomeworkScreen() {
           {filterByCourse && (
             <AuthorFilter
               noun="course"
-              options={[{ value: ALL_COURSES, label: 'All courses' }, ...courseOptions]}
+              options={[{ value: ALL_COURSES, label: t('homework.allCourses') }, ...courseOptions]}
               value={courseFilter}
               onChange={(v) => setCourseChoice((c) => ({ ...c, [tab]: v }))}
             />
@@ -173,9 +185,11 @@ export default function HomeworkScreen() {
  * overlaps the label or gets clipped by the segment's corners.
  */
 function TabSwitch({ value, onChange, newCount }: { value: Tab; onChange: (v: Tab) => void; newCount: number }) {
+  const { t, lang } = useI18n();
+  const owner = t('homework.tabOwner');
   const options: { value: Tab; label: string; badge: number; a11y: string }[] = [
-    { value: 'owner', label: 'Owner', badge: 0, a11y: 'Owner' },
-    { value: 'listener', label: 'Listener', badge: newCount, a11y: listenerTabLabel(newCount) },
+    { value: 'owner', label: owner, badge: 0, a11y: owner },
+    { value: 'listener', label: t('unread.listener'), badge: newCount, a11y: listenerTabLabel(newCount, lang) },
   ];
   return (
     <View style={styles.segmented} accessibilityRole="tablist">

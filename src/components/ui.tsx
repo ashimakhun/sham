@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ComponentProps, ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
 
-import { useI18n } from '@/i18n/LanguageProvider';
+import { useI18n } from '@/i18n/context';
 import { colors, roleColor, roleLabel } from '@/lib/theme';
 import type { HomeworkStatus, Role } from '@/lib/types';
 import { formatUnread, withUnreadLabel } from '@/lib/unread';
