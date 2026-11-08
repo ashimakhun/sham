@@ -3,7 +3,7 @@
 -- Users change only their own row: the existing "edit own profile" policy (0001) limits updates to id = auth.uid(),
 -- and the column joins full_name in the column grant (0021). Read like the rest of profiles (0021's policy); part 4
 -- (ARU-110) needs it on the server for Telegram messages. No other policy changes; deletes nothing.
--- Renumber to the next free number if another 0050 lands first.
+-- Renumbered from 0050 after ARU-107's 0050_homework_photo_rule.sql merged (ARU-115).
 
 alter table profiles add column language text check (language in ('en', 'ru'));
 
