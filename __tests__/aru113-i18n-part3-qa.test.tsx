@@ -639,7 +639,10 @@ describe("AC 2: confirmations in Russian on iOS, both buttons included; Cancel /
     as("T", "ru", { accessRequests: [pending] });
     await render(inApp(<RolesScreen />));
     await flush();
-    await fireEvent.press(screen.getByRole("button", { name: "Отклонить" }));
+    // ARU-114 made Reject a red X icon; its label is "Отклонить <name>".
+    await fireEvent.press(
+      screen.getByRole("button", { name: `Отклонить ${pending.name}` }),
+    );
     const a = lastAlert();
     allRussian(a);
     expect(a.message).toContain(pending.name);
