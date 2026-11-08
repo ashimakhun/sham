@@ -177,7 +177,7 @@ function HeaderSave({ busy, onPress }: { busy: boolean; onPress: () => void }) {
       hitSlop={8}
       onPress={onPress}
       style={{ paddingHorizontal: 8, minHeight: 44, justifyContent: 'center' }}>
-      <Text style={{ fontSize: 17, fontWeight: '600', color: busy ? colors.muted : colors.primary }}>
+      <Text style={[styles.caps, { fontSize: 16, color: busy ? colors.muted : colors.primary }]}>
         {t(busy ? 'common.saving' : 'common.save')}
       </Text>
     </Pressable>

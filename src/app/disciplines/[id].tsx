@@ -3,10 +3,11 @@ import { RefreshControl, ScrollView, Switch, Text, View } from 'react-native';
 
 import { CourseCard } from '@/components/CourseCard';
 import { DeleteDisciplineButton } from '@/components/DeleteDisciplineButton';
+import { RatingSummary } from '@/components/RatingSummary';
 import { Card, EmptyState, ErrorText, HiddenBadge, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import { canManageDisciplines, coursesInDiscipline, disciplineFeedback } from '@/lib/disciplines';
-import { isEdited, ratingSummary, ratingSummaryLabel, stars, starsLabel } from '@/lib/feedback';
+import { isEdited, stars, starsLabel } from '@/lib/feedback';
 import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
 import { useAction } from '@/lib/useAction';
@@ -26,7 +27,6 @@ export default function DisciplineScreen() {
 
   const teacher = canManageDisciplines(currentUser);
   const reviews = disciplineFeedback(discipline.id, courses, courseFeedback);
-  const summary = ratingSummary(reviews, lang);
   const assigned = coursesInDiscipline(discipline.id, courses);
 
   return (
@@ -42,11 +42,7 @@ export default function DisciplineScreen() {
           <Text style={[styles.h1, { flexShrink: 1 }]}>{discipline.name}</Text>
           {discipline.hidden ? <HiddenBadge /> : null}
         </View>
-        {summary ? (
-          <Text style={styles.title} accessibilityLabel={ratingSummaryLabel(reviews, lang)}>
-            {summary}
-          </Text>
-        ) : null}
+        <RatingSummary items={reviews} style={styles.title} />
         {teacher && (
           <View style={[styles.row, { alignItems: 'flex-start', paddingTop: 4 }]}>
             <View style={{ flex: 1, gap: 4 }}>
@@ -76,7 +72,7 @@ export default function DisciplineScreen() {
               {getCourse(f.courseId)?.title ?? t('disciplines.courseFallback')}
             </Text>
             <Text style={styles.body}>{getUser(f.userId)?.name ?? t('common.unknown')}</Text>
-            <Text style={{ color: '#F59E0B', fontSize: 16 }} accessibilityLabel={starsLabel(f.rating, lang)}>
+            <Text style={{ color: colors.star, fontSize: 16 }} accessibilityLabel={starsLabel(f.rating, lang)}>
               {stars(f.rating)}
             </Text>
             <Text style={styles.body}>{f.body}</Text>

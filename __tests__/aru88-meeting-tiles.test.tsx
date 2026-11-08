@@ -199,7 +199,8 @@ describe('footer (AC 6, AC 7, AC 9)', () => {
     const link = screen.getByRole('link', { name: 'Attended 0 of 1' });
     // ARU-126 AC 4: a people icon, then "0 of 1"; the screen reader label is unchanged.
     expect(within(link).getByTestId('icon-people-outline')).toBeTruthy();
-    expect(within(link).getByText('0 of 1')).toBeTruthy();
+    // ARU-122: the count's text is a pill text, upper case by style.
+    expect(flat(within(link).getByText('0 of 1').props.style)).toMatchObject({ fontSize: 12, textTransform: 'uppercase' });
     await fireEvent.press(link);
     expect(router.push).toHaveBeenCalledWith({
       pathname: '/courses/[id]/meetings/[meetingId]/attendance',

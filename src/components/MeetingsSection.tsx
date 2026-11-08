@@ -512,5 +512,6 @@ const tile = StyleSheet.create({
   iconPill: { width: 30, minWidth: 30, paddingHorizontal: 0, alignItems: 'center' },
   // The people count: icon then "7 of 8".
   iconTextPill: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  pillText: { fontSize: 13, fontWeight: '600' },
+  // ARU-122: action pills and the attended chip are upper case by style (labels stay as written).
+  pillText: { fontSize: 12, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase' },
 });
