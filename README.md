@@ -533,7 +533,8 @@ src/app/                  screens (Expo Router — every file is a route)
   general-chat.tsx        general chat for every accepted account (from Profile)
   change-password.tsx     the signed-in user changes their own password (from Profile)
   reset-password.tsx      Forgot password?: email a code, then set a new password with it (signed out)
-  courses/[id]/owner.tsx  teacher or mentor changes the course owner
+  courses/[id]/edit.tsx   Edit course (pencil in the course name card): discipline and owner, teacher or mentor (ARU-103)
+  courses/[id]/owner.tsx  teacher or mentor changes the course owner (opened from Edit course)
   courses/[id]/meetings/  schedule / edit a meeting; [meetingId]/notes.tsx notes; [meetingId]/assign-homework.tsx;
                           [meetingId]/attendance.tsx who attended
   roles.tsx               teacher accepts / rejects new accounts and switches users between student and mentor
@@ -565,6 +566,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | See disciplines, their rating and reviews | visible ones | visible ones | ✓ (hidden ones too) |
 | Create a discipline, hide / unhide it |   |                    | ✓       |
 | Delete a discipline and every course in it (ARU-83) | |         | ✓ (visible and hidden disciplines) |
+| Open Edit course (pencil on course details, ARU-103) | | ✓ (any course) | ✓ |
 | Set / change / clear a course's discipline (ARU-70) | | own courses   | any course |
 | Create courses             |           | ✓                  | ✓       |
 | Delete a course and everything in it (ARU-85) | |          | ✓ (any course, hidden ones too) |

@@ -1,6 +1,6 @@
 // QA ARU-96: gaps in the dev tests: no chat button on course details for every role that can use the chat (owner,
-// student and mentor listeners, teacher), even with unread messages; "Change owner" follows the discipline section
-// directly (AC 4, nothing left in between); a student outside the course still gets the summary; the teacher's
+// student and mentor listeners, teacher), even with unread messages; nothing chat-related on details (AC 4; since
+// ARU-103, Change owner is in Edit course); a student outside the course still gets the summary; the teacher's
 // discipline page keeps the course card's chat icon, and it opens the chat (AC 3).
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import { router } from "expo-router";
@@ -43,7 +43,7 @@ it.each(["M", "S1", "M2", "T"] as const)(
   },
 );
 
-it('AC 4: for the teacher, "Change owner" is the next button after the discipline section (nothing left between)', async () => {
+it("AC 4: for the teacher, nothing chat-related is on course details before the Meetings section (ARU-103 moved Change owner into Edit course)", async () => {
   setStore(
     fakeStore("T", {
       courses: [courseA],
@@ -52,20 +52,10 @@ it('AC 4: for the teacher, "Change owner" is the next button after the disciplin
     }),
   );
   await render(<CourseDetailScreen />);
-  const change = screen.getByRole("button", { name: "Change owner" });
-  // Every button before "Change owner" in screen order: none of them is a chat button.
-  const all = screen.getAllByRole("button");
-  const before = all.slice(0, all.indexOf(change));
-  expect(all.indexOf(change)).toBeGreaterThanOrEqual(0);
-  expect(
-    before.some((b) =>
-      screen.queryAllByTestId("icon-chatbubble-outline", hidden).some((i) => {
-        let n: typeof i | null = i;
-        while (n && n !== b) n = n.parent;
-        return n === b;
-      }),
-    ),
-  ).toBe(false);
+  expect(screen.getByRole("button", { name: "Edit course" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Change owner" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /chat/i })).toBeNull();
+  expect(screen.queryByTestId("icon-chatbubble-outline", hidden)).toBeNull();
 });
 
 it("AC 6: a student outside the course still gets the summary view, with no chat button", async () => {

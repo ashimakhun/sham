@@ -3,6 +3,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import CourseDetailScreen from '@/app/courses/[id]';
+import EditCourseScreen from '@/app/courses/[id]/edit';
 import ChangeOwnerScreen from '@/app/courses/[id]/owner';
 import { CourseCard } from '@/components/CourseCard';
 import { formatDate } from '@/lib/theme';
@@ -36,17 +37,21 @@ describe('Owner label', () => {
   });
 });
 
-describe('Change owner action', () => {
+describe('Change owner action (ARU-103: pencil → Edit course → Change owner)', () => {
   it.each(['M', 'N', 'M2', 'T'] as const)('AC3: %s (owner, unrelated mentor, listener-mentor, teacher) sees it', async (who) => {
     setStore(fakeStore(who, { courseMembers: members }));
-    await render(<CourseDetailScreen />);
+    const view = await render(<CourseDetailScreen />);
+    await fireEvent.press(button('Edit course'));
+    expect(router.push).toHaveBeenCalledWith({ pathname: '/courses/[id]/edit', params: { id: 'A' } });
+    await view.rerender(<EditCourseScreen />);
     await fireEvent.press(button('Change owner'));
-    expect(router.push).toHaveBeenCalledWith({ pathname: '/courses/[id]/owner', params: { id: 'A' } });
+    expect(router.push).toHaveBeenLastCalledWith({ pathname: '/courses/[id]/owner', params: { id: 'A' } });
   });
 
   it('AC3: a student does not see it', async () => {
     setStore(fakeStore('S1', { courseMembers: members }));
     await render(<CourseDetailScreen />);
+    expect(screen.queryByRole('button', { name: 'Edit course' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Change owner' })).toBeNull();
   });
 });
