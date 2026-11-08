@@ -7,6 +7,7 @@ import { Image, Pressable, Text, View } from 'react-native';
 import { KeyboardForm } from '@/components/KeyboardForm';
 import { Button, EmptyState, ErrorText, styles } from '@/components/ui';
 import { localMonth } from '@/lib/billing';
+import { preparePhoto } from '@/lib/compressPhoto';
 import { isAllowedProof, PHOTO_PERMISSION, PROOF_RULE } from '@/lib/paymentProof';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
@@ -23,6 +24,7 @@ export default function PayScreen() {
   const { getCourse, currentUser, courseMembers, sendPaymentRequest } = useStore();
   const [proof, setProof] = useState<PickedProof | null>(null);
   const [pickError, setPickError] = useState<string | null>(null);
+  const [preparing, setPreparing] = useState(false);
   const { busy, error, run } = useAction();
 
   const course = getCourse(id);
@@ -47,15 +49,24 @@ export default function PayScreen() {
         setPickError(PHOTO_PERMISSION);
         return;
       }
-      // iOS: "Compatible" turns HEIC into JPEG; quality < 1 re-encodes as JPEG too (as homework photos).
+      // iOS: "Compatible" hands over HEIC as JPEG. Full quality here: the one compression is preparePhoto's.
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        quality: 0.7,
+        quality: 1,
         preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
       });
       if (result.canceled || !result.assets?.length) return;
       const a = result.assets[0];
-      accept({ uri: a.uri, kind: 'image', name: a.fileName, mimeType: a.mimeType, size: a.fileSize });
+      // ARU-105 AC 5 / AC 6: compressed when picked; the 10 MB rule applies to the compressed file. If it can't be
+      // prepared, the earlier proof stays attached.
+      setPreparing(true);
+      let photo;
+      try {
+        photo = await preparePhoto(a.uri);
+      } finally {
+        setPreparing(false);
+      }
+      accept({ uri: photo.uri, kind: 'image', name: a.fileName, mimeType: 'image/jpeg', size: photo.size });
     } catch (e) {
       setPickError(e instanceof Error ? e.message : 'Could not open your photos.');
     }
@@ -130,9 +141,9 @@ export default function PayScreen() {
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <View style={{ flex: 1 }}>
             <Button
-              title={proof?.kind === 'image' ? 'Replace photo' : 'Attach a photo'}
+              title={preparing ? 'Preparing…' : proof?.kind === 'image' ? 'Replace photo' : 'Attach a photo'}
               variant="secondary"
-              disabled={busy}
+              disabled={busy || preparing}
               onPress={pickPhoto}
             />
           </View>
@@ -140,7 +151,7 @@ export default function PayScreen() {
             <Button
               title={proof?.kind === 'pdf' ? 'Replace PDF' : 'Attach a PDF'}
               variant="secondary"
-              disabled={busy}
+              disabled={busy || preparing}
               onPress={pickPdf}
             />
           </View>
@@ -148,7 +159,7 @@ export default function PayScreen() {
       </View>
       <ErrorText error={pickError} />
       <ErrorText error={error} />
-      <Button title={busy ? 'Sending…' : 'Send request'} onPress={send} disabled={!proof || busy} />
+      <Button title={busy ? 'Sending…' : 'Send request'} onPress={send} disabled={!proof || busy || preparing} />
     </KeyboardForm>
   );
 }

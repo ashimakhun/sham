@@ -1,4 +1,4 @@
--- ARU-108 (Russian version, part 1): profiles.language. Rules under test: supabase/migrations/0049_profile_language.sql
+-- ARU-108 (Russian version, part 1): profiles.language. Rules under test: supabase/migrations/0050_profile_language.sql
 -- (and the "edit own profile" policy of 0001, the column grant of 0021, the read policy of 0021).
 select t.seed();
 create function pg_temp.lang(who text) returns text language sql security definer as $$
