@@ -162,7 +162,10 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `set_telegram_notification()` (keeps 0044/0045/0046's kinds), `new_material_recipients()` and after-insert
    triggers on `materials` and `material_files`, turns on `pg_net` if the server offers it; no policy changes,
    deletes nothing; needs 0046. Works without the Vault secrets (it then sends nothing), see
-   [Telegram notifications](#telegram-notifications) → New materials).
+   [Telegram notifications](#telegram-notifications) → New materials),
+   `0049_profile_language.sql` (ARU-108: Russian version, part 1; adds `profiles.language` ('en', 'ru' or null =
+   follow the phone; existing accounts get null) and puts it in the profile update grant next to `full_name`, so users
+   change only their own; no other policy changes, deletes nothing).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
@@ -516,6 +519,21 @@ npm run test:db    # applies supabase/migrations to a throwaway Postgres and tes
 
 GitHub Actions runs both on every pull request and on pushes to `main` (`.github/workflows/ci.yml`).
 
+## Languages (ARU-108)
+
+Sham is in English and Russian. The app starts in the phone's (or browser's) language: Russian for any `ru-*` locale,
+English otherwise. **Profile → Language** overrides it and is saved on the account (`profiles.language`), so it is the
+same on every device; the sign-in screen uses the language last shown on the device.
+
+All texts live in one catalog: `src/i18n/en.json` and `src/i18n/ru.json` (the same text IDs, grouped by screen) and
+`src/i18n/notes.json` (where each text appears, for the product owner's spreadsheet). Screens read them with
+`useI18n().t('<id>', { …params })`; counts use plural forms (`<id>_one` / `_few` / `_many` / `_other`); dates use
+`formatDate` / `formatWeekdayDate` / `formatDateTime` from the same hook, in the chosen language. `npm test` fails when
+an ID is missing from one file, a Russian text or a note is empty, or the `{placeholders}` differ.
+Moved to the catalog so far (part 1): sign-in and create account, Reset and Change password, the waiting / declined
+screens, the tab bar and the Profile tab. The other screens are still English (ARU-109, ARU-113); Telegram messages
+(ARU-110) and database errors (ARU-111) come later.
+
 ## Project structure
 
 ```
@@ -617,6 +635,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Send / replace own payment request with a proof (ARU-99; unpaid, in the period) | as a listener | as a listener |  |
 | See payment requests and proofs, request count (ARU-99) | own only | accountants (current listeners of paid courses they can see) | ✓ (all) |
 | Delete payment proofs (only by deleting a course or discipline, ARU-99) | | | ✓ |
+| Choose the app language (Profile → Language, saved in `profiles.language`, ARU-108) | own | own | own |
 | Change own password (Supabase Auth, current password required, ARU-76) | own | own | own |
 | Reset a forgotten password with an emailed code (signed out, any approval state, ARU-77) | own | own | own |
 | Become / stop being teacher |          |                    | (nobody) |

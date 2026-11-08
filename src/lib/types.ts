@@ -10,6 +10,8 @@ export type User = {
   accessStatus?: AccessStatus;
   /** ARU-65: a mentor whom the teacher made an accountant. */
   isAccountant?: boolean;
+  /** ARU-108: the language chosen in Profile; undefined = never chose (follow the phone). */
+  language?: 'en' | 'ru';
 };
 
 /** ARU-65: a paid course and its monthly payment period (days 1-28, start <= end; the deadline is endDay). */
