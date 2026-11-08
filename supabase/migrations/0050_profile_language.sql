@@ -3,7 +3,7 @@
 -- Users change only their own row: the existing "edit own profile" policy (0001) limits updates to id = auth.uid(),
 -- and the column joins full_name in the column grant (0021). Read like the rest of profiles (0021's policy); part 4
 -- (ARU-110) needs it on the server for Telegram messages. No other policy changes; deletes nothing.
--- Renumber to the next free number if another 0049 lands first.
+-- Renumber to the next free number if another 0050 lands first.
 
 alter table profiles add column language text check (language in ('en', 'ru'));
 
