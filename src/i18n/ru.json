@@ -533,11 +533,6 @@
   "materials.sharing": "Публикация…",
   "materials.shareWithClass": "Опубликовать для группы",
   "materials.likeLabel": "Поставить лайк",
-  "materials.unlikeLabel": "Убрать лайк, лайк поставлен",
-  "materials.likeButton": "♡ Нравится",
-  "materials.likedButton": "♥ Понравилось",
-  "materials.noLikes": "Пока нет лайков",
-  "materials.likedBy": "Понравилось",
   "materials.openLink": "Открыть ссылку",
   "materials.deleting": "Удаление…",
   "materials.deleteMaterial": "Удалить материал",
@@ -677,5 +672,13 @@
   "homework.photoDeletionWarning_few": "{count} фото домашних заданий будут удалены {date}. Скачайте их сейчас.",
   "homework.photoDeletionWarning_many": "{count} фото домашних заданий будут удалены {date}. Скачайте их сейчас.",
   "homework.photoDeletionWarning_other": "{count} фото домашних заданий будут удалены {date}. Скачайте их сейчас.",
-  "homework.photosZipError": "Не удалось подготовить фото. Проверьте подключение и попробуйте ещё раз."
+  "homework.photosZipError": "Не удалось подготовить фото. Проверьте подключение и попробуйте ещё раз.",
+  "materials.heartLike_one": "Поставить лайк, {count} лайк",
+  "materials.heartLike_few": "Поставить лайк, {count} лайка",
+  "materials.heartLike_many": "Поставить лайк, {count} лайков",
+  "materials.heartLike_other": "Поставить лайк, {count} лайков",
+  "materials.heartUnlike_one": "Убрать лайк, {count} лайк",
+  "materials.heartUnlike_few": "Убрать лайк, {count} лайка",
+  "materials.heartUnlike_many": "Убрать лайк, {count} лайков",
+  "materials.heartUnlike_other": "Убрать лайк, {count} лайков"
 }

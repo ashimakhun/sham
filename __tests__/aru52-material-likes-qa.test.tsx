@@ -1,6 +1,7 @@
 // QA ARU-52: screen-side gaps: accessibility (button label and state, the card's spoken count, singular "1 like"),
 // a like screen that follows the like being removed elsewhere, a post deleted while open, and the Blog list's author
-// filter and Knowledge base tab staying as they were.
+// filter and Knowledge base tab staying as they were. ARU-120 replaced the Like button, the "N likes" text and the
+// card's " · ♥ N" with a heart labelled "Like" / "Like, N likes" / "Unlike, N likes"; these checks follow it.
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import MaterialsScreen from '@/app/(tabs)/materials';
@@ -29,32 +30,33 @@ beforeEach(() => {
 });
 
 describe('accessibility (edge case iOS/Android)', () => {
-  it('the button is "Like" (not selected), then "Unlike, liked" (selected) with the visible text Liked', async () => {
+  it('the heart is "Like" (not selected), then "Unlike, 1 like" (selected) (ARU-120)', async () => {
     setStore(store('S1'));
     const view = await render(<MaterialDetailScreen />);
     const off = screen.getByRole('button', { name: 'Like' });
     expect(off.props.accessibilityState).toEqual(expect.objectContaining({ selected: false }));
     setStore(store('S1', [like('A', 'S1')]));
     await view.rerender(<MaterialDetailScreen />);
-    const on = screen.getByRole('button', { name: 'Unlike, liked' });
+    const on = screen.getByRole('button', { name: 'Unlike, 1 like' });
     expect(on.props.accessibilityState).toEqual(expect.objectContaining({ selected: true }));
-    expect(screen.getByText('♥ Liked')).toBeTruthy();
   });
 
   it('one like reads "1 like" on the post and on the card', async () => {
     setStore(store('S2', [like('A', 'S1')]));
-    await render(<MaterialDetailScreen />);
-    expect(screen.getByText('1 like')).toBeTruthy();
+    const view = await render(<MaterialDetailScreen />);
+    expect(screen.getByRole('button', { name: 'Like, 1 like' })).toBeTruthy();
+    await view.unmount();
     await render(<MaterialsScreen />);
-    expect(screen.getByLabelText('1 like')).toBeTruthy();
-    expect(screen.getByText(' · ♥ 1')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Like, 1 like' })).toBeTruthy();
+    expect(screen.queryByText(/♥/)).toBeNull();
   });
 
-  it('the card count is part of the card\'s text (no explicit label on the card)', async () => {
+  it('the card count is spoken in the heart\'s label; 0 likes has no number', async () => {
     setStore(store('S2', [like('B', 'S1'), like('B', 'T', 1), like('B', 'M', 2)]));
     await render(<MaterialsScreen />);
-    expect(screen.getByLabelText('3 likes')).toBeTruthy();
-    expect(screen.queryByText(/♥ 0/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Like, 3 likes' })).toBeTruthy();
+    expect(screen.getByTestId('like-A')).toHaveAccessibleName('Like');
+    expect(screen.queryByText('0')).toBeNull();
   });
 });
 
@@ -62,11 +64,10 @@ describe('AC 6 / AC 10: changes made elsewhere', () => {
   it('my like removed on another device: the screen shows Like again with the new count, no error', async () => {
     setStore(store('S1', [like('A', 'S1'), like('A', 'M', 1)]));
     const view = await render(<MaterialDetailScreen />);
-    expect(screen.getByText('2 likes')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Unlike, 2 likes' })).toBeTruthy();
     setStore(store('S1', [like('A', 'M', 1)]));
     await view.rerender(<MaterialDetailScreen />);
-    expect(screen.getByRole('button', { name: 'Like' })).toBeTruthy();
-    expect(screen.getByText('1 like')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Like, 1 like' })).toBeTruthy();
   });
 
   it('AC 9: the post deleted while open shows "Material not found"', async () => {
@@ -81,10 +82,9 @@ describe('AC 6 / AC 10: changes made elsewhere', () => {
     const s = store('S1', [like('A', 'S1')], { unlikeMaterial: jest.fn(async () => { throw new Error('Network request failed'); }) });
     setStore(s);
     await render(<MaterialDetailScreen />);
-    await fireEvent.press(screen.getByRole('button', { name: 'Unlike, liked' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Unlike, 1 like' }));
     expect(await screen.findByText('Network request failed')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Unlike, liked' })).toBeTruthy();
-    expect(screen.getByText('1 like')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Unlike, 1 like' })).toBeTruthy();
   });
 });
 
@@ -95,7 +95,7 @@ describe('regression: Blog list', () => {
     await fireEvent.press(screen.getByRole('button', { name: /^Filter by author/ })); // ARU-62: authors open from one Filter button
     await fireEvent.press(screen.getByRole('button', { name: /Mentor Max/ }));
     expect(screen.queryByText('Post A')).toBeNull();
-    expect(screen.getByLabelText('2 likes')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Like, 2 likes' })).toBeTruthy();
   });
 
   it('the Knowledge base tab shows no like counts', async () => {
@@ -103,5 +103,6 @@ describe('regression: Blog list', () => {
     await render(<MaterialsScreen />);
     await fireEvent.press(screen.getByRole('tab', { name: 'Knowledge base' }));
     expect(screen.queryByText(/♥/)).toBeNull();
+    expect(screen.queryByTestId(/^like-/)).toBeNull();
   });
 });

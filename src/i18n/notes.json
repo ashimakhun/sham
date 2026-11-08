@@ -532,12 +532,7 @@
   "materials.linkLabel": "New material · link field label",
   "materials.sharing": "New material · share button while saving",
   "materials.shareWithClass": "New material · share button",
-  "materials.likeLabel": "Material · like button, screen reader label when not liked",
-  "materials.unlikeLabel": "Material · like button, screen reader label when liked",
-  "materials.likeButton": "Material · like button when not liked",
-  "materials.likedButton": "Material · like button when liked",
-  "materials.noLikes": "Material · likes card when no one liked the post",
-  "materials.likedBy": "Material · heading of the list of likers",
+  "materials.likeLabel": "Blog card and material screen · the heart, screen reader label at 0 likes",
   "materials.openLink": "Material · button that opens the post's link",
   "materials.deleting": "Material and file screens · delete button while deleting",
   "materials.deleteMaterial": "Material · delete button",
@@ -677,5 +672,13 @@
   "homework.photoDeletionWarning_few": "Homework tab · warning banner 30 days before photos are deleted",
   "homework.photoDeletionWarning_many": "Homework tab · warning banner 30 days before photos are deleted",
   "homework.photoDeletionWarning_other": "Homework tab · warning banner 30 days before photos are deleted",
-  "homework.photosZipError": "Homework tab and Download by course · error when the ZIP link can't be made or opened"
+  "homework.photosZipError": "Homework tab and Download by course · error when the ZIP link can't be made or opened",
+  "materials.heartLike_one": "Blog card and material screen · the heart, screen reader label when not liked (with the like count)",
+  "materials.heartLike_few": "Blog card and material screen · the heart, screen reader label when not liked (with the like count)",
+  "materials.heartLike_many": "Blog card and material screen · the heart, screen reader label when not liked (with the like count)",
+  "materials.heartLike_other": "Blog card and material screen · the heart, screen reader label when not liked (with the like count)",
+  "materials.heartUnlike_one": "Blog card and material screen · the heart, screen reader label when liked (with the like count)",
+  "materials.heartUnlike_few": "Blog card and material screen · the heart, screen reader label when liked (with the like count)",
+  "materials.heartUnlike_many": "Blog card and material screen · the heart, screen reader label when liked (with the like count)",
+  "materials.heartUnlike_other": "Blog card and material screen · the heart, screen reader label when liked (with the like count)"
 }
