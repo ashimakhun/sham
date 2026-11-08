@@ -3,9 +3,9 @@ import { router } from 'expo-router';
 import { useRef } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { RatingSummary } from '@/components/RatingSummary';
 import { Card, ErrorText, HiddenBadge, styles } from '@/components/ui';
 import { disciplineFeedback, HIDDEN_DISCIPLINE } from '@/lib/disciplines';
-import { ratingSummary, ratingSummaryLabel } from '@/lib/feedback';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import type { Course, Discipline, User } from '@/lib/types';
@@ -193,7 +193,6 @@ const TAP_GUARD_MS = 800;
 export function DisciplineCard({ discipline, onOpen }: { discipline: Discipline; onOpen?: () => void }) {
   const { courses, courseFeedback } = useStore();
   const feedback = disciplineFeedback(discipline.id, courses, courseFeedback);
-  const rating = ratingSummary(feedback);
   const lastTap = useRef(0);
   const open = () => {
     const now = Date.now();
@@ -210,11 +209,7 @@ export function DisciplineCard({ discipline, onOpen }: { discipline: Discipline;
         </Text>
         {discipline.hidden ? <HiddenBadge /> : null}
       </View>
-      {rating ? (
-        <Text style={styles.muted} accessibilityLabel={ratingSummaryLabel(feedback)}>
-          {rating}
-        </Text>
-      ) : null}
+      <RatingSummary items={feedback} style={styles.muted} />
     </Card>
   );
 }
