@@ -9,6 +9,7 @@ import { PhotoPreview } from '@/components/PhotoPreview';
 import { Button, Card, EmptyState, ErrorText, Field, StatusBadge, styles } from '@/components/ui';
 import { DELETED_ACCOUNT } from '@/lib/deleteAccount';
 import { PHOTO_UNAVAILABLE } from '@/lib/photo';
+import { PHOTO_REMOVED } from '@/lib/photoRetention';
 import { canCheckHomework } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
@@ -51,6 +52,21 @@ export default function HomeworkDetailScreen() {
             {student?.name} · {formatDate(item.createdAt)}
           </Text>
           {item.description ? <Text style={styles.body}>{item.description}</Text> : null}
+          {!item.photoPath && item.photoRemovedAt ? (
+            // ARU-112 AC 6: the daily job removed it; a note instead of the photo, with no preview and no Download.
+            <View
+              testID="homework-photo-removed"
+              style={{
+                width: '100%',
+                height: 120,
+                borderRadius: 10,
+                backgroundColor: colors.border,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+              <Text style={styles.muted}>{PHOTO_REMOVED}</Text>
+            </View>
+          ) : null}
           {item.photoPath && (
             // The whole photo, letterboxed (ARU-18 AC 1); tap for the full-screen preview.
             <Pressable accessibilityRole="imagebutton" accessibilityLabel="Open photo" onPress={() => setPreviewOpen(true)}>

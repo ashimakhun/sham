@@ -309,6 +309,8 @@ type HomeworkRow = {
   mentor_comment: string | null;
   created_at: string;
   assignment_id?: string | null;
+  /** ARU-112 (0051); undefined before that migration runs. */
+  photo_removed_at?: string | null;
 };
 type AssignmentRow = {
   id: string;
@@ -390,6 +392,8 @@ type TelegramLinkRow = {
   notify_general_chat?: boolean;
   /** ARU-102 (0048); undefined before that migration runs. */
   notify_new_material?: boolean;
+  /** ARU-112 (0051); undefined before that migration runs. */
+  notify_photo_deletion?: boolean;
 };
 const toTelegramLink = (r: TelegramLinkRow): TelegramLink => ({
   linkedAt: r.linked_at,
@@ -402,6 +406,7 @@ const toTelegramLink = (r: TelegramLinkRow): TelegramLink => ({
     homework_submitted: r.notify_homework_submitted ?? true,
     general_chat: r.notify_general_chat ?? true,
     new_material: r.notify_new_material ?? true,
+    photo_deletion: r.notify_photo_deletion ?? true,
   },
 });
 type MaterialRow = {
@@ -475,6 +480,7 @@ const toHomework = (r: HomeworkRow): Homework => ({
   checkedAt: r.checked_at ?? undefined,
   mentorComment: r.mentor_comment ?? undefined,
   assignmentId: r.assignment_id ?? undefined,
+  photoRemovedAt: r.photo_removed_at ?? undefined,
 });
 
 const toAssignment = (r: AssignmentRow): HomeworkAssignment => ({

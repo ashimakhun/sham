@@ -15,6 +15,8 @@ export const TELEGRAM_SWITCHES: { kind: TelegramKind; label: string }[] = [
   { kind: 'meeting_started', label: 'Meeting started' },
   { kind: 'new_homework', label: 'New homework' },
   { kind: 'homework_reviewed', label: 'Homework reviewed' },
+  // ARU-112: students and mentors (the senders of homework), right after Homework reviewed.
+  { kind: 'photo_deletion', label: 'Photo deletion' },
   // ARU-89: course owners (teacher and mentors) only; students can't own a course.
   { kind: 'homework_submitted', label: 'Homework submitted' },
   { kind: 'chat_message', label: 'Chat messages' },
@@ -37,12 +39,21 @@ const KINDS_FOR: Record<Role, TelegramKind[]> = {
     'meeting_started',
     'new_homework',
     'homework_reviewed',
+    'photo_deletion',
     'homework_submitted',
     'chat_message',
     'general_chat',
     'new_material',
   ],
-  student: ['meeting_started', 'new_homework', 'homework_reviewed', 'chat_message', 'general_chat', 'new_material'],
+  student: [
+    'meeting_started',
+    'new_homework',
+    'homework_reviewed',
+    'photo_deletion',
+    'chat_message',
+    'general_chat',
+    'new_material',
+  ],
 };
 
 export function telegramSwitchesFor(role: Role) {
