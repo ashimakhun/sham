@@ -4,7 +4,6 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
 import ProfileScreen from '@/app/(tabs)/profile';
-import { resetTelegramCardCollapsedCache } from '@/components/TelegramCard';
 import type { User } from '@/lib/types';
 
 import { fakeStore, users } from './helpers/fakeStore';
@@ -16,7 +15,6 @@ jest.mock('@/lib/store', () => require('./helpers/mocks').store);
 beforeEach(() => {
   jest.clearAllMocks();
   process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME = 'ShamSchoolBot';
-  resetTelegramCardCollapsedCache();
 });
 afterEach(() => {
   delete process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME;
@@ -50,7 +48,7 @@ it.each(roles)('AC 1 / AC 5: %s sees the chat button right after the name card, 
   const all = screen.getAllByRole('button');
   // The name card's only button is "Edit name"; the chat button comes straight after it.
   expect(all.indexOf(chat())).toBe(all.indexOf(screen.getByRole('button', { name: 'Edit name' })) + 1);
-  const markers = ['Open general chat', 'TELEGRAM NOTIFICATIONS', ...(billing ? ['ACCOUNTANT'] : []), 'Change password'];
+  const markers = ['Open general chat', 'Telegram notifications', ...(billing ? ['ACCOUNTANT'] : []), 'Change password'];
   const pos = positions(view, markers);
   expect(pos.every((p) => p >= 0)).toBe(true);
   expect(pos).toEqual([...pos].sort((a, b) => a - b));
@@ -98,7 +96,8 @@ it('edge: Telegram not configured — the chat button sits directly above the bo
   delete process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME;
   setStore(fakeStore('S1'));
   await renderProfile();
-  expect(screen.queryByText('TELEGRAM NOTIFICATIONS')).toBeNull();
+  // ARU-101: Telegram is a button now.
+  expect(screen.queryByRole('button', { name: 'Telegram notifications' })).toBeNull();
   const all = screen.getAllByRole('button');
   expect(all.indexOf(screen.getByRole('button', { name: 'Change password' }))).toBe(all.indexOf(chat()) + 1);
 });

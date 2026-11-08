@@ -5,7 +5,6 @@ import { act, render, screen, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
 import ProfileScreen from '@/app/(tabs)/profile';
-import { resetTelegramCardCollapsedCache } from '@/components/TelegramCard';
 import { colors } from '@/lib/theme';
 
 import { fakeStore } from './helpers/fakeStore';
@@ -19,7 +18,6 @@ const hidden = { includeHiddenElements: true };
 beforeEach(() => {
   jest.clearAllMocks();
   process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME = 'ShamSchoolBot';
-  resetTelegramCardCollapsedCache();
 });
 afterEach(() => {
   delete process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME;
