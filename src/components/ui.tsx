@@ -4,7 +4,8 @@ import { Pressable, StyleSheet, View, type TextInputProps, type ViewStyle } from
 
 import { Text, TextInput } from '@/components/AppText';
 
-import { colors, roleColor, roleLabel } from '@/lib/theme';
+import { useI18n } from '@/i18n/context';
+import { colors, roleColor } from '@/lib/theme';
 import type { HomeworkStatus, Role } from '@/lib/types';
 import { formatUnread, withUnreadLabel } from '@/lib/unread';
 import { font } from '@/lib/fonts';
@@ -56,12 +57,13 @@ type ButtonProps = {
 };
 
 export function Button({ title, onPress, variant = 'primary', disabled, unread = 0, icon, badgeOnIcon }: ButtonProps) {
+  const { lang } = useI18n();
   const textColor = variant === 'primary' ? '#fff' : variant === 'danger' ? colors.danger : colors.primary;
   return (
     <Pressable
       accessibilityRole="button"
       // With an icon there is no visible text, so the label is always set; the unread count joins it (ARU-31).
-      accessibilityLabel={unread > 0 ? withUnreadLabel(title, unread) : icon ? title : undefined}
+      accessibilityLabel={unread > 0 ? withUnreadLabel(title, unread, lang) : icon ? title : undefined}
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [
@@ -125,30 +127,33 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
 }
 
 export function StatusBadge({ status }: { status: HomeworkStatus }) {
+  const { t } = useI18n();
   const checked = status === 'checked';
   return (
     <View style={[styles.badge, { backgroundColor: checked ? colors.successSoft : colors.warningSoft }]}>
       <Text style={[styles.badgeText, { color: checked ? colors.success : colors.warning }]}>
-        {checked ? 'Checked' : 'Waiting for check'}
+        {checked ? t('homework.statusChecked') : t('homework.statusWaiting')}
       </Text>
     </View>
   );
 }
 
-/** `label` overrides the English role name (ARU-108: Profile passes the translated one). */
+/** The role in the app's language (ARU-109: role badges on Listeners, Change owner and attendance); `label` overrides it. */
 export function RoleBadge({ role, label }: { role: Role; label?: string }) {
+  const { t } = useI18n();
   return (
     <View style={[styles.badge, { backgroundColor: roleColor[role] + '1A' }]}>
-      <Text style={[styles.badgeText, { color: roleColor[role] }]}>{label ?? roleLabel[role]}</Text>
+      <Text style={[styles.badgeText, { color: roleColor[role] }]}>{label ?? t(`role.${role}`)}</Text>
     </View>
   );
 }
 
 /** "Owner: <name> · <date>" line for a course (ARU-9); the owner is `Course.createdById`. */
 export function OwnerLine({ name, date }: { name: string; date: string }) {
+  const { t } = useI18n();
   return (
     <Text style={styles.muted} numberOfLines={1}>
-      <Text style={{ ...font(500) }}>Owner: </Text>
+      <Text style={{ ...font(500) }}>{t('courses.ownerPrefix')} </Text>
       <Text>
         {name} · {date}
       </Text>
@@ -158,9 +163,10 @@ export function OwnerLine({ name, date }: { name: string; date: string }) {
 
 /** "Hidden" next to a hidden course's title (ARU-40); read with the title by screen readers. */
 export function HiddenBadge() {
+  const { t } = useI18n();
   return (
     <View style={[styles.badge, { backgroundColor: '#F3F4F6', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
-      <Text style={[styles.badgeText, { color: colors.muted }]}>Hidden</Text>
+      <Text style={[styles.badgeText, { color: colors.muted }]}>{t('common.hidden')}</Text>
     </View>
   );
 }
@@ -174,9 +180,11 @@ export function EmptyState({ title, hint }: { title: string; hint?: string }) {
   );
 }
 
+/** ARU-109 AC 3: an app message the catalog knows is shown in the app's language; any other text as it came. */
 export function ErrorText({ error }: { error: string | null }) {
+  const { te } = useI18n();
   if (!error) return null;
-  return <Text style={{ color: colors.danger, fontSize: 14 }}>{error}</Text>;
+  return <Text style={{ color: colors.danger, fontSize: 14 }}>{te(error)}</Text>;
 }
 
 export function Segmented<T extends string>({

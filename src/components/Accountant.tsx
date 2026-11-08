@@ -6,6 +6,7 @@ import { Pressable, View } from 'react-native';
 import { Text } from '@/components/AppText';
 
 import { Button, Card, ErrorText, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import {
   BILLING_DAY_MAX,
   BILLING_DAY_MIN,
@@ -13,7 +14,6 @@ import {
   isAccountant,
   localMonth,
   periodProblem,
-  requestCountText,
   unpaidThisMonth,
   waitingRequests,
 } from '@/lib/billing';
@@ -31,6 +31,7 @@ function DayStepper({ label, value, onChange, disabled }: {
   onChange: (day: number) => void;
   disabled?: boolean;
 }) {
+  const { t } = useI18n();
   const step = (by: number) => onChange(Math.min(BILLING_DAY_MAX, Math.max(BILLING_DAY_MIN, value + by)));
   const box = (enabled: boolean) => ({
     width: 44,
@@ -51,7 +52,7 @@ function DayStepper({ label, value, onChange, disabled }: {
         accessible
         accessibilityRole="adjustable"
         accessibilityLabel={label}
-        accessibilityValue={{ min: BILLING_DAY_MIN, max: BILLING_DAY_MAX, now: value, text: `Day ${value}` }}
+        accessibilityValue={{ min: BILLING_DAY_MIN, max: BILLING_DAY_MAX, now: value, text: t('accountant.day', { day: value }) }}
         accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
         onAccessibilityAction={(e) => {
           if (disabled) return;
@@ -61,7 +62,7 @@ function DayStepper({ label, value, onChange, disabled }: {
         style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${label}, earlier`}
+          accessibilityLabel={t('accountant.dayEarlier', { label })}
           disabled={!canDown}
           onPress={() => step(-1)}
           style={box(canDown)}>
@@ -70,7 +71,7 @@ function DayStepper({ label, value, onChange, disabled }: {
         <Text style={[styles.title, { minWidth: 28, textAlign: 'center' }]}>{value}</Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${label}, later`}
+          accessibilityLabel={t('accountant.dayLater', { label })}
           disabled={!canUp}
           onPress={() => step(1)}
           style={box(canUp)}>
@@ -96,25 +97,26 @@ export function PeriodEditor({
   const [startDay, setStartDay] = useState(initial.startDay);
   const [endDay, setEndDay] = useState(initial.endDay);
   const { busy, error, run } = useAction();
+  const { t, te } = useI18n();
   const problem = periodProblem(startDay, endDay);
   return (
     <View style={{ gap: 8, paddingTop: 4 }}>
       <View style={{ flexDirection: 'row', gap: 24, flexWrap: 'wrap' }}>
-        <DayStepper label="First day" value={startDay} onChange={setStartDay} disabled={busy} />
-        <DayStepper label="Last day" value={endDay} onChange={setEndDay} disabled={busy} />
+        <DayStepper label={t('accountant.firstDay')} value={startDay} onChange={setStartDay} disabled={busy} />
+        <DayStepper label={t('accountant.lastDay')} value={endDay} onChange={setEndDay} disabled={busy} />
       </View>
-      {problem ? <Text style={{ color: colors.danger }}>{problem}</Text> : null}
+      {problem ? <Text style={{ color: colors.danger }}>{te(problem)}</Text> : null}
       <ErrorText error={error} />
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <View style={{ flex: 1 }}>
           <Button
-            title={busy ? 'Saving…' : saveTitle}
+            title={busy ? t('common.saving') : saveTitle}
             disabled={!!problem || busy}
             onPress={() => run(() => onSave(startDay, endDay))}
           />
         </View>
         <View style={{ flex: 1 }}>
-          <Button title="Cancel" variant="secondary" disabled={busy} onPress={onCancel} />
+          <Button title={t('common.cancel')} variant="secondary" disabled={busy} onPress={onCancel} />
         </View>
       </View>
     </View>
@@ -124,6 +126,7 @@ export function PeriodEditor({
 /** ARU-65 AC 2 / AC 6 / AC 7: the Accountant section on the Profile tab (accountants and the teacher). */
 export function AccountantSection() {
   const { currentUser, courseBilling, getCourse } = useStore();
+  const { t } = useI18n();
   const now = useNow();
   if (!canSeeBilling(currentUser)) return null;
   const accountant = isAccountant(currentUser);
@@ -136,20 +139,20 @@ export function AccountantSection() {
     <View testID="accountant-section">
     <Card style={{ gap: 10 }}>
       <Text style={styles.label} accessibilityRole="header">
-        ACCOUNTANT
+        {t('accountant.header')}
       </Text>
       <UnpaidThisMonth now={now} />
       {paid.length === 0 ? (
         <View style={{ gap: 2 }}>
-          <Text style={styles.muted}>No paid courses yet</Text>
-          {accountant ? <Text style={styles.muted}>Tap &quot;Select courses&quot; to add one.</Text> : null}
+          <Text style={styles.muted}>{t('accountant.noPaidCourses')}</Text>
+          {accountant ? <Text style={styles.muted}>{t('accountant.selectHint')}</Text> : null}
         </View>
       ) : (
         paid.map(({ billing, course }) => (
           <PaidCourseRow key={billing.courseId} billing={billing} title={course.title} now={now} />
         ))
       )}
-      {accountant && <Button title="Select courses" variant="secondary" onPress={() => router.push('/accountant/courses')} />}
+      {accountant && <Button title={t('accountant.selectCourses')} variant="secondary" onPress={() => router.push('/accountant/courses')} />}
     </Card>
     </View>
   );
@@ -161,6 +164,7 @@ export function AccountantSection() {
  */
 function UnpaidThisMonth({ now }: { now: number }) {
   const { courseBilling, getCourse, courseMembers, getUser, coursePayments, paymentExemptions } = useStore();
+  const { t } = useI18n();
   const unpaid = unpaidThisMonth({
     billing: courseBilling,
     getCourse,
@@ -174,10 +178,10 @@ function UnpaidThisMonth({ now }: { now: number }) {
   return (
     <View testID="unpaid-this-month" style={{ gap: 6, paddingBottom: 4 }}>
       <Text style={[styles.title, { fontSize: 15 }]} accessibilityRole="header">
-        Unpaid this month
+        {t('accountant.unpaidThisMonth')}
       </Text>
       {unpaid.length === 0 ? (
-        <Text style={{ color: colors.success, ...font(500) }}>Everyone has paid</Text>
+        <Text style={{ color: colors.success, ...font(500) }}>{t('accountant.everyonePaid')}</Text>
       ) : (
         unpaid.map((c) => (
           <View key={c.courseId} testID={`unpaid-${c.courseId}`} style={{ gap: 2 }}>
@@ -197,6 +201,7 @@ function UnpaidThisMonth({ now }: { now: number }) {
  */
 function PaidCourseRow({ billing, title, now }: { billing: CourseBilling; title: string; now: number }) {
   const { paymentRequests, courseMembers, coursePayments, paymentExemptions } = useStore();
+  const { t } = useI18n();
   const waiting = waitingRequests({
     courseId: billing.courseId,
     month: localMonth(now),
@@ -206,13 +211,13 @@ function PaidCourseRow({ billing, title, now }: { billing: CourseBilling; title:
     exemptions: paymentExemptions,
   }).length;
   const label =
-    waiting > 0 ? `${title}, ${waiting} payment ${waiting === 1 ? 'request' : 'requests'}` : `Payments for ${title}`;
+    waiting > 0 ? t('accountant.requestsLabel', { title, count: waiting }) : t('accountant.paymentsFor', { title });
   return (
     <View testID={`paid-${billing.courseId}`}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={label}
-        accessibilityHint="Opens the listeners, their payment requests and who has paid this month"
+        accessibilityHint={t('accountant.rowHint')}
         onPress={() => router.push({ pathname: '/accountant/[id]', params: { id: billing.courseId } })}
         style={({ pressed }) => [
           { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingTop: 4 },
@@ -223,7 +228,7 @@ function PaidCourseRow({ billing, title, now }: { billing: CourseBilling; title:
           <View
             testID={`requests-${billing.courseId}`}
             style={{ backgroundColor: colors.primary, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 }}>
-            <Text style={{ color: '#fff', fontSize: 12, ...font(600) }}>{requestCountText(waiting)}</Text>
+            <Text style={{ color: '#fff', fontSize: 12, ...font(600) }}>{t('accountant.requestCount', { count: waiting })}</Text>
           </View>
         ) : null}
         <Ionicons name="chevron-forward" size={20} color={colors.muted} />

@@ -5,17 +5,19 @@ import { AppState, Pressable, View } from 'react-native';
 import { Text } from '@/components/AppText';
 
 import { Button, Card } from '@/components/ui';
+import { currentLanguage, formatDateIn, type Language, translate } from '@/i18n';
+import { useI18n } from '@/i18n/context';
 import { localMonth } from '@/lib/billing';
 import { useStore } from '@/lib/store';
-import { colors, formatDate } from '@/lib/theme';
+import { colors } from '@/lib/theme';
 import type { Course, PaymentRequest } from '@/lib/types';
 import { useNow } from '@/lib/useNow';
 import { usePaymentDues } from '@/lib/usePaymentDues';
 import { font } from '@/lib/fonts';
 
 /** "Payment request sent 5 Nov 2026 · waiting for the accountant" (AC 3). */
-export function requestSentText(r: Pick<PaymentRequest, 'sentAt'>) {
-  return `Payment request sent ${formatDate(r.sentAt)} · waiting for the accountant`;
+export function requestSentText(r: Pick<PaymentRequest, 'sentAt'>, lang: Language = currentLanguage()) {
+  return translate(lang, 'payments.requestSent', { date: formatDateIn(lang, r.sentAt) });
 }
 
 /**
@@ -26,6 +28,7 @@ export function requestSentText(r: Pick<PaymentRequest, 'sentAt'>) {
  */
 export function PaySection({ course }: { course: Course }) {
   const { loadMyPaymentRequest } = useStore();
+  const { t, lang } = useI18n();
   const { dues, reload: reloadDues } = usePaymentDues();
   const month = localMonth(useNow());
   const due = dues.has(course.id);
@@ -56,20 +59,20 @@ export function PaySection({ course }: { course: Course }) {
   const openPay = () => router.push({ pathname: '/courses/[id]/pay', params: { id: course.id } });
 
   if (!request) {
-    return <Button title="Pay" onPress={openPay} />;
+    return <Button title={t('payments.pay')} onPress={openPay} />;
   }
   return (
     <View testID="payment-request-sent">
       <Card style={{ gap: 8 }}>
-        <Text style={{ color: colors.text, ...font(500) }}>{requestSentText(request)}</Text>
+        <Text style={{ color: colors.text, ...font(500) }}>{requestSentText(request, lang)}</Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Send again"
-          accessibilityHint="Replaces the proof you sent this month"
+          accessibilityLabel={t('payments.sendAgain')}
+          accessibilityHint={t('payments.sendAgainHint')}
           hitSlop={8}
           onPress={openPay}
           style={{ minHeight: 32, justifyContent: 'center', alignSelf: 'flex-start' }}>
-          <Text style={{ color: colors.primary, ...font(500) }}>Send again</Text>
+          <Text style={{ color: colors.primary, ...font(500) }}>{t('payments.sendAgain')}</Text>
         </Pressable>
       </Card>
     </View>

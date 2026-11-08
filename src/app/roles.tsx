@@ -4,6 +4,8 @@ import { ActivityIndicator, SectionList, Switch, View } from 'react-native';
 import { Text, TextInput } from '@/components/AppText';
 
 import { Button, EmptyState, ErrorText, RoleBadge, styles } from '@/components/ui';
+import type { TextId } from '@/i18n';
+import { useI18n } from '@/i18n/context';
 import { confirmDestructive } from '@/lib/confirm';
 import { canManageRoles } from '@/lib/roles';
 import { useStore } from '@/lib/store';
@@ -11,10 +13,11 @@ import { colors, formatDate } from '@/lib/theme';
 import type { AccessRequest, Role, User } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
 
-const SECTIONS: { role: Role; title: string }[] = [
-  { role: 'teacher', title: 'Teacher' },
-  { role: 'mentor', title: 'Mentors' },
-  { role: 'student', title: 'Students' },
+// Catalog ids, not texts, so the titles follow the chosen language (ARU-113).
+const SECTIONS: { role: Role; title: TextId }[] = [
+  { role: 'teacher', title: 'roles.sectionTeacher' },
+  { role: 'mentor', title: 'roles.sectionMentors' },
+  { role: 'student', title: 'roles.sectionStudents' },
 ];
 
 type Row = { kind: 'user'; user: User } | { kind: 'request'; request: AccessRequest };
@@ -36,6 +39,7 @@ export default function RolesScreen() {
     setAccessStatus,
     setAccountant,
   } = useStore();
+  const { t } = useI18n();
   const [query, setQuery] = useState('');
   const { busy, error, run } = useAction();
 
@@ -48,7 +52,7 @@ export default function RolesScreen() {
     );
   }
   if (!canManageRoles(currentUser?.role)) {
-    return <EmptyState title="Only the teacher can manage roles" />;
+    return <EmptyState title={t('roles.onlyTeacher')} />;
   }
 
   const q = query.trim().toLowerCase();
@@ -58,15 +62,15 @@ export default function RolesScreen() {
       .filter((r) => r.status === status && r.name.toLowerCase().includes(q))
       .map((request): Row => ({ kind: 'request', request }));
   const sections = [
-    { title: 'Requests', data: requests('pending') },
+    { title: t('roles.sectionRequests'), data: requests('pending') },
     ...SECTIONS.map((s) => ({
-      title: s.title,
+      title: t(s.title),
       data: users
         .filter((u) => u.role === s.role && u.name.toLowerCase().includes(q))
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((user): Row => ({ kind: 'user', user })),
     })),
-    { title: 'Declined', data: requests('rejected') },
+    { title: t('roles.sectionDeclined'), data: requests('rejected') },
   ].filter((s) => s.data.length > 0); // a section with no rows is hidden
 
   // At once, without a confirmation (ARU-43 AC 6); a retry is a no-op in the database.
@@ -76,7 +80,11 @@ export default function RolesScreen() {
 
   function decline(r: AccessRequest) {
     run(async () => {
-      const ok = await confirmDestructive('Reject request', `Reject ${r.name}? They won't be able to use Sham.`, 'Reject');
+      const ok = await confirmDestructive(
+        t('roles.rejectTitle'),
+        t('roles.rejectMessage', { name: r.name }),
+        t('roles.reject'),
+      );
       if (ok) await setAccessStatus(r.id, 'rejected');
     });
   }
@@ -84,9 +92,9 @@ export default function RolesScreen() {
   function makeMentor(user: User) {
     run(async () => {
       const ok = await confirmDestructive(
-        'Make mentor',
-        `Make ${user.name} a mentor? They will be able to see and check all students' homework and photos in every course.`,
-        'Make mentor',
+        t('roles.makeMentor'),
+        t('roles.makeMentorMessage', { name: user.name }),
+        t('roles.makeMentor'),
       );
       if (ok) await setUserRole(user.id, 'mentor');
     });
@@ -100,12 +108,12 @@ export default function RolesScreen() {
         .map((c) => c.title)
         .sort((a, b) => a.localeCompare(b));
       if (owned.length) {
-        throw new Error(`${user.name} owns ${owned.length} course(s): ${owned.join(', ')}. Reassign them first`);
+        throw new Error(t('roles.ownsCourses', { name: user.name, count: owned.length, titles: owned.join(', ') }));
       }
       const ok = await confirmDestructive(
-        'Make student',
-        `Make ${user.name} a student? They will only see their own homework and can no longer check homework.`,
-        'Make student',
+        t('roles.makeStudent'),
+        t('roles.makeStudentMessage', { name: user.name }),
+        t('roles.makeStudent'),
       );
       if (ok) await setUserRole(user.id, 'student');
     });
@@ -126,8 +134,8 @@ export default function RolesScreen() {
       ListHeaderComponent={
         <View style={{ gap: 8 }}>
           <TextInput
-            accessibilityLabel="Search users"
-            placeholder="Search by name"
+            accessibilityLabel={t('roles.searchLabel')}
+            placeholder={t('roles.searchPlaceholder')}
             placeholderTextColor={colors.muted}
             value={query}
             onChangeText={setQuery}
@@ -154,12 +162,12 @@ export default function RolesScreen() {
                 <Text style={styles.muted} numberOfLines={1}>
                   {r.email}
                 </Text>
-                <Text style={styles.muted}>Signed up {formatDate(r.createdAt)}</Text>
+                <Text style={styles.muted}>{t('roles.signedUp', { date: formatDate(r.createdAt) })}</Text>
               </View>
               <View style={{ gap: 6 }}>
-                <Button title="Accept" disabled={busy} onPress={() => accept(r)} />
+                <Button title={t('roles.accept')} disabled={busy} onPress={() => accept(r)} />
                 {r.status === 'pending' && (
-                  <Button title="Reject" variant="danger" disabled={busy} onPress={() => decline(r)} />
+                  <Button title={t('roles.reject')} variant="danger" disabled={busy} onPress={() => decline(r)} />
                 )}
               </View>
             </View>
@@ -176,16 +184,16 @@ export default function RolesScreen() {
             </View>
             {/* The teacher's row has no action: nothing in the app makes anyone a teacher. */}
             {item.role === 'student' && (
-              <Button title="Make mentor" variant="secondary" disabled={busy} onPress={() => makeMentor(item)} />
+              <Button title={t('roles.makeMentor')} variant="secondary" disabled={busy} onPress={() => makeMentor(item)} />
             )}
             {item.role === 'mentor' && (
               <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                <Button title="Make student" variant="secondary" disabled={busy} onPress={() => makeStudent(item)} />
+                <Button title={t('roles.makeStudent')} variant="secondary" disabled={busy} onPress={() => makeStudent(item)} />
                 {/* ARU-65: the teacher turns Accountant on or off for a mentor (set_accountant() checks it). */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={styles.muted}>Accountant</Text>
+                  <Text style={styles.muted}>{t('roles.accountant')}</Text>
                   <Switch
-                    accessibilityLabel={`Accountant, ${item.name}`}
+                    accessibilityLabel={t('roles.accountantLabel', { name: item.name })}
                     value={!!item.isAccountant}
                     disabled={busy}
                     onValueChange={(on) => run(() => setAccountant(item.id, on))}
@@ -197,7 +205,11 @@ export default function RolesScreen() {
         );
       }}
       ListEmptyComponent={
-        q ? <EmptyState title={`No users match '${query.trim()}'`} /> : <EmptyState title="No users yet" />
+        q ? (
+          <EmptyState title={t('roles.noMatch', { query: query.trim() })} />
+        ) : (
+          <EmptyState title={t('roles.empty')} />
+        )
       }
     />
   );

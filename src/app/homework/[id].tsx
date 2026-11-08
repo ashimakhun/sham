@@ -9,8 +9,7 @@ import { KeyboardForm } from '@/components/KeyboardForm';
 import { PhotoPreview } from '@/components/PhotoPreview';
 
 import { Button, Card, EmptyState, ErrorText, Field, StatusBadge, styles } from '@/components/ui';
-import { DELETED_ACCOUNT } from '@/lib/deleteAccount';
-import { PHOTO_UNAVAILABLE } from '@/lib/photo';
+import { useI18n } from '@/i18n/context';
 import { canCheckHomework } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
@@ -24,9 +23,10 @@ export default function HomeworkDetailScreen() {
   // The photo's file is gone (or its link couldn't be made): show "Photo unavailable" instead of an empty box.
   const [photoFailed, setPhotoFailed] = useState(false);
   const { busy, error, run } = useAction();
+  const { t, lang } = useI18n();
 
   const item = visibleHomework.find((h) => h.id === id);
-  if (!item) return <EmptyState title="Homework not found" />;
+  if (!item) return <EmptyState title={t('homework.notFound')} />;
 
   const student = getUser(item.studentId);
   const checker = getUser(item.checkedById);
@@ -41,12 +41,12 @@ export default function HomeworkDetailScreen() {
         <Card>
           <StatusBadge status={item.status} />
           <Text style={styles.h1}>{item.title}</Text>
-          <Text style={[styles.label, { color: colors.primary }]}>{getCourse(item.courseId)?.title ?? 'No course'}</Text>
+          <Text style={[styles.label, { color: colors.primary }]}>{getCourse(item.courseId)?.title ?? t('homework.noCourse')}</Text>
           {assignment ? (
             <Text style={styles.muted} testID="homework-assignment">
-              Assignment: {assignment.title}
-              {meeting ? ` · Meeting ${formatDateTime(meeting.startsAt)}` : ''}
-              {assignment.dueAt ? `\n${dueText(assignment)}` : ''}
+              {t('homework.assignmentLine', { title: assignment.title })}
+              {meeting ? ` · ${t('homework.meetingAt', { date: formatDateTime(meeting.startsAt) })}` : ''}
+              {assignment.dueAt ? `\n${dueText(assignment, lang)}` : ''}
             </Text>
           ) : null}
           <Text style={styles.muted}>
@@ -55,7 +55,7 @@ export default function HomeworkDetailScreen() {
           {item.description ? <Text style={styles.body}>{item.description}</Text> : null}
           {item.photoPath && (
             // The whole photo, letterboxed (ARU-18 AC 1); tap for the full-screen preview.
-            <Pressable accessibilityRole="imagebutton" accessibilityLabel="Open photo" onPress={() => setPreviewOpen(true)}>
+            <Pressable accessibilityRole="imagebutton" accessibilityLabel={t('homework.openPhoto')} onPress={() => setPreviewOpen(true)}>
               {item.photoUrl && !photoFailed ? (
                 <Image
                   testID="homework-photo"
@@ -75,7 +75,7 @@ export default function HomeworkDetailScreen() {
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}>
-                  <Text style={styles.muted}>{PHOTO_UNAVAILABLE}</Text>
+                  <Text style={styles.muted}>{t('photo.unavailable')}</Text>
                 </View>
               )}
             </Pressable>
@@ -84,11 +84,11 @@ export default function HomeworkDetailScreen() {
 
         {item.status === 'checked' && (
           <Card>
-            <Text style={styles.label}>MENTOR FEEDBACK</Text>
-            <Text style={styles.body}>{item.mentorComment ?? 'Checked without a comment.'}</Text>
+            <Text style={styles.label}>{t('homework.mentorFeedback')}</Text>
+            <Text style={styles.body}>{item.mentorComment ?? t('homework.checkedNoComment')}</Text>
             <Text style={styles.muted}>
               {/* ARU-75: a checker who deleted their account shows as "Deleted account". */}
-              {item.checkedById ? checker?.name : DELETED_ACCOUNT}
+              {item.checkedById ? checker?.name : t('common.deletedAccount')}
               {item.checkedAt ? ` · ${formatDate(item.checkedAt)}` : ''}
             </Text>
           </Card>
@@ -97,15 +97,15 @@ export default function HomeworkDetailScreen() {
         {canCheck && (
           <Card style={{ gap: 12 }}>
             <Field
-              label="Comment for the student (optional)"
-              placeholder="What was good? What to improve?"
+              label={t('homework.commentLabel')}
+              placeholder={t('homework.commentPlaceholder')}
               value={comment}
               onChangeText={setComment}
               multiline
             />
             <ErrorText error={error} />
             <Button
-              title={busy ? 'Saving…' : '✓ Mark as checked'}
+              title={busy ? t('common.saving') : t('homework.markChecked')}
               disabled={busy}
               onPress={() => run(() => checkHomework(item.id, comment))}
             />

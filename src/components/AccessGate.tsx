@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { DeleteAccountForm } from '@/components/DeleteAccountForm';
 import { Button, ErrorText, styles } from '@/components/ui';
 import { translate } from '@/i18n';
-import { useI18n } from '@/i18n/LanguageProvider';
+import { useI18n } from '@/i18n/context';
 import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
 

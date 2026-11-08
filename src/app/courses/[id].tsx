@@ -11,6 +11,7 @@ import { ListenersSection } from '@/components/ListenersSection';
 import { MeetingsSection } from '@/components/MeetingsSection';
 import { PaySection } from '@/components/PaySection';
 import { Card, EmptyState, HiddenBadge, OwnerLine, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { canChangeOwner, seesOnlyCourseSummary } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { formatDate } from '@/lib/theme';
@@ -18,9 +19,10 @@ import { formatDate } from '@/lib/theme';
 export default function CourseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getCourse, getUser, loading, refresh, currentUser, courseMembers } = useStore();
+  const { t } = useI18n();
 
   const course = getCourse(id);
-  if (!course) return <EmptyState title="Course not found" />;
+  if (!course) return <EmptyState title={t('courses.notFound')} />;
 
   // ARU-24: a student who is not a listener sees only the title and description. Derived at render time, so a
   // live update on course_members switches between this and the full screen on its own.
@@ -38,7 +40,7 @@ export default function CourseDetailScreen() {
         </Card>
         {/* ARU-53: everyone who sees the course reads its feedback. */}
         <FeedbackSection course={course} />
-        <EmptyState title="You are not in this course" hint="Ask your teacher or mentor to add you." />
+        <EmptyState title={t('courses.notInCourse')} hint={t('courses.askToBeAdded')} />
       </ScrollView>
     );
   }
@@ -63,7 +65,7 @@ export default function CourseDetailScreen() {
               </View>
               {canEdit ? <EditCoursePencil courseId={course.id} /> : null}
             </View>
-            <OwnerLine name={getUser(course.createdById)?.name ?? 'Unknown'} date={formatDate(course.createdAt)} />
+            <OwnerLine name={getUser(course.createdById)?.name ?? t('common.unknown')} date={formatDate(course.createdAt)} />
             {/* ARU-63 AC 6: only a discipline the viewer can see. */}
             <DisciplineLabel course={course} />
             {course.description ? <Text style={styles.body}>{course.description}</Text> : null}

@@ -5,6 +5,7 @@ import { Text } from '@/components/AppText';
 
 import { MarkdownText } from '@/components/MarkdownText';
 import { Button, Card, EmptyState, ErrorText, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
 import { colors, formatDate } from '@/lib/theme';
@@ -14,9 +15,10 @@ export default function MaterialDetailScreen() {
   const { materials, materialLikes, currentUser, getUser, deleteMaterial, likeMaterial, unlikeMaterial } = useStore();
   const { busy, error, run } = useAction();
   const like = useAction();
+  const { t } = useI18n();
 
   const item = materials.find((m) => m.id === id);
-  if (!item) return <EmptyState title="Material not found" />;
+  if (!item) return <EmptyState title={t('materials.notFound')} />;
   // Only the author, and only while they are still a teacher or mentor (a mentor made student can't delete).
   const canDelete =
     currentUser?.id === item.teacherId && (currentUser.role === 'teacher' || currentUser.role === 'mentor');
@@ -29,7 +31,7 @@ export default function MaterialDetailScreen() {
     .filter((u) => u !== undefined);
   const liked = likers.some((u) => u.id === currentUser?.id);
   const count = likers.length;
-  const countLabel = `${count} ${count === 1 ? 'like' : 'likes'}`;
+  const countLabel = t('materials.likes', { count });
 
   return (
     <ScrollView
@@ -48,7 +50,7 @@ export default function MaterialDetailScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={liked ? 'Unlike, liked' : 'Like'}
+            accessibilityLabel={liked ? t('materials.unlikeLabel') : t('materials.likeLabel')}
             accessibilityState={{ selected: liked, disabled: like.busy }}
             disabled={like.busy}
             onPress={() => like.run(() => (liked ? unlikeMaterial(item.id) : likeMaterial(item.id)))}
@@ -58,17 +60,17 @@ export default function MaterialDetailScreen() {
               (pressed || like.busy) && { opacity: like.busy ? 0.4 : 0.8 },
             ]}>
             <Text style={[styles.buttonText, { color: liked ? '#fff' : colors.primary }]}>
-              {liked ? '♥ Liked' : '♡ Like'}
+              {liked ? t('materials.likedButton') : t('materials.likeButton')}
             </Text>
           </Pressable>
           <Text style={styles.muted}>{countLabel}</Text>
         </View>
         <ErrorText error={like.error} />
         {count === 0 ? (
-          <Text style={styles.muted}>No likes yet</Text>
+          <Text style={styles.muted}>{t('materials.noLikes')}</Text>
         ) : (
           <View style={{ gap: 4 }} testID="liked-by">
-            <Text style={styles.title}>Liked by</Text>
+            <Text style={styles.title}>{t('materials.likedBy')}</Text>
             {likers.map((u) => (
               <Text key={u.id} style={styles.body}>
                 {u.name}
@@ -77,11 +79,11 @@ export default function MaterialDetailScreen() {
           </View>
         )}
       </Card>
-      {item.link && <Button title="Open link" variant="secondary" onPress={() => Linking.openURL(item.link!)} />}
+      {item.link && <Button title={t('materials.openLink')} variant="secondary" onPress={() => Linking.openURL(item.link!)} />}
       <ErrorText error={error} />
       {canDelete && (
         <Button
-          title={busy ? 'Deleting…' : 'Delete material'}
+          title={busy ? t('materials.deleting') : t('materials.deleteMaterial')}
           variant="danger"
           disabled={busy}
           onPress={() =>

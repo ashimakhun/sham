@@ -8,8 +8,8 @@ import { KeyboardForm } from '@/components/KeyboardForm';
 import { MarkdownEditor } from '@/components/MarkdownEditor';
 import { MarkdownText } from '@/components/MarkdownText';
 import { Button, Card, EmptyState, ErrorText, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { confirmAction } from '@/lib/confirm';
-import { DELETED_ACCOUNT } from '@/lib/deleteAccount';
 import { canManageMeetings, canSeeMeetings } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors, formatDateTime } from '@/lib/theme';
@@ -22,18 +22,19 @@ import { font } from '@/lib/fonts';
 export default function MeetingNotesScreen() {
   const { id: courseId, meetingId, edit } = useLocalSearchParams<{ id: string; meetingId: string; edit?: string }>();
   const { currentUser, courseMembers, getCourse, meetings } = useStore();
+  const { t } = useI18n();
 
   const course = getCourse(courseId);
   const meeting = meetings.find((m) => m.id === meetingId && m.courseId === courseId);
   if (!course || !meeting || !canSeeMeetings(currentUser, course, courseMembers)) {
-    return <EmptyState title="Meeting not found" />;
+    return <EmptyState title={t('meetings.notFound')} />;
   }
   const canEdit = canManageMeetings(currentUser, course);
 
   if (edit === '1') {
-    if (!canEdit) return <EmptyState title="Not allowed" hint="Only the course owner or the teacher can edit notes." />;
+    if (!canEdit) return <EmptyState title={t('meetings.notAllowed')} hint={t('notes.onlyEditHint')} />;
     if (meeting.status !== 'completed') {
-      return <EmptyState title="Can't add notes" hint="Notes can be added only to completed meetings." />;
+      return <EmptyState title={t('notes.cantAdd')} hint={t('notes.cantAddHint')} />;
     }
     return <NotesEditor course={course} meeting={meeting} />;
   }
@@ -42,15 +43,16 @@ export default function MeetingNotesScreen() {
 
 function NotesView({ course, meeting, canEdit }: { course: Course; meeting: Meeting; canEdit: boolean }) {
   const { getUser } = useStore();
+  const { t } = useI18n();
   // Notes edited by someone who then deleted their account have no editor any more (ARU-75): "Deleted account".
   const editor = meeting.notesUpdatedById
-    ? (getUser(meeting.notesUpdatedById)?.name ?? 'Unknown')
+    ? (getUser(meeting.notesUpdatedById)?.name ?? t('common.unknown'))
     : meeting.notes && meeting.notesUpdatedAt
-      ? DELETED_ACCOUNT
+      ? t('common.deletedAccount')
       : undefined;
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic">
-      <Stack.Screen options={{ title: 'Notes' }} />
+      <Stack.Screen options={{ title: t('notes.title') }} />
       <View style={{ gap: 2 }}>
         <Text style={styles.title}>{meeting.topic}</Text>
         <Text style={styles.muted}>{formatDateTime(meeting.startsAt)}</Text>
@@ -60,16 +62,16 @@ function NotesView({ course, meeting, canEdit }: { course: Course; meeting: Meet
           <MarkdownText source={meeting.notes} />
           {editor && meeting.notesUpdatedAt ? (
             <Text style={[styles.muted, { paddingTop: 4 }]}>
-              Last edited by {editor}, {formatDateTime(meeting.notesUpdatedAt)}
+              {t('notes.lastEdited', { name: editor, when: formatDateTime(meeting.notesUpdatedAt) })}
             </Text>
           ) : null}
         </Card>
       ) : (
-        <EmptyState title="No notes yet" />
+        <EmptyState title={t('notes.none')} />
       )}
       {canEdit && (
         <Button
-          title={meeting.notes ? 'Edit notes' : 'Add notes'}
+          title={t(meeting.notes ? 'notes.edit' : 'notes.add')}
           variant="secondary"
           // Replace the view, so Save (which goes back) lands on the course details.
           onPress={() =>
@@ -87,6 +89,7 @@ function NotesView({ course, meeting, canEdit }: { course: Course; meeting: Meet
 function NotesEditor({ course, meeting }: { course: Course; meeting: Meeting }) {
   const { setMeetingNotes } = useStore();
   const { busy, error, run } = useAction();
+  const { t } = useI18n();
   // Prefilled once: a live update from another device doesn't overwrite what is being typed (last save wins).
   const [initial] = useState(meeting.notes ?? '');
   const [draft, setDraft] = useState(initial);
@@ -101,9 +104,9 @@ function NotesEditor({ course, meeting }: { course: Course; meeting: Meeting }) 
   }, [leaving]);
 
   usePreventRemove(dirty && !busy && !leaving, ({ repeat }) => {
-    confirmAction('Discard changes?', 'Your changes to the notes will be lost.', 'Discard', {
+    confirmAction(t('notes.discardTitle'), t('notes.discardMessage'), t('notes.discard'), {
       destructive: true,
-      cancelText: 'Keep editing',
+      cancelText: t('notes.keepEditing'),
     }).then((discard) => {
       if (!discard) return;
       // Continue the navigation the user started (back button, swipe).
@@ -134,7 +137,7 @@ function NotesEditor({ course, meeting }: { course: Course; meeting: Meeting }) 
     <KeyboardForm contentContainerStyle={styles.content}>
       <Stack.Screen
         options={{
-          title: meeting.notes ? 'Edit notes' : 'Add notes',
+          title: t(meeting.notes ? 'notes.edit' : 'notes.add'),
           // Always above the keyboard, whatever the field's size (ARU-58); the Save below stays for when it's closed.
           headerRight: () => <HeaderSave busy={busy} onPress={save} />,
         }}
@@ -142,25 +145,26 @@ function NotesEditor({ course, meeting }: { course: Course; meeting: Meeting }) 
       <Text style={styles.muted} numberOfLines={1}>
         {meeting.topic} · {formatDateTime(meeting.startsAt)}
       </Text>
-      <MarkdownEditor value={draft} onChange={setDraft} placeholder="What was covered in this meeting?" />
+      <MarkdownEditor value={draft} onChange={setDraft} placeholder={t('notes.placeholder')} />
       <ErrorText error={error} />
-      <Button title={busy ? 'Saving…' : 'Save'} onPress={save} disabled={busy} />
+      <Button title={t(busy ? 'common.saving' : 'common.save')} onPress={save} disabled={busy} />
     </KeyboardForm>
   );
 }
 
 function HeaderSave({ busy, onPress }: { busy: boolean; onPress: () => void }) {
+  const { t } = useI18n();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Save notes"
+      accessibilityLabel={t('notes.saveA11y')}
       accessibilityState={{ disabled: busy }}
       disabled={busy}
       hitSlop={8}
       onPress={onPress}
       style={{ paddingHorizontal: 8, minHeight: 44, justifyContent: 'center' }}>
       <Text style={{ fontSize: 17, ...font(500), color: busy ? colors.muted : colors.primary }}>
-        {busy ? 'Saving…' : 'Save'}
+        {t(busy ? 'common.saving' : 'common.save')}
       </Text>
     </Pressable>
   );

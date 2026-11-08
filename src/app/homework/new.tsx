@@ -8,9 +8,9 @@ import { Text } from '@/components/AppText';
 import { dueText } from '@/components/AssignmentCard';
 import { KeyboardForm } from '@/components/KeyboardForm';
 import { Button, EmptyState, ErrorText, Field, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { preparePhoto } from '@/lib/compressPhoto';
 import { newId } from '@/lib/id';
-import { PHOTO_RULE } from '@/lib/photoRetention';
 import { useStore } from '@/lib/store';
 import { formatDateTime } from '@/lib/theme';
 import { useAction } from '@/lib/useAction';
@@ -28,12 +28,13 @@ export default function NewHomeworkScreen() {
   // One id per form: a retry after a network error cannot save the homework twice.
   const [id] = useState(newId);
   const { busy, error, run } = useAction();
+  const { t, lang } = useI18n();
 
   // Only an assignment of a course I am a listener of (ARU-14/ARU-32; also enforced by RLS).
   const course = getCourse(assignment?.courseId);
   const isListener = !!course && courseMembers.some((m) => m.courseId === course.id && m.userId === currentUser?.id);
   if (!assignment || !course || !isListener) {
-    return <EmptyState title="No assignment" hint="Open a homework assignment from New to send homework." />;
+    return <EmptyState title={t('homework.noAssignmentTitle')} hint={t('homework.noAssignmentHint')} />;
   }
   const meeting = meetings.find((m) => m.id === assignment.meetingId);
   // The course owner is its mentor (ARU-14 AC 4 / ARU-9 AC 11).
@@ -72,39 +73,50 @@ export default function NewHomeworkScreen() {
   return (
     <KeyboardForm>
       <View style={{ gap: 6 }}>
-        <Text style={styles.label}>Course</Text>
+        <Text style={styles.label}>{t('homework.courseLabel')}</Text>
         <Text style={styles.body}>{course.title}</Text>
       </View>
       <View style={{ gap: 6 }}>
-        <Text style={styles.label}>Assignment</Text>
+        <Text style={styles.label}>{t('homework.assignmentLabel')}</Text>
         <Text style={styles.body}>{assignment.title}</Text>
         <Text style={styles.muted}>
-          {meeting ? `Meeting ${formatDateTime(meeting.startsAt)} · ` : ''}
-          {dueText(assignment)}
+          {meeting ? `${t('homework.meetingAt', { date: formatDateTime(meeting.startsAt) })} · ` : ''}
+          {dueText(assignment, lang)}
         </Text>
       </View>
-      <Field label="Title" placeholder="e.g. Fractions — exercises 1–10" value={title} onChangeText={setTitle} />
       <Field
-        label="Description"
-        placeholder="What did you do? Any questions for your mentor?"
+        label={t('homework.titleLabel')}
+        placeholder={t('homework.titlePlaceholder')}
+        value={title}
+        onChangeText={setTitle}
+      />
+      <Field
+        label={t('homework.descriptionLabel')}
+        placeholder={t('homework.descriptionPlaceholder')}
         value={description}
         onChangeText={setDescription}
         multiline
       />
       <View style={{ gap: 8 }}>
-        <Text style={styles.label}>Photo (optional)</Text>
+        <Text style={styles.label}>{t('homework.photoLabel')}</Text>
         {/* ARU-107 AC 8 */}
-        <Text style={styles.muted}>{PHOTO_RULE}</Text>
+        <Text style={styles.muted}>{t('homework.photoRule')}</Text>
         {photoUri && (
           <Image
             testID="homework-photo-preview"
-            accessibilityLabel="Attached photo"
+            accessibilityLabel={t('homework.attachedPhoto')}
             source={{ uri: photoUri }}
             style={{ width: '100%', height: 220, borderRadius: 10 }}
           />
         )}
         <Button
-          title={preparing ? 'Preparing photo…' : photoUri ? 'Change photo' : 'Attach a photo'}
+          title={
+            preparing
+              ? t('homework.preparingPhoto')
+              : photoUri
+                ? t('homework.changePhoto')
+                : t('homework.attachPhoto')
+          }
           variant="secondary"
           onPress={pickPhoto}
           disabled={preparing || busy}
@@ -113,13 +125,13 @@ export default function NewHomeworkScreen() {
       </View>
       <ErrorText error={error} />
       <Button
-        title={busy ? 'Sending…' : 'Send to mentor'}
+        title={busy ? t('homework.sending') : t('homework.sendToMentor')}
         onPress={submit}
         disabled={!title.trim() || busy || preparing}
       />
       <Text style={[styles.muted, { textAlign: 'center' }]}>
         {/* The course owner is its mentor; any mentor or the teacher may check (ARU-14), so no "will check it". */}
-        {owner ? `Mentor: ${owner.name}` : null}
+        {owner ? t('homework.mentorLine', { name: owner.name }) : null}
       </Text>
     </KeyboardForm>
   );

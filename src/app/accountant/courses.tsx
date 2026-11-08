@@ -5,6 +5,7 @@ import { Text } from '@/components/AppText';
 
 import { PeriodEditor } from '@/components/Accountant';
 import { Button, Card, EmptyState, ErrorText, HiddenBadge, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { DEFAULT_PERIOD, isAccountant, periodText } from '@/lib/billing';
 import { confirmAction } from '@/lib/confirm';
 import { useStore } from '@/lib/store';
@@ -17,8 +18,9 @@ import type { Course } from '@/lib/types';
  */
 export default function SelectPaidCoursesScreen() {
   const { currentUser, courses, courseBilling, loading, refresh } = useStore();
+  const { t } = useI18n();
   if (!isAccountant(currentUser)) {
-    return <EmptyState title="Not allowed" hint="Only accountants select paid courses." />;
+    return <EmptyState title={t('courses.notAllowed')} hint={t('accountant.selectNotAllowedHint')} />;
   }
   const sorted = [...courses].sort((a, b) => a.title.localeCompare(b.title));
   return (
@@ -29,7 +31,7 @@ export default function SelectPaidCoursesScreen() {
       keyExtractor={(c) => c.id}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={() => refresh().catch(() => {})} />}
       renderItem={({ item }) => <CourseRow course={item} billing={courseBilling.find((b) => b.courseId === item.id)} />}
-      ListEmptyComponent={<EmptyState title="No courses yet" />}
+      ListEmptyComponent={<EmptyState title={t('accountant.noCourses')} />}
     />
   );
 }
@@ -38,6 +40,7 @@ function CourseRow({ course, billing }: { course: Course; billing?: { startDay: 
   const { selectPaidCourse, unselectPaidCourse } = useStore();
   const [choosing, setChoosing] = useState(false);
   const { busy, error, run } = useAction();
+  const { t, lang } = useI18n();
   return (
     <View testID={`select-${course.id}`}>
     <Card style={{ gap: 6 }}>
@@ -47,18 +50,18 @@ function CourseRow({ course, billing }: { course: Course; billing?: { startDay: 
       </View>
       {billing ? (
         <>
-          <Text style={styles.muted}>Paid course · {periodText(billing)}</Text>
+          <Text style={styles.muted}>{t('accountant.paidCourse', { period: periodText(billing, lang) })}</Text>
           <Button
-            title={busy ? 'Saving…' : 'Unselect'}
+            title={busy ? t('common.saving') : t('accountant.unselect')}
             variant="secondary"
             disabled={busy}
             onPress={() =>
               run(async () => {
                 const ok = await confirmAction(
-                  'Unselect paid course',
-                  `${course.title} will stop being a paid course for everyone.`,
-                  'Unselect',
-                  { destructive: true, cancelText: 'Keep' },
+                  t('accountant.unselectTitle'),
+                  t('accountant.unselectMessage', { title: course.title }),
+                  t('accountant.unselect'),
+                  { destructive: true, cancelText: t('accountant.keep') },
                 );
                 if (ok) await unselectPaidCourse(course.id);
               })
@@ -68,7 +71,7 @@ function CourseRow({ course, billing }: { course: Course; billing?: { startDay: 
       ) : choosing ? (
         <PeriodEditor
           initial={DEFAULT_PERIOD}
-          saveTitle="Select"
+          saveTitle={t('accountant.select')}
           onCancel={() => setChoosing(false)}
           onSave={async (s, e) => {
             await selectPaidCourse(course.id, s, e);
@@ -76,7 +79,7 @@ function CourseRow({ course, billing }: { course: Course; billing?: { startDay: 
           }}
         />
       ) : (
-        <Button title="Select" variant="secondary" onPress={() => setChoosing(true)} />
+        <Button title={t('accountant.select')} variant="secondary" onPress={() => setChoosing(true)} />
       )}
       <ErrorText error={error} />
     </Card>

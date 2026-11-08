@@ -4,6 +4,7 @@ import { FlatList, Pressable, View } from 'react-native';
 import { Text } from '@/components/AppText';
 
 import { EmptyState, ErrorText, RoleBadge, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { canChangeOwner } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
@@ -13,13 +14,14 @@ import { useAction } from '@/lib/useAction';
 export default function ChangeOwnerScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { currentUser, users, courseMembers, getCourse, changeCourseOwner } = useStore();
+  const { t } = useI18n();
   const { busy, error, run } = useAction();
 
   const course = getCourse(id);
   if (currentUser && !canChangeOwner(currentUser.role)) {
-    return <EmptyState title="Not allowed" hint="Only the teacher or a mentor can change a course's owner." />;
+    return <EmptyState title={t('courses.notAllowed')} hint={t('courses.ownerNotAllowedHint')} />;
   }
-  if (!course) return <EmptyState title="Course not found" />;
+  if (!course) return <EmptyState title={t('courses.notFound')} />;
 
   const courseId = course.id;
   const listenerIds = new Set(courseMembers.filter((m) => m.courseId === courseId).map((m) => m.userId));
@@ -46,7 +48,7 @@ export default function ChangeOwnerScreen() {
       ListHeaderComponent={
         <View style={{ gap: 8 }}>
           <Text style={styles.muted} numberOfLines={2}>
-            Choose the new owner of {course.title}. The change is made as soon as you tap a name.
+            {t('courses.ownerIntro', { title: course.title })}
           </Text>
           <ErrorText error={error} />
         </View>
@@ -74,11 +76,11 @@ export default function ChangeOwnerScreen() {
               </Text>
               <RoleBadge role={item.role} />
             </View>
-            {isListener && <Text style={styles.muted}>Listener of this course — remove them first</Text>}
+            {isListener && <Text style={styles.muted}>{t('courses.ownerListenerNote')}</Text>}
           </Pressable>
         );
       }}
-      ListEmptyComponent={<EmptyState title="No other teachers or mentors to choose from" />}
+      ListEmptyComponent={<EmptyState title={t('courses.ownerNoCandidates')} />}
     />
   );
 }

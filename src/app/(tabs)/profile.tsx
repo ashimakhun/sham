@@ -6,7 +6,7 @@ import { LanguageSwitch } from '@/components/LanguageSwitch';
 import { ProfileNameCard } from '@/components/ProfileNameCard';
 import { TelegramButton } from '@/components/Telegram';
 import { Button, ErrorText, styles } from '@/components/ui';
-import { useI18n } from '@/i18n/LanguageProvider';
+import { useI18n } from '@/i18n/context';
 import { canManageRoles, canUseGeneralChat } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';

@@ -7,6 +7,7 @@ import { Text } from '@/components/AppText';
 import { CourseCard } from '@/components/CourseCard';
 import { DisciplineCard } from '@/components/Disciplines';
 import { Button, EmptyState, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { canManageDisciplines } from '@/lib/disciplines';
 import { canCreateCourse } from '@/lib/roles';
 import { useStore } from '@/lib/store';
@@ -17,16 +18,18 @@ import { usePaymentDues } from '@/lib/usePaymentDues';
 /** ARU-63: "Courses" (was "My courses", plus courses with no discipline) and "Disciplines" (replaces "All courses"). */
 type CoursesView = 'courses' | 'disciplines';
 
+// ARU-109: catalog ids, translated at render time (a module-level text would stay in English).
 const myEmpty: Record<string, { title: string; hint: string }> = {
-  student: { title: 'You are not in any course yet', hint: 'Ask your teacher or mentor to add you.' },
-  mentor: { title: "You don't own or attend any course yet", hint: 'Create one with "+ New course" or ask to be added.' },
-  teacher: { title: "You don't own any course yet", hint: 'Create one with "+ New course".' },
+  student: { title: 'courses.emptyStudentTitle', hint: 'courses.askToBeAdded' },
+  mentor: { title: 'courses.emptyMentorTitle', hint: 'courses.emptyMentorHint' },
+  teacher: { title: 'courses.emptyTeacherTitle', hint: 'courses.emptyTeacherHint' },
 };
 
 type Section = { key: string; title?: string; data: Course[] };
 
 export default function CoursesScreen() {
   const { currentUser, courseMembers, loading, refresh, courses, disciplines } = useStore();
+  const { t } = useI18n();
   const role = currentUser?.role ?? 'student';
   const me = currentUser?.id;
   const canCreate = canCreateCourse(currentUser?.role);
@@ -61,10 +64,10 @@ export default function CoursesScreen() {
   const noDiscipline = courses.filter((c) => !mine.has(c.id) && !c.disciplineId);
 
   const sections: Section[] = [
-    { key: 'in', title: "Courses I'm in", data: listening },
+    { key: 'in', title: t('courses.sectionIn'), data: listening },
     // A student can't own a course, so the section is only for teachers and mentors.
-    ...(canCreate ? [{ key: 'own', title: 'Courses I own', data: owned }] : []),
-    { key: 'none', title: 'No discipline', data: noDiscipline },
+    ...(canCreate ? [{ key: 'own', title: t('courses.sectionOwn'), data: owned }] : []),
+    { key: 'none', title: t('courses.sectionNone'), data: noDiscipline },
   ].filter((s) => s.data.length > 0); // no empty headings; with no sections the empty state shows
 
   const header = (
@@ -72,7 +75,7 @@ export default function CoursesScreen() {
       <ViewSwitch value={view} onChange={setView} />
       {view === 'courses' && canCreate && (
         <Button
-          title="+ New course"
+          title={t('courses.newCourseButton')}
           onPress={() => {
             openFromHere();
             router.push('/courses/new');
@@ -81,7 +84,7 @@ export default function CoursesScreen() {
       )}
       {view === 'disciplines' && canManageDisciplines(currentUser) && (
         <Button
-          title="+ New discipline"
+          title={t('courses.newDisciplineButton')}
           onPress={() => {
             openFromHere();
             router.push('/disciplines/new');
@@ -105,9 +108,9 @@ export default function CoursesScreen() {
         renderItem={({ item }) => <DisciplineCard discipline={item} onOpen={openFromHere} />}
         ListEmptyComponent={
           canManageDisciplines(currentUser) ? (
-            <EmptyState title="No disciplines yet" hint={'Tap "+ New discipline" to create the first one.'} />
+            <EmptyState title={t('courses.noDisciplines')} hint={t('courses.noDisciplinesHint')} />
           ) : (
-            <EmptyState title="No disciplines yet" />
+            <EmptyState title={t('courses.noDisciplines')} />
           )
         }
       />
@@ -130,16 +133,17 @@ export default function CoursesScreen() {
       renderItem={({ item, section }) => (
         <CourseCard course={item} onOpen={openFromHere} paymentDue={dues.get(item.id)} />
       )}
-      ListEmptyComponent={<EmptyState {...myEmpty[role]} />}
+      ListEmptyComponent={<EmptyState title={t(myEmpty[role].title)} hint={t(myEmpty[role].hint)} />}
     />
   );
 }
 
 /** "Courses" / "Disciplines" switch (ARU-63): two tabs built from existing styles (no new package). */
 function ViewSwitch({ value, onChange }: { value: CoursesView; onChange: (v: CoursesView) => void }) {
+  const { t } = useI18n();
   const options: { value: CoursesView; label: string }[] = [
-    { value: 'courses', label: 'Courses' },
-    { value: 'disciplines', label: 'Disciplines' },
+    { value: 'courses', label: t('courses.viewCourses') },
+    { value: 'disciplines', label: t('courses.viewDisciplines') },
   ];
   return (
     <View style={styles.segmented} accessibilityRole="tablist">

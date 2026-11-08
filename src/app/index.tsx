@@ -6,7 +6,7 @@ import { Text } from '@/components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, ErrorText, Field, Segmented, styles } from '@/components/ui';
-import { useI18n } from '@/i18n/LanguageProvider';
+import { useI18n } from '@/i18n/context';
 import { PASSWORD_MIN } from '@/lib/password';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
@@ -55,14 +55,14 @@ export default function SignInScreen() {
           <View style={{ gap: 4, marginVertical: 24 }}>
             <Image
               source={require('../../assets/logo.png')}
-              style={{ width: 72, height: 76, marginBottom: 12 }}
+              style={{ width: 72, height: 76, marginBottom: 12, alignSelf: 'center' }}
               resizeMode="contain"
               accessibilityIgnoresInvertColors
               accessible={false}
               testID="app-logo"
             />
-            <Text style={styles.h1}>Sham</Text>
-            <Text style={styles.muted}>{t('signIn.tagline')}</Text>
+            <Text style={[styles.h1, { textAlign: 'center' }]}>Sham</Text>
+            <Text style={[styles.muted, { textAlign: 'center' }]}>{t('signIn.tagline')}</Text>
           </View>
 
           {/* ARU-75: after this account was deleted (here or on another device). */}

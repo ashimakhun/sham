@@ -5,6 +5,7 @@ import { FlatList, Pressable, View } from 'react-native';
 import { Text } from '@/components/AppText';
 
 import { Button, EmptyState, ErrorText, RoleBadge, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { canManageListeners } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
@@ -13,14 +14,15 @@ import { useAction } from '@/lib/useAction';
 export default function AddListenersScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { currentUser, users, courseMembers, getCourse, addListeners } = useStore();
+  const { t } = useI18n();
   const [selected, setSelected] = useState<string[]>([]);
   const { busy, error, run } = useAction();
 
   const course = getCourse(id);
   if (currentUser && !canManageListeners(currentUser.role)) {
-    return <EmptyState title="Not allowed" hint="Only teachers and mentors can add listeners." />;
+    return <EmptyState title={t('courses.notAllowed')} hint={t('listeners.addNotAllowedHint')} />;
   }
-  if (!course) return <EmptyState title="Course not found" />;
+  if (!course) return <EmptyState title={t('courses.notFound')} />;
 
   const inCourse = new Set(courseMembers.filter((m) => m.courseId === course.id).map((m) => m.userId));
   // Students and mentors who are not yet listeners; never the owner or the teacher (also enforced by RLS).
@@ -54,7 +56,7 @@ export default function AddListenersScreen() {
         keyExtractor={(u) => u.id}
         ListHeaderComponent={
           <Text style={styles.muted} numberOfLines={2}>
-            Add students and mentors to {course.title}.
+            {t('listeners.addIntro', { title: course.title })}
           </Text>
         }
         renderItem={({ item }) => {
@@ -79,12 +81,18 @@ export default function AddListenersScreen() {
             </Pressable>
           );
         }}
-        ListEmptyComponent={<EmptyState title="Everyone is already in this course" />}
+        ListEmptyComponent={<EmptyState title={t('listeners.everyoneIn')} />}
       />
       <View style={[styles.content, { paddingTop: 0 }]}>
         <ErrorText error={error} />
         <Button
-          title={busy ? 'Adding…' : toAdd.length > 1 ? `Add ${toAdd.length} listeners` : 'Add listener'}
+          title={
+            busy
+              ? t('listeners.adding')
+              : toAdd.length > 1
+                ? t('listeners.addCount', { count: toAdd.length })
+                : t('listeners.addOne')
+          }
           onPress={submit}
           disabled={!toAdd.length || busy}
         />

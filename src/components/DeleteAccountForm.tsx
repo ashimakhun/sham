@@ -5,13 +5,8 @@ import { Text } from '@/components/AppText';
 
 import { KeyboardForm } from '@/components/KeyboardForm';
 import { Button, Card, ErrorText, Field, styles } from '@/components/ui';
-import {
-  DELETE_EXPLANATION_AFTER,
-  DELETE_EXPLANATION_BEFORE,
-  DELETED_ACCOUNT,
-  ownedCoursesProblem,
-  TEACHER_CANT_DELETE,
-} from '@/lib/deleteAccount';
+import { useI18n } from '@/i18n/context';
+import { ownedCoursesProblem, TEACHER_CANT_DELETE } from '@/lib/deleteAccount';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import { useAction } from '@/lib/useAction';
@@ -26,6 +21,7 @@ import { font } from '@/lib/fonts';
  */
 export function DeleteAccountForm({ onCancel, showTitle = false }: { onCancel: () => void; showTitle?: boolean }) {
   const { currentUser, courses, deleteAccount } = useStore();
+  const { t, te } = useI18n();
   const [password, setPassword] = useState('');
   const { busy, error, run } = useAction();
   // Blocks a second tap before "Deleting…" has rendered, so a double tap sends one request (AC 12).
@@ -54,24 +50,26 @@ export function DeleteAccountForm({ onCancel, showTitle = false }: { onCancel: (
     <KeyboardForm>
       {showTitle && (
         <Text style={styles.h1} accessibilityRole="header">
-          Delete account
+          {t('common.deleteAccount')}
         </Text>
       )}
       <Card>
         <Text style={styles.body} testID="delete-account-explanation">
-          {DELETE_EXPLANATION_BEFORE}
-          <Text style={{ ...font(600) }}>{DELETED_ACCOUNT}</Text>
-          {DELETE_EXPLANATION_AFTER}
+          {/* The parts around the bold "Deleted account" are their own texts, so Russian can quote it (ARU-113). */}
+          {t('deleteAccount.explanationBefore')}
+          <Text style={{ ...font(600) }}>{t('common.deletedAccount')}</Text>
+          {t('deleteAccount.explanationAfter')}
         </Text>
       </Card>
       {blocked ? (
         <Text style={[styles.body, { color: colors.danger }]} testID="delete-account-blocked">
-          {blocked}
+          {/* Not an ErrorText (its own style and testID), so translated here; both messages are registered. */}
+          {te(blocked)}
         </Text>
       ) : null}
       <Field
-        label="Password"
-        accessibilityLabel="Password"
+        label={t('deleteAccount.password')}
+        accessibilityLabel={t('deleteAccount.password')}
         value={password}
         onChangeText={setPassword}
         secureTextEntry
@@ -86,12 +84,12 @@ export function DeleteAccountForm({ onCancel, showTitle = false }: { onCancel: (
       <ErrorText error={error} />
       <View style={{ gap: 10 }}>
         <Button
-          title={busy ? 'Deleting…' : 'Delete my account'}
+          title={busy ? t('deleteAccount.deleting') : t('deleteAccount.submit')}
           variant="danger"
           disabled={!canDelete}
           onPress={submit}
         />
-        <Button title="Cancel" variant="secondary" disabled={busy} onPress={onCancel} />
+        <Button title={t('common.cancel')} variant="secondary" disabled={busy} onPress={onCancel} />
       </View>
     </KeyboardForm>
   );

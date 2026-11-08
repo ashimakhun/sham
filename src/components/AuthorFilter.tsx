@@ -3,6 +3,8 @@ import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 
+import type { TextId } from '@/i18n';
+import { useI18n } from '@/i18n/context';
 import { colors } from '@/lib/theme';
 import { font } from '@/lib/fonts';
 
@@ -10,9 +12,22 @@ type Option = { value: string; label: string };
 /** What the list filters by (ARU-80): the Blog's authors (default) or the Homework tab's courses. */
 type Noun = 'author' | 'course';
 
-const nounText: Record<Noun, { plural: string; testID: string }> = {
-  author: { plural: 'authors', testID: 'author-filter' },
-  course: { plural: 'courses', testID: 'course-filter' },
+/** ARU-109: one catalog text per noun (whole sentences, so Russian word order and cases work). */
+const nounText: Record<Noun, { heading: TextId; label: TextId; hint: TextId; close: TextId; testID: string }> = {
+  author: {
+    heading: 'homework.filterByAuthor',
+    label: 'homework.filterByAuthorLabel',
+    hint: 'homework.filterAuthorsHint',
+    close: 'homework.closeAuthorFilter',
+    testID: 'author-filter',
+  },
+  course: {
+    heading: 'homework.filterByCourse',
+    label: 'homework.filterByCourseLabel',
+    hint: 'homework.filterCoursesHint',
+    close: 'homework.closeCourseFilter',
+    testID: 'course-filter',
+  },
 };
 
 /**
@@ -33,8 +48,10 @@ export function AuthorFilter({
   noun?: Noun;
 }) {
   const [open, setOpen] = useState(false);
-  const { plural, testID } = nounText[noun];
-  const current = options.find((o) => o.value === value)?.label ?? options[0]?.label ?? 'All';
+  const { t } = useI18n();
+  const ids = nounText[noun];
+  const { testID } = ids;
+  const current = options.find((o) => o.value === value)?.label ?? options[0]?.label ?? t('homework.filterAll');
 
   const pick = (v: string) => {
     setOpen(false);
@@ -45,12 +62,12 @@ export function AuthorFilter({
     <>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Filter by ${noun}, ${current}`}
-        accessibilityHint={`Opens the list of ${plural}`}
+        accessibilityLabel={t(ids.label, { current })}
+        accessibilityHint={t(ids.hint)}
         onPress={() => setOpen(true)}
         style={s.button}>
         <Text style={s.buttonText} numberOfLines={1} ellipsizeMode="tail">
-          Filter: {current}
+          {t('homework.filterButton', { current })}
         </Text>
         <Text style={s.caret} importantForAccessibility="no" accessibilityElementsHidden>
           ▾
@@ -62,13 +79,13 @@ export function AuthorFilter({
           <Pressable
             testID={`${testID}-backdrop`}
             accessibilityRole="button"
-            accessibilityLabel={`Close ${noun} filter`}
+            accessibilityLabel={t(ids.close)}
             onPress={() => setOpen(false)}
             style={StyleSheet.absoluteFill}
           />
           <View style={s.sheet} accessibilityViewIsModal>
             <Text style={s.heading} accessibilityRole="header">
-              {`Filter by ${noun}`}
+              {t(ids.heading)}
             </Text>
             <ScrollView testID={`${testID}-list`} style={s.list} keyboardShouldPersistTaps="handled">
               {options.map((o) => {
