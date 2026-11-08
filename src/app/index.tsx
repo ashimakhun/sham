@@ -52,14 +52,14 @@ export default function SignInScreen() {
           <View style={{ gap: 4, marginVertical: 24 }}>
             <Image
               source={require('../../assets/logo.png')}
-              style={{ width: 72, height: 76, marginBottom: 12 }}
+              style={{ width: 72, height: 76, marginBottom: 12, alignSelf: 'center' }}
               resizeMode="contain"
               accessibilityIgnoresInvertColors
               accessible={false}
               testID="app-logo"
             />
-            <Text style={styles.h1}>Sham</Text>
-            <Text style={styles.muted}>{t('signIn.tagline')}</Text>
+            <Text style={[styles.h1, { textAlign: 'center' }]}>Sham</Text>
+            <Text style={[styles.muted, { textAlign: 'center' }]}>{t('signIn.tagline')}</Text>
           </View>
 
           {/* ARU-75: after this account was deleted (here or on another device). */}
