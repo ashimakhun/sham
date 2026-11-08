@@ -7,6 +7,7 @@ import { periodProblem } from './billing';
 import { ACCOUNT_DELETED, DELETE_FAILED, DELETE_OFFLINE } from './deleteAccount';
 import { FEEDBACK_MAX } from './feedback';
 import { fileFieldsError, isAllowedPdf, PDF_MAX_BYTES, PDF_RULE } from './files';
+import { PHOTO_TOO_LARGE } from './compressPhoto';
 import { newId } from './id';
 import { PHOTOS_ZIP_ERROR } from './photoRetention';
 import { isAllowedProof, PROOF_MAX_BYTES, PROOF_RULE, proofFormat } from './paymentProof';
@@ -684,6 +685,15 @@ function checkFeedback(res: Result) {
 }
 
 const ALREADY_SENT = 'You have already sent homework for this assignment.';
+
+/** ARU-105 AC 7: the "homework" bucket refuses a file over 10 MB or not declared as JPEG (0049); other errors (offline,
+ *  a leftover that couldn't be removed) keep Storage's own message. */
+export function homeworkPhotoUploadError(error: { message: string; statusCode?: string | number }) {
+  const status = String(error.statusCode ?? '');
+  return status === '413' || status === '415' || /maximum allowed size|too large|mime type|not supported/i.test(error.message)
+    ? PHOTO_TOO_LARGE
+    : error.message;
+}
 const DEADLINE_PAST = 'The deadline must be in the future.';
 
 /** Whether a row with this id exists (and is visible): tells a safe retry from a real duplicate. */
@@ -909,7 +919,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setPaymentRequests([]);
         return;
       }
-      // ARU-107 AC 2: the deletion start date. Before 0049 runs there is no table: no date, so no deletion dates.
+      // ARU-107 AC 2: the deletion start date. Before 0050 runs there is no table: no date, so no deletion dates.
       const settings = await supabase.from('app_settings').select('photo_deletion_start');
       setPhotoDeletionStart(
         settings.error ? null : ((settings.data as { photo_deletion_start: string | null }[] | null)?.[0]?.photo_deletion_start ?? null),
@@ -1279,11 +1289,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (sent.length > 0) throw new Error(ALREADY_SENT);
       let photoPath: string | null = null;
       if (input.photoUri) {
+        // The photo was resized and compressed when picked (ARU-105); this is exactly the file the form showed.
         const file = await fetch(input.photoUri).then((r) => r.arrayBuffer());
-        // Named after the homework id, so a retry finds the photo it already uploaded.
+        // Named after the homework id. ARU-105 AC 10 b: a leftover from an earlier failed send of this form is removed
+        // first (0049 lets the sender delete it while no homework points to it), so only the photo shown now is
+        // stored. A missing file is fine; a failed removal stops the send.
         photoPath = `${student.id}/${input.id}.jpg`;
+        const leftover = await supabase.storage.from('homework').remove([photoPath]);
+        if (leftover.error) throw new Error(leftover.error.message);
         const upload = await supabase.storage.from('homework').upload(photoPath, file, { contentType: 'image/jpeg' });
-        if (upload.error && !/already exists/i.test(upload.error.message)) throw new Error(upload.error.message);
+        // "Already exists" now means the leftover couldn't be removed: a failed send, never success.
+        if (upload.error) throw new Error(homeworkPhotoUploadError(upload.error));
       }
       const res = await supabase.from('homework').insert({
         id: input.id,
@@ -1295,9 +1311,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         photo_path: photoPath,
       });
       // A duplicate is either this form's earlier attempt (saved: fine) or another homework for the assignment.
-      if (res.error?.code === '23505' && !(await rowExists('homework', input.id))) {
-        if (photoPath) await supabase.storage.from('homework').remove([photoPath]);
-        throw new Error(ALREADY_SENT);
+      if (res.error?.code === '23505' && (await rowExists('homework', input.id))) {
+        await load();
+        return;
+      }
+      if (res.error) {
+        // ARU-105 AC 10 a: the homework wasn't saved, so its photo goes too (best effort: if this fails, the next
+        // send removes the leftover first, and ARU-107's daily clean-up catches a form closed without retrying).
+        if (photoPath) await supabase.storage.from('homework').remove([photoPath]).catch(() => {});
+        if (res.error.code === '23505') throw new Error(ALREADY_SENT);
       }
       checkInsert(res);
       await load();
@@ -1330,7 +1352,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           .update({
             status: 'checked',
             checked_by: mentor.id,
-            // checked_at is set by the server (ARU-107 AC 1, migration 0049).
+            // checked_at is set by the server (ARU-107 AC 1, migration 0050).
             mentor_comment: comment.trim() || null,
           })
           .eq('id', id),

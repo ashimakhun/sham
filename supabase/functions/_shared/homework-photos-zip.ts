@@ -1,6 +1,6 @@
 // ARU-107 (part a): "Download my photos". The homework-photos-zip Edge Function has two entrances:
 //   POST (the app, "Authorization: Bearer <user jwt>", body {"courseId"?, "part"?}): picks the caller's own stored
-//       homework photos (homework_photos_for_zip(), migration 0049), at most PHOTO_ZIP_MAX of them, and returns a
+//       homework photos (homework_photos_for_zip(), migration 0050), at most PHOTO_ZIP_MAX of them, and returns a
 //       one-time link valid for LINK_SECONDS: {"url", "expiresAt", "count"}. Only a hash of the token is stored.
 //   GET  ?token=… (the link, opened by the browser or the system viewer, which can't send an auth header): uses the
 //       link once and streams sham-homework-photos-<date>.zip. HEAD requests (prefetches, Quick Look probes) answer

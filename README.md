@@ -163,7 +163,11 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    triggers on `materials` and `material_files`, turns on `pg_net` if the server offers it; no policy changes,
    deletes nothing; needs 0046. Works without the Vault secrets (it then sends nothing), see
    [Telegram notifications](#telegram-notifications) → New materials),
-   `0049_homework_photo_rule.sql` (ARU-107: the 6-month rule for homework photos, without deleting anything yet;
+   `0049_homework_photo_limits.sql` (ARU-105: the `homework` bucket accepts only JPEG files up to 10 MB (the app
+   resizes and compresses photos when they're picked); adds `homework_photo_in_use()` and two storage policies that
+   let a sender read and delete their own photo in their own folder while no homework row points to it, so a failed
+   send leaves no photo behind; existing files and policies are unchanged, deletes nothing),
+   `0050_homework_photo_rule.sql` (ARU-107: the 6-month rule for homework photos, without deleting anything yet;
    a trigger makes `homework.checked_at` server-set (set when checked, cleared when unchecked, any client value
    overwritten; checked homework without one gets the migration's time), adds the one-row `app_settings` table
    (`photo_deletion_start`, null until ARU-112's daily job runs), `photo_deletion_date()`, the `photo_zip_links` table
@@ -499,7 +503,7 @@ nothing is deleted yet). A sender downloads their own stored photos as a ZIP fro
 Download. The link (GET) streams `sham-homework-photos-<date>.zip` with at most 50 photos; more than 50 are offered by
 course on **Download by course**. Only a hash of each link is stored (`photo_zip_links`); no ZIP is stored.
 
-1. Run `supabase/migrations/0049_homework_photo_rule.sql`.
+1. Run `supabase/migrations/0050_homework_photo_rule.sql`.
 2. Deploy the function without JWT verification (the link is opened without an auth header; the POST checks the
    user's token itself and the GET accepts only an unused, unexpired link). It needs no secrets of its own:
    ```bash
@@ -589,6 +593,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | See homework assignments   | courses they're in | ✓ (all courses) | ✓    |
 | Assign homework to a completed meeting | | own courses        | any course |
 | Send homework (for an assignment) | courses they're in | courses they're in |  |
+| Remove own leftover photo of a failed send (own folder, no homework points to it; ARU-105) | ✓ | ✓ |  |
 | Download own homework photos as a ZIP (one-time link, ARU-107) | own photos | own photos (sent as a listener) |  |
 | Set `homework.checked_at` directly (ARU-107: the server sets it when checking) | (nobody) | (nobody) | (nobody) |
 | Mark homework checked      |           | any (not their own) | any (not their own) |
