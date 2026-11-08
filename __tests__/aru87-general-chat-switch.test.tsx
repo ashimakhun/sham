@@ -3,7 +3,7 @@
 // supabase/tests/aru87_every_chat_message.test.sql.
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
-import ProfileScreen from '@/app/(tabs)/profile';
+import TelegramScreen from '@/app/telegram';
 import { telegramSwitchesFor } from '@/lib/telegram';
 import type { TelegramLink } from '@/lib/types';
 
@@ -41,7 +41,7 @@ it('the teacher sees Chat messages, General chat and New accounts', () => {
 describe('the card', () => {
   it.each(['T', 'M', 'S1'] as const)('%s sees General chat below Chat messages, on by default', async (who) => {
     setStore(fakeStore(who, { telegram: linked() }));
-    await render(<ProfileScreen />);
+    await render(<TelegramScreen />);
     const labels = switches();
     expect(labels[labels.indexOf('Chat messages') + 1]).toBe('General chat');
     expect(screen.getByLabelText('General chat').props.value).toBe(true);
@@ -50,7 +50,7 @@ describe('the card', () => {
   it('shows the saved value; turning it off saves kind general_chat and leaves Chat messages alone', async () => {
     const store = fakeStore('S1', { telegram: linked({ general_chat: true }) });
     setStore(store);
-    await render(<ProfileScreen />);
+    await render(<TelegramScreen />);
     await fireEvent(screen.getByLabelText('General chat'), 'valueChange', false);
     expect(store.setTelegramNotification).toHaveBeenCalledWith('general_chat', false);
     expect(store.setTelegramNotification).not.toHaveBeenCalledWith('chat_message', expect.anything());
@@ -58,7 +58,7 @@ describe('the card', () => {
 
   it('a saved off value shows off', async () => {
     setStore(fakeStore('M', { telegram: linked({ general_chat: false }) }));
-    await render(<ProfileScreen />);
+    await render(<TelegramScreen />);
     expect(screen.getByLabelText('General chat').props.value).toBe(false);
     expect(screen.getByLabelText('Chat messages').props.value).toBe(true);
   });

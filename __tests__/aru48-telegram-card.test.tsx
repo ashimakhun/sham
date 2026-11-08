@@ -1,9 +1,10 @@
-// ARU-48: the Telegram notifications card on the Profile tab (app side of AC 1, 4, 5, 6, 9). The bot and the database
+// ARU-48: Telegram notifications settings, on the Telegram notifications page since ARU-101 (was a card on the Profile tab) (app side of AC 1, 4, 5, 6, 9). The bot and the database
 // are tested in supabase/functions/_shared/*.test.ts and supabase/tests/aru48_telegram_links.test.sql.
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { Alert, AppState, Linking } from 'react-native';
 
 import ProfileScreen from '@/app/(tabs)/profile';
+import TelegramScreen from '@/app/telegram';
 import type { TelegramLink } from '@/lib/types';
 
 import { fakeStore } from './helpers/fakeStore';
@@ -30,10 +31,9 @@ afterEach(() => {
 });
 
 describe('Connect (AC 1)', () => {
-  it.each(['S1', 'M', 'T'] as const)('%s sees the card and Connect when not connected', async (who) => {
+  it.each(['S1', 'M', 'T'] as const)('%s sees Connect on the page when not connected', async (who) => {
     setStore(fakeStore(who, { telegram: null }));
-    await render(<ProfileScreen />);
-    expect(screen.getByText('TELEGRAM NOTIFICATIONS')).toBeTruthy();
+    await render(<TelegramScreen />);
     expect(screen.getByText('Get Sham notifications in Telegram.')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Connect Telegram' })).toBeTruthy();
     expect(switches()).toEqual([]);
@@ -42,7 +42,7 @@ describe('Connect (AC 1)', () => {
   it('Connect gets a code and opens the bot link', async () => {
     const store = fakeStore('S1', { telegram: null, createTelegramLinkCode: jest.fn(async () => 'abc_123') });
     setStore(store);
-    await render(<ProfileScreen />);
+    await render(<TelegramScreen />);
     await fireEvent.press(screen.getByRole('button', { name: 'Connect Telegram' }));
     expect(store.createTelegramLinkCode).toHaveBeenCalledTimes(1);
     expect(openUrl).toHaveBeenCalledWith('https://t.me/ShamSchoolBot?start=abc_123');
@@ -51,7 +51,7 @@ describe('Connect (AC 1)', () => {
   it('a "@" in the configured username is ignored', async () => {
     process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME = '@ShamSchoolBot';
     setStore(fakeStore('S1', { telegram: null }));
-    await render(<ProfileScreen />);
+    await render(<TelegramScreen />);
     await fireEvent.press(screen.getByRole('button', { name: 'Connect Telegram' }));
     expect(openUrl).toHaveBeenCalledWith('https://t.me/ShamSchoolBot?start=CODE123');
   });
@@ -63,7 +63,7 @@ describe('Connect (AC 1)', () => {
       createTelegramLinkCode: jest.fn(() => new Promise<string>((resolve) => (finish = resolve))),
     });
     setStore(store);
-    await render(<ProfileScreen />);
+    await render(<TelegramScreen />);
     const button = screen.getByRole('button', { name: 'Connect Telegram' });
     await fireEvent.press(button);
     await fireEvent.press(button);
@@ -76,7 +76,7 @@ describe('Connect (AC 1)', () => {
     setStore(
       fakeStore('S1', { telegram: null, createTelegramLinkCode: jest.fn().mockRejectedValue(new Error('Network request failed')) }),
     );
-    await render(<ProfileScreen />);
+    await render(<TelegramScreen />);
     await fireEvent.press(screen.getByRole('button', { name: 'Connect Telegram' }));
     expect(screen.getByText('Network request failed')).toBeTruthy();
     expect(openUrl).not.toHaveBeenCalled();
@@ -84,11 +84,11 @@ describe('Connect (AC 1)', () => {
 });
 
 describe('Hidden (AC 9)', () => {
-  it('no bot username configured: no card, the rest of Profile unchanged', async () => {
+  it('no bot username configured: no Telegram button on Profile, the rest of Profile unchanged', async () => {
     delete process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME;
     setStore(fakeStore('S1', { telegram: null }));
     await render(<ProfileScreen />);
-    expect(screen.queryByText('TELEGRAM NOTIFICATIONS')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Telegram notifications' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy();
   });
 
@@ -96,7 +96,7 @@ describe('Hidden (AC 9)', () => {
     process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME = '   ';
     setStore(fakeStore('T', { telegram: null }));
     await render(<ProfileScreen />);
-    expect(screen.queryByText('TELEGRAM NOTIFICATIONS')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Telegram notifications' })).toBeNull();
   });
 });
 
@@ -110,7 +110,7 @@ describe('Coming back from Telegram (AC 4)', () => {
       listeners.push(cb as (s: string) => void);
       return { remove: jest.fn() } as never;
     });
-    const view = await render(<ProfileScreen />);
+    const view = await render(<TelegramScreen />);
     expect(store.loadTelegram).toHaveBeenCalledTimes(1);
     await refocus();
     expect(store.loadTelegram).toHaveBeenCalledTimes(2);
@@ -123,7 +123,7 @@ describe('Coming back from Telegram (AC 4)', () => {
 
   it('once linked, shows Connected, the switches and Disconnect', async () => {
     setStore(fakeStore('S1', { telegram: linked() }));
-    await render(<ProfileScreen />);
+    await render(<TelegramScreen />);
     expect(screen.getByText('Connected to Telegram')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Connect Telegram' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Disconnect' })).toBeTruthy();
@@ -137,7 +137,7 @@ describe('Switches (AC 5)', () => {
     ['M', ['Meeting started', 'New homework', 'Homework reviewed', 'Homework submitted', 'Chat messages', 'General chat', 'New materials']],
   ] as const)('%s sees the listener switches (mentors also Homework submitted, ARU-89; General chat, ARU-87), as saved', async (who, labels) => {
     setStore(fakeStore(who, { telegram: linked({ new_homework: false }) }));
-    await render(<ProfileScreen />);
+    await render(<TelegramScreen />);
     expect(switches()).toEqual(labels);
     expect(screen.getByLabelText('New homework').props.value).toBe(false);
     expect(screen.getByLabelText('Chat messages').props.value).toBe(true);
@@ -145,14 +145,14 @@ describe('Switches (AC 5)', () => {
 
   it('the teacher sees Homework submitted (ARU-89), Chat messages, General chat (ARU-87), New accounts (ARU-84)', async () => {
     setStore(fakeStore('T', { telegram: linked() }));
-    await render(<ProfileScreen />);
+    await render(<TelegramScreen />);
     expect(switches()).toEqual(['Homework submitted', 'Chat messages', 'General chat', 'New materials', 'New accounts']);
   });
 
   it('flipping a switch saves it', async () => {
     const store = fakeStore('S1', { telegram: linked() });
     setStore(store);
-    await render(<ProfileScreen />);
+    await render(<TelegramScreen />);
     await fireEvent(screen.getByLabelText('Meeting started'), 'valueChange', false);
     expect(store.setTelegramNotification).toHaveBeenCalledWith('meeting_started', false);
   });
@@ -163,7 +163,7 @@ describe('Switches (AC 5)', () => {
       setTelegramNotification: jest.fn().mockRejectedValue(new Error('Network request failed')),
     });
     setStore(store);
-    await render(<ProfileScreen />);
+    await render(<TelegramScreen />);
     await fireEvent(screen.getByLabelText('Chat messages'), 'valueChange', false);
     expect(screen.getByText('Network request failed')).toBeTruthy();
     expect(screen.getByLabelText('Chat messages').props.value).toBe(true);
@@ -175,7 +175,7 @@ describe('Disconnect (AC 6)', () => {
     const store = fakeStore('S1', { telegram: linked() });
     setStore(store);
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    await render(<ProfileScreen />);
+    await render(<TelegramScreen />);
     await fireEvent.press(screen.getByRole('button', { name: 'Disconnect' }));
     expect(alert).toHaveBeenCalledWith('Disconnect Telegram', 'Stop Sham notifications in Telegram?', expect.any(Array), expect.any(Object));
     const yes = alert.mock.lastCall![2]!.find((b) => b.text === 'Disconnect')!;
@@ -187,7 +187,7 @@ describe('Disconnect (AC 6)', () => {
     const store = fakeStore('S1', { telegram: linked() });
     setStore(store);
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    await render(<ProfileScreen />);
+    await render(<TelegramScreen />);
     await fireEvent.press(screen.getByRole('button', { name: 'Disconnect' }));
     const cancel = alert.mock.lastCall![2]!.find((b) => b.style === 'cancel')!;
     await act(async () => cancel.onPress!());
