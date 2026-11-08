@@ -2,12 +2,25 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
 import { AccessGate } from '@/components/AccessGate';
+import { LanguageProvider, useI18n } from '@/i18n/LanguageProvider';
 import { StoreProvider } from '@/lib/store';
 import { colors } from '@/lib/theme';
 
 export default function RootLayout() {
   return (
     <StoreProvider>
+      {/* ARU-108: the app's language (account choice, else the phone's); every screen below reads it. */}
+      <LanguageProvider>
+        <AppStack />
+      </LanguageProvider>
+    </StoreProvider>
+  );
+}
+
+function AppStack() {
+  const { t } = useI18n();
+  return (
+    <>
       <StatusBar style="dark" />
       {/* ARU-43: accounts waiting for (or declined) approval see only the waiting / declined screen. */}
       <AccessGate>
@@ -53,12 +66,12 @@ export default function RootLayout() {
           <Stack.Screen name="general-chat" options={{ title: 'General chat' }} />
           {/* ARU-101: a pushed page (not a modal), so iOS swipe-back and Android back return to Profile. */}
           <Stack.Screen name="telegram" options={{ title: 'Telegram notifications' }} />
-          <Stack.Screen name="change-password" options={{ title: 'Change password', presentation: 'modal' }} />
-          <Stack.Screen name="reset-password" options={{ title: 'Reset password' }} />
+          <Stack.Screen name="change-password" options={{ title: t('changePassword.title'), presentation: 'modal' }} />
+          <Stack.Screen name="reset-password" options={{ title: t('reset.title') }} />
           <Stack.Screen name="disciplines/new" options={{ title: 'New discipline', presentation: 'modal' }} />
           <Stack.Screen name="disciplines/[id]" options={{ title: 'Discipline' }} />
         </Stack>
       </AccessGate>
-    </StoreProvider>
+    </>
   );
 }

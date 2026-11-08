@@ -1,23 +1,35 @@
 // Shared rules and messages for the password screens: change password on Profile (ARU-76) and the forgotten-password
-// reset on the sign-in screen (ARU-77), so both behave and read the same.
+// reset on the sign-in screen (ARU-77), so both behave and read the same. ARU-108: the texts are the English catalog's
+// (src/i18n/en.json); the screens show them in the chosen language with translateMessage().
+import { translate } from '@/i18n';
+
+const en = (id: Parameters<typeof translate>[1], params?: Record<string, string | number>) => translate('en', id, params);
 
 /** The minimum Sham asks for at sign-up; Supabase Auth may be set stricter (its message is shown then). */
 export const PASSWORD_MIN = 6;
-export const PASSWORD_PLACEHOLDER = `At least ${PASSWORD_MIN} characters`;
-export const PASSWORDS_DONT_MATCH = "Passwords don't match";
-export const SAME_PASSWORD = 'The new password must be different from the current one';
-export const WRONG_CURRENT_PASSWORD = 'Current password is incorrect';
-export const PASSWORD_CHANGED = 'Password changed';
-export const NETWORK_ERROR = 'Could not reach the server. Check your connection and try again.';
-export const RATE_LIMITED = 'Too many requests. Please wait a few minutes and try again.';
+export const PASSWORD_PLACEHOLDER = en('password.placeholder', { min: PASSWORD_MIN });
+export const PASSWORDS_DONT_MATCH = en('password.mismatch');
+export const SAME_PASSWORD = en('auth.samePassword');
+export const WRONG_CURRENT_PASSWORD = en('auth.wrongCurrentPassword');
+export const PASSWORD_CHANGED = en('password.changed');
+export const NETWORK_ERROR = en('auth.network');
+export const RATE_LIMITED = en('auth.rateLimited');
+// ARU-108 AC 7a: Auth errors the app words itself.
+export const INVALID_CREDENTIALS = en('auth.invalidCredentials');
+export const USER_EXISTS = en('auth.userExists');
+export const EMAIL_NOT_CONFIRMED = en('auth.emailNotConfirmed');
+/** The server's minimum length when it states one ("Password should be at least 8 characters."), else ours. The
+ *  analysis note on ARU-108: a stricter project setting must not be contradicted by "at least 6". */
+export const weakPasswordMessage = (serverText?: string) =>
+  en('auth.weakPassword', { min: Number(/at least (\d+)/i.exec(serverText ?? '')?.[1] ?? PASSWORD_MIN) });
+export const GENERIC_ERROR = en('common.genericError');
 
 // ARU-77: the forgotten-password reset with a code from the email.
-export const CODE_INVALID = 'This code is wrong or has expired. Check the email or send a new code.';
+export const CODE_INVALID = en('auth.codeInvalid');
 /** Seconds before "Send a new code" can be tapped again. */
 export const RESEND_COOLDOWN_S = 60;
 /** The same answer whether or not an account exists for the email (AC 3). */
-export const codeSentMessage = (email: string) =>
-  `If an account exists for ${email}, we've sent a code to it. It can take a few minutes.`;
+export const codeSentMessage = (email: string) => en('reset.codeSent', { email });
 /** Digits only: letters are dropped and a pasted "123 456" becomes "123456". */
 export const cleanCode = (text: string) => text.replace(/\D/g, '').slice(0, 10);
 /** A complete code: 6–10 digits (the project's OTP length, 6 by default). */
@@ -59,11 +71,16 @@ export function codeErrorMessage(error: AuthErrorLike) {
   return CODE_INVALID;
 }
 
-/** A user-readable message for an Auth error: the server's own text, except for the cases the app words itself. */
+/** A user-readable message for an Auth error: the server's own text, except for the cases the app words itself
+ *  (ARU-108 AC 7a). The screens translate the app's texts; any other text becomes the generic one in Russian. */
 export function authErrorMessage(error: AuthErrorLike): string {
-  if (!error) return 'Something went wrong. Please try again.';
+  if (!error) return GENERIC_ERROR;
   if (error.code === 'same_password') return SAME_PASSWORD;
+  if (isInvalidCredentials(error)) return INVALID_CREDENTIALS;
+  if (error.code === 'user_already_exists' || error.code === 'email_exists') return USER_EXISTS;
+  if (error.code === 'email_not_confirmed') return EMAIL_NOT_CONFIRMED;
+  if (error.code === 'weak_password') return weakPasswordMessage(error.message);
   if (isRateLimited(error)) return RATE_LIMITED;
   if (isNetworkError(error)) return NETWORK_ERROR;
-  return error.message || 'Something went wrong. Please try again.';
+  return error.message || GENERIC_ERROR;
 }

@@ -3,7 +3,8 @@ import { useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { Button, Card, ErrorText, Field, RoleBadge, styles } from '@/components/ui';
-import { NAME_MAX, NAME_TOO_LONG } from '@/lib/profileName';
+import { useI18n } from '@/i18n/LanguageProvider';
+import { NAME_MAX } from '@/lib/profileName';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import { useAction } from '@/lib/useAction';
@@ -16,6 +17,7 @@ export const EDIT_NAME_ICON = 'create-outline' as const;
 export function ProfileNameCard() {
   const { currentUser, session, updateMyName } = useStore();
   const { busy, error, run } = useAction();
+  const { t, tm } = useI18n();
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState('');
   // Blocks a second tap before the busy state has rendered, so a double tap sends one request.
@@ -57,7 +59,7 @@ export function ProfileNameCard() {
         {editing ? null : (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Edit name"
+            accessibilityLabel={t('profile.editName')}
             onPress={startEditing}
             // 44×44 touch area; the negative margin keeps the 22 pt glyph on the name's first line.
             style={({ pressed }) => [
@@ -71,7 +73,7 @@ export function ProfileNameCard() {
       {editing && (
         <View style={{ gap: 10 }}>
           <Field
-            label="NAME"
+            label={t('profile.nameLabel')}
             value={text}
             onChangeText={setText}
             autoFocus
@@ -82,20 +84,22 @@ export function ProfileNameCard() {
             onSubmitEditing={save}
             editable={!busy}
           />
-          {tooLong && <Text style={{ color: colors.danger, fontSize: 14 }}>{NAME_TOO_LONG}</Text>}
-          <ErrorText error={error} />
+          {tooLong && (
+            <Text style={{ color: colors.danger, fontSize: 14 }}>{t('profile.nameTooLong', { max: NAME_MAX })}</Text>
+          )}
+          <ErrorText error={tm(error)} />
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <View style={{ flex: 1 }}>
-              <Button title={busy ? 'Saving…' : 'Save'} onPress={save} disabled={!canSave} />
+              <Button title={busy ? t('common.saving') : t('common.save')} onPress={save} disabled={!canSave} />
             </View>
             <View style={{ flex: 1 }}>
-              <Button title="Cancel" variant="secondary" onPress={cancel} disabled={busy} />
+              <Button title={t('common.cancel')} variant="secondary" onPress={cancel} disabled={busy} />
             </View>
           </View>
         </View>
       )}
       <Text style={styles.muted}>{session?.user.email}</Text>
-      <RoleBadge role={currentUser.role} />
+      <RoleBadge role={currentUser.role} label={t(`role.${currentUser.role}`)} />
     </Card>
   );
 }
