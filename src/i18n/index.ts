@@ -163,6 +163,7 @@ const APP_MESSAGE_IDS: [TextId, Params?][] = [
   ['telegram.linkFailed'],
   ['chat.loadError'],
   ['chat.loadOlderError'],
+  ['homework.photosZipError'],
 ];
 /**
  * ARU-113: app messages that carry a value only known at run time; the named groups fill the text's placeholders.

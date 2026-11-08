@@ -37,6 +37,7 @@ function AppStack() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="homework/new" options={{ title: t('homework.addTitle'), presentation: 'modal' }} />
           <Stack.Screen name="homework/[id]" options={{ title: t('homework.detailTitle') }} />
+          <Stack.Screen name="homework/photos" options={{ title: t('homework.photosByCourseTitle'), presentation: 'modal' }} />
           <Stack.Screen name="courses/new" options={{ title: t('courses.newTitle'), presentation: 'modal' }} />
           <Stack.Screen name="courses/[id]" options={{ title: t('courses.detailTitle') }} />
           <Stack.Screen name="courses/[id]/chat" options={{ title: t('chat.title') }} />

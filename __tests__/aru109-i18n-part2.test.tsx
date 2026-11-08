@@ -261,3 +261,19 @@ describe('AC 7: switching keeps the tab\'s state', () => {
     expect(screen.getByText(/^Новые/)).toBeTruthy();
   });
 });
+
+describe('ARU-128: ARU-107 photo texts in both languages', () => {
+  const { deletionWarningText, formatUtcDate } = require('@/lib/photoRetention');
+  it.each([
+    [1, '1 фото домашнего задания будет удалено 20 ноября 2026. Скачайте его сейчас.'],
+    [3, '3 фото домашних заданий будут удалены 20 ноября 2026. Скачайте их сейчас.'],
+  ])('%i photo(s) (ru)', (count, text) => {
+    expect(deletionWarningText({ count, date: '2026-11-20' }, 'ru')).toBe(text);
+  });
+  it('English reads as before', () => {
+    expect(deletionWarningText({ count: 1, date: '2026-11-20' }, 'en')).toBe(
+      `1 homework photo will be deleted on ${formatUtcDate('2026-11-20', 'en')}. Download them now.`,
+    );
+    expect(translate('ru', 'homework.photoRule')).toMatch(/^Фото хранятся 6 месяцев/);
+  });
+});
