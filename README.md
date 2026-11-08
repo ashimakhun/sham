@@ -2,22 +2,25 @@
 
 An educational mobile app where teachers, mentors and students work together:
 
-- **Teachers and mentors** create courses and add students and mentors to them as listeners.
+- **Teachers and mentors** create courses and add students and mentors to them as listeners (course details → **Listeners** page,
+  ARU-97). Only the teacher deletes a course with everything in it (ARU-85).
 - **The course owner** (or the teacher) schedules meetings; after a completed meeting they add notes and assign
   homework, and listeners mark that they attended.
 - **Listeners** send homework (text + optional photo) for an assignment from the **New** list on the Homework tab.
 - **Mentors and the teacher** see all homework, leave a comment and mark it as checked (never their own).
 - **All homework lives on the Homework tab** (ARU-80; course details no longer lists it); its **Checked** list has a
   course filter.
-- **Each course** has a chat with a new-message counter for its owner, listeners and the teacher.
-- **General chat** for every accepted account, any role, opened from the Profile tab.
+- **Each course** has a chat with a new-message counter for its owner, listeners and the teacher; it opens from the chat
+  icon on the course card (ARU-96).
+- **General chat** for every accepted account, any role, opened from the top of the Profile tab (ARU-100).
 - **Teachers and mentors** share formatted posts (lessons, notes, links) on the Materials tab's **Blog**, filterable
   by author, which everyone can like; and PDF books in the **Knowledge base**, optionally linked to a course and
-  optionally visible only to that course's participants.
+  optionally visible only to that course's participants. The teacher can delete any of these PDFs (ARU-86).
 - **Listeners** rate a course once it has started (1–5 stars and a review); everyone who sees the course reads it.
 - **Hidden courses** are seen only by their owner, their listeners and the teacher.
 - **Disciplines** (ARU-63): the teacher groups courses into disciplines; the Courses tab shows **Courses** (your courses,
-  then those with no discipline) and **Disciplines** (each with the rating and reviews of its courses).
+  then those with no discipline) and **Disciplines** (each with the rating and reviews of its courses). The teacher deletes
+  a discipline together with its courses (ARU-83).
 - **Accountants** (ARU-65): the teacher turns Accountant on for mentors; accountants pick the paid courses and give
   each a monthly payment period (Profile tab).
 - **Payments** (ARU-66): accountants and the teacher open a paid course from the Accountant section and mark each
@@ -28,6 +31,10 @@ An educational mobile app where teachers, mentors and students work together:
   a row with ">" and a count of waiting requests; its payments page has the period, Change period, Unselect and,
   under each listener, their request with View proof.
 - **New accounts** wait for the teacher's approval before they can use the app.
+- **Telegram notifications** from the Sham bot, set up on Profile → **Telegram notifications** (its own page, ARU-101):
+  meeting started, new homework, homework reviewed, homework submitted (course owner), every course chat and general
+  chat message, and new accounts (teacher). See [Telegram notifications](#telegram-notifications).
+- **Profile** no longer lists courses (ARU-98); courses are on the Courses tab.
 - **Delete account** (ARU-75): students and mentors (and waiting or declined accounts) delete their own account after
   re-entering their password. Personal data is removed; chat messages and work done for others stay, shown as
   **Deleted account**. A mentor who owns courses must hand them over first; the teacher can't delete their account.
@@ -207,7 +214,8 @@ teacher in the SQL Editor, then run the migration again.
 ### Telegram notifications
 
 Notifications go through the Sham Telegram bot (ARU-48). Each user connects on **Profile → Telegram notifications**
-and chooses which types they get. Until the steps below are done the card stays hidden and nothing else changes.
+(a separate page since ARU-101) and chooses which types they get. Until the steps below are done the button stays
+hidden and nothing else changes.
 
 1. In Telegram, message **@BotFather**, send `/newbot` and keep the **token** it gives you secret.
 2. Set the Edge Function secrets (dashboard → Edge Functions → Secrets, or the CLI). `TELEGRAM_WEBHOOK_SECRET` is
@@ -483,16 +491,20 @@ GitHub Actions runs both on every pull request and on pushes to `main` (`.github
 ```
 src/app/                  screens (Expo Router — every file is a route)
   index.tsx               sign in / create account
-  (tabs)/                 Homework · Courses (My courses / All courses) · Materials · Profile tabs
+  (tabs)/                 Homework · Courses (Courses / Disciplines) · Materials · Profile tabs
   homework/new.tsx        a listener sends homework for an assignment (opened from New)
   homework/[id].tsx       homework details; mentor marks it checked
   courses/new.tsx         teacher or mentor creates a course (visible or hidden)
-  courses/[id].tsx        course details, meetings, a Listeners row, linked Knowledge base PDFs, feedback and homework
+  courses/[id].tsx        course details: Pay, discipline, Change owner, meetings, a Listeners row, linked Knowledge base
+                          PDFs, feedback, meeting history, Delete course (teacher); no chat button or homework list
   courses/[id]/feedback.tsx  a listener adds or edits their feedback (stars + review)
   courses/[id]/members.tsx  Listeners page: the list; teacher or mentor removes (X) and adds (ARU-97)
   courses/[id]/listeners.tsx  teacher or mentor adds listeners
-  courses/[id]/chat.tsx   course chat (owner, listeners and the teacher)
+  courses/[id]/chat.tsx   course chat (owner, listeners and the teacher), opened from the course card's chat icon
   general-chat.tsx        general chat for every accepted account (from Profile)
+  telegram.tsx            Telegram notifications page: connect the bot, switches, Disconnect (from Profile, ARU-101)
+  delete-account.tsx      the user deletes their own account with their password (ARU-75)
+  disciplines/            new.tsx teacher creates a discipline; [id].tsx rating, reviews, courses, Delete discipline
   change-password.tsx     the signed-in user changes their own password (from Profile)
   reset-password.tsx      Forgot password?: email a code, then set a new password with it (signed out)
   courses/[id]/owner.tsx  teacher or mentor changes the course owner
@@ -535,7 +547,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Change course owner        |           | ✓ (any course they can reach¹) | ✓       |
 | Own a course               | never     | ✓ (not if a listener) | ✓    |
 | Be a course listener       | ✓         | ✓ (not own course) |         |
-| See course listeners       | own courses | ✓                | ✓       |
+| See course listeners (Listeners page) | own courses (read-only) | ✓ | ✓  |
 | Add / remove listeners     |           | ✓ (any course they can reach¹) | ✓       |
 | Course chat (read / post)  | courses they're in | own courses + courses they're in | all |
 | General chat (read / post; no edit or delete) | ✓ | ✓ | ✓ |
@@ -583,7 +595,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Delete someone else's account |         |                    | (nobody) |
 
 ¹ Since ARU-63 a mentor reaches a course through the Courses list (courses they own or attend, and courses with no
-discipline), the Profile tab or a Knowledge base PDF's course link. Courses in a discipline that they neither own nor
+discipline) or a Knowledge base PDF's course link (the Profile tab no longer lists courses, ARU-98). Courses in a discipline that they neither own nor
 attend aren't listed; database access to them is unchanged.
 
 ## Development workflow
@@ -599,11 +611,10 @@ mentor or the teacher change homework that is already checked; the app never off
 
 ## Work in progress
 
-- **Telegram notifications** (instead of push notifications, which were canceled): linking a Sham account to the
-  Sham Telegram bot (ARU-48, in QA, PR #46; it uses migration 0023), then notifications for new chat messages
-  (ARU-44), checked homework (ARU-49), new homework assignments (ARU-50) and meetings starting (ARU-41). The
-  product owner starts this work; the dev agent skips it until then.
-- **Full formatted posts on Blog cards** (ARU-54): in development.
+- **Edit course** (ARU-103): a pencil in the course name card opens Edit course (discipline and owner), replacing the
+  Discipline card and the Change owner button. Done in Linear; its PR (branch `sham-ARU-103-edit-course`) isn't merged.
+- **Telegram for new materials** (ARU-102): a Telegram message when a Blog post or Knowledge base PDF is shared. In QA
+  (branch `sham-ARU-102-new-material-notifications`).
 
 ## Next steps
 
