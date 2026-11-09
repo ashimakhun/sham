@@ -479,5 +479,6 @@ const tile = StyleSheet.create({
     backgroundColor: colors.primarySoft,
   },
   pillDanger: { backgroundColor: '#FEF2F2' },
-  pillText: { fontSize: 13, fontWeight: '600' },
+  // ARU-122: action pills and the attended chip are upper case by style (labels stay as written).
+  pillText: { fontSize: 12, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase' },
 });

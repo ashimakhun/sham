@@ -164,7 +164,7 @@ describe('footer (AC 6, AC 7, AC 9)', () => {
     expect(footerItems('P')).toEqual(['Edit', 'Attended 0 of 1', 'Mark completed', 'Mark canceled']);
     const pill = screen.getByRole('button', { name: 'Edit' });
     expect(flat(pill.props.style)).toMatchObject({ backgroundColor: colors.primarySoft, borderRadius: 999 });
-    expect(flat(inMeeting('P').getByText('Edit').props.style)).toMatchObject({ color: colors.primary, fontSize: 13, fontWeight: '600' });
+    expect(flat(inMeeting('P').getByText('Edit').props.style)).toMatchObject({ color: colors.primary, fontSize: 12, fontWeight: '500', textTransform: 'uppercase' }); // ARU-122
     const cancel = screen.getByRole('button', { name: 'Mark canceled' });
     expect(flat(cancel.props.style).backgroundColor).toBe('#FEF2F2');
     expect(flat(inMeeting('P').getByText('Mark canceled').props.style).color).toBe(colors.danger);
