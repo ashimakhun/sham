@@ -227,8 +227,8 @@ export const styles = StyleSheet.create({
   },
   title: { fontSize: 17, ...font(500), color: colors.text },
   h1: { fontSize: 26, ...font(600), color: colors.text },
-  body: { fontSize: 15, lineHeight: 22, color: colors.text },
-  muted: { fontSize: 13, color: colors.muted },
+  body: { fontSize: 15, lineHeight: 22, ...font(300), color: colors.text },
+  muted: { fontSize: 13, ...font(300), color: colors.muted },
   label: { fontSize: 13, ...font(500), color: colors.muted },
   input: {
     backgroundColor: colors.card,

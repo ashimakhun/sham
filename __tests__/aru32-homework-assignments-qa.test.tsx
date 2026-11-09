@@ -2,7 +2,7 @@
 // count (AC 6), an assignment leaving New once sent and moving to Waiting / Checked (AC 7), a listener removed and
 // re-added (edge case), a student outside the course never seeing its assignments, a whitespace-only title and a
 // double-tapped Save on the Assign homework screen (AC 1, AC 2), and the assignment line for any mentor (AC 10).
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 
 import HomeworkScreen from '@/app/(tabs)/homework';
 import AssignHomeworkScreen from '@/app/courses/[id]/meetings/[meetingId]/assign-homework';
@@ -164,7 +164,9 @@ describe('AC10: homework details', () => {
     setStore(fakeStore(who, { courseMembers: [member('A', 'S1')], meetings: MEETINGS, assignments: ASSIGNMENTS, visibleHomework: [linked] }));
     await render(<HomeworkDetailScreen />);
     const line = screen.getByTestId('homework-assignment');
-    expect(line).toHaveTextContent(/Assignment: Fresh · Meeting /);
+    // ARU-117: the meeting is its own row now, with no " · " separator.
+    expect(within(line).getByText('Assignment: Fresh')).toBeTruthy();
+    expect(within(line).getByTestId('homework-assignment-meeting')).toHaveTextContent(/^Meeting /);
     expect(line).toHaveTextContent(`Due ${formatDateTime(fresh.dueAt!)}`, { exact: false });
   });
 });
