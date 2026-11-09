@@ -640,6 +640,7 @@
   "accountant.markPaidLabel": "Course payments · Mark paid accessibility label",
   "accountant.undoPaid": "Course payments · link",
   "accountant.undoPaidLabel": "Course payments · Undo paid accessibility label",
+  "accountant.undoPaidMessage": "Course payments · confirmation message when tapping the red X (ARU-118); the title and the confirm button reuse accountant.undoPaid",
   "accountant.clearExempt": "Course payments · link",
   "accountant.clearExemptLabel": "Course payments · Clear exempt accessibility label",
   "accountant.setExempt": "Course payments · link",

@@ -3,7 +3,7 @@
 // listeners S1, S2, S3; B (paid, days 10-15) has S1; C is paid (1-5) with no unpaid listeners. The device date is
 // 3 Nov 2026 unless a test changes it.
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import { AppState } from 'react-native';
+import { Alert, AppState } from 'react-native';
 import { router } from 'expo-router';
 
 import CoursesScreen from '@/app/(tabs)/courses';
@@ -149,7 +149,7 @@ describe('AC1 / AC6: the payments screen', () => {
     params.id = 'A';
   });
 
-  it('lists current listeners sorted by name with Unpaid, Paid (date) or Exempt; Exempt wins', async () => {
+  it('lists current listeners Unpaid, then Paid (date), then Exempt (ARU-124); Exempt wins', async () => {
     setStore(
       forUser('M', {
         courseBilling: [bill('A')],
@@ -159,7 +159,7 @@ describe('AC1 / AC6: the payments screen', () => {
     );
     await render(<CoursePaymentsScreen />);
     const order = screen.getAllByTestId(/^payment-/).map((n) => n.props.testID);
-    expect(order).toEqual(['payment-S3', 'payment-S1', 'payment-S2']);
+    expect(order).toEqual(['payment-S2', 'payment-S1', 'payment-S3']);
     expect(within(screen.getByTestId('payment-S1')).getByText(`Paid · ${formatDate(new Date(2026, 10, 2, 12).toISOString())}`)).toBeTruthy();
     expect(within(screen.getByTestId('payment-S2')).getByText('Unpaid')).toBeTruthy(); // October's mark doesn't count
     expect(within(screen.getByTestId('payment-S3')).getByText('Exempt')).toBeTruthy();
@@ -175,6 +175,8 @@ describe('AC1 / AC6: the payments screen', () => {
     await render(<CoursePaymentsScreen />);
     await fireEvent.press(screen.getByRole('button', { name: 'Mark Student Sue paid' }));
     await waitFor(() => expect(store.markPaid).toHaveBeenCalledWith('A', 'S2', '2026-11-01'));
+    // ARU-118 AC 5: Undo paid now asks first; confirm it.
+    jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => buttons?.[1]?.onPress?.());
     await fireEvent.press(screen.getByRole('button', { name: 'Undo paid for Student Sam' }));
     await waitFor(() => expect(store.undoPaid).toHaveBeenCalledWith('A', 'S1', '2026-11-01'));
     await fireEvent.press(screen.getByRole('button', { name: 'Clear exempt for Abby Student' }));
