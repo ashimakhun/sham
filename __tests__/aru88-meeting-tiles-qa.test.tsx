@@ -1,12 +1,12 @@
 // QA ARU-88: gaps in aru88-meeting-tiles.test.tsx: every pill's tap target is at least 44 pt tall (pill + hit slop),
-// a long topic is cut to 2 lines while the badge keeps its size, the teacher (not the owner) gets the same footer as
+// a long title wraps while the badge keeps its size (ARU-129: the title is the date and time), the teacher (not the owner) gets the same footer as
 // the owner, a canceled meeting in MEETING HISTORY has a grey bar and a Canceled badge, a long location wraps to 2
 // lines inside the tile, and the meeting testIDs stay unique per meeting.
 import { render, screen, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
 import CourseDetailScreen from '@/app/courses/[id]';
-import { colors } from '@/lib/theme';
+import { colors, formatDateTime } from '@/lib/theme';
 import type { Meeting } from '@/lib/types';
 
 import { fakeStore, member } from './helpers/fakeStore';
@@ -52,12 +52,17 @@ it('AC6: every action pill is at least 44 pt tall once its hit slop is counted',
   }
 });
 
-it('AC4 edge: a long topic is cut to 2 lines and the badge keeps its size', async () => {
+// ARU-129 replaced the topic title with the date and time; its edge case: a long title wraps (no line limit) and the
+// badge on the right keeps its size. The old long topic is never shown.
+it('AC4 edge (ARU-129): the date-and-time title wraps, the badge keeps its size, a long old topic is not shown', async () => {
   const long = meeting({ id: 'L', startsAt: at(3), topic: 'A very long meeting topic that goes on '.repeat(5).trim() });
   setStore(fakeStore('S1', { courseMembers: members, meetings: [long] }));
   await render(<CourseDetailScreen />);
   const tile = within(screen.getByTestId('meeting-L'));
-  expect(tile.getByText(long.topic).props.numberOfLines).toBe(2);
+  expect(tile.queryByText(long.topic)).toBeNull();
+  const title = tile.getByText(formatDateTime(long.startsAt));
+  expect(title.props.numberOfLines).toBeUndefined();
+  expect((flat(title.props.style) as { flex?: number }).flex).toBe(1);
   const badge = tile.getByTestId('status-badge');
   expect((flat(badge.props.style) as { flexShrink?: number }).flexShrink).toBe(0);
   expect(tile.getByText('Scheduled')).toBeTruthy();

@@ -63,10 +63,12 @@ it('AC3: re-picking the same date and time of a past meeting is not a reschedule
   await answer(new Date(2000, 0, 1, start.getHours(), start.getMinutes()));
 
   expect(screen.queryByText('Pick a time in the future')).toBeNull();
-  await fireEvent.changeText(screen.getByDisplayValue('Past'), 'Past, fixed');
+  // ARU-129: the form has no Topic field; change the place instead. The stored topic is sent back unchanged (AC 6).
+  expect(screen.queryByDisplayValue('Past')).toBeNull();
+  await fireEvent.changeText(screen.getByDisplayValue('Room 12'), 'Room 14');
   await fireEvent.press(screen.getByRole('button', { name: 'Save' }));
   await waitFor(() => expect(router.back).toHaveBeenCalled());
-  expect(updateMeeting).toHaveBeenCalledWith('P', { startsAt: P.startsAt, topic: 'Past, fixed', location: 'Room 12' });
+  expect(updateMeeting).toHaveBeenCalledWith('P', { startsAt: P.startsAt, topic: 'Past', location: 'Room 14' });
 });
 
 it('AC2/AC3: picking a new future date through the dialogs reschedules to that minute', async () => {
