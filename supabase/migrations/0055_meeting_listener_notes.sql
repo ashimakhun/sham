@@ -65,7 +65,7 @@ create policy "authors edit own notes while listeners" on meeting_listener_notes
   with check (author_id = auth.uid() and is_member(course_id));
 create policy "authors, the owner or the teacher delete notes" on meeting_listener_notes for delete to authenticated
   using (
-    (author_id = auth.uid() and (is_member(course_id) or my_role() in ('mentor', 'teacher')))
+    (author_id is not null and author_id = auth.uid() and (is_member(course_id) or my_role() in ('mentor', 'teacher')))
     or owns_course(course_id)
     or my_role() = 'teacher'
   );
@@ -174,7 +174,8 @@ create function delete_meeting_listener_notes(note uuid) returns void
       raise exception 'Notes not found.' using errcode = 'P0002', hint = 'sham:listener_notes_not_found';
     end if;
     if not (
-      (n.author_id = auth.uid() and (is_member(n.course_id) or coalesce(my_role() in ('mentor', 'teacher'), false)))
+      -- AC 12: a deleted account's notes have no author; that term must be false, not null (null would let anyone in).
+      (n.author_id is not null and n.author_id = auth.uid() and (is_member(n.course_id) or coalesce(my_role() in ('mentor', 'teacher'), false)))
       or owns_course(n.course_id)
       or coalesce(my_role() = 'teacher', false)
     ) then
