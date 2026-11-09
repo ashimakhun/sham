@@ -18,6 +18,7 @@ import { LanguageProvider } from '@/i18n/LanguageProvider';
 import notes from '@/i18n/notes.json';
 import ru from '@/i18n/ru.json';
 import { colors, formatDateTime } from '@/lib/theme';
+import { font } from '@/lib/fonts';
 import type { Meeting, User } from '@/lib/types';
 
 import { fakeStore, member, users } from './helpers/fakeStore';
@@ -215,7 +216,7 @@ describe('AC 4: tile layout', () => {
     expect(s).toMatchObject({ fontSize: 12, color: colors.muted });
     const title = within(screen.getByTestId('meeting-R')).getByText(formatDateTime(R.startsAt));
     expect([title.props.children].flat().join('')).not.toMatch(/Rescheduled/);
-    expect(StyleSheet.flatten(title.props.style)).toMatchObject({ fontSize: 14, fontWeight: '600' });
+    expect(StyleSheet.flatten(title.props.style)).toMatchObject({ fontSize: 14, ...font(600) });
     expect(screen.queryByTestId('rescheduled-F')).toBeNull();
     // The separate date line is gone: the date and time appears once per tile.
     expect(within(screen.getByTestId('meeting-F')).getAllByText(formatDateTime(F.startsAt))).toHaveLength(1);
