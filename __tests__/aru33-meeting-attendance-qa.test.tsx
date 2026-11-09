@@ -42,13 +42,13 @@ describe('AC7: live updates', () => {
   it('the count on the course screen follows marks and undos from the store', async () => {
     setStore(store('T'));
     const view = await render(<CourseDetailScreen />);
-    expect(inMeeting('C').getByText('Attended: 0 of 3')).toBeTruthy();
+    expect(inMeeting('C').getByRole('link', { name: 'Attended 0 of 3' })).toBeTruthy();
     setStore(store('T', { attendance: [mark('C', 'S1'), mark('C', 'M2')] }));
     await view.rerender(<CourseDetailScreen />);
-    expect(inMeeting('C').getByText('Attended: 2 of 3')).toBeTruthy();
+    expect(inMeeting('C').getByRole('link', { name: 'Attended 2 of 3' })).toBeTruthy();
     setStore(store('T', { attendance: [mark('C', 'M2')] }));
     await view.rerender(<CourseDetailScreen />);
-    expect(inMeeting('C').getByText('Attended: 1 of 3')).toBeTruthy();
+    expect(inMeeting('C').getByRole('link', { name: 'Attended 1 of 3' })).toBeTruthy();
   });
 
   it('the Attendance screen moves a listener between Attended and Not marked', async () => {
@@ -92,7 +92,7 @@ describe('AC7: live updates', () => {
 it('AC9: a mark by someone who is not a current listener never counts', async () => {
   setStore(store('T', { attendance: [mark('C', 'S2'), mark('C', 'S1')] }));
   await render(<CourseDetailScreen />);
-  expect(inMeeting('C').getByText('Attended: 1 of 3')).toBeTruthy();
+  expect(inMeeting('C').getByRole('link', { name: 'Attended 1 of 3' })).toBeTruthy();
 });
 
 it('edge: a mentor who owns course B and listens to A sees the count on B and "I attended" on A', async () => {
@@ -108,12 +108,12 @@ it('edge: a mentor who owns course B and listens to A sees the count on B and "I
   setStore(both('A'));
   const a = await render(<CourseDetailScreen />);
   expect(inMeeting('C').getByRole('button', { name: 'I attended' })).toBeTruthy();
-  expect(screen.queryByText(/Attended: /)).toBeNull();
+  expect(screen.queryByRole('link', { name: /^Attended / })).toBeNull();
   await a.unmount();
   params.id = 'B';
   setStore(both('B'));
   await render(<CourseDetailScreen />);
-  expect(inMeeting('CB').getByText('Attended: 0 of 1')).toBeTruthy();
+  expect(inMeeting('CB').getByRole('link', { name: 'Attended 0 of 1' })).toBeTruthy();
   expect(inMeeting('CB').queryByRole('button', { name: 'I attended' })).toBeNull();
 });
 
@@ -122,5 +122,5 @@ it('ARU-28 / ARU-32 regression: the owner keeps Add notes and Assign homework ne
   await render(<CourseDetailScreen />);
   expect(inMeeting('C').getByRole('button', { name: 'Add notes' })).toBeTruthy();
   expect(inMeeting('C').getByRole('button', { name: 'Assign homework' })).toBeTruthy();
-  expect(inMeeting('C').getByText('Attended: 0 of 3')).toBeTruthy();
+  expect(inMeeting('C').getByRole('link', { name: 'Attended 0 of 3' })).toBeTruthy();
 });
