@@ -1,5 +1,5 @@
-import { useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { FlatList, Linking, Pressable, RefreshControl, Text, View } from 'react-native';
 
 import { PeriodEditor } from '@/components/Accountant';
@@ -7,10 +7,13 @@ import { PhotoPreview } from '@/components/PhotoPreview';
 import { Card, EmptyState, ErrorText, HiddenBadge, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import {
+  byPaymentRank,
   canSeeBilling,
+  inFrozenOrder,
   isAccountant,
   listenersOf,
   localMonth,
+  paymentRank,
   paymentStatus,
   periodText,
   waitingRequests,
@@ -30,6 +33,8 @@ import { useNow } from '@/lib/useNow';
  * month, and set or clear Exempt. Nothing changes on screen until the change is saved (the store reloads after it).
  * ARU-99 AC 8-11: the header has the period, Change period and Unselect (moved here from the Profile row); a
  * listener's waiting request for this month shows under their name with View proof, and they are listed first.
+ * ARU-124: the list is sorted (request, unpaid, paid, exempt; A–Z within each) when the screen gains focus and after
+ * pull to refresh. In between the order is frozen, so marking someone doesn't move their row (AC 2).
  */
 export default function CoursePaymentsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -47,6 +52,14 @@ export default function CoursePaymentsScreen() {
   } = useStore();
   const { t } = useI18n();
   const month = localMonth(useNow());
+  // ARU-124 AC 3: bumping sortKey re-sorts the list (on focus and after pull to refresh); store reloads don't.
+  const [sortKey, setSortKey] = useState(0);
+  const [frozen, setFrozen] = useState<{ key: number; ids: string[] } | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      setSortKey((k) => k + 1);
+    }, [setSortKey]),
+  );
   if (!canSeeBilling(currentUser)) {
     return <EmptyState title={t('courses.notAllowed')} hint={t('accountant.paymentsNotAllowedHint')} />;
   }
@@ -64,17 +77,33 @@ export default function CoursePaymentsScreen() {
     exemptions: paymentExemptions,
   });
   const requestOf = new Map(waiting.map((r) => [r.userId, r]));
-  // Listeners with a waiting request first; the rest keep the usual order (by name). sort() is stable.
-  const listeners = listenersOf(course.id, courseMembers, getUser).sort(
-    (a, b) => Number(requestOf.has(b.id)) - Number(requestOf.has(a.id)),
-  );
+  const live = listenersOf(course.id, courseMembers, getUser);
+  const statusOf = (userId: string) => paymentStatus(course.id, userId, month, coursePayments, paymentExemptions);
+  // AC 1 on a new sort; otherwise (AC 2) the last order, with new listeners at the end. If nobody from the last order
+  // is left (e.g. the store hadn't loaded yet when the screen opened), sort afresh.
+  const last = frozen;
+  const fresh = !last || last.key !== sortKey || !live.some((l) => last.ids.includes(l.id));
+  const listeners = fresh
+    ? byPaymentRank(live, (userId) => paymentRank(statusOf(userId), requestOf.has(userId)))
+    : inFrozenOrder(live, last.ids);
+  const ids = listeners.map((l) => l.id);
+  if (!last || last.key !== sortKey || ids.join('\n') !== last.ids.join('\n')) setFrozen({ key: sortKey, ids });
   return (
     <FlatList
       style={styles.screen}
       contentContainerStyle={[styles.content, { gap: 12 }]}
       data={listeners}
       keyExtractor={(l) => l.id}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={() => refresh().catch(() => {})} />}
+      refreshControl={
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() =>
+            refresh()
+              .catch(() => {})
+              .then(() => setSortKey((k) => k + 1))
+          }
+        />
+      }
       ListHeaderComponent={<CourseHeader billing={billing} title={course.title} hidden={!!course.hidden} />}
       renderItem={({ item }) => (
         <ListenerRow
@@ -83,7 +112,7 @@ export default function CoursePaymentsScreen() {
           userId={item.id}
           name={item.name}
           month={month}
-          status={paymentStatus(course.id, item.id, month, coursePayments, paymentExemptions)}
+          status={statusOf(item.id)}
           request={requestOf.get(item.id)}
         />
       )}
@@ -125,7 +154,7 @@ function CourseHeader({ billing, title, hidden }: { billing: CourseBilling; titl
             accessibilityLabel={t('accountant.changePeriod')}
             hitSlop={8}
             onPress={() => setEditing(true)}>
-            <Text style={{ color: colors.primary, fontWeight: '600' }}>{t('accountant.changePeriod')}</Text>
+            <Text style={[styles.linkText, { color: colors.primary }]}>{t('accountant.changePeriod')}</Text>
           </Pressable>
           {accountant && (
             <Pressable
@@ -145,7 +174,7 @@ function CourseHeader({ billing, title, hidden }: { billing: CourseBilling; titl
                   if (ok) await unselectPaidCourse(billing.courseId);
                 })
               }>
-              <Text style={{ color: colors.danger, fontWeight: '600', opacity: busy ? 0.4 : 1 }}>{t('accountant.unselect')}</Text>
+              <Text style={[styles.linkText, { color: colors.danger, opacity: busy ? 0.4 : 1 }]}>{t('accountant.unselect')}</Text>
             </Pressable>
           )}
         </View>
@@ -157,14 +186,14 @@ function CourseHeader({ billing, title, hidden }: { billing: CourseBilling; titl
 
 function StatusLabel({ status }: { status: PaymentStatus }) {
   const { t } = useI18n();
-  if (status.kind === 'exempt') return <Text style={[styles.muted, { fontWeight: '600' }]}>{t('billing.exempt')}</Text>;
+  if (status.kind === 'exempt') return <Text style={[styles.muted, styles.caps, { fontSize: 12 }]}>{t('billing.exempt')}</Text>;
   if (status.kind === 'paid')
     return (
-      <Text style={{ color: colors.success, fontWeight: '600' }}>
+      <Text style={[styles.linkText, { color: colors.success }]}>
         {t('billing.paidOn', { date: formatDate(status.payment.markedAt) })}
       </Text>
     );
-  return <Text style={{ color: colors.danger, fontWeight: '600' }}>{t('billing.unpaid')}</Text>;
+  return <Text style={[styles.linkText, { color: colors.danger }]}>{t('billing.unpaid')}</Text>;
 }
 
 /** A text button; `label` (with the listener's name) is what screen readers read. */
@@ -190,7 +219,7 @@ function Action({
       hitSlop={8}
       onPress={onPress}
       style={{ minHeight: 32, justifyContent: 'center' }}>
-      <Text style={{ color: danger ? colors.danger : colors.primary, fontWeight: '600', opacity: disabled ? 0.4 : 1 }}>
+      <Text style={[styles.linkText, { color: danger ? colors.danger : colors.primary, opacity: disabled ? 0.4 : 1 }]}>
         {text}
       </Text>
     </Pressable>

@@ -140,6 +140,35 @@ export function waitingRequests(input: {
   );
 }
 
+/**
+ * ARU-124 AC 1: the payments page group of a listener: 0 unpaid with a waiting request, 1 unpaid, 2 paid, 3 exempt
+ * (Exempt wins over Paid, as in paymentStatus).
+ */
+export function paymentRank(status: PaymentStatus, hasRequest: boolean) {
+  if (status.kind === 'exempt') return 3;
+  if (status.kind === 'paid') return 2;
+  return hasRequest ? 0 : 1;
+}
+
+/** ARU-124 AC 1 / AC 5: listeners (already by name) ordered by paymentRank; sort() is stable, so A–Z stays. */
+export function byPaymentRank<T extends { id: string }>(listeners: T[], rankOf: (id: string) => number): T[] {
+  return [...listeners].sort((a, b) => rankOf(a.id) - rankOf(b.id));
+}
+
+/**
+ * ARU-124 AC 2: keep a frozen order of ids. Listeners still present keep their place, gone ones are dropped and new
+ * ones go at the end (in the order given).
+ */
+export function inFrozenOrder<T extends { id: string }>(listeners: T[], frozenIds: string[]): T[] {
+  const byId = new Map(listeners.map((l) => [l.id, l]));
+  const kept = frozenIds.flatMap((id) => {
+    const l = byId.get(id);
+    return l ? [l] : [];
+  });
+  const known = new Set(frozenIds);
+  return [...kept, ...listeners.filter((l) => !known.has(l.id))];
+}
+
 /** "1 request" / "2 requests" (AC 6); "2 запроса" in Russian (ARU-113 AC 4). */
 export function requestCountText(n: number, lang: Language = currentLanguage()) {
   return translate(lang, 'accountant.requestCount', { count: n });
