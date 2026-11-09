@@ -184,7 +184,12 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `0053_db_error_codes.sql` (ARU-111: Russian version, part 5; every message a database function raises for users
    gets a stable code in its hint (`sham:<code>`, values in detail as JSON), so the app shows it in the user's
    language; the English messages, errcodes, signatures and grants are unchanged; recreates the latest definition of
-   31 functions with `create or replace`; no table, column or policy changes, deletes nothing).
+   31 functions with `create or replace`; no table, column or policy changes, deletes nothing),
+   `0054_homework_photo_deletion.sql` (ARU-112: the daily photo-deletion job; adds `homework.photo_removed_at`, the
+   service-role-only `photo_deletion_warnings` table, `telegram_links.notify_photo_deletion` (on for existing links),
+   the kind `photo_deletion` in `set_telegram_notification()`, five service-role functions and a daily `pg_cron` job;
+   needs **pg_cron** and **pg_net**; deletes nothing until the Edge Function is deployed and its URL and secret are in
+   Vault, see [Daily photo deletion](#daily-photo-deletion-aru-112)).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
@@ -525,6 +530,53 @@ course on **Download by course**. Only a hash of each link is stored (`photo_zip
 
 The warning banner ("<N> homework photos will be deleted on <date>") stays hidden until ARU-112's job sets
 `app_settings.photo_deletion_start`.
+
+### Daily photo deletion (ARU-112)
+
+Once a day (03:17 UTC) a `pg_cron` job calls the Edge Function `photo-deletion`. Each run:
+
+- **First run:** sets `app_settings.photo_deletion_start` to that day (UTC) + 30 days and deletes no homework photo. From
+  then on the app shows each photo's deletion date and the warning banner, and no photo is deleted before that date.
+- **Deletion:** for checked homework whose deletion date (`photo_deletion_date()`) is today or earlier, deletes the
+  file from the `homework` bucket, then clears `photo_path` and sets `photo_removed_at`. The homework itself stays; the
+  details screen shows "Photo removed 6 months after checking". Unchecked homework, payment proofs and materials are
+  never touched. At most 1000 photos per run, most overdue first; the rest go the next day. A file that fails to delete
+  keeps its path and is retried the next day.
+- **Leftovers:** deletes files in the `homework` bucket that no homework points to and that are older than 24 hours
+  (photos of failed sends, ARU-105). Every run, the first included.
+- **Telegram warnings:** when a photo is 30 days or less, then 7 days or less, from its deletion date, its sender gets
+  one message per run: "<N> homework photo(s) will be deleted on <date>. Open Sham → Homework to download them.", if
+  they connected Telegram, are Approved and left **Photo deletion** on. Each mark is recorded once
+  (`photo_deletion_warnings`), whether or not a message could be sent, so turning the switch on later sends nothing
+  for marks already passed.
+
+Until the steps below are done, nothing is deleted, no warning is sent and the start date stays empty.
+
+1. Dashboard → **Database → Extensions**: turn on **pg_cron** and **pg_net** (already on if you set up
+   [Meeting started](#meeting-started-aru-41)).
+2. Run `supabase/migrations/0054_homework_photo_deletion.sql` (it stops with a message if step 1 is missing).
+3. Make a random secret (`openssl rand -hex 24`) and set it as the function's secret:
+   ```bash
+   npx supabase secrets set PHOTO_DELETION_SECRET=<secret>
+   ```
+   (`TELEGRAM_BOT_TOKEN` is already set for [Telegram notifications](#telegram-notifications); without it the photos
+   are still deleted, and the warnings are counted as failed.)
+4. Deploy the function (the cron job sends the secret in `x-cron-secret`, not a Supabase JWT):
+   ```bash
+   npx supabase functions deploy photo-deletion --no-verify-jwt
+   ```
+5. Store the URL and the same secret in Vault (SQL Editor). The job reads both on every run, so neither is in
+   `cron.job`:
+   ```sql
+   select vault.create_secret('https://<project-ref>.supabase.co/functions/v1/photo-deletion', 'photo_deletion_url');
+   select vault.create_secret('<secret>', 'photo_deletion_secret');
+   ```
+6. Check the next day: `select status_code, content from net._http_response order by created desc limit 5;` shows
+   `200` with `{"start_date_set":true,"start_date":"…","deleted":0,"failed":0,"leftovers_deleted":…,…}` on the first
+   run. A `401` means the two secrets differ. To run it at once instead of waiting, call the function yourself:
+   ```bash
+   curl -X POST -H "x-cron-secret: <secret>" https://<project-ref>.supabase.co/functions/v1/photo-deletion
+   ```
 
 ## Run it
 

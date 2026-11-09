@@ -5,6 +5,8 @@ import { currentLanguage, formatDateIn, type Language, translate } from '@/i18n'
 import type { Homework } from './types';
 
 export const PHOTO_RULE = 'Photos are kept for 6 months after the homework is checked, then deleted.';
+/** ARU-112 AC 6: the English text shown in place of a removed photo (the screen reads catalog homework.photoRemoved). */
+export const PHOTO_REMOVED = 'Photo removed 6 months after checking';
 export const PHOTOS_ZIP_ERROR = "Couldn't prepare your photos. Check your connection and try again.";
 /** At most this many photos in one ZIP (the server's PHOTO_ZIP_MAX); more opens Download by course (AC 6). */
 export const PHOTO_ZIP_MAX = 50;
