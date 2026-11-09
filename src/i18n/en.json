@@ -639,6 +639,7 @@
   "accountant.markPaidLabel": "Mark {name} paid",
   "accountant.undoPaid": "Undo paid",
   "accountant.undoPaidLabel": "Undo paid for {name}",
+  "accountant.undoPaidMessage": "Undo paid for {name} for this month? They will show as Unpaid.",
   "accountant.clearExempt": "Clear exempt",
   "accountant.clearExemptLabel": "Clear exempt for {name}",
   "accountant.setExempt": "Set exempt",

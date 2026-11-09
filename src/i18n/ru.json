@@ -639,6 +639,7 @@
   "accountant.markPaidLabel": "Отметить оплату: {name}",
   "accountant.undoPaid": "Отменить оплату",
   "accountant.undoPaidLabel": "Отменить оплату: {name}",
+  "accountant.undoPaidMessage": "Отменить оплату за этот месяц для {name}? Будет показано «Не оплачено».",
   "accountant.clearExempt": "Снять освобождение",
   "accountant.clearExemptLabel": "Снять освобождение: {name}",
   "accountant.setExempt": "Освободить от оплаты",
