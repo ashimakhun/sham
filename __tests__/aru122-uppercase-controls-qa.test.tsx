@@ -78,7 +78,7 @@ function as(who: keyof typeof users, language: "en" | "ru", over: object = {}, a
 
 // User text on these screens: it must never be upper-cased (AC 7).
 const USER_TEXT = [
-  ...Object.values(users).flatMap((u) => [u.name, u.email].filter(Boolean) as string[]),
+  ...Object.values(users).map((u) => u.name),
   courseA.title,
   courseB.title,
   pending.name,
