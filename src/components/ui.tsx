@@ -171,6 +171,43 @@ export function HiddenBadge() {
   );
 }
 
+/**
+ * ARU-118 (same look as ARU-114): a round icon button, a glyph in a tinted 36 pt circle. Hit slop 4 makes the touch
+ * area 44×44 pt. Dimmed (0.4) and disabled while `disabled`.
+ */
+export const ICON_BUTTON_SIZE = 36;
+export function IconButton({
+  icon,
+  tone,
+  label,
+  onPress,
+  disabled,
+  testID,
+}: {
+  icon: ComponentProps<typeof Ionicons>['name'];
+  tone: 'success' | 'danger';
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  testID?: string;
+}) {
+  const color = tone === 'success' ? colors.success : colors.danger;
+  const backgroundColor = tone === 'success' ? colors.successSoft : colors.dangerSoft;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
+      disabled={disabled}
+      hitSlop={4}
+      testID={testID}
+      onPress={onPress}
+      style={[styles.iconButton, { backgroundColor, opacity: disabled ? 0.4 : 1 }]}>
+      <Ionicons name={icon} size={20} color={color} accessibilityElementsHidden importantForAccessibility="no" />
+    </Pressable>
+  );
+}
+
 export function EmptyState({ title, hint }: { title: string; hint?: string }) {
   return (
     <View style={styles.empty}>
@@ -253,6 +290,13 @@ export const styles = StyleSheet.create({
   badgeText: { fontSize: 11, ...font(500), letterSpacing: 0.5, textTransform: 'uppercase' },
   // ARU-122: a tappable text action (View proof, Set exempt, Unselect, Edit…): upper case, 1 pt under the default 14.
   linkText: { fontSize: 13, ...font(500), letterSpacing: 0.5, textTransform: 'uppercase' },
+  iconButton: {
+    width: ICON_BUTTON_SIZE,
+    height: ICON_BUTTON_SIZE,
+    borderRadius: ICON_BUTTON_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   unread: {
     minWidth: 20,
     height: 20,

@@ -6,7 +6,7 @@ import { Text } from '@/components/AppText';
 
 import { PeriodEditor } from '@/components/Accountant';
 import { PhotoPreview } from '@/components/PhotoPreview';
-import { Card, EmptyState, ErrorText, HiddenBadge, styles } from '@/components/ui';
+import { Card, EmptyState, ErrorText, HiddenBadge, IconButton, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import {
   byPaymentRank,
@@ -21,7 +21,7 @@ import {
   waitingRequests,
   type PaymentStatus,
 } from '@/lib/billing';
-import { confirmAction } from '@/lib/confirm';
+import { confirmAction, confirmDestructive } from '@/lib/confirm';
 import { PROOF_LOAD_ERROR, proofFileName } from '@/lib/paymentProof';
 import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
@@ -186,16 +186,20 @@ function CourseHeader({ billing, title, hidden }: { billing: CourseBilling; titl
   );
 }
 
-function StatusLabel({ status }: { status: PaymentStatus }) {
+/** ARU-118 AC 1: the status as a small rounded badge (read as text, not a button). */
+function StatusBadge({ status }: { status: PaymentStatus }) {
   const { t } = useI18n();
-  if (status.kind === 'exempt') return <Text style={[styles.muted, styles.caps, { fontSize: 12 }]}>{t('billing.exempt')}</Text>;
-  if (status.kind === 'paid')
-    return (
-      <Text style={[styles.linkText, { color: colors.success }]}>
-        {t('billing.paidOn', { date: formatDate(status.payment.markedAt) })}
-      </Text>
-    );
-  return <Text style={[styles.linkText, { color: colors.danger }]}>{t('billing.unpaid')}</Text>;
+  const [text, color, backgroundColor] =
+    status.kind === 'exempt'
+      ? [t('billing.exempt'), colors.muted, colors.mutedSoft]
+      : status.kind === 'paid'
+        ? [t('billing.paidOn', { date: formatDate(status.payment.markedAt) }), colors.success, colors.successSoft]
+        : [t('billing.unpaid'), colors.danger, colors.dangerSoft];
+  return (
+    <View style={[styles.badge, { backgroundColor }]} testID="status-badge">
+      <Text style={[styles.badgeText, { color }]}>{text}</Text>
+    </View>
+  );
 }
 
 /** A text button; `label` (with the listener's name) is what screen readers read. */
@@ -228,15 +232,18 @@ function Action({
   );
 }
 
-/** AC 9: "Payment request · <date>" and View proof: a photo full-screen (with Download), a PDF in the browser. */
-function RequestLine({ request, courseTitle, name }: { request: PaymentRequest; courseTitle: string; name: string }) {
+/**
+ * ARU-99 AC 9: View proof opens a photo full-screen (with Download), a PDF in the browser. ARU-118 AC 7: the link
+ * sits in the row's links row; it has its own `opening` state, separate from the row's busy state.
+ */
+function useProofViewer(request: PaymentRequest | undefined) {
   const { getPaymentProofUrl } = useStore();
   const [preview, setPreview] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
-  const { t } = useI18n();
 
   async function view() {
+    if (!request) return;
     setError(null);
     if (request.proofType === 'image') {
       setPreview(true);
@@ -253,27 +260,7 @@ function RequestLine({ request, courseTitle, name }: { request: PaymentRequest; 
     }
   }
 
-  return (
-    <View testID={`request-${request.userId}`} style={{ gap: 2 }}>
-      <Text style={{ color: colors.text }}>{t('accountant.requestLine', { date: formatDate(request.sentAt) })}</Text>
-      <Action
-        text={opening ? t('accountant.opening') : t('accountant.viewProof')}
-        label={t('accountant.viewProofLabel', { name })}
-        disabled={opening}
-        onPress={view}
-      />
-      <ErrorText error={error} />
-      {preview && (
-        <PhotoPreview
-          path={request.proofPath}
-          loadUrl={getPaymentProofUrl}
-          fileName={proofFileName(courseTitle, name)}
-          errorText={t('payments.proofLoadError')}
-          onClose={() => setPreview(false)}
-        />
-      )}
-    </View>
-  );
+  return { preview, closePreview: () => setPreview(false), error, opening, view, getPaymentProofUrl };
 }
 
 function ListenerRow({
@@ -296,47 +283,89 @@ function ListenerRow({
   const { markPaid, undoPaid, setExempt } = useStore();
   const { t } = useI18n();
   const { busy, error, run } = useAction();
+  const proof = useProofViewer(request);
   return (
     <View testID={`payment-${userId}`}>
       <Card style={{ gap: 6 }}>
-        <Text style={[styles.title, { fontSize: 15 }]}>{name}</Text>
-        <StatusLabel status={status} />
-        {request ? <RequestLine request={request} courseTitle={courseTitle} name={name} /> : null}
-        <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ flex: 1, gap: 6 }}>
+            <Text style={[styles.title, { fontSize: 15 }]}>{name}</Text>
+            <StatusBadge status={status} />
+            {request ? (
+              <Text testID={`request-${request.userId}`} style={{ color: colors.text }}>
+                {t('accountant.requestLine', { date: formatDate(request.sentAt) })}
+              </Text>
+            ) : null}
+            {/* AC 7: View proof and Set / Clear exempt on one row; Set exempt only for Unpaid listeners. */}
+            <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap' }}>
+              {request ? (
+                <Action
+                  text={proof.opening ? t('accountant.opening') : t('accountant.viewProof')}
+                  label={t('accountant.viewProofLabel', { name })}
+                  disabled={proof.opening}
+                  onPress={proof.view}
+                />
+              ) : null}
+              {status.kind === 'exempt' && (
+                <Action
+                  text={t('accountant.clearExempt')}
+                  label={t('accountant.clearExemptLabel', { name })}
+                  disabled={busy}
+                  onPress={() => run(() => setExempt(courseId, userId, false))}
+                />
+              )}
+              {status.kind === 'unpaid' && (
+                <Action
+                  text={t('accountant.setExempt')}
+                  label={t('accountant.setExemptLabel', { name })}
+                  disabled={busy}
+                  onPress={() => run(() => setExempt(courseId, userId, true))}
+                />
+              )}
+            </View>
+          </View>
+          {/* AC 2-5: a green check mark marks Paid at once; a red X undoes Paid after a confirmation. */}
           {status.kind === 'unpaid' && (
-            <Action
-              text={t('accountant.markPaid')}
+            <IconButton
+              icon="checkmark"
+              tone="success"
               label={t('accountant.markPaidLabel', { name })}
+              testID={`mark-paid-${userId}`}
               disabled={busy}
               onPress={() => run(() => markPaid(courseId, userId, month))}
             />
           )}
           {status.kind === 'paid' && (
-            <Action
-              text={t('accountant.undoPaid')}
+            <IconButton
+              icon="close"
+              tone="danger"
               label={t('accountant.undoPaidLabel', { name })}
-              danger
+              testID={`undo-paid-${userId}`}
               disabled={busy}
-              onPress={() => run(() => undoPaid(courseId, userId, month))}
-            />
-          )}
-          {status.kind === 'exempt' ? (
-            <Action
-              text={t('accountant.clearExempt')}
-              label={t('accountant.clearExemptLabel', { name })}
-              disabled={busy}
-              onPress={() => run(() => setExempt(courseId, userId, false))}
-            />
-          ) : (
-            <Action
-              text={t('accountant.setExempt')}
-              label={t('accountant.setExemptLabel', { name })}
-              disabled={busy}
-              onPress={() => run(() => setExempt(courseId, userId, true))}
+              onPress={() =>
+                run(async () => {
+                  const ok = await confirmDestructive(
+                    t('accountant.undoPaid'),
+                    t('accountant.undoPaidMessage', { name }),
+                    t('accountant.undoPaid'),
+                  );
+                  if (ok) await undoPaid(courseId, userId, month);
+                })
+              }
             />
           )}
         </View>
+        <ErrorText error={proof.error} />
         <ErrorText error={error} />
+        {proof.preview && request && (
+          <PhotoPreview
+            path={request.proofPath}
+            loadUrl={proof.getPaymentProofUrl}
+            fileName={proofFileName(courseTitle, name)}
+            errorText={t('payments.proofLoadError')}
+            onClose={proof.closePreview}
+          />
+        )}
       </Card>
     </View>
   );
