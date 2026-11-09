@@ -1,6 +1,8 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Linking, Pressable, ScrollView, Text } from 'react-native';
+import { Linking, Pressable, ScrollView } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { Button, Card, EmptyState, ErrorText, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
@@ -9,6 +11,7 @@ import { formatSize, OPEN_FAILED } from '@/lib/files';
 import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
 import { useAction } from '@/lib/useAction';
+import { font } from '@/lib/fonts';
 
 /** Knowledge base item details (ARU-30 AC 5–8). */
 export default function MaterialFileScreen() {
@@ -70,7 +73,7 @@ export default function MaterialFileScreen() {
             accessibilityLabel={t('materials.courseLine', { title: course.title })}
             hitSlop={8}
             onPress={() => router.push({ pathname: '/courses/[id]', params: { id: course.id } })}>
-            <Text style={[styles.body, { color: colors.primary, fontWeight: '600' }]}>
+            <Text style={[styles.body, { color: colors.primary, ...font(500) }]}>
               {t('materials.courseLine', { title: course.title })}
             </Text>
           </Pressable>

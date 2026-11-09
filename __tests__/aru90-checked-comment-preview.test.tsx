@@ -9,6 +9,7 @@ import type { Homework } from '@/lib/types';
 
 import { fakeStore, hw, member } from './helpers/fakeStore';
 import { setStore } from './helpers/mocks';
+import { font } from '@/lib/fonts';
 
 jest.mock('expo-router', () => require('./helpers/mocks').expoRouter);
 jest.mock('@/lib/store', () => require('./helpers/mocks').store);
@@ -72,7 +73,7 @@ describe('AC1-AC4: the Checked list', () => {
     const [first] = screen.getAllByTestId('homework-comment-preview');
     expect(first.props.numberOfLines).toBe(2);
     expect(first.props.ellipsizeMode).toBe('tail');
-    expect(screen.getAllByText('Mentor Max:')[0].props.style).toEqual({ fontWeight: '600' });
+    expect(screen.getAllByText('Mentor Max:')[0].props.style).toEqual(font(500)); // ARU-119: SemiBold 600 became Inter Medium 500
   });
 
   it.each(['T', 'M2'] as const)('%s (checker view): comment preview, no badge, never their own', async (who) => {

@@ -1,11 +1,14 @@
 import { useRef, useState } from 'react';
-import { Keyboard, Pressable, Text, TextInput, type TextInputInstance, useWindowDimensions, View } from 'react-native';
+import { Keyboard, Pressable, type TextInputInstance, useWindowDimensions, View } from 'react-native';
+
+import { Text, TextInput } from '@/components/AppText';
 
 import { ErrorText, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import { type Edit, NOTES_MAX, notesCounter, type Selection, toggleList, toggleWrap } from '@/lib/markdown';
 import { colors } from '@/lib/theme';
 import { useKeyboardHeight } from '@/lib/useKeyboardHeight';
+import { font } from '@/lib/fonts';
 
 type Props = {
   value: string;
@@ -20,7 +23,7 @@ type Props = {
 
 // ARU-109: `label` is a catalog ID, translated when rendered.
 const TOOLS = [
-  { key: 'bold', label: 'notes.bold', glyph: 'B', glyphStyle: { fontWeight: '800' as const } },
+  { key: 'bold', label: 'notes.bold', glyph: 'B', glyphStyle: { ...font(600) } },
   {
     key: 'italic',
     label: 'notes.italic',

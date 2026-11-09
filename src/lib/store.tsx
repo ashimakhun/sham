@@ -7,7 +7,7 @@ import { periodProblem } from './billing';
 import { ACCOUNT_DELETED, DELETE_FAILED, DELETE_OFFLINE } from './deleteAccount';
 import { FEEDBACK_MAX } from './feedback';
 import { fileFieldsError, isAllowedPdf, PDF_MAX_BYTES, PDF_RULE } from './files';
-import { phoneLanguage, translate } from '@/i18n';
+import { dbErrorMessage, phoneLanguage, translate } from '@/i18n';
 
 import { PHOTO_TOO_LARGE } from './compressPhoto';
 import { newId } from './id';
@@ -318,6 +318,8 @@ type HomeworkRow = {
   mentor_comment: string | null;
   created_at: string;
   assignment_id?: string | null;
+  /** ARU-112 (0053); undefined before that migration runs. */
+  photo_removed_at?: string | null;
 };
 type AssignmentRow = {
   id: string;
@@ -399,6 +401,8 @@ type TelegramLinkRow = {
   notify_general_chat?: boolean;
   /** ARU-102 (0048); undefined before that migration runs. */
   notify_new_material?: boolean;
+  /** ARU-112 (0053); undefined before that migration runs. */
+  notify_photo_deletion?: boolean;
 };
 const toTelegramLink = (r: TelegramLinkRow): TelegramLink => ({
   linkedAt: r.linked_at,
@@ -411,6 +415,7 @@ const toTelegramLink = (r: TelegramLinkRow): TelegramLink => ({
     homework_submitted: r.notify_homework_submitted ?? true,
     general_chat: r.notify_general_chat ?? true,
     new_material: r.notify_new_material ?? true,
+    photo_deletion: r.notify_photo_deletion ?? true,
   },
 });
 type MaterialRow = {
@@ -486,6 +491,7 @@ const toHomework = (r: HomeworkRow): Homework => ({
   checkedAt: r.checked_at ?? undefined,
   mentorComment: r.mentor_comment ?? undefined,
   assignmentId: r.assignment_id ?? undefined,
+  photoRemovedAt: r.photo_removed_at ?? undefined,
 });
 
 const toAssignment = (r: AssignmentRow): HomeworkAssignment => ({
@@ -625,10 +631,11 @@ async function deleteErrorMessage(error: unknown): Promise<string> {
   return DELETE_FAILED;
 }
 
-type Result = { error: { message: string; code?: string } | null };
+type Result = { error: { message: string; code?: string; hint?: string | null; details?: string | null } | null };
 
+/** A failed database call: its message in the user's language (ARU-111; English unchanged). */
 function check(res: Result) {
-  if (res.error) throw new Error(res.error.message);
+  if (res.error) throw new Error(dbErrorMessage(res.error));
 }
 
 /** Like check(), but a duplicate primary key means an earlier attempt already saved this row. */
@@ -1130,7 +1137,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const loadTelegram = useCallback(async () => {
     if (!userId) return;
     const res = await supabase.from('telegram_links').select('*').eq('user_id', userId);
-    if (res.error) throw new Error(res.error.message);
+    check(res);
     const row = ((res.data as TelegramLinkRow[] | null) ?? [])[0];
     setTelegram(row ? toTelegramLink(row) : null);
   }, [userId]);
@@ -1885,7 +1892,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           if (res.error?.code === '23505') {
             // Sent from another device (or a double tap) meanwhile: replace that one instead.
             const other = await findMine();
-            if (!other) throw new Error(res.error.message);
+            if (!other) throw new Error(dbErrorMessage(res.error));
             oldPath = other.proof_path;
             check(await supabase.from('course_payment_requests').update(fields).eq('id', other.id));
           } else if (res.error?.code === '42501') {

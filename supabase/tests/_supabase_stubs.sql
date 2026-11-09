@@ -34,6 +34,7 @@ create table storage.objects (
   bucket_id text references storage.buckets (id),
   name text not null,
   owner uuid,
+  created_at timestamptz default now(), -- as in Supabase (ARU-112's leftover sweep reads it)
   unique (bucket_id, name)
 );
 alter table storage.objects enable row level security;

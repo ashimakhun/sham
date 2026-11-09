@@ -1,10 +1,12 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Switch, Text, View } from 'react-native';
+import { View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { DisciplinePicker } from '@/components/Disciplines';
 import { KeyboardForm } from '@/components/KeyboardForm';
-import { Button, EmptyState, ErrorText, Field, styles } from '@/components/ui';
+import { Button, EmptyState, ErrorText, Field, styles, ThemedSwitch } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import { newId } from '@/lib/id';
 import { canCreateCourse } from '@/lib/roles';
@@ -63,7 +65,7 @@ export default function NewCourseScreen() {
           <Text style={styles.body}>{t('courses.hiddenCourse')}</Text>
           <Text style={styles.muted}>{t('courses.hiddenCourseHint')}</Text>
         </View>
-        <Switch
+        <ThemedSwitch
           accessibilityLabel={t('courses.hiddenCourse')}
           accessibilityHint={t('courses.hiddenCourseHint')}
           value={hidden}

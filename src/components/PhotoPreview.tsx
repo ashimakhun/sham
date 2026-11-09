@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Linking, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useI18n } from '@/i18n/context';
 import { photoFileName } from '@/lib/photo';
 import { useStore } from '@/lib/store';
+import { font } from '@/lib/fonts';
 
 type UrlLoader = (path: string, options?: { expiresIn?: number; download?: string }) => Promise<string>;
 
@@ -126,7 +129,7 @@ const s = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: '#000' },
   bar: { flexDirection: 'row', justifyContent: 'flex-end', padding: 12 },
   close: { padding: 8 },
-  closeText: { color: '#fff', fontSize: 24, fontWeight: '600' },
+  closeText: { color: '#fff', fontSize: 24, ...font(500) },
   body: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   image: { width: '100%', height: '100%' },
   error: { color: '#fff', fontSize: 15, textAlign: 'center', paddingHorizontal: 24 },
@@ -138,5 +141,5 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
     alignItems: 'center',
   },
-  downloadText: { fontSize: 15, fontWeight: '600', color: '#000' },
+  downloadText: { fontSize: 15, ...font(500), color: '#000' },
 });

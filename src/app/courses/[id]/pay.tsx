@@ -2,7 +2,9 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Image, Pressable, Text, View } from 'react-native';
+import { Image, Pressable, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { KeyboardForm } from '@/components/KeyboardForm';
 import { Button, EmptyState, ErrorText, styles } from '@/components/ui';

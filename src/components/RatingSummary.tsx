@@ -1,9 +1,10 @@
-import { Text, type StyleProp, type TextStyle } from 'react-native';
+import { type StyleProp, type TextStyle } from 'react-native';
 
 import { useI18n } from '@/i18n/context';
 import { ratingSummary, ratingSummaryLabel } from '@/lib/feedback';
 import { colors } from '@/lib/theme';
 import type { CourseFeedback } from '@/lib/types';
+import { Text } from '@/components/AppText';
 
 /**
  * ARU-123: "★ 4.3 · 6 reviews" with the ★ in the shared star colour; the number and count keep `style`.

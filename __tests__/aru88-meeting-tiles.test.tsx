@@ -12,6 +12,7 @@ import type { Meeting } from '@/lib/types';
 
 import { fakeStore, member } from './helpers/fakeStore';
 import { params, setStore } from './helpers/mocks';
+import { font } from '@/lib/fonts';
 
 jest.mock('expo-router', () => require('./helpers/mocks').expoRouter);
 jest.mock('@/lib/store', () => require('./helpers/mocks').store);
@@ -106,7 +107,7 @@ describe('tiles (AC 1, AC 2, AC 4, AC 8)', () => {
     const title = inMeeting('F').getByText(when);
     // A long localized date wraps instead of being cut.
     expect(title.props.numberOfLines).toBeUndefined();
-    expect(flat(title.props.style)).toMatchObject({ fontSize: 14, fontWeight: '600', color: colors.text });
+    expect(flat(title.props.style)).toMatchObject({ fontSize: 14, ...font(600), color: colors.text });
     const rescheduled = inMeeting('F').getByText('Rescheduled');
     expect(flat(rescheduled.props.style).color).toBe(colors.muted);
     expect(flat(inMeeting('F').getByTestId('status-badge').props.style).flexShrink).toBe(0);
@@ -164,7 +165,7 @@ describe('footer (AC 6, AC 7, AC 9)', () => {
     expect(footerItems('P')).toEqual(['Edit', 'Attended 0 of 1', 'Mark completed', 'Mark canceled']);
     const pill = screen.getByRole('button', { name: 'Edit' });
     expect(flat(pill.props.style)).toMatchObject({ backgroundColor: colors.primarySoft, borderRadius: 999 });
-    expect(flat(inMeeting('P').getByText('Edit').props.style)).toMatchObject({ color: colors.primary, fontSize: 12, fontWeight: '500', textTransform: 'uppercase' }); // ARU-122
+    expect(flat(inMeeting('P').getByText('Edit').props.style)).toMatchObject({ color: colors.primary, fontSize: 12, ...font(500), textTransform: 'uppercase' }); // ARU-122, ARU-119
     const cancel = screen.getByRole('button', { name: 'Mark canceled' });
     expect(flat(cancel.props.style).backgroundColor).toBe('#FEF2F2');
     expect(flat(inMeeting('P').getByText('Mark canceled').props.style).color).toBe(colors.danger);

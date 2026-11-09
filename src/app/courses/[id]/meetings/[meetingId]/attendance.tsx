@@ -1,5 +1,7 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { RefreshControl, ScrollView, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { Card, EmptyState, RoleBadge, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
