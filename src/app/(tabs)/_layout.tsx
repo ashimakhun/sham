@@ -4,6 +4,7 @@ import { Redirect, Tabs } from 'expo-router';
 import { useI18n } from '@/i18n/context';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
+import { font } from '@/lib/fonts';
 
 export default function TabLayout() {
   const { ready, currentUser } = useStore();
@@ -14,7 +15,9 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
-        headerTitleStyle: { color: colors.text },
+        // ARU-119: Inter, SemiBold 600 titles and Light 300 tab labels.
+        headerTitleStyle: { color: colors.text, ...font(600) },
+        tabBarLabelStyle: font(300),
         sceneStyle: { backgroundColor: colors.bg },
       }}>
       <Tabs.Screen

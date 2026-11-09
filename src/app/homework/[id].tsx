@@ -1,6 +1,8 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Image, Pressable, Text, View } from 'react-native';
+import { Image, Pressable, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { dueText } from '@/components/AssignmentCard';
 import { KeyboardForm } from '@/components/KeyboardForm';

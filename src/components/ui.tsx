@@ -1,22 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ComponentProps, ReactNode } from 'react';
-import {
-  Platform,
-  Pressable,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  View,
-  type SwitchProps,
-  type TextInputProps,
-  type ViewStyle,
-} from 'react-native';
+import { Platform, Pressable, StyleSheet, Switch, View, type SwitchProps, type TextInputProps, type ViewStyle } from 'react-native';
+
+import { Text, TextInput } from '@/components/AppText';
 
 import { useI18n } from '@/i18n/context';
 import { colors, roleColor } from '@/lib/theme';
 import type { HomeworkStatus, Role } from '@/lib/types';
 import { formatUnread, withUnreadLabel } from '@/lib/unread';
+import { font } from '@/lib/fonts';
 
 type CardProps = {
   children: ReactNode;
@@ -161,7 +153,7 @@ export function OwnerLine({ name, date }: { name: string; date: string }) {
   const { t } = useI18n();
   return (
     <Text style={styles.muted} numberOfLines={1}>
-      <Text style={{ fontWeight: '600' }}>{t('courses.ownerPrefix')} </Text>
+      <Text style={{ ...font(500) }}>{t('courses.ownerPrefix')} </Text>
       <Text>
         {name} · {date}
       </Text>
@@ -270,11 +262,11 @@ export const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
   },
-  title: { fontSize: 17, fontWeight: '600', color: colors.text },
-  h1: { fontSize: 26, fontWeight: '700', color: colors.text },
-  body: { fontSize: 15, lineHeight: 22, color: colors.text },
-  muted: { fontSize: 13, color: colors.muted },
-  label: { fontSize: 13, fontWeight: '600', color: colors.muted },
+  title: { fontSize: 17, ...font(500), color: colors.text },
+  h1: { fontSize: 26, ...font(600), color: colors.text },
+  body: { fontSize: 15, lineHeight: 22, ...font(300), color: colors.text },
+  muted: { fontSize: 13, ...font(300), color: colors.muted },
+  label: { fontSize: 13, ...font(500), color: colors.muted },
   input: {
     backgroundColor: colors.card,
     borderWidth: 1,
@@ -290,14 +282,14 @@ export const styles = StyleSheet.create({
   // ARU-122: controls and states are upper case by style only (the source text and screen reader labels stay as
   // written), Medium 500, slightly spaced and 1 pt smaller than before so they don't get wider. Text is never cut
   // with numberOfLines, so a long Russian label wraps inside the button.
-  caps: { textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '500' },
-  buttonText: { fontSize: 14, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase' },
+  caps: { textTransform: 'uppercase', letterSpacing: 0.5, ...font(500) },
+  buttonText: { fontSize: 14, ...font(500), letterSpacing: 0.5, textTransform: 'uppercase' },
   // ARU-78: same 18 pt layout height as the plain icon (24 pt glyph, -3 margins), so the button height is unchanged.
   buttonIconBox: { width: 24, height: 24, marginVertical: -3 },
   badge: { alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
-  badgeText: { fontSize: 11, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase' },
+  badgeText: { fontSize: 11, ...font(500), letterSpacing: 0.5, textTransform: 'uppercase' },
   // ARU-122: a tappable text action (View proof, Set exempt, Unselect, Edit…): upper case, 1 pt under the default 14.
-  linkText: { fontSize: 13, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase' },
+  linkText: { fontSize: 13, ...font(500), letterSpacing: 0.5, textTransform: 'uppercase' },
   iconButton: {
     width: ICON_BUTTON_SIZE,
     height: ICON_BUTTON_SIZE,
@@ -316,14 +308,14 @@ export const styles = StyleSheet.create({
   },
   // Grows by the ring's width so the number keeps the same room inside it (ARU-57).
   unreadRing: { minWidth: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: colors.card },
-  unreadText: { fontSize: 11, fontWeight: '700', color: '#fff' },
+  unreadText: { fontSize: 11, ...font(600), color: '#fff' },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   empty: { alignItems: 'center', paddingVertical: 48, gap: 6 },
-  emptyTitle: { fontSize: 16, fontWeight: '600', color: colors.text },
+  emptyTitle: { fontSize: 16, ...font(500), color: colors.text },
   segmented: { flexDirection: 'row', backgroundColor: '#E9EAF0', borderRadius: 10, padding: 3 },
   segment: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
   segmentActive: { backgroundColor: colors.card },
-  segmentText: { fontSize: 12, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase', color: colors.muted },
+  segmentText: { fontSize: 12, ...font(500), letterSpacing: 0.5, textTransform: 'uppercase', color: colors.muted },
 });
 
 /**

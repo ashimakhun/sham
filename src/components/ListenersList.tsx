@@ -1,7 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { Button, Card, ErrorText, RoleBadge, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';

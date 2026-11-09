@@ -1,7 +1,9 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { FlatList, Pressable, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { AuthorFilter } from '@/components/AuthorFilter';
 import { LikeRow, likesOf } from '@/components/LikeHeart';

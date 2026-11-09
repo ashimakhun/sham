@@ -1,5 +1,7 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { RefreshControl, ScrollView, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { CourseCard } from '@/components/CourseCard';
 import { DeleteDisciplineButton } from '@/components/DeleteDisciplineButton';

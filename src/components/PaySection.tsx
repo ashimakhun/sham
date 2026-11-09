@@ -1,6 +1,8 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Pressable, Text, View } from 'react-native';
+import { AppState, Pressable, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { Button, Card, styles } from '@/components/ui';
 import { currentLanguage, formatDateIn, type Language, translate } from '@/i18n';
@@ -11,6 +13,7 @@ import { colors } from '@/lib/theme';
 import type { Course, PaymentRequest } from '@/lib/types';
 import { useNow } from '@/lib/useNow';
 import { usePaymentDues } from '@/lib/usePaymentDues';
+import { font } from '@/lib/fonts';
 
 /** "Payment request sent 5 Nov 2026 · waiting for the accountant" (AC 3). */
 export function requestSentText(r: Pick<PaymentRequest, 'sentAt'>, lang: Language = currentLanguage()) {
@@ -61,7 +64,7 @@ export function PaySection({ course }: { course: Course }) {
   return (
     <View testID="payment-request-sent">
       <Card style={{ gap: 8 }}>
-        <Text style={{ color: colors.text, fontWeight: '600' }}>{requestSentText(request, lang)}</Text>
+        <Text style={{ color: colors.text, ...font(500) }}>{requestSentText(request, lang)}</Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('payments.sendAgain')}

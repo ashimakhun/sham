@@ -1,4 +1,6 @@
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { FlatList, Pressable, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { usePhotoZipDownload } from '@/components/PhotoDownload';
 import { EmptyState, ErrorText, styles } from '@/components/ui';

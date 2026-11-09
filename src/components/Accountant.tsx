@@ -1,7 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { Button, Card, ErrorText, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
@@ -20,6 +22,7 @@ import { colors } from '@/lib/theme';
 import type { CourseBilling } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
 import { useNow } from '@/lib/useNow';
+import { font } from '@/lib/fonts';
 
 /** One day of the month, 1-28, with − / + buttons (works with screen readers; no free text). */
 function DayStepper({ label, value, onChange, disabled }: {
@@ -178,11 +181,11 @@ function UnpaidThisMonth({ now }: { now: number }) {
         {t('accountant.unpaidThisMonth')}
       </Text>
       {unpaid.length === 0 ? (
-        <Text style={{ color: colors.success, fontWeight: '600' }}>{t('accountant.everyonePaid')}</Text>
+        <Text style={{ color: colors.success, ...font(500) }}>{t('accountant.everyonePaid')}</Text>
       ) : (
         unpaid.map((c) => (
           <View key={c.courseId} testID={`unpaid-${c.courseId}`} style={{ gap: 2 }}>
-            <Text style={{ fontWeight: '600', color: colors.text }}>{c.title}</Text>
+            <Text style={{ ...font(500), color: colors.text }}>{c.title}</Text>
             <Text style={{ color: colors.danger }}>{c.names.join(', ')}</Text>
           </View>
         ))
@@ -225,7 +228,7 @@ function PaidCourseRow({ billing, title, now }: { billing: CourseBilling; title:
           <View
             testID={`requests-${billing.courseId}`}
             style={{ backgroundColor: colors.primary, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 }}>
-            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{t('accountant.requestCount', { count: waiting })}</Text>
+            <Text style={{ color: '#fff', fontSize: 12, ...font(600) }}>{t('accountant.requestCount', { count: waiting })}</Text>
           </View>
         ) : null}
         <Ionicons name="chevron-forward" size={20} color={colors.muted} />

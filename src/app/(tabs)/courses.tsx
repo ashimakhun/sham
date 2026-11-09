@@ -1,6 +1,8 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { FlatList, Pressable, SectionList, Text, View } from 'react-native';
+import { FlatList, Pressable, SectionList, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { CourseCard } from '@/components/CourseCard';
 import { DisciplineCard } from '@/components/Disciplines';

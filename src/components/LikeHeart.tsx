@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ReactNode } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { ErrorText, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
@@ -9,6 +9,7 @@ import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import type { MaterialLike, User } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
+import { Text } from '@/components/AppText';
 
 // User-visible texts of the like heart (ARU-120), from the EN/RU catalog (ARU-132), with Russian plurals.
 export const likeTexts = {
