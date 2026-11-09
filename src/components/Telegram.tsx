@@ -1,15 +1,18 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Linking, Pressable, Switch, Text, View } from 'react-native';
+import { AppState, Linking, Pressable, View } from 'react-native';
 
-import { Button, Card, ErrorText, styles } from '@/components/ui';
+import { Text } from '@/components/AppText';
+
+import { Button, Card, ErrorText, styles, ThemedSwitch } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import { confirmDestructive } from '@/lib/confirm';
 import { useStore } from '@/lib/store';
 import { telegramBotUsername, telegramStartUrl, telegramSwitchesFor } from '@/lib/telegram';
 import { colors } from '@/lib/theme';
 import type { TelegramKind } from '@/lib/types';
+import { font } from '@/lib/fonts';
 
 // The fallback is passed in already translated; e.message is shown through ErrorText, which translates app messages.
 const errorText = (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback);
@@ -147,11 +150,11 @@ export function TelegramSettings({ username }: { username: string }) {
         </>
       ) : (
         <>
-          <Text style={[styles.body, { fontWeight: '600' }]}>{t('telegram.connected')}</Text>
+          <Text style={[styles.body, { ...font(500) }]}>{t('telegram.connected')}</Text>
           {telegramSwitchesFor(currentUser.role, lang).map(({ kind, label }) => (
             <View key={kind} style={[styles.row, { minHeight: 44 }]}>
               <Text style={[styles.body, { flex: 1 }]}>{label}</Text>
-              <Switch
+              <ThemedSwitch
                 accessibilityLabel={label}
                 value={pending[kind] ?? telegram.switches[kind] ?? true}
                 onValueChange={(v) => toggle(kind, v)}

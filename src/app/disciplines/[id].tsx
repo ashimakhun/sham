@@ -1,10 +1,12 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { RefreshControl, ScrollView, Switch, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { CourseCard } from '@/components/CourseCard';
 import { DeleteDisciplineButton } from '@/components/DeleteDisciplineButton';
 import { RatingSummary } from '@/components/RatingSummary';
-import { Card, EmptyState, ErrorText, HiddenBadge, styles } from '@/components/ui';
+import { Card, EmptyState, ErrorText, HiddenBadge, styles, ThemedSwitch } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import { canManageDisciplines, coursesInDiscipline, disciplineFeedback } from '@/lib/disciplines';
 import { isEdited, stars, starsLabel } from '@/lib/feedback';
@@ -49,7 +51,7 @@ export default function DisciplineScreen() {
               <Text style={styles.body}>{t('disciplines.hidden')}</Text>
               <Text style={styles.muted}>{t('disciplines.hiddenHint')}</Text>
             </View>
-            <Switch
+            <ThemedSwitch
               accessibilityLabel={t('disciplines.hidden')}
               value={discipline.hidden}
               disabled={busy}

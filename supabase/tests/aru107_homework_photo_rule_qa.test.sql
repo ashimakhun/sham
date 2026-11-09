@@ -97,7 +97,9 @@ select t.ok((select used_at is not null from photo_zip_links where token_hash = 
 delete from profiles where id = t.id('S1');
 select t.eq((select count(*) from photo_zip_links where user_id = t.id('S1')), 0::bigint, 'ARU-75 account deletion removes its links');
 
--- AC 10: nothing schedules a job; no file was removed by this story.
-select t.eq((select count(*) from cron.job where command ~* 'photo|homework'), 0::bigint, 'AC10 no job scheduled for photos');
+-- AC 10: this story schedules no job (ARU-112 later adds the daily 'photo-deletion' job, the only one allowed); no
+-- file was removed by this story.
+select t.eq((select count(*) from cron.job where command ~* 'photo|homework' and jobname <> 'photo-deletion'), 0::bigint,
+  'AC10 no photo job other than ARU-112''s photo-deletion');
 select t.eq((select count(*) from storage.objects where bucket_id = 'homework' and owner in (t.id('M2'), t.id('S3'))), 3::bigint,
   'AC10 every photo file is still there');

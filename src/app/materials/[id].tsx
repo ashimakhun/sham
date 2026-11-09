@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { Linking, ScrollView, Text } from 'react-native';
+import { Linking, ScrollView } from 'react-native';
 
 import { LikerRow, LikeRow, likesOf } from '@/components/LikeHeart';
 import { MarkdownText } from '@/components/MarkdownText';
@@ -8,6 +8,7 @@ import { useI18n } from '@/i18n/context';
 import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
 import { formatDate } from '@/lib/theme';
+import { Text } from '@/components/AppText';
 
 export default function MaterialDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();

@@ -1,6 +1,8 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { FlatList, Pressable, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { Button, EmptyState, ErrorText, RoleBadge, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';

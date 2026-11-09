@@ -1,7 +1,7 @@
 // ARU-110: the Telegram notification texts in English and Russian, with a note per text (which notification, when
 // it's sent) for the product owner's spreadsheet. Kept apart from the app catalog (src/i18n), which Edge Functions
 // can't import. telegram-texts.test.ts checks every text has both languages and a note, and the same {placeholders}.
-// A later notification kind (e.g. ARU-112's photo-deletion warning) adds its texts here.
+// A later notification kind adds its texts here (ARU-112's photo-deletion warning did).
 //
 // The bot's own replies (/start, /stop in telegram-bot.ts) stay English by product owner decision (ARU-110 analysis
 // comment, 2026-11-08), so they are not in this catalog.
@@ -55,6 +55,23 @@ export const TELEGRAM_TEXTS = {
     en: 'New file in the knowledge base from {name}: {title}',
     ru: 'Новый файл в базе знаний от {name}: {title}',
     note: 'New materials · to everyone who may read it when a PDF is added to the knowledge base',
+  },
+  // ARU-112 / ARU-133: the photo-deletion warning, in three plural forms (Russian one / few / many; English uses
+  // "photo" for 1 and "photos" otherwise). photo-deletion.ts picks the form and fills {count} and {date}.
+  photoDeletionOne: {
+    en: '{count} homework photo will be deleted on {date}. Open Sham → Homework to download them.',
+    ru: '{count} фотография домашнего задания будет удалена {date}. Откройте Sham → Задания, чтобы скачать её.',
+    note: 'Photo deletion · to the sender, 30 and 7 days before their photos are deleted (count ends in 1, not 11)',
+  },
+  photoDeletionFew: {
+    en: '{count} homework photos will be deleted on {date}. Open Sham → Homework to download them.',
+    ru: '{count} фотографии домашних заданий будут удалены {date}. Откройте Sham → Задания, чтобы скачать их.',
+    note: 'Photo deletion · to the sender, 30 and 7 days before their photos are deleted (count ends in 2–4, not 12–14)',
+  },
+  photoDeletionMany: {
+    en: '{count} homework photos will be deleted on {date}. Open Sham → Homework to download them.',
+    ru: '{count} фотографий домашних заданий будут удалены {date}. Откройте Sham → Задания, чтобы скачать их.',
+    note: 'Photo deletion · to the sender, 30 and 7 days before their photos are deleted (any other count)',
   },
 } satisfies Record<string, Entry>;
 

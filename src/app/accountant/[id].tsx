@@ -1,22 +1,27 @@
-import { useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { FlatList, Linking, Pressable, RefreshControl, Text, View } from 'react-native';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { FlatList, Linking, Pressable, RefreshControl, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { PeriodEditor } from '@/components/Accountant';
 import { PhotoPreview } from '@/components/PhotoPreview';
-import { Card, EmptyState, ErrorText, HiddenBadge, styles } from '@/components/ui';
+import { Card, EmptyState, ErrorText, HiddenBadge, IconButton, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import {
+  byPaymentRank,
   canSeeBilling,
+  inFrozenOrder,
   isAccountant,
   listenersOf,
   localMonth,
+  paymentRank,
   paymentStatus,
   periodText,
   waitingRequests,
   type PaymentStatus,
 } from '@/lib/billing';
-import { confirmAction } from '@/lib/confirm';
+import { confirmAction, confirmDestructive } from '@/lib/confirm';
 import { PROOF_LOAD_ERROR, proofFileName } from '@/lib/paymentProof';
 import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
@@ -30,6 +35,8 @@ import { useNow } from '@/lib/useNow';
  * month, and set or clear Exempt. Nothing changes on screen until the change is saved (the store reloads after it).
  * ARU-99 AC 8-11: the header has the period, Change period and Unselect (moved here from the Profile row); a
  * listener's waiting request for this month shows under their name with View proof, and they are listed first.
+ * ARU-124: the list is sorted (request, unpaid, paid, exempt; A–Z within each) when the screen gains focus and after
+ * pull to refresh. In between the order is frozen, so marking someone doesn't move their row (AC 2).
  */
 export default function CoursePaymentsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -47,6 +54,14 @@ export default function CoursePaymentsScreen() {
   } = useStore();
   const { t } = useI18n();
   const month = localMonth(useNow());
+  // ARU-124 AC 3: bumping sortKey re-sorts the list (on focus and after pull to refresh); store reloads don't.
+  const [sortKey, setSortKey] = useState(0);
+  const [frozen, setFrozen] = useState<{ key: number; ids: string[] } | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      setSortKey((k) => k + 1);
+    }, [setSortKey]),
+  );
   if (!canSeeBilling(currentUser)) {
     return <EmptyState title={t('courses.notAllowed')} hint={t('accountant.paymentsNotAllowedHint')} />;
   }
@@ -64,17 +79,33 @@ export default function CoursePaymentsScreen() {
     exemptions: paymentExemptions,
   });
   const requestOf = new Map(waiting.map((r) => [r.userId, r]));
-  // Listeners with a waiting request first; the rest keep the usual order (by name). sort() is stable.
-  const listeners = listenersOf(course.id, courseMembers, getUser).sort(
-    (a, b) => Number(requestOf.has(b.id)) - Number(requestOf.has(a.id)),
-  );
+  const live = listenersOf(course.id, courseMembers, getUser);
+  const statusOf = (userId: string) => paymentStatus(course.id, userId, month, coursePayments, paymentExemptions);
+  // AC 1 on a new sort; otherwise (AC 2) the last order, with new listeners at the end. If nobody from the last order
+  // is left (e.g. the store hadn't loaded yet when the screen opened), sort afresh.
+  const last = frozen;
+  const fresh = !last || last.key !== sortKey || !live.some((l) => last.ids.includes(l.id));
+  const listeners = fresh
+    ? byPaymentRank(live, (userId) => paymentRank(statusOf(userId), requestOf.has(userId)))
+    : inFrozenOrder(live, last.ids);
+  const ids = listeners.map((l) => l.id);
+  if (!last || last.key !== sortKey || ids.join('\n') !== last.ids.join('\n')) setFrozen({ key: sortKey, ids });
   return (
     <FlatList
       style={styles.screen}
       contentContainerStyle={[styles.content, { gap: 12 }]}
       data={listeners}
       keyExtractor={(l) => l.id}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={() => refresh().catch(() => {})} />}
+      refreshControl={
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={() =>
+            refresh()
+              .catch(() => {})
+              .then(() => setSortKey((k) => k + 1))
+          }
+        />
+      }
       ListHeaderComponent={<CourseHeader billing={billing} title={course.title} hidden={!!course.hidden} />}
       renderItem={({ item }) => (
         <ListenerRow
@@ -83,7 +114,7 @@ export default function CoursePaymentsScreen() {
           userId={item.id}
           name={item.name}
           month={month}
-          status={paymentStatus(course.id, item.id, month, coursePayments, paymentExemptions)}
+          status={statusOf(item.id)}
           request={requestOf.get(item.id)}
         />
       )}
@@ -155,16 +186,20 @@ function CourseHeader({ billing, title, hidden }: { billing: CourseBilling; titl
   );
 }
 
-function StatusLabel({ status }: { status: PaymentStatus }) {
+/** ARU-118 AC 1: the status as a small rounded badge (read as text, not a button). */
+function StatusBadge({ status }: { status: PaymentStatus }) {
   const { t } = useI18n();
-  if (status.kind === 'exempt') return <Text style={[styles.muted, styles.caps, { fontSize: 12 }]}>{t('billing.exempt')}</Text>;
-  if (status.kind === 'paid')
-    return (
-      <Text style={[styles.linkText, { color: colors.success }]}>
-        {t('billing.paidOn', { date: formatDate(status.payment.markedAt) })}
-      </Text>
-    );
-  return <Text style={[styles.linkText, { color: colors.danger }]}>{t('billing.unpaid')}</Text>;
+  const [text, color, backgroundColor] =
+    status.kind === 'exempt'
+      ? [t('billing.exempt'), colors.muted, colors.mutedSoft]
+      : status.kind === 'paid'
+        ? [t('billing.paidOn', { date: formatDate(status.payment.markedAt) }), colors.success, colors.successSoft]
+        : [t('billing.unpaid'), colors.danger, colors.dangerSoft];
+  return (
+    <View style={[styles.badge, { backgroundColor }]} testID="status-badge">
+      <Text style={[styles.badgeText, { color }]}>{text}</Text>
+    </View>
+  );
 }
 
 /** A text button; `label` (with the listener's name) is what screen readers read. */
@@ -197,15 +232,18 @@ function Action({
   );
 }
 
-/** AC 9: "Payment request · <date>" and View proof: a photo full-screen (with Download), a PDF in the browser. */
-function RequestLine({ request, courseTitle, name }: { request: PaymentRequest; courseTitle: string; name: string }) {
+/**
+ * ARU-99 AC 9: View proof opens a photo full-screen (with Download), a PDF in the browser. ARU-118 AC 7: the link
+ * sits in the row's links row; it has its own `opening` state, separate from the row's busy state.
+ */
+function useProofViewer(request: PaymentRequest | undefined) {
   const { getPaymentProofUrl } = useStore();
   const [preview, setPreview] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
-  const { t } = useI18n();
 
   async function view() {
+    if (!request) return;
     setError(null);
     if (request.proofType === 'image') {
       setPreview(true);
@@ -222,27 +260,7 @@ function RequestLine({ request, courseTitle, name }: { request: PaymentRequest; 
     }
   }
 
-  return (
-    <View testID={`request-${request.userId}`} style={{ gap: 2 }}>
-      <Text style={{ color: colors.text }}>{t('accountant.requestLine', { date: formatDate(request.sentAt) })}</Text>
-      <Action
-        text={opening ? t('accountant.opening') : t('accountant.viewProof')}
-        label={t('accountant.viewProofLabel', { name })}
-        disabled={opening}
-        onPress={view}
-      />
-      <ErrorText error={error} />
-      {preview && (
-        <PhotoPreview
-          path={request.proofPath}
-          loadUrl={getPaymentProofUrl}
-          fileName={proofFileName(courseTitle, name)}
-          errorText={t('payments.proofLoadError')}
-          onClose={() => setPreview(false)}
-        />
-      )}
-    </View>
-  );
+  return { preview, closePreview: () => setPreview(false), error, opening, view, getPaymentProofUrl };
 }
 
 function ListenerRow({
@@ -265,47 +283,89 @@ function ListenerRow({
   const { markPaid, undoPaid, setExempt } = useStore();
   const { t } = useI18n();
   const { busy, error, run } = useAction();
+  const proof = useProofViewer(request);
   return (
     <View testID={`payment-${userId}`}>
       <Card style={{ gap: 6 }}>
-        <Text style={[styles.title, { fontSize: 15 }]}>{name}</Text>
-        <StatusLabel status={status} />
-        {request ? <RequestLine request={request} courseTitle={courseTitle} name={name} /> : null}
-        <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ flex: 1, gap: 6 }}>
+            <Text style={[styles.title, { fontSize: 15 }]}>{name}</Text>
+            <StatusBadge status={status} />
+            {request ? (
+              <Text testID={`request-${request.userId}`} style={{ color: colors.text }}>
+                {t('accountant.requestLine', { date: formatDate(request.sentAt) })}
+              </Text>
+            ) : null}
+            {/* AC 7: View proof and Set / Clear exempt on one row; Set exempt only for Unpaid listeners. */}
+            <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap' }}>
+              {request ? (
+                <Action
+                  text={proof.opening ? t('accountant.opening') : t('accountant.viewProof')}
+                  label={t('accountant.viewProofLabel', { name })}
+                  disabled={proof.opening}
+                  onPress={proof.view}
+                />
+              ) : null}
+              {status.kind === 'exempt' && (
+                <Action
+                  text={t('accountant.clearExempt')}
+                  label={t('accountant.clearExemptLabel', { name })}
+                  disabled={busy}
+                  onPress={() => run(() => setExempt(courseId, userId, false))}
+                />
+              )}
+              {status.kind === 'unpaid' && (
+                <Action
+                  text={t('accountant.setExempt')}
+                  label={t('accountant.setExemptLabel', { name })}
+                  disabled={busy}
+                  onPress={() => run(() => setExempt(courseId, userId, true))}
+                />
+              )}
+            </View>
+          </View>
+          {/* AC 2-5: a green check mark marks Paid at once; a red X undoes Paid after a confirmation. */}
           {status.kind === 'unpaid' && (
-            <Action
-              text={t('accountant.markPaid')}
+            <IconButton
+              icon="checkmark"
+              tone="success"
               label={t('accountant.markPaidLabel', { name })}
+              testID={`mark-paid-${userId}`}
               disabled={busy}
               onPress={() => run(() => markPaid(courseId, userId, month))}
             />
           )}
           {status.kind === 'paid' && (
-            <Action
-              text={t('accountant.undoPaid')}
+            <IconButton
+              icon="close"
+              tone="danger"
               label={t('accountant.undoPaidLabel', { name })}
-              danger
+              testID={`undo-paid-${userId}`}
               disabled={busy}
-              onPress={() => run(() => undoPaid(courseId, userId, month))}
-            />
-          )}
-          {status.kind === 'exempt' ? (
-            <Action
-              text={t('accountant.clearExempt')}
-              label={t('accountant.clearExemptLabel', { name })}
-              disabled={busy}
-              onPress={() => run(() => setExempt(courseId, userId, false))}
-            />
-          ) : (
-            <Action
-              text={t('accountant.setExempt')}
-              label={t('accountant.setExemptLabel', { name })}
-              disabled={busy}
-              onPress={() => run(() => setExempt(courseId, userId, true))}
+              onPress={() =>
+                run(async () => {
+                  const ok = await confirmDestructive(
+                    t('accountant.undoPaid'),
+                    t('accountant.undoPaidMessage', { name }),
+                    t('accountant.undoPaid'),
+                  );
+                  if (ok) await undoPaid(courseId, userId, month);
+                })
+              }
             />
           )}
         </View>
+        <ErrorText error={proof.error} />
         <ErrorText error={error} />
+        {proof.preview && request && (
+          <PhotoPreview
+            path={request.proofPath}
+            loadUrl={proof.getPaymentProofUrl}
+            fileName={proofFileName(courseTitle, name)}
+            errorText={t('payments.proofLoadError')}
+            onClose={proof.closePreview}
+          />
+        )}
       </Card>
     </View>
   );

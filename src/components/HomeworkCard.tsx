@@ -1,11 +1,13 @@
 import { router } from 'expo-router';
-import { Text } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { Card, StatusBadge, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
 import type { Homework } from '@/lib/types';
+import { font } from '@/lib/fonts';
 
 /** ARU-90: a checker's comment as one line for the card preview; null when there is nothing to show. */
 export function commentPreview(comment: string | null | undefined): string | null {
@@ -41,7 +43,7 @@ export function HomeworkCard({ item, showStatus = true }: { item: Homework; show
         (comment ? (
           // One Text with the name nested: the 2-line ellipsis covers both, and screen readers hear "Name: comment".
           <Text testID="homework-comment-preview" style={commentStyle} numberOfLines={2} ellipsizeMode="tail">
-            <Text style={{ fontWeight: '600' }}>{`${getUser(item.checkedById)?.name ?? t('common.unknown')}:`}</Text>
+            <Text style={{ ...font(500) }}>{`${getUser(item.checkedById)?.name ?? t('common.unknown')}:`}</Text>
             {` ${comment}`}
           </Text>
         ) : (

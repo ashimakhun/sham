@@ -5,10 +5,12 @@ import { render, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
 import { Button, HiddenBadge, RoleBadge, Segmented, StatusBadge, UnreadBadge, styles } from '@/components/ui';
+import { font } from '@/lib/fonts';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const flat = (node: { props: { style?: any } }) => StyleSheet.flatten(node.props.style) as Record<string, unknown>;
-const caps = { textTransform: 'uppercase', fontWeight: '500', letterSpacing: 0.5 };
+// ARU-119: Medium 500 is the Inter Medium face.
+const caps = { textTransform: 'uppercase', ...font(500), letterSpacing: 0.5 };
 
 describe('ARU-122 shared styles', () => {
   it('buttons: upper case, 14 pt, centred so a long label wraps inside, never cut off', async () => {

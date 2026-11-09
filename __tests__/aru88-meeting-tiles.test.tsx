@@ -12,6 +12,7 @@ import type { Meeting } from '@/lib/types';
 
 import { fakeStore, member } from './helpers/fakeStore';
 import { params, setStore } from './helpers/mocks';
+import { font } from '@/lib/fonts';
 
 jest.mock('expo-router', () => require('./helpers/mocks').expoRouter);
 jest.mock('@/lib/store', () => require('./helpers/mocks').store);
@@ -101,7 +102,7 @@ describe('tiles (AC 1, AC 2, AC 4, AC 8)', () => {
     expect(texts(tile).slice(0, 2)).toEqual(['Future', 'Scheduled']);
     const topic = inMeeting('F').getByText('Future');
     expect(topic.props.numberOfLines).toBe(2);
-    expect(flat(topic.props.style)).toMatchObject({ fontSize: 16, fontWeight: '700' });
+    expect(flat(topic.props.style)).toMatchObject({ fontSize: 16, ...font(600) }); // ARU-119: 700 became Inter SemiBold 600
     const date = inMeeting('F').getByText(new RegExp(formatDateTime(F.startsAt).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     expect(flat(date.props.style).color).toBe(colors.muted);
     expect(inMeeting('F').getByText('Rescheduled')).toBeTruthy();

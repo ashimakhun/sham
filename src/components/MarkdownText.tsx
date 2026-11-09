@@ -1,29 +1,41 @@
 import { Fragment } from 'react';
-import { Linking, Text, View } from 'react-native';
+import { Linking, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { styles } from '@/components/ui';
 import { type Inline, parseMarkdown } from '@/lib/markdown';
+import { font } from '@/lib/fonts';
 import { colors } from '@/lib/theme';
 
-function InlineText({ nodes }: { nodes: Inline[] }) {
+/** Bold is Inter SemiBold 600 and italic Inter Light Italic (ARU-119); bold italic is SemiBold Italic. Each face is
+ *  its own font, so nested marks pass down what is already on. */
+type Marks = { bold?: boolean; italic?: boolean };
+const face = (m: Marks) => font(m.bold ? 600 : 300, !!m.italic);
+
+function InlineText({ nodes, marks = {} }: { nodes: Inline[]; marks?: Marks }) {
   return (
     <>
       {nodes.map((n, i) => {
         switch (n.type) {
           case 'text':
             return <Fragment key={i}>{n.text}</Fragment>;
-          case 'bold':
+          case 'bold': {
+            const next = { ...marks, bold: true };
             return (
-              <Text key={i} style={{ fontWeight: '700' }}>
-                <InlineText nodes={n.children} />
+              <Text key={i} style={face(next)}>
+                <InlineText nodes={n.children} marks={next} />
               </Text>
             );
-          case 'italic':
+          }
+          case 'italic': {
+            const next = { ...marks, italic: true };
             return (
-              <Text key={i} style={{ fontStyle: 'italic' }}>
-                <InlineText nodes={n.children} />
+              <Text key={i} style={face(next)}>
+                <InlineText nodes={n.children} marks={next} />
               </Text>
             );
+          }
           case 'link':
             return (
               <Text

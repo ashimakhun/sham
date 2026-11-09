@@ -1,9 +1,12 @@
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import type { TextId } from '@/i18n';
 import { useI18n } from '@/i18n/context';
 import { colors } from '@/lib/theme';
+import { font } from '@/lib/fonts';
 
 type Option = { value: string; label: string };
 /** What the list filters by (ARU-80): the Blog's authors (default) or the Homework tab's courses. */
@@ -126,7 +129,7 @@ const s = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.card,
   },
-  buttonText: { flexShrink: 1, fontSize: 15, fontWeight: '600', color: colors.text },
+  buttonText: { flexShrink: 1, fontSize: 15, ...font(500), color: colors.text },
   caret: { fontSize: 14, color: colors.muted },
   backdrop: {
     flex: 1,
@@ -146,10 +149,10 @@ const s = StyleSheet.create({
     paddingVertical: 8,
     overflow: 'hidden',
   },
-  heading: { fontSize: 13, fontWeight: '600', color: colors.muted, paddingHorizontal: 16, paddingVertical: 8 },
+  heading: { fontSize: 13, ...font(500), color: colors.muted, paddingHorizontal: 16, paddingVertical: 8 },
   list: { flexGrow: 0 },
   row: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16 },
   rowText: { flex: 1, fontSize: 16, color: colors.text },
-  rowTextSelected: { fontWeight: '700', color: colors.primary },
-  check: { width: 18, fontSize: 16, fontWeight: '700', color: colors.primary, textAlign: 'right' },
+  rowTextSelected: { ...font(600), color: colors.primary },
+  check: { width: 18, fontSize: 16, ...font(600), color: colors.primary, textAlign: 'right' },
 });

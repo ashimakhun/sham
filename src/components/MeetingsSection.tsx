@@ -1,7 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { type ComponentProps, useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { Button, Card, ErrorText, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
@@ -30,6 +32,7 @@ import { colors, formatDateTime } from '@/lib/theme';
 import type { Course, Meeting, MeetingStatus } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
 import { useNow } from '@/lib/useNow';
+import { font } from '@/lib/fonts';
 
 /** ARU-109: `meetingBadge` gives the English label; the badge shows the catalog text for it. */
 const BADGE_TEXT: Record<MeetingBadgeInfo['label'], TextId> = {
@@ -455,7 +458,7 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
         {/* ARU-126 AC 1 / AC 7: "Homework: <title>", then Due on its own line; history tiles show neither. */}
         {assignment && group !== 'history' ? (
           <View testID={`assignment-${m.id}`}>
-            <Text style={[styles.muted, { fontWeight: '600', color: colors.text }]} numberOfLines={2}>
+            <Text style={[styles.muted, { ...font(500), color: colors.text }]} numberOfLines={2}>
               {t('meetings.homeworkLine', { title: assignment.title })}
             </Text>
             <Text style={styles.muted} numberOfLines={1} testID={`assignment-due-${m.id}`}>
@@ -488,7 +491,7 @@ const tile = StyleSheet.create({
     padding: 12,
     gap: 4,
   },
-  topic: { flex: 1, fontSize: 16, fontWeight: '700', color: colors.text },
+  topic: { flex: 1, fontSize: 16, ...font(600), color: colors.text },
   // AC 6: a thin divider above the actions, which wrap in rows with 8 pt gaps.
   footer: {
     flexDirection: 'row',
@@ -513,5 +516,5 @@ const tile = StyleSheet.create({
   // The people count: icon then "7 of 8".
   iconTextPill: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   // ARU-122: action pills and the attended chip are upper case by style (labels stay as written).
-  pillText: { fontSize: 12, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase' },
+  pillText: { fontSize: 12, ...font(500), letterSpacing: 0.5, textTransform: 'uppercase' },
 });

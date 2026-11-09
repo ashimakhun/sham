@@ -243,6 +243,41 @@ export function formatDateTimeIn(lang: Language, value: Date | string, timeZone?
   return `${formatDateIn(lang, date, timeZone)}, ${p.hour}:${p.minute}`;
 }
 
+/** Whether the catalog has a text for `id` (or its plural forms). */
+export function hasText(id: string) {
+  const en = catalogs.en;
+  return !!(en[id] || en[`${id}_one`]);
+}
+
+type DbError = { message?: string | null; code?: string | null; hint?: string | null; details?: string | null };
+
+/**
+ * ARU-111: a database error as the user should read it. English: the server's message, unchanged (AC 2, AC 6).
+ * Russian: the catalog text of its sham: code (db.<code>), with the values from `details` (AC 3); an unknown code or a
+ * message without one: "no access" for an access refusal (42501), else the generic text (AC 4, AC 5).
+ */
+export function dbErrorMessage(error: DbError, lang: Language = currentLanguage()): string {
+  const message = error.message || translate('en', 'common.genericError');
+  if (lang === 'en') return message;
+  const code = /^sham:([a-z0-9_]+)$/.exec(error.hint ?? '')?.[1];
+  if (code && hasText(`db.${code}`)) {
+    let values: Record<string, unknown> = {};
+    try {
+      const parsed = error.details ? JSON.parse(error.details) : {};
+      if (parsed && typeof parsed === 'object') values = parsed as Record<string, unknown>;
+    } catch {
+      // Not JSON: the text without values.
+    }
+    const params: Params = {};
+    for (const [key, value] of Object.entries(values)) {
+      if (key === 'status' && typeof value === 'string') params.status = translate(lang, `db.status.${value}`);
+      else if (typeof value === 'number' || typeof value === 'string') params[key] = value;
+    }
+    return translate(lang, `db.${code}`, params);
+  }
+  return translate(lang, error.code === '42501' ? 'db.noAccess' : 'common.genericError');
+}
+
 /** ARU-109 AC 4: a number in the chosen language: "10,000" / "10 000". */
 export function formatNumberIn(lang: Language, value: number) {
   return new Intl.NumberFormat(LOCALE[lang]).format(value);

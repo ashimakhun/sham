@@ -1,6 +1,8 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Image, Pressable, Text, View } from 'react-native';
+import { Image, Pressable, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { dueText } from '@/components/AssignmentCard';
 import { KeyboardForm } from '@/components/KeyboardForm';
@@ -41,16 +43,40 @@ export default function HomeworkDetailScreen() {
           <Text style={styles.h1}>{item.title}</Text>
           <Text style={[styles.label, { color: colors.primary }]}>{getCourse(item.courseId)?.title ?? t('homework.noCourse')}</Text>
           {assignment ? (
-            <Text style={styles.muted} testID="homework-assignment">
-              {t('homework.assignmentLine', { title: assignment.title })}
-              {meeting ? ` · ${t('homework.meetingAt', { date: formatDateTime(meeting.startsAt) })}` : ''}
-              {assignment.dueAt ? `\n${dueText(assignment, lang)}` : ''}
-            </Text>
+            // ARU-117: one row each, so a long title wraps on its own and never splits the meeting date.
+            <View testID="homework-assignment">
+              <Text style={styles.muted}>{t('homework.assignmentLine', { title: assignment.title })}</Text>
+              {meeting ? (
+                <Text style={styles.muted} testID="homework-assignment-meeting">
+                  {t('homework.meetingAt', { date: formatDateTime(meeting.startsAt) })}
+                </Text>
+              ) : null}
+              {assignment.dueAt ? (
+                <Text style={styles.muted} testID="homework-assignment-due">
+                  {dueText(assignment, lang)}
+                </Text>
+              ) : null}
+            </View>
           ) : null}
           <Text style={styles.muted}>
             {student?.name} · {formatDate(item.createdAt)}
           </Text>
           {item.description ? <Text style={styles.body}>{item.description}</Text> : null}
+          {!item.photoPath && item.photoRemovedAt ? (
+            // ARU-112 AC 6: the daily job removed it; a note instead of the photo, with no preview and no Download.
+            <View
+              testID="homework-photo-removed"
+              style={{
+                width: '100%',
+                height: 120,
+                borderRadius: 10,
+                backgroundColor: colors.border,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+              <Text style={styles.muted}>{t('homework.photoRemoved')}</Text>
+            </View>
+          ) : null}
           {item.photoPath && (
             // The whole photo, letterboxed (ARU-18 AC 1); tap for the full-screen preview.
             <Pressable accessibilityRole="imagebutton" accessibilityLabel={t('homework.openPhoto')} onPress={() => setPreviewOpen(true)}>

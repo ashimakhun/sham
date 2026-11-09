@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, SectionList, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, SectionList, View } from 'react-native';
 
-import { Button, EmptyState, ErrorText, RoleBadge, styles } from '@/components/ui';
+import { Button, EmptyState, ErrorText, RoleBadge, styles, ThemedSwitch } from '@/components/ui';
 import type { TextId } from '@/i18n';
 import { useI18n } from '@/i18n/context';
 import { confirmDestructive } from '@/lib/confirm';
@@ -11,6 +11,8 @@ import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
 import type { AccessRequest, Role, User } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
+import { Text, TextInput } from '@/components/AppText';
+import { font } from '@/lib/fonts';
 
 // Catalog ids, not texts, so the titles follow the chosen language (ARU-113).
 const SECTIONS: { role: Role; title: TextId }[] = [
@@ -228,7 +230,7 @@ export default function RolesScreen() {
                   }}
                   onPress={() => accept(r)}>
                   <Ionicons name="checkmark" size={16} color={colors.success} />
-                  <Text style={{ color: colors.success, fontSize: 14, fontWeight: '600' }}>{t('roles.accept')}</Text>
+                  <Text style={{ color: colors.success, fontSize: 14, ...font(500) }}>{t('roles.accept')}</Text>
                 </Pressable>
               )}
             </View>
@@ -253,7 +255,7 @@ export default function RolesScreen() {
                 {/* ARU-65: the teacher turns Accountant on or off for a mentor (set_accountant() checks it). */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Text style={styles.muted}>{t('roles.accountant')}</Text>
-                  <Switch
+                  <ThemedSwitch
                     accessibilityLabel={t('roles.accountantLabel', { name: item.name })}
                     value={!!item.isAccountant}
                     disabled={busy}
