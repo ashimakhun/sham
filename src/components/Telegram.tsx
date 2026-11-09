@@ -1,9 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Linking, Pressable, Switch, Text, View } from 'react-native';
+import { AppState, Linking, Pressable, Text, View } from 'react-native';
 
-import { Button, Card, ErrorText, styles } from '@/components/ui';
+import { Button, Card, ErrorText, styles, ThemedSwitch } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import { confirmDestructive } from '@/lib/confirm';
 import { useStore } from '@/lib/store';
@@ -151,7 +151,7 @@ export function TelegramSettings({ username }: { username: string }) {
           {telegramSwitchesFor(currentUser.role, lang).map(({ kind, label }) => (
             <View key={kind} style={[styles.row, { minHeight: 44 }]}>
               <Text style={[styles.body, { flex: 1 }]}>{label}</Text>
-              <Switch
+              <ThemedSwitch
                 accessibilityLabel={label}
                 value={pending[kind] ?? telegram.switches[kind] ?? true}
                 onValueChange={(v) => toggle(kind, v)}

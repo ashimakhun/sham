@@ -180,7 +180,11 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `0052_profile_device_language.sql` (ARU-110: Russian version, part 4; adds `profiles.device_language` ('en', 'ru'
    or null), the phone language the app saves for a user who never chose one, so Telegram notifications follow it;
    in the profile update grant next to `full_name` and `language`, so users change only their own; existing accounts
-   get null; no other policy changes, deletes nothing).
+   get null; no other policy changes, deletes nothing),
+   `0053_db_error_codes.sql` (ARU-111: Russian version, part 5; every message a database function raises for users
+   gets a stable code in its hint (`sham:<code>`, values in detail as JSON), so the app shows it in the user's
+   language; the English messages, errcodes, signatures and grants are unchanged; recreates the latest definition of
+   31 functions with `create or replace`; no table, column or policy changes, deletes nothing).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
@@ -571,7 +575,11 @@ screens, the tab bar and the Profile tab; (part 2, ARU-109) the Homework and Cou
 feedback, meeting and discipline screens; (part 3, ARU-113) Materials, the chats, Pay, the accountant screens, Manage
 roles, the Telegram notifications page and Delete account. Every screen is now in both languages; the only app English
 left in Russian is the Telegram page's **Connect Telegram** / **Disconnect** buttons, which match the bot's English
-replies (product owner decision). Database errors (ARU-111) come later.
+replies (product owner decision). Database errors (ARU-111): a function's `raise exception` carries `hint = 'sham:<code>'` (and its values in `detail`
+as JSON); `dbErrorMessage()` in `src/i18n/index.ts` shows the server's English message in English and the catalog
+text `db.<code>` in Russian, with "Нет доступа к этому действию." for an access refusal without a code and the
+generic text otherwise. A new user-facing `raise exception` needs a code and a `db.<code>` catalog entry
+(`supabase/tests/aru111_db_error_codes.test.sql` and `__tests__/aru111-db-errors.test.ts` check both).
 
 Telegram notifications (ARU-110) go out in each recipient's language: the one they chose in Profile, else the phone
 language the app saved on their account at start (`profiles.device_language`), else English. Their texts are in

@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, SectionList, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, SectionList, Text, TextInput, View } from 'react-native';
 
-import { Button, EmptyState, ErrorText, RoleBadge, styles } from '@/components/ui';
+import { Button, EmptyState, ErrorText, RoleBadge, styles, ThemedSwitch } from '@/components/ui';
 import type { TextId } from '@/i18n';
 import { useI18n } from '@/i18n/context';
 import { confirmDestructive } from '@/lib/confirm';
@@ -253,7 +253,7 @@ export default function RolesScreen() {
                 {/* ARU-65: the teacher turns Accountant on or off for a mentor (set_accountant() checks it). */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Text style={styles.muted}>{t('roles.accountant')}</Text>
-                  <Switch
+                  <ThemedSwitch
                     accessibilityLabel={t('roles.accountantLabel', { name: item.name })}
                     value={!!item.isAccountant}
                     disabled={busy}

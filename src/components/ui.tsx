@@ -1,6 +1,17 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ComponentProps, ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  View,
+  type SwitchProps,
+  type TextInputProps,
+  type ViewStyle,
+} from 'react-native';
 
 import { useI18n } from '@/i18n/context';
 import { colors, roleColor } from '@/lib/theme';
@@ -314,3 +325,20 @@ export const styles = StyleSheet.create({
   segmentActive: { backgroundColor: colors.card },
   segmentText: { fontSize: 12, fontWeight: '500', letterSpacing: 0.5, textTransform: 'uppercase', color: colors.muted },
 });
+
+/**
+ * The app's one switch (ARU-116): ON in the theme colour instead of the system green, with a white knob in both
+ * states on iOS and Android. The OFF track is left to each platform, so it looks as before. The colours always win
+ * over any passed in, so a call site can't bring green back; every other prop passes through.
+ */
+export function ThemedSwitch(props: SwitchProps) {
+  return (
+    <Switch
+      {...props}
+      trackColor={{ ...props.trackColor, true: colors.primary }}
+      thumbColor="#FFFFFF"
+      // Custom colours replace Android's own disabled tint, so dim it here; iOS dims itself.
+      style={[props.style, Platform.OS === 'android' && props.disabled && { opacity: 0.5 }]}
+    />
+  );
+}
