@@ -176,7 +176,11 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    [Download my photos](#download-my-photos-aru-107)),
    `0051_profile_language.sql` (ARU-108: Russian version, part 1; adds `profiles.language` ('en', 'ru' or null =
    follow the phone; existing accounts get null) and puts it in the profile update grant next to `full_name`, so users
-   change only their own; no other policy changes, deletes nothing).
+   change only their own; no other policy changes, deletes nothing),
+   `0052_profile_device_language.sql` (ARU-110: Russian version, part 4; adds `profiles.device_language` ('en', 'ru'
+   or null), the phone language the app saves for a user who never chose one, so Telegram notifications follow it;
+   in the profile update grant next to `full_name` and `language`, so users change only their own; existing accounts
+   get null; no other policy changes, deletes nothing).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
@@ -563,8 +567,23 @@ All texts live in one catalog: `src/i18n/en.json` and `src/i18n/ru.json` (the sa
 `formatDate` / `formatWeekdayDate` / `formatDateTime` from the same hook, in the chosen language. `npm test` fails when
 an ID is missing from one file, a Russian text or a note is empty, or the `{placeholders}` differ.
 Moved to the catalog so far (part 1): sign-in and create account, Reset and Change password, the waiting / declined
-screens, the tab bar and the Profile tab. The other screens are still English (ARU-109, ARU-113); Telegram messages
-(ARU-110) and database errors (ARU-111) come later.
+screens, the tab bar and the Profile tab; (part 2, ARU-109) the Homework and Courses tabs, homework, course, listener,
+feedback, meeting and discipline screens; (part 3, ARU-113) Materials, the chats, Pay, the accountant screens, Manage
+roles, the Telegram notifications page and Delete account. Every screen is now in both languages; the only app English
+left in Russian is the Telegram page's **Connect Telegram** / **Disconnect** buttons, which match the bot's English
+replies (product owner decision). Database errors (ARU-111) come later.
+
+Telegram notifications (ARU-110) go out in each recipient's language: the one they chose in Profile, else the phone
+language the app saved on their account at start (`profiles.device_language`), else English. Their texts are in
+`supabase/functions/_shared/telegram-texts.ts` (English, Russian and a note each, checked by
+`telegram-i18n.test.ts`); a new notification kind adds its texts there and builds its messages with
+`localizedMessage()`. The bot's own `/start` / `/stop` replies stay English (product owner decision).
+
+Shared pieces follow the chosen language too: `ErrorText` shows an app message the catalog knows in that language and
+any other text (a database error) as it came (`translateKnown`, with the app's messages listed in `APP_MESSAGE_IDS` in
+`src/i18n/index.ts`); `formatDate` / `formatDateTime` in `src/lib/theme.ts`, the shared confirmation's Cancel and the
+"Deleted account" fallback read the current language (`currentLanguage()`, set by `LanguageProvider`). Shared
+components import the hook from `src/i18n/context.tsx`, which doesn't load the store.
 
 ## Project structure
 

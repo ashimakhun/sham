@@ -105,7 +105,9 @@ describe('Telegram notifications page', () => {
   it('AC 3: registered as a pushed stack screen titled "Telegram notifications" (not a modal)', () => {
     const layout = fs.readFileSync('src/app/_layout.tsx', 'utf8');
     const line = layout.split('\n').find((l: string) => l.includes('name="telegram"'));
-    expect(line).toContain("title: 'Telegram notifications'");
+    // ARU-113: the title comes from the catalog; in English it reads "Telegram notifications".
+    expect(line).toContain("title: t('telegram.title')");
+    expect(require('@/i18n/en.json')['telegram.title']).toBe('Telegram notifications');
     expect(line).not.toContain('modal');
   });
 

@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import { Linking, Text, View } from 'react-native';
 
 import { Button, ErrorText, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { deletionWarningText, PHOTO_ZIP_MAX, PHOTOS_ZIP_ERROR } from '@/lib/photoRetention';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
@@ -46,11 +47,12 @@ export function usePhotoZipDownload(totalPhotos: number) {
 /** AC 5: "Download my photos" on the Checked list. Hidden without stored photos. */
 export function DownloadMyPhotosButton({ totalPhotos }: { totalPhotos: number }) {
   const { busy, error, download } = usePhotoZipDownload(totalPhotos);
+  const { t } = useI18n();
   if (totalPhotos === 0) return null;
   return (
     <View style={{ gap: 6 }}>
       <Button
-        title={busy ? 'Preparing…' : 'Download my photos'}
+        title={busy ? t('homework.photosPreparing') : t('homework.downloadMyPhotos')}
         variant="secondary"
         disabled={busy}
         onPress={() => void download()}
@@ -69,13 +71,14 @@ export function PhotoDeletionBanner({
   totalPhotos: number;
 }) {
   const { busy, error, download } = usePhotoZipDownload(totalPhotos);
+  const { t, lang } = useI18n();
   return (
     <View
       testID="photo-deletion-banner"
       accessibilityRole="alert"
       style={[styles.card, { gap: 10, borderColor: colors.danger, backgroundColor: colors.card }]}>
-      <Text style={styles.body}>{deletionWarningText(warning)}</Text>
-      <Button title={busy ? 'Preparing…' : 'Download photos'} disabled={busy} onPress={() => void download()} />
+      <Text style={styles.body}>{deletionWarningText(warning, lang)}</Text>
+      <Button title={busy ? t('homework.photosPreparing') : t('homework.downloadPhotos')} disabled={busy} onPress={() => void download()} />
       <ErrorText error={error} />
     </View>
   );

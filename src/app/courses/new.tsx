@@ -1,10 +1,11 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Switch, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { DisciplinePicker } from '@/components/Disciplines';
 import { KeyboardForm } from '@/components/KeyboardForm';
-import { Button, EmptyState, ErrorText, Field, styles } from '@/components/ui';
+import { Button, EmptyState, ErrorText, Field, styles, ThemedSwitch } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { newId } from '@/lib/id';
 import { canCreateCourse } from '@/lib/roles';
 import { useStore } from '@/lib/store';
@@ -12,6 +13,7 @@ import { useAction } from '@/lib/useAction';
 
 export default function NewCourseScreen() {
   const { addCourse, currentUser, disciplines } = useStore();
+  const { t } = useI18n();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   // ARU-40: off by default; kept on an error so a retry creates the same course.
@@ -23,7 +25,7 @@ export default function NewCourseScreen() {
   const { busy, error, run } = useAction();
 
   if (currentUser && !canCreateCourse(currentUser.role)) {
-    return <EmptyState title="Not allowed" hint="Only teachers and mentors can create courses." />;
+    return <EmptyState title={t('courses.notAllowed')} hint={t('courses.createNotAllowedHint')} />;
   }
 
   function submit() {
@@ -43,22 +45,27 @@ export default function NewCourseScreen() {
 
   return (
     <KeyboardForm>
-      <Field label="Title" placeholder="e.g. Algebra — Grade 7" value={title} onChangeText={setTitle} />
       <Field
-        label="Description (optional)"
-        placeholder="What is this course about?"
+        label={t('courses.titleLabel')}
+        placeholder={t('courses.titlePlaceholder')}
+        value={title}
+        onChangeText={setTitle}
+      />
+      <Field
+        label={t('courses.descriptionLabel')}
+        placeholder={t('courses.descriptionPlaceholder')}
         value={description}
         onChangeText={setDescription}
         multiline
       />
       <View style={[styles.row, { alignItems: 'flex-start' }]}>
         <View style={{ flex: 1, gap: 4 }}>
-          <Text style={styles.body}>Hidden course</Text>
-          <Text style={styles.muted}>Only the owner, listeners and the teacher will see this course.</Text>
+          <Text style={styles.body}>{t('courses.hiddenCourse')}</Text>
+          <Text style={styles.muted}>{t('courses.hiddenCourseHint')}</Text>
         </View>
-        <Switch
-          accessibilityLabel="Hidden course"
-          accessibilityHint="Only the owner, listeners and the teacher will see this course."
+        <ThemedSwitch
+          accessibilityLabel={t('courses.hiddenCourse')}
+          accessibilityHint={t('courses.hiddenCourseHint')}
           value={hidden}
           onValueChange={setHidden}
           disabled={busy}
@@ -67,7 +74,7 @@ export default function NewCourseScreen() {
       {/* Only when there is something to pick; with no disciplines every course has none. */}
       {disciplines.length > 0 && <DisciplinePicker value={disciplineId} onChange={setDisciplineId} disabled={busy} />}
       <ErrorText error={error} />
-      <Button title={busy ? 'Creating…' : 'Create course'} onPress={submit} disabled={!title.trim() || busy} />
+      <Button title={busy ? t('courses.creating') : t('courses.create')} onPress={submit} disabled={!title.trim() || busy} />
     </KeyboardForm>
   );
 }

@@ -297,7 +297,8 @@ describe('AC10: homework details', () => {
     const view = await render(<HomeworkDetailScreen />);
     const line = screen.getByTestId('homework-assignment');
     expect(line).toBeTruthy();
-    expect(screen.getByText(/Assignment: Old one · Meeting /)).toBeTruthy();
+    expect(screen.getByText('Assignment: Old one')).toBeTruthy();
+    expect(screen.getByText(/^Meeting /)).toBeTruthy();
     expect(screen.getByText(/Due /)).toBeTruthy();
     params.id = 'h2';
     await view.rerender(<HomeworkDetailScreen />);

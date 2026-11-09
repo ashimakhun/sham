@@ -5,6 +5,7 @@ import { FlatList, Linking, Pressable, RefreshControl, Text, View } from 'react-
 import { PeriodEditor } from '@/components/Accountant';
 import { PhotoPreview } from '@/components/PhotoPreview';
 import { Card, EmptyState, ErrorText, HiddenBadge, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import {
   byPaymentRank,
   canSeeBilling,
@@ -49,6 +50,7 @@ export default function CoursePaymentsScreen() {
     loading,
     refresh,
   } = useStore();
+  const { t } = useI18n();
   const month = localMonth(useNow());
   // ARU-124 AC 3: bumping sortKey re-sorts the list (on focus and after pull to refresh); store reloads don't.
   const [sortKey, setSortKey] = useState(0);
@@ -59,12 +61,12 @@ export default function CoursePaymentsScreen() {
     }, [setSortKey]),
   );
   if (!canSeeBilling(currentUser)) {
-    return <EmptyState title="Not allowed" hint="Only accountants and the teacher see payments." />;
+    return <EmptyState title={t('courses.notAllowed')} hint={t('accountant.paymentsNotAllowedHint')} />;
   }
   const course = getCourse(id);
   const billing = courseBilling.find((b) => b.courseId === id);
   if (!course || !billing) {
-    return <EmptyState title="Not a paid course" hint="This course isn't a paid course (any more)." />;
+    return <EmptyState title={t('accountant.notPaidTitle')} hint={t('accountant.notPaidHint')} />;
   }
   const waiting = waitingRequests({
     courseId: course.id,
@@ -114,7 +116,7 @@ export default function CoursePaymentsScreen() {
           request={requestOf.get(item.id)}
         />
       )}
-      ListEmptyComponent={<EmptyState title="No listeners yet" />}
+      ListEmptyComponent={<EmptyState title={t('accountant.noListeners')} />}
     />
   );
 }
@@ -124,6 +126,7 @@ function CourseHeader({ billing, title, hidden }: { billing: CourseBilling; titl
   const { currentUser, setBillingPeriod, unselectPaidCourse } = useStore();
   const [editing, setEditing] = useState(false);
   const { busy, error, run } = useAction();
+  const { t, lang } = useI18n();
   const accountant = isAccountant(currentUser);
   return (
     <View style={{ gap: 4 }} testID="payments-header">
@@ -133,11 +136,11 @@ function CourseHeader({ billing, title, hidden }: { billing: CourseBilling; titl
         </Text>
         {hidden ? <HiddenBadge /> : null}
       </View>
-      <Text style={styles.muted}>{periodText(billing)}</Text>
+      <Text style={styles.muted}>{periodText(billing, lang)}</Text>
       {editing ? (
         <PeriodEditor
           initial={billing}
-          saveTitle="Save period"
+          saveTitle={t('accountant.savePeriod')}
           onCancel={() => setEditing(false)}
           onSave={async (s, e) => {
             await setBillingPeriod(billing.courseId, s, e);
@@ -146,28 +149,32 @@ function CourseHeader({ billing, title, hidden }: { billing: CourseBilling; titl
         />
       ) : (
         <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap' }}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Change period" hitSlop={8} onPress={() => setEditing(true)}>
-            <Text style={{ color: colors.primary, fontWeight: '600' }}>Change period</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('accountant.changePeriod')}
+            hitSlop={8}
+            onPress={() => setEditing(true)}>
+            <Text style={[styles.linkText, { color: colors.primary }]}>{t('accountant.changePeriod')}</Text>
           </Pressable>
           {accountant && (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Unselect"
+              accessibilityLabel={t('accountant.unselect')}
               accessibilityState={{ disabled: busy }}
               disabled={busy}
               hitSlop={8}
               onPress={() =>
                 run(async () => {
                   const ok = await confirmAction(
-                    'Unselect paid course',
-                    `${title} will stop being a paid course for everyone.`,
-                    'Unselect',
-                    { destructive: true, cancelText: 'Keep' },
+                    t('accountant.unselectTitle'),
+                    t('accountant.unselectMessage', { title }),
+                    t('accountant.unselect'),
+                    { destructive: true, cancelText: t('accountant.keep') },
                   );
                   if (ok) await unselectPaidCourse(billing.courseId);
                 })
               }>
-              <Text style={{ color: colors.danger, fontWeight: '600', opacity: busy ? 0.4 : 1 }}>Unselect</Text>
+              <Text style={[styles.linkText, { color: colors.danger, opacity: busy ? 0.4 : 1 }]}>{t('accountant.unselect')}</Text>
             </Pressable>
           )}
         </View>
@@ -178,12 +185,15 @@ function CourseHeader({ billing, title, hidden }: { billing: CourseBilling; titl
 }
 
 function StatusLabel({ status }: { status: PaymentStatus }) {
-  if (status.kind === 'exempt') return <Text style={[styles.muted, { fontWeight: '600' }]}>Exempt</Text>;
+  const { t } = useI18n();
+  if (status.kind === 'exempt') return <Text style={[styles.muted, styles.caps, { fontSize: 12 }]}>{t('billing.exempt')}</Text>;
   if (status.kind === 'paid')
     return (
-      <Text style={{ color: colors.success, fontWeight: '600' }}>Paid · {formatDate(status.payment.markedAt)}</Text>
+      <Text style={[styles.linkText, { color: colors.success }]}>
+        {t('billing.paidOn', { date: formatDate(status.payment.markedAt) })}
+      </Text>
     );
-  return <Text style={{ color: colors.danger, fontWeight: '600' }}>Unpaid</Text>;
+  return <Text style={[styles.linkText, { color: colors.danger }]}>{t('billing.unpaid')}</Text>;
 }
 
 /** A text button; `label` (with the listener's name) is what screen readers read. */
@@ -209,7 +219,7 @@ function Action({
       hitSlop={8}
       onPress={onPress}
       style={{ minHeight: 32, justifyContent: 'center' }}>
-      <Text style={{ color: danger ? colors.danger : colors.primary, fontWeight: '600', opacity: disabled ? 0.4 : 1 }}>
+      <Text style={[styles.linkText, { color: danger ? colors.danger : colors.primary, opacity: disabled ? 0.4 : 1 }]}>
         {text}
       </Text>
     </Pressable>
@@ -222,6 +232,7 @@ function RequestLine({ request, courseTitle, name }: { request: PaymentRequest; 
   const [preview, setPreview] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
+  const { t } = useI18n();
 
   async function view() {
     setError(null);
@@ -242,10 +253,10 @@ function RequestLine({ request, courseTitle, name }: { request: PaymentRequest; 
 
   return (
     <View testID={`request-${request.userId}`} style={{ gap: 2 }}>
-      <Text style={{ color: colors.text }}>Payment request · {formatDate(request.sentAt)}</Text>
+      <Text style={{ color: colors.text }}>{t('accountant.requestLine', { date: formatDate(request.sentAt) })}</Text>
       <Action
-        text={opening ? 'Opening…' : 'View proof'}
-        label={`View payment proof from ${name}`}
+        text={opening ? t('accountant.opening') : t('accountant.viewProof')}
+        label={t('accountant.viewProofLabel', { name })}
         disabled={opening}
         onPress={view}
       />
@@ -255,7 +266,7 @@ function RequestLine({ request, courseTitle, name }: { request: PaymentRequest; 
           path={request.proofPath}
           loadUrl={getPaymentProofUrl}
           fileName={proofFileName(courseTitle, name)}
-          errorText={PROOF_LOAD_ERROR}
+          errorText={t('payments.proofLoadError')}
           onClose={() => setPreview(false)}
         />
       )}
@@ -281,6 +292,7 @@ function ListenerRow({
   request?: PaymentRequest;
 }) {
   const { markPaid, undoPaid, setExempt } = useStore();
+  const { t } = useI18n();
   const { busy, error, run } = useAction();
   return (
     <View testID={`payment-${userId}`}>
@@ -291,16 +303,16 @@ function ListenerRow({
         <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap' }}>
           {status.kind === 'unpaid' && (
             <Action
-              text="Mark paid"
-              label={`Mark ${name} paid`}
+              text={t('accountant.markPaid')}
+              label={t('accountant.markPaidLabel', { name })}
               disabled={busy}
               onPress={() => run(() => markPaid(courseId, userId, month))}
             />
           )}
           {status.kind === 'paid' && (
             <Action
-              text="Undo paid"
-              label={`Undo paid for ${name}`}
+              text={t('accountant.undoPaid')}
+              label={t('accountant.undoPaidLabel', { name })}
               danger
               disabled={busy}
               onPress={() => run(() => undoPaid(courseId, userId, month))}
@@ -308,15 +320,15 @@ function ListenerRow({
           )}
           {status.kind === 'exempt' ? (
             <Action
-              text="Clear exempt"
-              label={`Clear exempt for ${name}`}
+              text={t('accountant.clearExempt')}
+              label={t('accountant.clearExemptLabel', { name })}
               disabled={busy}
               onPress={() => run(() => setExempt(courseId, userId, false))}
             />
           ) : (
             <Action
-              text="Set exempt"
-              label={`Set ${name} exempt`}
+              text={t('accountant.setExempt')}
+              label={t('accountant.setExemptLabel', { name })}
               disabled={busy}
               onPress={() => run(() => setExempt(courseId, userId, true))}
             />

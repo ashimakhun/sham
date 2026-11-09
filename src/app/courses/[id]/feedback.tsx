@@ -4,6 +4,7 @@ import { Pressable, Text, TextInput, View } from 'react-native';
 
 import { KeyboardForm } from '@/components/KeyboardForm';
 import { Button, EmptyState, ErrorText, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { confirmAction } from '@/lib/confirm';
 import { courseStarted, FEEDBACK_MAX, starsLabel } from '@/lib/feedback';
 import { isCourseListener } from '@/lib/roles';
@@ -16,6 +17,7 @@ import { useAction } from '@/lib/useAction';
 export default function CourseFeedbackScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getCourse, currentUser, courseMembers, meetings, courseFeedback } = useStore();
+  const { t } = useI18n();
 
   // Read once, so a live update while typing doesn't swap the form (or close it if the user is removed: the save
   // then shows the error and keeps the text, AC 12).
@@ -25,15 +27,16 @@ export default function CourseFeedbackScreen() {
     () => !!course && isCourseListener(currentUser, course, courseMembers) && (!!mine || courseStarted(meetings, course.id)),
   );
 
-  if (!course) return <EmptyState title="Course not found" />;
+  if (!course) return <EmptyState title={t('courses.notFound')} />;
   if (!allowed) {
-    return <EmptyState title="Can't leave feedback" hint="Listeners leave feedback once the first meeting is completed." />;
+    return <EmptyState title={t('feedback.cantLeave')} hint={t('feedback.cantLeaveHint')} />;
   }
   return <FeedbackForm course={course} mine={mine} />;
 }
 
 function FeedbackForm({ course, mine }: { course: Course; mine?: CourseFeedback }) {
   const { saveFeedback } = useStore();
+  const { t, lang } = useI18n();
   const { busy, error, run } = useAction();
   const [rating, setRating] = useState(mine?.rating ?? 0);
   const [body, setBody] = useState(mine?.body ?? '');
@@ -48,9 +51,9 @@ function FeedbackForm({ course, mine }: { course: Course; mine?: CourseFeedback 
     if (leaving) leave.current?.();
   }, [leaving]);
   usePreventRemove(dirty && !busy && !leaving, ({ repeat }) => {
-    confirmAction('Discard changes?', 'Your feedback will be lost.', 'Discard', {
+    confirmAction(t('feedback.discardTitle'), t('feedback.discardMessage'), t('feedback.discard'), {
       destructive: true,
-      cancelText: 'Keep editing',
+      cancelText: t('feedback.keepEditing'),
     }).then((discard) => {
       if (!discard) return;
       leave.current = repeat;
@@ -79,27 +82,27 @@ function FeedbackForm({ course, mine }: { course: Course; mine?: CourseFeedback 
     <KeyboardForm>
       <Text style={styles.title}>{course.title}</Text>
       <View style={{ gap: 6 }}>
-        <Text style={styles.label}>Rating</Text>
+        <Text style={styles.label}>{t('feedback.rating')}</Text>
         <View style={{ flexDirection: 'row', gap: 4 }} accessibilityRole="radiogroup">
           {[1, 2, 3, 4, 5].map((n) => (
             <Pressable
               key={n}
               accessibilityRole="radio"
-              accessibilityLabel={starsLabel(n)}
+              accessibilityLabel={starsLabel(n, lang)}
               accessibilityState={{ selected: rating === n, checked: rating === n }}
               onPress={() => setRating(n)}
               hitSlop={4}
               style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontSize: 30, color: n <= rating ? '#F59E0B' : colors.border }}>★</Text>
+              <Text style={{ fontSize: 30, color: n <= rating ? colors.star : colors.starEmpty }}>★</Text>
             </Pressable>
           ))}
         </View>
       </View>
       <View style={{ gap: 6 }}>
-        <Text style={styles.label}>Feedback</Text>
+        <Text style={styles.label}>{t('feedback.title')}</Text>
         <TextInput
-          accessibilityLabel="Feedback"
-          placeholder="What went well, what could be better…"
+          accessibilityLabel={t('feedback.title')}
+          placeholder={t('feedback.placeholder')}
           placeholderTextColor={colors.muted}
           value={body}
           onChangeText={setBody}
@@ -112,7 +115,7 @@ function FeedbackForm({ course, mine }: { course: Course; mine?: CourseFeedback 
         </Text>
       </View>
       <ErrorText error={error} />
-      <Button title={busy ? 'Saving…' : 'Save'} onPress={save} disabled={!canSave} />
+      <Button title={busy ? t('common.saving') : t('common.save')} onPress={save} disabled={!canSave} />
     </KeyboardForm>
   );
 }

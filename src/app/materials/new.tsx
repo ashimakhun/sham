@@ -5,11 +5,14 @@ import { Text, View } from 'react-native';
 import { KeyboardForm } from '@/components/KeyboardForm';
 import { MarkdownEditor } from '@/components/MarkdownEditor';
 import { Button, ErrorText, Field, styles } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
+import { formatLimit } from '@/lib/files';
 import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
 
 export default function NewMaterialScreen() {
   const { addMaterial } = useStore();
+  const { t, lang } = useI18n();
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [link, setLink] = useState('');
@@ -25,22 +28,22 @@ export default function NewMaterialScreen() {
 
   return (
     <KeyboardForm>
-      <Field label="Title" placeholder="e.g. Lesson 3: Decimals" value={title} onChangeText={setTitle} />
+      <Field label={t('materials.titleLabel')} placeholder={t('materials.titlePlaceholder')} value={title} onChangeText={setTitle} />
       {/* Formatted blog post (ARU-38): stored as Markdown in materials.body, 10,000 characters at most. */}
       <View style={{ gap: 6 }}>
         <Text style={styles.label}>
-          Content
+          {t('materials.contentLabel')}
         </Text>
         <MarkdownEditor
           value={body}
           onChange={setBody}
-          placeholder="Explanation, instructions, what to read…"
-          accessibilityLabel="Content"
-          limitMessage="Content can be at most 10,000 characters."
+          placeholder={t('materials.contentPlaceholder')}
+          accessibilityLabel={t('materials.contentLabel')}
+          limitMessage={t('materials.contentTooLong', { max: formatLimit(10000, lang) })}
         />
       </View>
       <Field
-        label="Link (optional)"
+        label={t('materials.linkLabel')}
         placeholder="https://…"
         value={link}
         onChangeText={setLink}
@@ -49,7 +52,7 @@ export default function NewMaterialScreen() {
       />
       <ErrorText error={error} />
       <Button
-        title={busy ? 'Sharing…' : 'Share with class'}
+        title={busy ? t('materials.sharing') : t('materials.shareWithClass')}
         onPress={submit}
         disabled={!title.trim() || !body.trim() || busy}
       />

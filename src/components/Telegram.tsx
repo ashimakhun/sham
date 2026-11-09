@@ -1,15 +1,17 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Linking, Pressable, Switch, Text, View } from 'react-native';
+import { AppState, Linking, Pressable, Text, View } from 'react-native';
 
-import { Button, Card, ErrorText, styles } from '@/components/ui';
+import { Button, Card, ErrorText, styles, ThemedSwitch } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { confirmDestructive } from '@/lib/confirm';
 import { useStore } from '@/lib/store';
 import { telegramBotUsername, telegramStartUrl, telegramSwitchesFor } from '@/lib/telegram';
 import { colors } from '@/lib/theme';
 import type { TelegramKind } from '@/lib/types';
 
+// The fallback is passed in already translated; e.message is shown through ErrorText, which translates app messages.
 const errorText = (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback);
 
 /**
@@ -18,6 +20,7 @@ const errorText = (e: unknown, fallback: string) => (e instanceof Error ? e.mess
  * saved by that card is ignored. Hidden when no bot username is configured (ARU-48).
  */
 export function TelegramButton() {
+  const { t } = useI18n();
   // A double tap opens one page; the guard clears when Profile is focused again.
   const opening = useRef(false);
   useFocusEffect(
@@ -30,8 +33,8 @@ export function TelegramButton() {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Telegram notifications"
-      accessibilityHint="Opens the Telegram notifications page"
+      accessibilityLabel={t('telegram.title')}
+      accessibilityHint={t('telegram.buttonHint')}
       testID="telegram-button"
       onPress={() => {
         if (opening.current) return;
@@ -43,7 +46,7 @@ export function TelegramButton() {
         { backgroundColor: colors.primarySoft, flexDirection: 'row', alignItems: 'center', minHeight: 44, gap: 8 },
         pressed && { opacity: 0.8 },
       ]}>
-      <Text style={[styles.buttonText, { color: colors.primary, flex: 1 }]}>Telegram notifications</Text>
+      <Text style={[styles.buttonText, { color: colors.primary, flex: 1 }]}>{t('telegram.title')}</Text>
       <Ionicons name="chevron-forward" size={20} color={colors.primary} accessibilityElementsHidden importantForAccessibility="no" />
     </Pressable>
   );
@@ -57,6 +60,7 @@ export function TelegramButton() {
 export function TelegramSettings({ username }: { username: string }) {
   const { currentUser, telegram, loadTelegram, createTelegramLinkCode, setTelegramNotification, disconnectTelegram } =
     useStore();
+  const { t, lang } = useI18n();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // A failed refetch shows on the page and keeps the last loaded state (ARU-101 edge cases).
@@ -69,8 +73,8 @@ export function TelegramSettings({ username }: { username: string }) {
   const refetch = useCallback(() => {
     loadTelegram()
       .then(() => setLoadError(null))
-      .catch((e) => setLoadError(errorText(e, 'Could not load Telegram settings. Please try again.')));
-  }, [loadTelegram]);
+      .catch((e) => setLoadError(errorText(e, t('telegram.loadFailed'))));
+  }, [loadTelegram, t]);
   useFocusEffect(refetch);
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
@@ -87,7 +91,7 @@ export function TelegramSettings({ username }: { username: string }) {
     try {
       await action();
     } catch (e) {
-      setError(errorText(e, 'Something went wrong. Please try again.'));
+      setError(errorText(e, t('common.genericError')));
     } finally {
       setBusy(false);
     }
@@ -109,7 +113,7 @@ export function TelegramSettings({ username }: { username: string }) {
     setPending((p) => ({ ...p, [kind]: value }));
     setError(null);
     setTelegramNotification(kind, value)
-      .catch((e) => setError(errorText(e, 'Could not save. Please try again.')))
+      .catch((e) => setError(errorText(e, t('telegram.saveFailed'))))
       .finally(() =>
         setPending((p) => {
           const { [kind]: _done, ...rest } = p;
@@ -120,7 +124,11 @@ export function TelegramSettings({ username }: { username: string }) {
 
   function disconnect() {
     act(async () => {
-      const ok = await confirmDestructive('Disconnect Telegram', 'Stop Sham notifications in Telegram?', 'Disconnect');
+      const ok = await confirmDestructive(
+        t('telegram.disconnectTitle'),
+        t('telegram.disconnectMessage'),
+        t('telegram.disconnectConfirm'),
+      );
       if (ok) await disconnectTelegram();
     });
   }
@@ -131,17 +139,19 @@ export function TelegramSettings({ username }: { username: string }) {
     <Card style={{ gap: 10 }}>
       {!telegram ? (
         <>
-          <Text style={styles.body}>Get Sham notifications in Telegram.</Text>
+          <Text style={styles.body}>{t('telegram.intro')}</Text>
           <ErrorText error={shownError} />
-          <Button title={busy ? 'Opening Telegram…' : 'Connect Telegram'} onPress={connect} disabled={busy} />
+          {/* ARU-113 AC 11: "Connect Telegram" stays English in Russian too: the bot replies in English (ARU-110) and
+              names this button. */}
+          <Button title={busy ? t('telegram.opening') : 'Connect Telegram'} onPress={connect} disabled={busy} />
         </>
       ) : (
         <>
-          <Text style={[styles.body, { fontWeight: '600' }]}>Connected to Telegram</Text>
-          {telegramSwitchesFor(currentUser.role).map(({ kind, label }) => (
+          <Text style={[styles.body, { fontWeight: '600' }]}>{t('telegram.connected')}</Text>
+          {telegramSwitchesFor(currentUser.role, lang).map(({ kind, label }) => (
             <View key={kind} style={[styles.row, { minHeight: 44 }]}>
               <Text style={[styles.body, { flex: 1 }]}>{label}</Text>
-              <Switch
+              <ThemedSwitch
                 accessibilityLabel={label}
                 value={pending[kind] ?? telegram.switches[kind] ?? true}
                 onValueChange={(v) => toggle(kind, v)}
@@ -149,8 +159,9 @@ export function TelegramSettings({ username }: { username: string }) {
               />
             </View>
           ))}
-          <Text style={styles.muted}>{"You'll keep getting these after signing out of the app."}</Text>
+          <Text style={styles.muted}>{t('telegram.keepAfterSignOut')}</Text>
           <ErrorText error={shownError} />
+          {/* ARU-113 AC 11: stays English like "Connect Telegram" (the bot's replies are English, ARU-110). */}
           <Button title="Disconnect" variant="secondary" onPress={disconnect} disabled={busy} />
         </>
       )}

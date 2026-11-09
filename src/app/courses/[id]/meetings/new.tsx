@@ -3,6 +3,7 @@ import { useState } from 'react';
 
 import { MeetingForm, nextFullHour } from '@/components/MeetingForm';
 import { EmptyState } from '@/components/ui';
+import { useI18n } from '@/i18n/context';
 import { newId } from '@/lib/id';
 import { canManageMeetings } from '@/lib/roles';
 import { useStore } from '@/lib/store';
@@ -16,18 +17,19 @@ export default function ScheduleMeetingScreen() {
   const [id] = useState(newId);
   const [initial] = useState(() => ({ startsAt: nextFullHour(), topic: '', location: '' }));
   const { busy, error, run } = useAction();
+  const { t } = useI18n();
 
   const course = getCourse(courseId);
-  if (!course) return <EmptyState title="Course not found" />;
+  if (!course) return <EmptyState title={t('meetings.courseNotFound')} />;
   if (currentUser && !canManageMeetings(currentUser, course)) {
-    return <EmptyState title="Not allowed" hint="Only the course owner or the teacher can schedule meetings." />;
+    return <EmptyState title={t('meetings.notAllowed')} hint={t('meetings.onlyScheduleHint')} />;
   }
 
   return (
     <MeetingForm
       initial={initial}
-      submitTitle="Schedule"
-      busyTitle="Scheduling…"
+      submitTitle={t('meetings.schedule')}
+      busyTitle={t('meetings.scheduling')}
       busy={busy}
       error={error}
       onSubmit={(values) =>
