@@ -15,6 +15,7 @@ import {
 import { Alert, Platform, StyleSheet } from "react-native";
 
 import CoursePaymentsScreen from "@/app/accountant/[id]";
+import { styles } from "@/components/ui";
 import { localMonth } from "@/lib/billing";
 import { colors, formatDate } from "@/lib/theme";
 import type {
@@ -356,6 +357,6 @@ describe("look and layout", () => {
     const text = within(row("S1").getByTestId("status-badge")).getByText(
       "Unpaid",
     );
-    expect(flat(text)).toMatchObject({ fontSize: 12, fontWeight: "600" });
+    expect(flat(text)).toMatchObject(StyleSheet.flatten(styles.badgeText) as object);
   });
 });
