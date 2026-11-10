@@ -29,7 +29,7 @@ Each bug `blocks` the story it was found in. The story waits in **In Dev** until
 2. Clone ashimakhun/sham and check out the PR branch. On a re-test, first fix or remove any test named in an `ANALYSIS: NOT A BUG` comment on this story's closed bugs.
 3. **Update older tests to the new requirements before checking anything.** Newer stories change behaviour that older tests still expect (for example ARU-126 replaced the "Mark canceled" button with a ✕ "Cancel meeting" icon, and an ARU-129 test kept pressing the old button).
    - Merge the latest `main` into the branch locally (`git fetch origin main && git merge origin/main`), so tests from stories merged since the PR was opened run too.
-   - Run `npm test` and `npm run test:db` once. For every failing test that is **not** one of this story's own new tests, decide:
+   - Run `npm ci` (with the proxy setting from step 5), then `npm test` and `npm run test:db` once. For every failing test that is **not** one of this story's own new tests, decide:
      - **The story's criteria (or an `ANALYSIS: CRITERION CHANGE`) deliberately changed that behaviour** (a renamed or replaced button, new wording, a removed action, a changed rule): rewrite the old test to the new behaviour. Keep what it was checking; change only the expectation the new requirement replaced. Never delete a test unless the feature it covers was removed by the story.
      - **Nothing in the story explains the change:** don't touch the test. It's a regression, and it gets a Bug (`bug-cause/code`, "Regression: <feature>").
      - **Unsure whether the change was intended:** don't touch the test; file a `bug-cause/requirements` Bug so analysis decides.
