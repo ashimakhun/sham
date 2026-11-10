@@ -20,9 +20,10 @@ If the team has no **Ready for Dev** status, stop and report that it must be add
 ## 1. Choose the issue
 1. Using the Linear connector, list Sham issues in **Requirements ready** without the `agent:working` label.
 2. Take **requirements bugs first** (label `Bug`): severity blocker → major → minor, then oldest. Handle them with section 5 instead of sections 3–4.
-3. Otherwise sort the stories: by difficulty label (easy → medium → hard, unrated last), then issues that block the most other open issues, then oldest.
-4. Take the first. If none, stop and report "nothing to do".
-5. Add `agent:working` before anything else.
+3. Otherwise, **first drop every story that is blocked**: it has a `blocked by` relation to an issue that isn't resolved yet (resolved = Done, Canceled or Duplicate). Check this before sorting, so a blocked story never comes up first. A blocked story waits in Requirements ready; it's picked up in a later run once all its blockers are resolved. (Requirements bugs in step 2 are never skipped for this.)
+4. Sort the remaining stories: by difficulty label (easy → medium → hard, unrated last), then issues that block the most other open issues, then oldest.
+5. Take the first. If none is left, stop and report "nothing to do" (and, if stories were skipped as blocked, list them with their open blockers in the run summary).
+6. Add `agent:working` before anything else.
 
 ## 2. Gather context
 - The issue description, all comments (including earlier `ANALYSIS:` comments, if it came back before), labels and relations.

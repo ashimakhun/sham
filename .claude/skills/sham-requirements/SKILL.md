@@ -58,3 +58,4 @@ Before choosing, load the `sham-merge-issues` skill with the Skill tool and foll
 - Never write code or change the repo.
 - Write requirements for one issue per run (rating and merging others per `sham-merge-issues` is fine).
 - Do not invent features beyond the idea; put extras under Out of scope.
+- In a text table, never reword an existing `db.*` error text. An error code is a permanent ID and keeps one message for good (the ARU-111 test enforces it). When an error needs new wording, give it a **new** key (for example `db.notes_add_role` instead of rewording `db.listener_notes_add_role`), list it as new, and leave the old key unchanged.
