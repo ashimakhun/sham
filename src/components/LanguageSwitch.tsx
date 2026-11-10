@@ -1,4 +1,6 @@
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { ErrorText, styles } from '@/components/ui';
 import type { Language } from '@/i18n';

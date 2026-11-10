@@ -1,7 +1,8 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { ActivityIndicator, SectionList, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, SectionList, View } from 'react-native';
 
-import { Button, EmptyState, ErrorText, RoleBadge, styles } from '@/components/ui';
+import { Button, EmptyState, ErrorText, RoleBadge, styles, ThemedSwitch } from '@/components/ui';
 import type { TextId } from '@/i18n';
 import { useI18n } from '@/i18n/context';
 import { confirmDestructive } from '@/lib/confirm';
@@ -10,6 +11,8 @@ import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
 import type { AccessRequest, Role, User } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
+import { Text, TextInput } from '@/components/AppText';
+import { font } from '@/lib/fonts';
 
 // Catalog ids, not texts, so the titles follow the chosen language (ARU-113).
 const SECTIONS: { role: Role; title: TextId }[] = [
@@ -18,7 +21,21 @@ const SECTIONS: { role: Role; title: TextId }[] = [
   { role: 'student', title: 'roles.sectionStudents' },
 ];
 
-type Row = { kind: 'user'; user: User } | { kind: 'request'; request: AccessRequest };
+// ARU-114: request icons sit in 36 pt circles 8 pt apart; hit slop 4 makes each touch area 44×44 pt, and
+// 4 + 4 = the 8 pt gap, so the two touch areas meet but never overlap.
+const ICON_SIZE = 36;
+const ICON_GAP = 8;
+const ICON_HIT_SLOP = 4;
+const DANGER_SOFT = '#FEF2F2'; // as the danger Button's background
+const iconCircle = {
+  width: ICON_SIZE,
+  height: ICON_SIZE,
+  borderRadius: ICON_SIZE / 2,
+  alignItems: 'center',
+  justifyContent: 'center',
+} as const;
+
+type Row ={ kind: 'user'; user: User } | { kind: 'request'; request: AccessRequest };
 
 /**
  * The teacher accepts or declines new accounts (ARU-43: Requests first, Declined last) and switches users between
@@ -161,13 +178,61 @@ export default function RolesScreen() {
                   {r.email}
                 </Text>
                 <Text style={styles.muted}>{t('roles.signedUp', { date: formatDate(r.createdAt) })}</Text>
-              </View>
-              <View style={{ gap: 6 }}>
-                <Button title={t('roles.accept')} disabled={busy} onPress={() => accept(r)} />
-                {r.status === 'pending' && (
-                  <Button title={t('roles.reject')} variant="danger" disabled={busy} onPress={() => decline(r)} />
+                {r.status === 'rejected' && (
+                  <View style={[styles.badge, { backgroundColor: DANGER_SOFT, alignSelf: 'flex-start' }]}>
+                    <Text style={[styles.badgeText, { color: colors.danger }]}>{t('roles.declinedBadge')}</Text>
+                  </View>
                 )}
               </View>
+              {/* ARU-114: icons instead of text buttons; disabled for every row while any action runs. */}
+              {r.status === 'pending' ? (
+                <View style={{ flexDirection: 'row', gap: ICON_GAP }}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('roles.acceptLabel', { name: r.name })}
+                    accessibilityState={{ disabled: busy }}
+                    disabled={busy}
+                    hitSlop={ICON_HIT_SLOP}
+                    testID={`accept-request-${r.id}`}
+                    style={[iconCircle, { backgroundColor: colors.successSoft, opacity: busy ? 0.4 : 1 }]}
+                    onPress={() => accept(r)}>
+                    <Ionicons name="checkmark" size={20} color={colors.success} />
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('roles.rejectLabel', { name: r.name })}
+                    accessibilityState={{ disabled: busy }}
+                    disabled={busy}
+                    hitSlop={ICON_HIT_SLOP}
+                    testID={`reject-request-${r.id}`}
+                    style={[iconCircle, { backgroundColor: DANGER_SOFT, opacity: busy ? 0.4 : 1 }]}
+                    onPress={() => decline(r)}>
+                    <Ionicons name="close" size={20} color={colors.danger} />
+                  </Pressable>
+                </View>
+              ) : (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('roles.acceptLabel', { name: r.name })}
+                  accessibilityState={{ disabled: busy }}
+                  disabled={busy}
+                  hitSlop={6}
+                  testID={`accept-request-${r.id}`}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                    minHeight: 32,
+                    paddingHorizontal: 12,
+                    borderRadius: 16,
+                    backgroundColor: colors.successSoft,
+                    opacity: busy ? 0.4 : 1,
+                  }}
+                  onPress={() => accept(r)}>
+                  <Ionicons name="checkmark" size={16} color={colors.success} />
+                  <Text style={{ color: colors.success, fontSize: 14, ...font(500) }}>{t('roles.accept')}</Text>
+                </Pressable>
+              )}
             </View>
           );
         }
@@ -190,7 +255,7 @@ export default function RolesScreen() {
                 {/* ARU-65: the teacher turns Accountant on or off for a mentor (set_accountant() checks it). */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Text style={styles.muted}>{t('roles.accountant')}</Text>
-                  <Switch
+                  <ThemedSwitch
                     accessibilityLabel={t('roles.accountantLabel', { name: item.name })}
                     value={!!item.isAccountant}
                     disabled={busy}

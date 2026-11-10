@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from 'react';
-import { RefreshControl, ScrollView, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DeleteAccountForm } from '@/components/DeleteAccountForm';

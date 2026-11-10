@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { KeyboardForm } from '@/components/KeyboardForm';
 import { Button, Card, ErrorText, Field, styles } from '@/components/ui';
@@ -8,6 +10,7 @@ import { ownedCoursesProblem, TEACHER_CANT_DELETE } from '@/lib/deleteAccount';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import { useAction } from '@/lib/useAction';
+import { font } from '@/lib/fonts';
 
 /**
  * ARU-75: the Delete account screen's body, shared by the route (opened from the Profile tab) and the waiting /
@@ -54,7 +57,7 @@ export function DeleteAccountForm({ onCancel, showTitle = false }: { onCancel: (
         <Text style={styles.body} testID="delete-account-explanation">
           {/* The parts around the bold "Deleted account" are their own texts, so Russian can quote it (ARU-113). */}
           {t('deleteAccount.explanationBefore')}
-          <Text style={{ fontWeight: '700' }}>{t('common.deletedAccount')}</Text>
+          <Text style={{ ...font(600) }}>{t('common.deletedAccount')}</Text>
           {t('deleteAccount.explanationAfter')}
         </Text>
       </Card>

@@ -1,6 +1,8 @@
 import { router, Stack, useLocalSearchParams, usePreventRemove } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { KeyboardForm } from '@/components/KeyboardForm';
 import { MarkdownEditor } from '@/components/MarkdownEditor';
@@ -304,7 +306,7 @@ function HeaderSave({ busy, disabled = busy, onPress }: { busy: boolean; disable
       hitSlop={8}
       onPress={onPress}
       style={{ paddingHorizontal: 8, minHeight: 44, justifyContent: 'center' }}>
-      <Text style={{ fontSize: 17, fontWeight: '600', color: disabled ? colors.muted : colors.primary }}>
+      <Text style={[styles.caps, { fontSize: 16, color: disabled ? colors.muted : colors.primary }]}>
         {t(busy ? 'common.saving' : 'common.save')}
       </Text>
     </Pressable>

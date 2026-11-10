@@ -1,7 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { EditCourseDisciplineSection } from '@/components/Disciplines';
 import { Card, EmptyState, styles } from '@/components/ui';
@@ -59,7 +61,7 @@ export default function EditCourseScreen() {
             { flexDirection: 'row', alignItems: 'center', minHeight: 44, gap: 8 },
             pressed && { opacity: 0.7 },
           ]}>
-          <Text style={[styles.body, { flex: 1, color: colors.primary, fontWeight: '600' }]}>{t('courses.changeOwner')}</Text>
+          <Text style={[styles.caps, { fontSize: 14, flex: 1, color: colors.primary }]}>{t('courses.changeOwner')}</Text>
           <Ionicons name="chevron-forward" size={20} color={colors.muted} />
         </Pressable>
       </Card>

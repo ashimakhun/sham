@@ -1,4 +1,6 @@
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { Field } from '@/components/ui';
 import { useI18n } from '@/i18n/context';

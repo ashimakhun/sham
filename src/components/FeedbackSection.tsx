@@ -1,10 +1,13 @@
 import { router } from 'expo-router';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
+import { Text } from '@/components/AppText';
+
+import { RatingSummary } from '@/components/RatingSummary';
 import { Button, Card, ErrorText, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import { confirmDestructive } from '@/lib/confirm';
-import { courseStarted, feedbackFor, isEdited, ratingSummary, ratingSummaryLabel, stars, starsLabel } from '@/lib/feedback';
+import { courseStarted, feedbackFor, isEdited, stars, starsLabel } from '@/lib/feedback';
 import { isCourseListener } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
@@ -22,7 +25,6 @@ export function FeedbackSection({ course }: { course: Course }) {
   const { t, lang } = useI18n();
 
   const items = feedbackFor(courseFeedback, course.id);
-  const summary = ratingSummary(items, lang);
   // Only current listeners write (owners and the teacher are never listeners; a removed listener's feedback stays
   // but is locked, AC 9).
   const listener = isCourseListener(currentUser, course, courseMembers);
@@ -33,11 +35,7 @@ export function FeedbackSection({ course }: { course: Course }) {
   return (
     <Card style={{ gap: 8 }}>
       <Text style={styles.label}>{t('feedback.heading')}</Text>
-      {summary ? (
-        <Text style={styles.title} accessibilityLabel={ratingSummaryLabel(items, lang)}>
-          {summary}
-        </Text>
-      ) : null}
+      <RatingSummary items={items} style={styles.title} />
       {listener && !started ? (
         <Text style={styles.muted}>{t('feedback.opensAfterFirst')}</Text>
       ) : null}
@@ -67,7 +65,7 @@ export function FeedbackSection({ course }: { course: Course }) {
           testID={`feedback-${f.id}`}
           style={[{ gap: 2, paddingTop: 8 }, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
           <Text style={styles.body}>{getUser(f.userId)?.name ?? t('common.unknown')}</Text>
-          <Text style={{ color: '#F59E0B', fontSize: 16 }} accessibilityLabel={starsLabel(f.rating, lang)}>
+          <Text style={{ color: colors.star, fontSize: 16 }} accessibilityLabel={starsLabel(f.rating, lang)}>
             {stars(f.rating)}
           </Text>
           <Text style={styles.body}>{f.body}</Text>

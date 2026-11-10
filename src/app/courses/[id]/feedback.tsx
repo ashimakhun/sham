@@ -1,6 +1,8 @@
 import { router, useLocalSearchParams, usePreventRemove } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+
+import { Text, TextInput } from '@/components/AppText';
 
 import { KeyboardForm } from '@/components/KeyboardForm';
 import { Button, EmptyState, ErrorText, styles } from '@/components/ui';
@@ -93,7 +95,7 @@ function FeedbackForm({ course, mine }: { course: Course; mine?: CourseFeedback 
               onPress={() => setRating(n)}
               hitSlop={4}
               style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontSize: 30, color: n <= rating ? '#F59E0B' : colors.border }}>★</Text>
+              <Text style={{ fontSize: 30, color: n <= rating ? colors.star : colors.starEmpty }}>★</Text>
             </Pressable>
           ))}
         </View>

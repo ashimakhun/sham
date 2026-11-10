@@ -8,6 +8,7 @@ import type { Material, MaterialLike } from '@/lib/types';
 
 import { fakeStore } from './helpers/fakeStore';
 import { setStore } from './helpers/mocks';
+import { font } from '@/lib/fonts';
 
 jest.mock('expo-router', () => require('./helpers/mocks').expoRouter);
 jest.mock('@/lib/store', () => require('./helpers/mocks').store);
@@ -42,8 +43,8 @@ it('AC1: the whole body is shown, with no line limit', async () => {
 it('AC2: bold, italic, bullets, numbers and links are formatted; no raw Markdown', async () => {
   setStore(fakeStore('S1', { materials: [post('A', FORMATTED)] }));
   await render(<MaterialsScreen />);
-  expect(card().getByText('Read').props.style).toEqual({ fontWeight: '700' });
-  expect(card().getByText('this').props.style).toEqual({ fontStyle: 'italic' });
+  expect(card().getByText('Read').props.style).toEqual(font(600)); // ARU-119: bold is Inter SemiBold 600
+  expect(card().getByText('this').props.style).toEqual(font(300, true)); // ARU-119: italic is Inter Light Italic
   expect(card().getAllByText('•')).toHaveLength(2);
   expect(card().getByText('1.')).toBeTruthy();
   expect(card().getByText('2.')).toBeTruthy();
@@ -93,7 +94,8 @@ it('AC6: title above the body; author · date, link marker and likes below it', 
   const order = screen.getAllByText(/^(Post A|Body)$|^Teacher Tess · /);
   expect(order).toEqual([screen.getByText('Post A'), screen.getByText('Body'), screen.getByText(/^Teacher Tess · /)]);
   expect(screen.getByText(/Teacher Tess · .* · 🔗 link/)).toBeTruthy();
-  expect(screen.getByLabelText('1 like')).toBeTruthy();
+  // ARU-120: the likes are the heart at the right of that line.
+  expect(screen.getByRole('button', { name: 'Unlike, 1 like' })).toBeTruthy();
 });
 
 it('AC8: the title is its own button and links are separate elements (the card is not grouped)', async () => {

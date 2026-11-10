@@ -15,6 +15,13 @@ export const colors = {
   warning: '#B45309',
   warningSoft: '#FFFBEB',
   danger: '#DC2626',
+  dangerSoft: '#FEF2F2',
+  /** Light grey behind muted badges (Hidden, Exempt). */
+  mutedSoft: '#F3F4F6',
+  /** ARU-123: rating stars (filled, review stars and summaries) use the theme colour. */
+  star: '#4F46E5',
+  /** ARU-123: unselected stars in the rating form. */
+  starEmpty: '#C7D2FE',
 };
 
 export const roleLabel: Record<Role, string> = {

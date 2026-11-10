@@ -1,11 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ComponentProps, ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
+import { Platform, Pressable, StyleSheet, Switch, View, type SwitchProps, type TextInputProps, type ViewStyle } from 'react-native';
+
+import { Text, TextInput } from '@/components/AppText';
 
 import { useI18n } from '@/i18n/context';
 import { colors, roleColor } from '@/lib/theme';
 import type { HomeworkStatus, Role } from '@/lib/types';
 import { formatUnread, withUnreadLabel } from '@/lib/unread';
+import { font } from '@/lib/fonts';
 
 type CardProps = {
   children: ReactNode;
@@ -82,7 +85,7 @@ export function Button({ title, onPress, variant = 'primary', disabled, unread =
         // Same size as the course card's chat icon (ARU-25); the button keeps its full-width, 46 pt target.
         <Ionicons name={icon} size={24} color={textColor} style={{ marginVertical: -3 }} accessibilityElementsHidden importantForAccessibility="no" />
       ) : (
-        <Text style={[styles.buttonText, { color: textColor }]}>{title}</Text>
+        <Text style={[styles.buttonText, { color: textColor, textAlign: 'center' }]}>{title}</Text>
       )}
       {unread > 0 && !(icon && badgeOnIcon) && <UnreadBadge count={unread} style={{ position: 'absolute', right: 12, top: 11 }} />}
     </Pressable>
@@ -150,7 +153,7 @@ export function OwnerLine({ name, date }: { name: string; date: string }) {
   const { t } = useI18n();
   return (
     <Text style={styles.muted} numberOfLines={1}>
-      <Text style={{ fontWeight: '600' }}>{t('courses.ownerPrefix')} </Text>
+      <Text style={{ ...font(500) }}>{t('courses.ownerPrefix')} </Text>
       <Text>
         {name} · {date}
       </Text>
@@ -165,6 +168,43 @@ export function HiddenBadge() {
     <View style={[styles.badge, { backgroundColor: '#F3F4F6', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
       <Text style={[styles.badgeText, { color: colors.muted }]}>{t('common.hidden')}</Text>
     </View>
+  );
+}
+
+/**
+ * ARU-118 (same look as ARU-114): a round icon button, a glyph in a tinted 36 pt circle. Hit slop 4 makes the touch
+ * area 44×44 pt. Dimmed (0.4) and disabled while `disabled`.
+ */
+export const ICON_BUTTON_SIZE = 36;
+export function IconButton({
+  icon,
+  tone,
+  label,
+  onPress,
+  disabled,
+  testID,
+}: {
+  icon: ComponentProps<typeof Ionicons>['name'];
+  tone: 'success' | 'danger';
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  testID?: string;
+}) {
+  const color = tone === 'success' ? colors.success : colors.danger;
+  const backgroundColor = tone === 'success' ? colors.successSoft : colors.dangerSoft;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
+      disabled={disabled}
+      hitSlop={4}
+      testID={testID}
+      onPress={onPress}
+      style={[styles.iconButton, { backgroundColor, opacity: disabled ? 0.4 : 1 }]}>
+      <Ionicons name={icon} size={20} color={color} accessibilityElementsHidden importantForAccessibility="no" />
+    </Pressable>
   );
 }
 
@@ -222,11 +262,11 @@ export const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
   },
-  title: { fontSize: 17, fontWeight: '600', color: colors.text },
-  h1: { fontSize: 26, fontWeight: '700', color: colors.text },
-  body: { fontSize: 15, lineHeight: 22, color: colors.text },
-  muted: { fontSize: 13, color: colors.muted },
-  label: { fontSize: 13, fontWeight: '600', color: colors.muted },
+  title: { fontSize: 17, ...font(500), color: colors.text },
+  h1: { fontSize: 26, ...font(600), color: colors.text },
+  body: { fontSize: 15, lineHeight: 22, ...font(300), color: colors.text },
+  muted: { fontSize: 13, ...font(300), color: colors.muted },
+  label: { fontSize: 13, ...font(500), color: colors.muted },
   input: {
     backgroundColor: colors.card,
     borderWidth: 1,
@@ -239,11 +279,24 @@ export const styles = StyleSheet.create({
   },
   // Side padding keeps the label inside the background when the button sits in a row and sizes to its text (ARU-22).
   button: { borderRadius: 10, paddingVertical: 13, paddingHorizontal: 16, alignItems: 'center' },
-  buttonText: { fontSize: 15, fontWeight: '600' },
+  // ARU-122: controls and states are upper case by style only (the source text and screen reader labels stay as
+  // written), Medium 500, slightly spaced and 1 pt smaller than before so they don't get wider. Text is never cut
+  // with numberOfLines, so a long Russian label wraps inside the button.
+  caps: { textTransform: 'uppercase', letterSpacing: 0.5, ...font(500) },
+  buttonText: { fontSize: 14, ...font(500), letterSpacing: 0.5, textTransform: 'uppercase' },
   // ARU-78: same 18 pt layout height as the plain icon (24 pt glyph, -3 margins), so the button height is unchanged.
   buttonIconBox: { width: 24, height: 24, marginVertical: -3 },
   badge: { alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
-  badgeText: { fontSize: 12, fontWeight: '600' },
+  badgeText: { fontSize: 11, ...font(500), letterSpacing: 0.5, textTransform: 'uppercase' },
+  // ARU-122: a tappable text action (View proof, Set exempt, Unselect, Edit…): upper case, 1 pt under the default 14.
+  linkText: { fontSize: 13, ...font(500), letterSpacing: 0.5, textTransform: 'uppercase' },
+  iconButton: {
+    width: ICON_BUTTON_SIZE,
+    height: ICON_BUTTON_SIZE,
+    borderRadius: ICON_BUTTON_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   unread: {
     minWidth: 20,
     height: 20,
@@ -255,12 +308,29 @@ export const styles = StyleSheet.create({
   },
   // Grows by the ring's width so the number keeps the same room inside it (ARU-57).
   unreadRing: { minWidth: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: colors.card },
-  unreadText: { fontSize: 11, fontWeight: '700', color: '#fff' },
+  unreadText: { fontSize: 11, ...font(600), color: '#fff' },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   empty: { alignItems: 'center', paddingVertical: 48, gap: 6 },
-  emptyTitle: { fontSize: 16, fontWeight: '600', color: colors.text },
+  emptyTitle: { fontSize: 16, ...font(500), color: colors.text },
   segmented: { flexDirection: 'row', backgroundColor: '#E9EAF0', borderRadius: 10, padding: 3 },
   segment: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
   segmentActive: { backgroundColor: colors.card },
-  segmentText: { fontSize: 13, fontWeight: '600', color: colors.muted },
+  segmentText: { fontSize: 12, ...font(500), letterSpacing: 0.5, textTransform: 'uppercase', color: colors.muted },
 });
+
+/**
+ * The app's one switch (ARU-116): ON in the theme colour instead of the system green, with a white knob in both
+ * states on iOS and Android. The OFF track is left to each platform, so it looks as before. The colours always win
+ * over any passed in, so a call site can't bring green back; every other prop passes through.
+ */
+export function ThemedSwitch(props: SwitchProps) {
+  return (
+    <Switch
+      {...props}
+      trackColor={{ ...props.trackColor, true: colors.primary }}
+      thumbColor="#FFFFFF"
+      // Custom colours replace Android's own disabled tint, so dim it here; iOS dims itself.
+      style={[props.style, Platform.OS === 'android' && props.disabled && { opacity: 0.5 }]}
+    />
+  );
+}

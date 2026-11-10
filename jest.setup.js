@@ -55,3 +55,18 @@ jest.mock('expo-image-manipulator', () => {
     __reset: () => images.clear(),
   };
 });
+
+// ARU-119: the Inter faces can't load under Jest (no native font registry). useFonts reports them loaded, so the root
+// layout renders; tests that need the startup or failure path override it with
+// require('expo-font').useFonts.mockReturnValueOnce([false, null]) (or [false, new Error(...)]).
+jest.mock('expo-font', () => ({
+  useFonts: jest.fn(() => [true, null]),
+  isLoaded: jest.fn(() => true),
+  loadAsync: jest.fn(async () => {}),
+}));
+jest.mock('expo-splash-screen', () => ({
+  preventAutoHideAsync: jest.fn(async () => true),
+  hideAsync: jest.fn(async () => {}),
+  hide: jest.fn(),
+  setOptions: jest.fn(),
+}));

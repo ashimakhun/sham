@@ -1,18 +1,22 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useRef } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { DisciplineLabel } from '@/components/Disciplines';
+import { RatingSummary } from '@/components/RatingSummary';
 import { Card, HiddenBadge, OwnerLine, UnreadBadge, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import { paymentDueText } from '@/lib/billing';
-import { feedbackFor, ratingSummary, ratingSummaryLabel } from '@/lib/feedback';
+import { feedbackFor } from '@/lib/feedback';
 import { inCourseChat, seesOnlyCourseSummary } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
 import type { Course } from '@/lib/types';
 import { withUnreadLabel } from '@/lib/unread';
+import { font } from '@/lib/fonts';
 
 type Props = {
   course: Course;
@@ -39,7 +43,6 @@ export function CourseCard({ course, tag, onOpen, paymentDue }: Props) {
   const unread = showChat ? unreadCount(course.id) : 0;
   // Average rating and count (ARU-53); nothing when the course has no feedback.
   const feedback = feedbackFor(courseFeedback, course.id);
-  const rating = ratingSummary(feedback, lang);
   const lastTap = useRef(0);
 
   const open = (pathname: '/courses/[id]' | '/courses/[id]/chat') => {
@@ -81,14 +84,10 @@ export function CourseCard({ course, tag, onOpen, paymentDue }: Props) {
       {!summaryOnly && (
         <OwnerLine name={getUser(course.createdById)?.name ?? t('common.unknown')} date={formatDate(course.createdAt)} />
       )}
-      {rating ? (
-        <Text style={styles.muted} accessibilityLabel={ratingSummaryLabel(feedback, lang)}>
-          {rating}
-        </Text>
-      ) : null}
+      <RatingSummary items={feedback} style={styles.muted} />
       {/* ARU-66 AC 7: read with the card's other text by screen readers. */}
       {paymentDue ? (
-        <Text testID={`payment-due-${course.id}`} style={{ color: colors.danger, fontSize: 14, fontWeight: '600' }}>
+        <Text testID={`payment-due-${course.id}`} style={{ color: colors.danger, fontSize: 14, ...font(500) }}>
           {paymentDueText(paymentDue, lang)}
         </Text>
       ) : null}

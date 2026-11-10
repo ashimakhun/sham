@@ -2,7 +2,9 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Image, Pressable, Text, View } from 'react-native';
+import { Image, Pressable, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { KeyboardForm } from '@/components/KeyboardForm';
 import { Button, EmptyState, ErrorText, styles } from '@/components/ui';
@@ -132,7 +134,7 @@ export default function PayScreen() {
               hitSlop={8}
               onPress={() => setProof(null)}
               style={{ alignSelf: 'flex-start', minHeight: 32, justifyContent: 'center' }}>
-              <Text style={{ color: colors.danger, fontWeight: '600', opacity: busy ? 0.4 : 1 }}>{t('payments.remove')}</Text>
+              <Text style={[styles.linkText, { color: colors.danger, opacity: busy ? 0.4 : 1 }]}>{t('payments.remove')}</Text>
             </Pressable>
           </View>
         ) : (

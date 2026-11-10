@@ -1,6 +1,8 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { KeyboardForm } from '@/components/KeyboardForm';
 import { MarkdownEditor } from '@/components/MarkdownEditor';

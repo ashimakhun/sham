@@ -1,6 +1,8 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
+
+import { Text } from '@/components/AppText';
 
 import { Button, Card, ErrorText, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
@@ -30,6 +32,7 @@ import { colors, formatDate, formatDateTime } from '@/lib/theme';
 import type { Course, Meeting, MeetingStatus } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
 import { useNow } from '@/lib/useNow';
+import { font } from '@/lib/fonts';
 
 /** ARU-109: `meetingBadge` gives the English label; the badge shows the catalog text for it. */
 const BADGE_TEXT: Record<MeetingBadgeInfo['label'], TextId> = {
@@ -439,7 +442,7 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
         ) : null}
         {assignment ? (
           <Text style={styles.muted} numberOfLines={2} testID={`assignment-${m.id}`}>
-            <Text style={{ fontWeight: '600', color: colors.text }}>
+            <Text style={{ ...font(500), color: colors.text }}>
               {t('meetings.homeworkLine', { title: assignment.title })}
             </Text>
             {' · '}
@@ -476,7 +479,7 @@ const tile = StyleSheet.create({
     padding: 12,
     gap: 4,
   },
-  topic: { flex: 1, fontSize: 16, fontWeight: '700', color: colors.text },
+  topic: { flex: 1, fontSize: 16, ...font(600), color: colors.text },
   // AC 6: a thin divider above the actions, which wrap in rows with 8 pt gaps.
   footer: {
     flexDirection: 'row',
@@ -497,5 +500,6 @@ const tile = StyleSheet.create({
     backgroundColor: colors.primarySoft,
   },
   pillDanger: { backgroundColor: '#FEF2F2' },
-  pillText: { fontSize: 13, fontWeight: '600' },
+  // ARU-122: action pills and the attended chip are upper case by style (labels stay as written).
+  pillText: { fontSize: 12, ...font(500), letterSpacing: 0.5, textTransform: 'uppercase' },
 });
