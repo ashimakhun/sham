@@ -192,7 +192,7 @@ describe('AC 2 / AC 3 in Russian', () => {
     await fireEvent.press(pill('P', ru['meetings.markCompleted']));
     expect(alert.mock.calls.at(-1)![1]).toBe(`Отметить встречу ${when(P)} как завершённую?`);
     await notNow();
-    await fireEvent.press(pill('P', ru['meetings.markCanceled']));
+    await fireEvent.press(pill('P', ru['meetings.cancelMeeting']));
     expect(alert.mock.calls.at(-1)![1]).toBe(`Отметить встречу ${when(P)} как отменённую?`);
     await notNow();
     await fireEvent.press(pill('C', ru['meetings.markHomeworkChecked']));
