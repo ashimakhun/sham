@@ -19,6 +19,7 @@ import { LanguageProvider } from "@/i18n/LanguageProvider";
 import en from "@/i18n/en.json";
 import ru from "@/i18n/ru.json";
 import { localMonth } from "@/lib/billing";
+import { font } from "@/lib/fonts";
 import type { AccessRequest, CourseBilling, User } from "@/lib/types";
 
 import { courseA, courseB, fakeStore, hw, member, users } from "./helpers/fakeStore";
@@ -171,7 +172,7 @@ describe("AC 9: Russian buttons", () => {
     expect(text.props.numberOfLines).toBeUndefined();
     expect(StyleSheet.flatten(text.props.style)).toMatchObject({
       textTransform: "uppercase",
-      fontWeight: "500",
+      ...font(500),
       letterSpacing: 0.5,
     });
     expect(screen.getByRole("button", { name: label })).toBeTruthy();
