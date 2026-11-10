@@ -216,9 +216,12 @@ function TabSwitch({ value, onChange, newCount }: { value: Tab; onChange: (v: Ta
             onPress={() => onChange(o.value)}
             style={[
               styles.segment,
-              { flexDirection: 'row', justifyContent: 'center', gap: 6, paddingHorizontal: 6 },
+              // ARU-144: the shared side padding (no override), so this switch matches the others.
+              { flexDirection: 'row', justifyContent: 'center', gap: 6 },
               selected && styles.segmentActive,
             ]}>
+            {/* One line, so the badge stays right after the label (ARU-73). The labels are single short words, so with
+                ARU-144's content-sized tabs they fit even at iPhone SE width. */}
             <Text style={[styles.segmentText, { flexShrink: 1 }, selected && { color: colors.text }]} numberOfLines={1}>
               {o.label}
             </Text>

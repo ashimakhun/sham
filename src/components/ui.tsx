@@ -313,9 +313,29 @@ export const styles = StyleSheet.create({
   empty: { alignItems: 'center', paddingVertical: 48, gap: 6 },
   emptyTitle: { fontSize: 16, ...font(500), color: colors.text },
   segmented: { flexDirection: 'row', backgroundColor: '#E9EAF0', borderRadius: 10, padding: 3 },
-  segment: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
+  // ARU-144: each tab is as wide as its label plus the same side padding, and the row's leftover space is shared
+  // equally (flexGrow 1 on a content-sized basis), so the tabs still fill the row. flexShrink lets them narrow and the
+  // label wrap on a small screen instead of overflowing or being cut (ARU-122).
+  segment: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 'auto',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   segmentActive: { backgroundColor: colors.card },
-  segmentText: { fontSize: 12, ...font(500), letterSpacing: 0.5, textTransform: 'uppercase', color: colors.muted },
+  segmentText: {
+    fontSize: 12,
+    ...font(500),
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    color: colors.muted,
+    // ARU-144: a wrapped label stays centred in its tab.
+    textAlign: 'center',
+  },
 });
 
 /**

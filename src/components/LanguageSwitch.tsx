@@ -36,9 +36,8 @@ export function LanguageSwitch() {
               disabled={saving}
               onPress={() => void choose(o.value)}
               style={[styles.segment, selected && styles.segmentActive, saving && { opacity: 0.6 }]}>
-              <Text style={[styles.segmentText, selected && { color: colors.text }]} numberOfLines={1}>
-                {o.label}
-              </Text>
+              {/* ARU-144: wraps on a narrow screen rather than being cut with "…". */}
+              <Text style={[styles.segmentText, selected && { color: colors.text }]}>{o.label}</Text>
             </Pressable>
           );
         })}
