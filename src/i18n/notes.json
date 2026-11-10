@@ -717,6 +717,8 @@
   "db.meeting_status_role": "Meeting · Complete or Cancel by someone else",
   "db.edit_meeting_role": "Edit meeting · not the owner",
   "db.notes_role": "Meeting notes · not the owner",
+  "db.workspace_mismatch": "Database error · something of another workspace was written or linked (ARU-145; normally not reachable from the app)",
+  "db.workspace_locked": "Database error · an account's workspace was changed from the app (ARU-145)",
   "db.only_teacher_requests_action": "Manage roles · not the teacher",
   "db.only_teacher_roles": "Manage roles · not the teacher",
   "db.only_teacher_delete_course": "Course details · Delete course by someone else",

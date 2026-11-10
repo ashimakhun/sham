@@ -29,16 +29,21 @@ const C: Meeting = {
   createdAt: at(-100),
 };
 const members = [member('A', 'S1'), member('A', 'M2')];
-const note = (id: string, authorId: string | null, body: string, created: number, updated = created): MeetingListenerNote => ({
-  id,
-  meetingId: 'C',
-  courseId: 'A',
-  authorId,
-  body,
-  createdAt: at(created),
-  updatedAt: at(updated),
-  isPublic: true,
-});
+// Both times come from one Date.now(): two separate calls can land a millisecond apart, and the note then reads as
+// edited (updatedAt > createdAt), which made the "Edited" count flaky.
+const note = (id: string, authorId: string | null, body: string, created: number, updated = created): MeetingListenerNote => {
+  const now = Date.now();
+  return {
+    id,
+    meetingId: 'C',
+    courseId: 'A',
+    authorId,
+    body,
+    createdAt: new Date(now + created * HOUR).toISOString(),
+    updatedAt: new Date(now + updated * HOUR).toISOString(),
+    isPublic: true,
+  };
+};
 const inMeeting = () => within(screen.getByTestId('meeting-C'));
 const ru = (ui: React.ReactElement) => <I18nContext.Provider value={make('ru')}>{ui}</I18nContext.Provider>;
 

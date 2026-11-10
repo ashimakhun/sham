@@ -717,6 +717,8 @@
   "db.meeting_status_role": "Only the course owner or the teacher can change a meeting's status.",
   "db.edit_meeting_role": "Only the course owner or the teacher can edit a meeting.",
   "db.notes_role": "Only the course owner or the teacher can edit notes.",
+  "db.workspace_mismatch": "This belongs to another workspace.",
+  "db.workspace_locked": "An account's workspace can't be changed.",
   "db.only_teacher_requests_action": "Only the teacher can accept or decline requests.",
   "db.only_teacher_roles": "Only the teacher can change roles",
   "db.only_teacher_delete_course": "Only the teacher can delete a course.",
