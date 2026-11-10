@@ -97,6 +97,7 @@ export function fakeStore(who: keyof typeof users | null, over: Partial<Store> =
     setMeetingStatus: jest.fn(async () => {}),
     updateMeeting: jest.fn(async () => {}),
     saveMyMeetingNotes: jest.fn(async () => {}),
+    refreshMeetingNotes: jest.fn(async () => {}),
     deleteMeetingListenerNotes: jest.fn(async () => {}),
     disciplines,
     getDiscipline: (id) => (id ? disciplines.find((d) => d.id === id) : undefined),

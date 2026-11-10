@@ -56,7 +56,7 @@ describe('Save in the header', () => {
     const header = await render(mockOptions.headerRight!());
     await fireEvent.press(header.getByRole('button', { name: 'Save notes' }));
     // ARU-142: the owner and the teacher save their own signed notes.
-    expect(store.saveMyMeetingNotes).toHaveBeenCalledWith('C', 'Four\nlines\nof\nnotes');
+    expect(store.saveMyMeetingNotes).toHaveBeenCalledWith('C', 'Four\nlines\nof\nnotes', false);
   });
 });
 

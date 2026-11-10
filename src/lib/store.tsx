@@ -185,7 +185,10 @@ export type Store = {
   /** ARU-125 / ARU-142: a current listener, the course's owner or the teacher adds their own notes to a Completed
    *  meeting, or changes them (one entry per meeting). The text is trimmed; blank or over 10,000 characters is
    *  refused. */
-  saveMyMeetingNotes: (meetingId: string, body: string) => Promise<void>;
+  saveMyMeetingNotes: (meetingId: string, body: string, isPublic: boolean) => Promise<void>;
+  /** ARU-143 AC 10: refetches the meeting notes this user can read and replaces the list (realtime doesn't tell a
+   *  client that a note it could read became private). Called when the Notes screen or the course opens. */
+  refreshMeetingNotes: () => Promise<void>;
   /** ARU-125: deletes listener notes: the author's own, or any on the course for its current owner and the teacher.
    *  Already deleted is fine. */
   deleteMeetingListenerNotes: (id: string) => Promise<void>;
@@ -380,6 +383,7 @@ type ListenerNoteRow = {
   body: string;
   created_at: string;
   updated_at: string;
+  is_public?: boolean | null;
 };
 type AssignmentSentCountRow = { assignment_id: string; sent: number | string; listeners: number | string };
 /** ARU-130: the count rows as a map by assignment id. */
@@ -584,6 +588,7 @@ const toListenerNote = (r: ListenerNoteRow): MeetingListenerNote => ({
   body: r.body,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
+  isPublic: !!r.is_public,
 });
 
 const toAttendance = (r: AttendanceRow): MeetingAttendance => ({
@@ -1702,16 +1707,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       );
       await load();
     },
-    saveMyMeetingNotes: async (meetingId, body) => {
+    saveMyMeetingNotes: async (meetingId, body, isPublic) => {
       if (!currentUser) throw new Error('Please sign in again.');
       if (body.trim().length > NOTES_MAX) throw new Error('Notes can be at most 10,000 characters.');
       const mine = meetingListenerNotes.find((n) => n.meetingId === meetingId && n.authorId === currentUser.id);
       check(
         mine
-          ? await supabase.rpc('update_meeting_listener_notes', { note: mine.id, new_body: body })
-          : await supabase.rpc('add_meeting_listener_notes', { meeting: meetingId, new_body: body }),
+          ? await supabase.rpc('update_meeting_listener_notes', { note: mine.id, new_body: body, publish: isPublic })
+          : await supabase.rpc('add_meeting_listener_notes', { meeting: meetingId, new_body: body, publish: isPublic }),
       );
       await load();
+    },
+    refreshMeetingNotes: async () => {
+      if (!currentUser) return;
+      const res = await supabase.from('meeting_listener_notes').select('*').order('created_at').order('id');
+      if (!res.error) setMeetingListenerNotes(((res.data as ListenerNoteRow[] | null) ?? []).map(toListenerNote));
     },
     deleteMeetingListenerNotes: async (id) => {
       const res = await supabase.rpc('delete_meeting_listener_notes', { note: id });

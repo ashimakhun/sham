@@ -28,7 +28,8 @@ end $$;
 grant execute on function pg_temp.err(text) to authenticated, anon;
 
 create function pg_temp.add(meeting text, body text) returns text language sql as $$
-  select pg_temp.err(format('select add_meeting_listener_notes(%L, %L)', meeting, body)) $$;
+  -- ARU-143: published, so these notes keep the course-wide audience this test is about.
+  select pg_temp.err(format('select add_meeting_listener_notes(%L, %L, true)', meeting, body)) $$;
 create function pg_temp.upd(note uuid, body text) returns text language sql as $$
   select pg_temp.err(format('select update_meeting_listener_notes(%L, %L)', note, body)) $$;
 create function pg_temp.del(note uuid) returns text language sql as $$
@@ -51,7 +52,7 @@ select t.eq((select confdeltype from pg_constraint where conrelid = 'meeting_lis
 select t.ok(not has_table_privilege('authenticated', 'meeting_listener_notes', 'insert')
   and not has_table_privilege('authenticated', 'meeting_listener_notes', 'update')
   and not has_table_privilege('authenticated', 'meeting_listener_notes', 'delete'), 'data: no direct writes');
-select t.ok(not has_function_privilege('anon', 'add_meeting_listener_notes(uuid, text)', 'execute'), 'data: anon cannot add');
+select t.ok(not has_function_privilege('anon', 'add_meeting_listener_notes(uuid, text, boolean)', 'execute'), 'data: anon cannot add');
 
 -- AC 1-2: a student listener adds notes; the text is stored trimmed (spaces, tabs, line breaks, NBSP), signed.
 select t.login('S1');
@@ -180,15 +181,19 @@ select t.login('S1');
 select t.eq((select count(*) from meeting_listener_notes where course_id = t.id('A')), 5::bigint,
   'AC11 removed listeners'' notes stay visible to others');
 select t.login('S3');
-select t.eq((select count(*) from meeting_listener_notes), 0::bigint, 'AC11 removed student sees no notes');
+-- ARU-143: an author always reads their own notes; nobody else's once removed.
+select t.eq((select count(*) from meeting_listener_notes), 1::bigint, 'AC11 removed student sees only their own notes');
 select t.eq(pg_temp.upd(pg_temp.note('S3', '00000000-0000-0000-0000-0000000125c1'), 'x'),
   '42501 | Only the course''s listeners, its owner and the teacher can edit notes. | sham:notes_edit_role', 'AC11 removed student update refused');
 select t.eq(pg_temp.del(pg_temp.note('S3', '00000000-0000-0000-0000-0000000125c1')),
   '42501 | You can''t delete these notes. | sham:listener_notes_cant_delete', 'AC11 removed student delete refused');
 select t.login('M2');
 -- ARU-142 AC6: a mentor who is neither the owner nor a listener reads no notes, their own included.
-select t.eq((select count(*) from meeting_listener_notes where author_id = t.id('M2')), 0::bigint,
-  'ARU-142 AC6 removed mentor no longer reads their own notes');
+-- ARU-143 (supersedes ARU-142 here): an author always reads their own notes.
+select t.eq((select count(*) from meeting_listener_notes where author_id = t.id('M2')), 1::bigint,
+  'ARU-143 removed mentor reads their own notes');
+select t.eq((select count(*) from meeting_listener_notes where author_id is distinct from t.id('M2')), 0::bigint,
+  'ARU-142 AC6 removed mentor reads no one else''s notes');
 select t.eq(pg_temp.upd(pg_temp.note('M2', '00000000-0000-0000-0000-0000000125c1'), 'x'),
   '42501 | Only the course''s listeners, its owner and the teacher can edit notes. | sham:notes_edit_role', 'AC11 removed mentor update refused');
 select t.eq(pg_temp.add('00000000-0000-0000-0000-0000000125c2', 'x'),

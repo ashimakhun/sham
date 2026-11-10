@@ -53,6 +53,7 @@ const note = (
   body,
   createdAt: at(-10),
   updatedAt: at(-10),
+  isPublic: true,
 });
 const ruUi = (ui: React.ReactElement) => (
   <I18nContext.Provider value={make("ru")}>{ui}</I18nContext.Provider>
@@ -272,6 +273,7 @@ describe("AC 4 / AC 7 / AC 11: the Notes page", () => {
     expect(store.saveMyMeetingNotes).toHaveBeenCalledWith(
       "C",
       expect.stringContaining("Итоги"),
+      false, // ARU-143: a new note is private unless published
     );
   });
 });

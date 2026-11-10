@@ -41,6 +41,7 @@ const mNote: MeetingListenerNote = {
   body: '**Covered** _ch 1_\n- one\n- two',
   createdAt: '2026-10-20T10:00:00.000Z',
   updatedAt: '2026-10-20T10:00:00.000Z',
+  isPublic: true,
 };
 const notes = [mNote];
 const X = meeting({ id: 'X', startsAt: at(-5), status: 'canceled' });
@@ -282,7 +283,7 @@ describe('AC3-AC6: editor', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Bold' }));
     expect(screen.getByLabelText('Notes').props.value).toBe('**hello**');
     await fireEvent.press(screen.getByRole('button', { name: 'Save' }));
-    expect(store.saveMyMeetingNotes).toHaveBeenCalledWith('CN', '**hello**');
+    expect(store.saveMyMeetingNotes).toHaveBeenCalledWith('CN', '**hello**', true);
     expect(router.back).toHaveBeenCalled();
   });
 

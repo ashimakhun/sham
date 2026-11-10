@@ -82,6 +82,7 @@ const row = {
   body: 'Mine',
   created_at: '2026-10-20T10:00:00.000Z',
   updated_at: '2026-10-21T10:00:00.000Z',
+  is_public: true, // ARU-143
 };
 const listenerRpcs = () => mockState.rpcs.filter((r) => r.name.includes('listener_notes'));
 
@@ -106,6 +107,7 @@ it('loads listener notes oldest first, mapped', async () => {
       body: 'Mine',
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+      isPublic: true,
     },
     expect.objectContaining({ id: 'n2', authorId: null }),
   ]);
@@ -113,25 +115,25 @@ it('loads listener notes oldest first, mapped', async () => {
 
 it('adds the first entry, then changes it', async () => {
   await mount();
-  await act(() => store.saveMyMeetingNotes('C', ' New '));
-  expect(listenerRpcs()).toEqual([{ name: 'add_meeting_listener_notes', args: { meeting: 'C', new_body: ' New ' } }]);
+  await act(() => store.saveMyMeetingNotes('C', ' New ', false));
+  expect(listenerRpcs()).toEqual([{ name: 'add_meeting_listener_notes', args: { meeting: 'C', new_body: ' New ', publish: false } }]);
   mockState.notes = [row];
   await act(() => store.refresh());
   mockState.rpcs = [];
-  await act(() => store.saveMyMeetingNotes('C', 'Changed'));
-  expect(listenerRpcs()).toEqual([{ name: 'update_meeting_listener_notes', args: { note: 'n1', new_body: 'Changed' } }]);
+  await act(() => store.saveMyMeetingNotes('C', 'Changed', true));
+  expect(listenerRpcs()).toEqual([{ name: 'update_meeting_listener_notes', args: { note: 'n1', new_body: 'Changed', publish: true } }]);
 });
 
 it('refuses over 10,000 characters before calling the server', async () => {
   await mount();
-  await expect(store.saveMyMeetingNotes('C', 'a'.repeat(10001))).rejects.toThrow('Notes can be at most 10,000 characters.');
+  await expect(store.saveMyMeetingNotes('C', 'a'.repeat(10001), false)).rejects.toThrow('Notes can be at most 10,000 characters.');
   expect(listenerRpcs()).toEqual([]);
 });
 
 it('shows the server message', async () => {
   await mount();
   mockState.rpcError = { message: 'You already have notes for this meeting.', code: '23505', hint: 'sham:listener_notes_exists' };
-  await expect(store.saveMyMeetingNotes('C', 'x')).rejects.toThrow('You already have notes for this meeting.');
+  await expect(store.saveMyMeetingNotes('C', 'x', false)).rejects.toThrow('You already have notes for this meeting.');
 });
 
 it('deleting notes that are already gone is fine; other refusals are errors', async () => {

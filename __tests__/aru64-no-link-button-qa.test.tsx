@@ -40,6 +40,7 @@ const linkedNote = (who: string) => ({
   body: LINKED,
   createdAt: done.startsAt,
   updatedAt: done.startsAt,
+  isPublic: true,
 });
 const toolbar = () => within(screen.getByLabelText('Formatting')).getAllByRole('button').map((b) => b.props.accessibilityLabel);
 
@@ -99,7 +100,7 @@ describe('AC 2 / AC 5: meeting notes', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Bold' }));
     expect(screen.getByLabelText('Notes').props.value).toBe('Read [docs](https://x.io) **first**');
     await fireEvent.press(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(store.saveMyMeetingNotes).toHaveBeenCalledWith('C', 'Read [docs](https://x.io) **first**'));
+    await waitFor(() => expect(store.saveMyMeetingNotes).toHaveBeenCalledWith('C', 'Read [docs](https://x.io) **first**', true));
   });
 
   it('a student listener reading the notes still sees and opens the link', async () => {

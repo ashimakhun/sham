@@ -64,6 +64,7 @@ const mNote: MeetingListenerNote = {
   body: "Covered",
   createdAt: at(-19),
   updatedAt: at(-19),
+  isPublic: true,
 };
 const notes = [mNote];
 const X = meeting({

@@ -25,7 +25,8 @@ exception when others then
   return concat_ws(' | ', code, msg, hint);
 end $$;
 create function pg_temp.add(meeting uuid, body text) returns text language sql as $$
-  select pg_temp.err(format('select add_meeting_listener_notes(%L, %L)', meeting, body)) $$;
+  -- ARU-143: published, so these notes keep the course-wide audience this test is about.
+  select pg_temp.err(format('select add_meeting_listener_notes(%L, %L, true)', meeting, body)) $$;
 create function pg_temp.upd(note uuid, body text) returns text language sql as $$
   select pg_temp.err(format('select update_meeting_listener_notes(%L, %L)', note, body)) $$;
 create function pg_temp.del(note uuid) returns text language sql as $$
@@ -59,6 +60,8 @@ update course_meetings set notes = E' \t' || chr(160) || E'\n', notes_updated_by
 update course_meetings set notes = 'No time', notes_updated_by = t.id('M'), notes_updated_at = null where id = t.mt('c9');
 
 select copy_official_notes();
+-- ARU-143 (0058) runs after this copy in a real database and makes every note that exists then public.
+update meeting_listener_notes set is_public = true;
 
 -- AC 9: the copy.
 select t.ok((select body = 'Official by Tess' and created_at = updated_at
@@ -140,7 +143,9 @@ select t.eq((select count(*) from meeting_listener_notes), 0::bigint, 'AC6 a stu
 reset role;
 update courses set created_by = t.id('N') where id = t.id('A');
 select t.login('M');
-select t.eq((select count(*) from meeting_listener_notes), 0::bigint, 'edge: the former owner reads none');
+-- ARU-143: an author always reads their own notes; the former owner reads nobody else's.
+select t.eq((select count(*) from meeting_listener_notes where author_id is distinct from t.id('M')), 0::bigint,
+  'edge: the former owner reads no one else''s notes');
 select t.eq(pg_temp.upd(pg_temp.note('M', t.mt('c1')), 'x'),
   '42501 | Only the course''s listeners, its owner and the teacher can edit notes. | sham:notes_edit_role',
   'edge: the former owner can''t edit their notes');
