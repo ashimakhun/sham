@@ -34,7 +34,8 @@ exception when others then
   return concat_ws(' | ', code, msg, hint);
 end $$;
 create function pg_temp.add(meeting uuid, body text) returns text language sql as $$
-  select pg_temp.err(format('select add_meeting_listener_notes(%L, %L)', meeting, body)) $$;
+  -- ARU-143: published, so these notes keep the course-wide audience this test is about.
+  select pg_temp.err(format('select add_meeting_listener_notes(%L, %L, true)', meeting, body)) $$;
 create function pg_temp.upd(note uuid, body text) returns text language sql as $$
   select pg_temp.err(format('select update_meeting_listener_notes(%L, %L)', note, body)) $$;
 create function pg_temp.del(note uuid) returns text language sql as $$
@@ -49,6 +50,8 @@ grant execute on all functions in schema pg_temp to authenticated, anon;
 update course_meetings set notes = 'Official by Sam', notes_updated_by = t.id('S1'),
   notes_updated_at = now() - interval '2 days' where id = t.q('a2');
 select copy_official_notes();
+-- ARU-143 (0058) runs after this copy in a real database and makes every note that exists then public.
+update meeting_listener_notes set is_public = true;
 select t.eq((select count(*) from meeting_listener_notes where meeting_id = t.q('a2') and author_id = t.id('S1')), 1::bigint,
   'setup: the official note on a2 is signed by its editor');
 
@@ -107,12 +110,13 @@ select t.ok(pg_temp.add(t.q('a1'), 'pending') <> 'no error', 'AC2 a Pending list
 reset role;
 delete from course_members where course_id = t.id('A') and user_id in (t.id('S1'), t.id('M2'));
 select t.login('S1');
-select t.eq(pg_temp.seen(t.q('a1')), 0::bigint, 'edge: a removed student reads none, not even their own');
+-- ARU-143: an author always reads their own notes (and nobody else's once removed).
+select t.eq(pg_temp.seen(t.q('a1')), 1::bigint, 'edge: a removed student reads only their own (ARU-143)');
 select t.eq(pg_temp.upd(pg_temp.note(t.id('S1'), t.q('a1')), 'x'),
   '42501 | Only the course''s listeners, its owner and the teacher can edit notes. | sham:notes_edit_role',
   'edge: a removed student can''t edit their notes');
 select t.login('M2');
-select t.eq(pg_temp.seen(t.q('a1')), 0::bigint, 'edge: a removed mentor reads none (AC6: no "any mentor" rule)');
+select t.eq(pg_temp.seen(t.q('a1')), 1::bigint, 'edge: a removed mentor reads only their own (ARU-143; no "any mentor" rule)');
 select t.eq(pg_temp.add(t.q('a2'), 'x'),
   '42501 | Only the course''s listeners, its owner and the teacher can add notes. | sham:notes_add_role',
   'edge: a removed mentor can''t add');

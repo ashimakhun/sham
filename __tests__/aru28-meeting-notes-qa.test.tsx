@@ -176,6 +176,7 @@ describe('AC7/AC9 and the owner change edge case', () => {
     body: '1. intro\n2. loops\n\nSee [the docs](https://docs.example.com)',
     createdAt: '2026-10-20T10:00:00.000Z',
     updatedAt: '2026-10-20T10:00:00.000Z',
+    isPublic: true,
   };
 
   it('the read view shows numbered lists and links formatted, never raw Markdown', async () => {

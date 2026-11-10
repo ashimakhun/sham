@@ -37,6 +37,7 @@ const note = (id: string, authorId: string | null, body: string, created: number
   body,
   createdAt: at(created),
   updatedAt: at(updated),
+  isPublic: true,
 });
 const inMeeting = () => within(screen.getByTestId('meeting-C'));
 const ru = (ui: React.ReactElement) => <I18nContext.Provider value={make('ru')}>{ui}</I18nContext.Provider>;
@@ -116,7 +117,7 @@ describe('AC 5 / AC 9: the editor', () => {
     expect(screen.getByPlaceholderText('What was covered in this meeting?')).toBeTruthy();
     await fireEvent.changeText(screen.getByLabelText('Notes'), 'Covered fractions');
     await fireEvent.press(screen.getByRole('button', { name: 'Save' }));
-    expect(store.saveMyMeetingNotes).toHaveBeenCalledWith('C', 'Covered fractions');
+    expect(store.saveMyMeetingNotes).toHaveBeenCalledWith('C', 'Covered fractions', false);
   });
 
   it('a merged note over 10,000 characters is shown whole, can only shrink, and saves once it fits', async () => {
@@ -142,7 +143,7 @@ describe('AC 5 / AC 9: the editor', () => {
     await fireEvent.changeText(field(), 'a'.repeat(10000));
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
     await fireEvent.press(screen.getByRole('button', { name: 'Save' }));
-    expect(store.saveMyMeetingNotes).toHaveBeenCalledWith('C', 'a'.repeat(10000));
+    expect(store.saveMyMeetingNotes).toHaveBeenCalledWith('C', 'a'.repeat(10000), true);
   });
 
   it('a mentor outside the course is told who can write', async () => {

@@ -1,4 +1,5 @@
-import { useLocalSearchParams } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
@@ -18,8 +19,15 @@ import { formatDate } from '@/lib/theme';
 
 export default function CourseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getCourse, getUser, loading, refresh, currentUser, courseMembers } = useStore();
+  const { getCourse, getUser, loading, refresh, currentUser, courseMembers, refreshMeetingNotes } = useStore();
   const { t } = useI18n();
+  // ARU-143 AC 10: notes someone made private disappear the next time the course opens (realtime doesn't tell a
+  // client that lost access to a row).
+  useFocusEffect(
+    useCallback(() => {
+      refreshMeetingNotes().catch(() => {});
+    }, [refreshMeetingNotes]),
+  );
 
   const course = getCourse(id);
   if (!course) return <EmptyState title={t('courses.notFound')} />;

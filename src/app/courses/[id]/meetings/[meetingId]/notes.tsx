@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router, Stack, useLocalSearchParams, usePreventRemove } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { router, Stack, useFocusEffect, useLocalSearchParams, usePreventRemove } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
@@ -8,7 +8,7 @@ import { Text } from '@/components/AppText';
 import { KeyboardForm } from '@/components/KeyboardForm';
 import { MarkdownEditor } from '@/components/MarkdownEditor';
 import { MarkdownText } from '@/components/MarkdownText';
-import { Button, Card, EmptyState, ErrorText, styles } from '@/components/ui';
+import { Button, Card, EmptyState, ErrorText, styles, ThemedSwitch } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import { confirmAction } from '@/lib/confirm';
 import { font } from '@/lib/fonts';
@@ -24,8 +24,16 @@ import { useAction } from '@/lib/useAction';
  *  teacher. */
 export default function MeetingNotesScreen() {
   const { id: courseId, meetingId, edit } = useLocalSearchParams<{ id: string; meetingId: string; edit?: string }>();
-  const { currentUser, courseMembers, getCourse, meetings, meetingListenerNotes, saveMyMeetingNotes } = useStore();
+  const { currentUser, courseMembers, getCourse, meetings, meetingListenerNotes, saveMyMeetingNotes, refreshMeetingNotes } =
+    useStore();
   const { t } = useI18n();
+  // ARU-143 AC 10: a note made private on another device disappears the next time this screen opens (realtime doesn't
+  // tell a client that lost access to a row).
+  useFocusEffect(
+    useCallback(() => {
+      refreshMeetingNotes().catch(() => {});
+    }, [refreshMeetingNotes]),
+  );
 
   const course = getCourse(courseId);
   const meeting = meetings.find((m) => m.id === meetingId && m.courseId === courseId);
@@ -49,7 +57,9 @@ export default function MeetingNotesScreen() {
         course={course}
         meeting={meeting}
         initialText={myNote?.body ?? ''}
-        onSave={(text) => saveMyMeetingNotes(meeting.id, text)}
+        // ARU-143 AC 1 / 2: a new note starts private; my existing note shows its current state.
+        initialPublic={myNote?.isPublic ?? false}
+        onSave={(text, isPublic) => saveMyMeetingNotes(meeting.id, text, isPublic)}
       />
     );
   }
@@ -139,7 +149,20 @@ function NoteCard({ note, canDelete }: { note: MeetingListenerNote; canDelete: b
   return (
     <Card testID={`listener-note-${note.id}`}>
       <View style={{ gap: 2 }}>
-        <Text style={{ ...font(600), color: colors.text }}>{author}</Text>
+        {/* ARU-143 AC 6 / 11: my own private notes carry a "Private" badge, read together with my name. */}
+        {note.isPublic ? (
+          <Text style={{ ...font(600), color: colors.text }}>{author}</Text>
+        ) : (
+          <View
+            accessible
+            accessibilityLabel={`${author}, ${t('notes.privateBadge')}`}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <Text style={{ ...font(600), color: colors.text }}>{author}</Text>
+            <View testID="private-badge" style={{ backgroundColor: colors.primarySoft, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
+              <Text style={[styles.caps, { fontSize: 11, color: colors.primary }]}>{t('notes.privateBadge')}</Text>
+            </View>
+          </View>
+        )}
         <Text style={styles.muted}>{formatDateTime(note.createdAt)}</Text>
         {edited ? <Text style={styles.muted}>{t('notes.edited', { when: formatDateTime(note.updatedAt) })}</Text> : null}
       </View>
@@ -165,23 +188,28 @@ function NotesEditor({
   course,
   meeting,
   initialText,
+  initialPublic,
   onSave,
 }: {
   course: Course;
   meeting: Meeting;
   initialText: string;
-  onSave: (text: string) => Promise<void>;
+  initialPublic: boolean;
+  onSave: (text: string, isPublic: boolean) => Promise<void>;
 }) {
   const { busy, error, run } = useAction();
   const { t } = useI18n();
   // Prefilled once: a live update from another device doesn't overwrite what is being typed (last save wins).
   const [initial] = useState(initialText);
   const [draft, setDraft] = useState(initial);
+  const [startPublic] = useState(initialPublic);
+  const [isPublic, setPublic] = useState(startPublic);
   const saving = useRef(false);
-  const dirty = draft !== initial;
+  // ARU-143 AC 3: the text or the Publish switch changed (a switch change alone also asks to discard on leaving).
+  const dirty = draft !== initial || isPublic !== startPublic;
   // Blank can't be saved (ARU-125 AC 2); nor can a note still over the limit (a merged note from ARU-142's migration
-  // must be shortened first: the editor never cuts it).
-  const blocked = busy || draft.trim() === '' || draft.trim().length > NOTES_MAX;
+  // must be shortened first: the editor never cuts it); nor can nothing changed (ARU-143 AC 3).
+  const blocked = busy || !dirty || draft.trim() === '' || draft.trim().length > NOTES_MAX;
 
   // Leaving (after Save, or "Discard"): first turn the unsaved-changes prompt off, then navigate on the next render.
   const [leaving, setLeaving] = useState(false);
@@ -207,7 +235,7 @@ function NotesEditor({
     saving.current = true;
     run(async () => {
       try {
-        await onSave(draft);
+        await onSave(draft, isPublic);
         leave.current = () => {
           if (router.canGoBack()) router.back();
           else router.replace({ pathname: '/courses/[id]', params: { id: course.id } });
@@ -234,6 +262,21 @@ function NotesEditor({
         {formatDateTime(meeting.startsAt)}
       </Text>
       <MarkdownEditor value={draft} onChange={setDraft} placeholder={t('notes.placeholder')} />
+      {/* ARU-143 AC 1 / 11: the Publish switch (off = only me), its hint under it. */}
+      <View style={{ gap: 4 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 44 }}>
+          <Text style={{ ...font(500), color: colors.text, fontSize: 16, flexShrink: 1 }}>{t('notes.publish')}</Text>
+          <ThemedSwitch
+            testID="notes-publish"
+            accessibilityLabel={t('notes.publish')}
+            accessibilityHint={t(isPublic ? 'notes.publicHint' : 'notes.privateHint')}
+            value={isPublic}
+            onValueChange={setPublic}
+            disabled={busy}
+          />
+        </View>
+        <Text style={styles.muted}>{t(isPublic ? 'notes.publicHint' : 'notes.privateHint')}</Text>
+      </View>
       <ErrorText error={error} />
       <Button title={t(busy ? 'common.saving' : 'common.save')} onPress={save} disabled={blocked} />
     </KeyboardForm>

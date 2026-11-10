@@ -14,7 +14,7 @@ select t.login('M');
 select t.throws($$select set_meeting_notes('00000000-0000-0000-0000-00000000f291', 'x')$$, '42501', 'ARU-142 owner: set_meeting_notes revoked');
 
 -- AC 6: the limit counts characters, not bytes: 10,000 emoji (40,000 bytes) are accepted, 10,001 are not.
-select t.lives($$select add_meeting_listener_notes('00000000-0000-0000-0000-00000000f291', repeat('😀', 10000))$$,
+select t.lives($$select add_meeting_listener_notes('00000000-0000-0000-0000-00000000f291', repeat('😀', 10000), true)$$,
   'AC6 10,000 multibyte characters accepted');
 reset role;
 select t.eq((select char_length(body) from meeting_listener_notes where meeting_id = '00000000-0000-0000-0000-00000000f291'
@@ -42,7 +42,7 @@ select t.throws(format('select update_meeting_listener_notes(%L, %L)',
 
 -- The author is always the caller: the function has no parameter for it, and a direct write is impossible.
 select t.login('T');
-select t.lives($$select add_meeting_listener_notes('00000000-0000-0000-0000-00000000f291', 'Teacher notes')$$, 'teacher saves notes');
+select t.lives($$select add_meeting_listener_notes('00000000-0000-0000-0000-00000000f291', 'Teacher notes', true)$$, 'teacher saves notes');
 reset role;
 select t.ok(exists (select 1 from meeting_listener_notes where author_id = t.id('T') and body = 'Teacher notes'),
   'the author is the caller (the teacher)');

@@ -35,6 +35,7 @@ const note = (over: Partial<MeetingListenerNote> & { id: string }): MeetingListe
   body: 'Sam **wrote**',
   createdAt: '2026-10-20T10:00:00.000Z',
   updatedAt: '2026-10-20T10:00:00.000Z',
+  isPublic: true,
   ...over,
 });
 const samNote = note({ id: 'n1' });
@@ -224,7 +225,7 @@ describe('AC 1-3: the editor', () => {
     expect(store.saveMyMeetingNotes).not.toHaveBeenCalled();
     await fireEvent.changeText(input, '  My notes ');
     await fireEvent.press(screen.getByRole('button', { name: 'Save' }));
-    expect(store.saveMyMeetingNotes).toHaveBeenCalledWith('C', '  My notes ');
+    expect(store.saveMyMeetingNotes).toHaveBeenCalledWith('C', '  My notes ', false);
     expect(router.back).toHaveBeenCalled();
   });
 
@@ -261,7 +262,7 @@ describe('AC 1-3: the editor', () => {
     await render(<MeetingNotesScreen />);
     await fireEvent.changeText(screen.getByLabelText('Notes'), 'Owner notes');
     await fireEvent.press(screen.getByRole('button', { name: 'Save' }));
-    expect(store.saveMyMeetingNotes).toHaveBeenCalledWith('C', 'Owner notes');
+    expect(store.saveMyMeetingNotes).toHaveBeenCalledWith('C', 'Owner notes', false);
     expect(router.back).toHaveBeenCalled();
   });
 

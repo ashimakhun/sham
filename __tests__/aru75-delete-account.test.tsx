@@ -298,7 +298,7 @@ describe('AC8: shared content shows "Deleted account"', () => {
     params.meetingId = 'K';
     const k = completed({});
     const note = { id: 'nk', meetingId: k.id, courseId: 'A', authorId: null, body: 'Read chapter 1',
-      createdAt: '2026-10-21T10:00:00.000Z', updatedAt: '2026-10-21T10:00:00.000Z' };
+      createdAt: '2026-10-21T10:00:00.000Z', updatedAt: '2026-10-21T10:00:00.000Z', isPublic: true };
     setStore(fakeStore('S1', { meetings: [k], courseMembers: [member('A', 'S1')], meetingListenerNotes: [note] }));
     await render(<MeetingNotesScreen />);
     expect(screen.getByText('Deleted account')).toBeTruthy();

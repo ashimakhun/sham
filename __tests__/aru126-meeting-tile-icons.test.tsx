@@ -40,6 +40,7 @@ const mNote = (meetingId: string, body: string): MeetingListenerNote => ({
   body,
   createdAt: at(-19),
   updatedAt: at(-19),
+  isPublic: true,
 });
 const notes = [mNote('CN', 'Covered'), mNote('K', 'Old')];
 const asg = (meetingId: string, dueAt?: string): HomeworkAssignment => ({

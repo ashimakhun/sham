@@ -226,6 +226,8 @@ export type MeetingListenerNote = {
   createdAt: string;
   /** Later than createdAt once the text was changed: "Edited <date and time>". */
   updatedAt: string;
+  /** ARU-143: published to the course's listeners, its owner and the teacher; false = only the author sees it. */
+  isPublic: boolean;
 };
 
 /** A listener's self-reported attendance of a Completed meeting (ARU-33). */

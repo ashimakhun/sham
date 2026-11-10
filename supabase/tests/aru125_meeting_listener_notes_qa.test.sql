@@ -43,7 +43,8 @@ exception when others then
   return concat_ws(' | ', code, msg, hint);
 end $$;
 create function pg_temp.add(meeting text, body text) returns text language sql as $$
-  select pg_temp.err(format('select add_meeting_listener_notes(%L, %L)', meeting, body)) $$;
+  -- ARU-143: published, so these notes keep the course-wide audience this test is about.
+  select pg_temp.err(format('select add_meeting_listener_notes(%L, %L, true)', meeting, body)) $$;
 create function pg_temp.upd(note uuid, body text) returns text language sql as $$
   select pg_temp.err(format('select update_meeting_listener_notes(%L, %L)', note, body)) $$;
 create function pg_temp.del(note uuid) returns text language sql as $$
