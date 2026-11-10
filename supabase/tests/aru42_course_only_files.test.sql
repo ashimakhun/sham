@@ -27,7 +27,9 @@ insert into material_files (id, author_id, name, course_id, storage_path, size_b
 select t.ok(not (select course_only from material_files where id = t.f(1)), 'AC10 a new or existing item defaults to Everyone');
 select t.ok((select is_nullable = 'NO' and column_default = 'false' from information_schema.columns
   where table_name = 'material_files' and column_name = 'course_only'), 'AC10 course_only is not null, default false');
-select t.ok(not exists (select 1 from pg_constraint where conrelid = 'material_files'::regclass and pg_get_constraintdef(oid) like '%course_only%'),
+-- Check constraints only: Postgres 18 (ubuntu-latest since 26.04) also lists NOT NULL as a pg_constraint row.
+select t.ok(not exists (select 1 from pg_constraint where conrelid = 'material_files'::regclass and contype = 'c'
+  and pg_get_constraintdef(oid) like '%course_only%'),
   'data: no check constraint on course_only');
 select t.ok((select prosecdef and 'search_path=public' = any(proconfig) from pg_proc where proname = 'can_see_material_file'),
   'data: can_see_material_file is security definer with search_path = public');
