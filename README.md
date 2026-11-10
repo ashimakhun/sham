@@ -195,7 +195,10 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `on delete set null`, so a deleted account's notes stay as "Deleted account") with read access as course meetings
    and the hidden-course policies of 0019, and the functions `add_meeting_listener_notes()`,
    `update_meeting_listener_notes()` and `delete_meeting_listener_notes()`, the only way to write it; changes no
-   existing table or policy, deletes nothing; needs 0031 and, for its number, 0053 and 0054).
+   existing table or policy, deletes nothing; needs 0031 and, for its number, 0053 and 0054),
+   `0056_assignment_sent_counts.sql` (ARU-130: the read-only function `assignment_sent_counts(uuid[])`, how many current
+   listeners sent homework for each assignment, out of all current listeners; counts only, for courses whose meetings
+   the caller can see, empty otherwise; changes no table, policy or publication).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
@@ -730,6 +733,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Delete any listener's notes (ARU-125) | | own courses | any course |
 | Mark a completed meeting's homework checked (ARU-126: no undo in the app) | | any course they can see, not one they're a listener of | any course |
 | Mark / undo own attendance of a started meeting | courses they're in | courses they're in |  |
+| See how many listeners sent homework for an assignment (ARU-130; count only) | courses they're in | all courses (not hidden ones they aren't in) | ✓ |
 | See who attended a meeting | own marks only | ✓ (own courses and courses they don't listen to; own marks only where a listener) | ✓ |
 | See materials              | ✓         | ✓                  | ✓       |
 | Share / delete materials   |           | ✓ (own materials)  | ✓ (own) |

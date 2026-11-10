@@ -101,6 +101,9 @@ export type Homework = {
   assignmentId?: string;
 };
 
+/** ARU-130: how many current listeners sent homework for an assignment, out of all current listeners. Counts only. */
+export type AssignmentSentCount = { sent: number; listeners: number };
+
 /** Homework assigned to a completed meeting (ARU-32): at most one per meeting, for every listener of the course. */
 export type HomeworkAssignment = {
   id: string;
