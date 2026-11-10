@@ -7,12 +7,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, ErrorText, Field, Segmented, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
-import { PASSWORD_MIN } from '@/lib/password';
+import { PASSWORD_MIN, WORKSPACE_NAME_MAX } from '@/lib/password';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import { useAction } from '@/lib/useAction';
 
 type Mode = 'signIn' | 'signUp';
+/** ARU-146: nothing is chosen until the user picks one. */
+type Choice = '' | 'create' | 'join';
 
 export default function SignInScreen() {
   const { ready, session, currentUser, dataLoaded, refresh, signIn, signUp, signOut, accountNotice } = useStore();
@@ -20,6 +22,9 @@ export default function SignInScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [choice, setChoice] = useState<Choice>('');
+  const [workspaceName, setWorkspaceName] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const { busy, error, run } = useAction();
   const { t, tm } = useI18n();
 
@@ -45,7 +50,20 @@ export default function SignInScreen() {
     );
   }
 
-  const canSubmit = email.trim() && password.length >= PASSWORD_MIN && (mode === 'signIn' || name.trim());
+  // ARU-146 AC 1: Create account also needs a workspace choice whose field has something other than spaces.
+  const choiceReady =
+    (choice === 'create' && workspaceName.trim() !== '') || (choice === 'join' && inviteCode.trim() !== '');
+  const canSubmit = email.trim() && password.length >= PASSWORD_MIN && (mode === 'signIn' || (name.trim() && choiceReady));
+
+  function submit() {
+    if (mode === 'signIn') return signIn(email, password);
+    return signUp(
+      name,
+      email,
+      password,
+      choice === 'create' ? { kind: 'create', name: workspaceName } : { kind: 'join', code: inviteCode },
+    );
+  }
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -106,6 +124,40 @@ export default function SignInScreen() {
             secureTextEntry
             autoComplete={mode === 'signIn' ? 'current-password' : 'new-password'}
           />
+          {mode === 'signUp' && (
+            // ARU-146: create a workspace (and become its teacher) or join one with its invite code.
+            <View style={{ gap: 12 }} testID="workspace-choice">
+              <Segmented<Choice>
+                value={choice}
+                onChange={setChoice}
+                options={[
+                  { value: 'create', label: t('signIn.workspaceCreate') },
+                  { value: 'join', label: t('signIn.workspaceJoin') },
+                ]}
+              />
+              {choice === 'create' && (
+                <Field
+                  label={t('signIn.workspaceName')}
+                  placeholder={t('signIn.workspaceNamePlaceholder')}
+                  value={workspaceName}
+                  onChangeText={setWorkspaceName}
+                  maxLength={WORKSPACE_NAME_MAX}
+                />
+              )}
+              {choice === 'join' && (
+                <Field
+                  label={t('signIn.inviteCode')}
+                  placeholder={t('signIn.inviteCodePlaceholder')}
+                  value={inviteCode}
+                  onChangeText={setInviteCode}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  autoComplete="off"
+                  maxLength={20}
+                />
+              )}
+            </View>
+          )}
           {mode === 'signIn' && (
             // ARU-77: reset a forgotten password with a code sent by email.
             <Text
@@ -120,7 +172,7 @@ export default function SignInScreen() {
           <Button
             title={busy ? t('common.pleaseWait') : mode === 'signIn' ? t('signIn.submit') : t('signIn.createAccount')}
             disabled={!canSubmit || busy}
-            onPress={() => run(() => (mode === 'signIn' ? signIn(email, password) : signUp(name, email, password)))}
+            onPress={() => run(submit)}
           />
         </ScrollView>
       </KeyboardAvoidingView>

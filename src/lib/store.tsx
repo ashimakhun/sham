@@ -21,6 +21,7 @@ import {
   isInvalidCredentials,
   NETWORK_ERROR,
   SAME_PASSWORD,
+  signUpErrorMessage,
   USER_EXISTS,
   WRONG_CURRENT_PASSWORD,
 } from './password';
@@ -29,6 +30,8 @@ import { supabase } from './supabase';
 import type {
   AccessRequest,
   AssignmentSentCount,
+  WorkspaceChoice,
+  WorkspaceInvite,
   Course,
   CourseMember,
   CourseBilling,
@@ -115,7 +118,11 @@ export type Store = {
   getUser: (id: string | undefined) => User | undefined;
   getCourse: (id: string | undefined) => Course | undefined;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (name: string, email: string, password: string) => Promise<void>;
+  /** ARU-146: creates the account and, in the same step, the workspace (its teacher) or the request to join one (by
+   *  invite code). Both travel in the sign-up's user data, so they also work with email confirmation on. */
+  signUp: (name: string, email: string, password: string, workspace: WorkspaceChoice) => Promise<void>;
+  /** ARU-146: the teacher's workspace name and invite code; null for anyone else (the database returns no row). */
+  getWorkspaceInvite: () => Promise<WorkspaceInvite | null>;
   signOut: () => Promise<void>;
   /** ARU-75: deletes the signed-in user's own account through the delete-account Edge Function, after checking the
    *  password there. On success this device is signed out and the sign-in screen shows `accountNotice`. On failure
@@ -1272,14 +1279,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const res = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (res.error) throw new Error(authErrorMessage(res.error));
     },
-    signUp: async (name, email, password) => {
+    signUp: async (name, email, password, workspace) => {
       setAccountNotice(null);
+      const choice =
+        workspace.kind === 'create' ? { workspace_name: workspace.name.trim() } : { invite_code: workspace.code.trim().toUpperCase() };
       const res = await supabase.auth.signUp({
         email: email.trim(),
         password,
-        options: { data: { full_name: name.trim() } },
+        options: { data: { full_name: name.trim(), ...choice } },
       });
-      if (res.error) throw new Error(authErrorMessage(res.error));
+      if (res.error) throw new Error(signUpErrorMessage(res.error, workspace.kind));
       // With email confirmation on, Supabase answers an existing email with a user that has no identities instead of
       // an error (ARU-108 analysis note): the same message.
       if (res.data.user && Array.isArray(res.data.user.identities) && res.data.user.identities.length === 0) {
@@ -1288,6 +1297,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     signOut: async () => {
       check(await supabase.auth.signOut());
+    },
+    getWorkspaceInvite: async () => {
+      const res = await supabase.rpc('my_workspace_invite');
+      check(res);
+      const row = ((res.data as { name: string; invite_code: string }[] | null) ?? [])[0];
+      return row ? { name: row.name, code: row.invite_code } : null;
     },
     accountNotice,
     deleteAccount: async (password) => {

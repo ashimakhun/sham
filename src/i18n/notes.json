@@ -776,5 +776,19 @@
   "materials.heartUnlike_one": "Blog card and material screen · the heart, screen reader label when liked (with the like count)",
   "materials.heartUnlike_few": "Blog card and material screen · the heart, screen reader label when liked (with the like count)",
   "materials.heartUnlike_many": "Blog card and material screen · the heart, screen reader label when liked (with the like count)",
-  "materials.heartUnlike_other": "Blog card and material screen · the heart, screen reader label when liked (with the like count)"
+  "materials.heartUnlike_other": "Blog card and material screen · the heart, screen reader label when liked (with the like count)",
+  "signIn.workspaceCreate": "Sign-in · Create account · choice: start a new workspace and become its teacher (ARU-146)",
+  "signIn.workspaceJoin": "Sign-in · Create account · choice: join a workspace with its invite code (ARU-146)",
+  "signIn.workspaceName": "Sign-in · Create account · label of the new workspace's name field (ARU-146)",
+  "signIn.workspaceNamePlaceholder": "Sign-in · Create account · example in the workspace name field (ARU-146)",
+  "signIn.inviteCode": "Sign-in · Create account · label of the invite code field (ARU-146)",
+  "signIn.inviteCodePlaceholder": "Sign-in · Create account · hint in the invite code field (ARU-146)",
+  "roles.workspace": "Manage roles · workspace card · label above the workspace name (ARU-146)",
+  "roles.inviteCode": "Manage roles · workspace card · label above the invite code (ARU-146)",
+  "roles.copy": "Manage roles · workspace card · button that copies the invite code (ARU-146)",
+  "roles.copyLabel": "Manage roles · workspace card · screen-reader name of the Copy button (ARU-146)",
+  "roles.copied": "Manage roles · workspace card · short confirmation after copying (ARU-146)",
+  "db.invite_code_unknown": "Sign-in · Create account · Join: the invite code matches no workspace (ARU-146)",
+  "db.signup_update_app": "Database error · a sign-up without a workspace choice, from an old app or the Auth API (ARU-146; not shown by this app)",
+  "db.workspace_name_length": "Database error · a workspace name blank or over 80 characters sent from outside the app (ARU-146)"
 }

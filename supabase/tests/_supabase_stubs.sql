@@ -5,6 +5,8 @@
 create role anon nologin;
 create role authenticated nologin;
 create role service_role nologin bypassrls;
+-- Supabase Auth's own role: the sign-up inserts into auth.users as it (ARU-146 tests switch to it).
+create role supabase_auth_admin nologin;
 
 create schema auth;
 create table auth.users (
@@ -52,6 +54,8 @@ create publication supabase_realtime;
 -- Supabase's default grants: RLS, not table privileges, is what restricts access.
 grant usage on schema public, auth, storage to anon, authenticated, service_role;
 grant execute on function auth.uid() to anon, authenticated;
+grant usage on schema auth to supabase_auth_admin;
+grant select, insert, update, delete on auth.users to supabase_auth_admin;
 grant all on storage.objects, storage.buckets to anon, authenticated, service_role;
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;

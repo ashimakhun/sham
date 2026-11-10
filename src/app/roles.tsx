@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useState } from 'react';
+import * as Clipboard from 'expo-clipboard';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, SectionList, View } from 'react-native';
 
 import { Button, EmptyState, ErrorText, RoleBadge, styles, ThemedSwitch } from '@/components/ui';
@@ -9,7 +10,7 @@ import { confirmDestructive } from '@/lib/confirm';
 import { canManageRoles } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
-import type { AccessRequest, Role, User } from '@/lib/types';
+import type { AccessRequest, Role, User, WorkspaceInvite } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
 import { Text, TextInput } from '@/components/AppText';
 import { font } from '@/lib/fonts';
@@ -53,10 +54,24 @@ export default function RolesScreen() {
     accessRequests,
     setAccessStatus,
     setAccountant,
+    getWorkspaceInvite,
   } = useStore();
   const { t } = useI18n();
   const [query, setQuery] = useState('');
   const { busy, error, run } = useAction();
+  const isTeacher = canManageRoles(currentUser?.role);
+  // ARU-146 AC 8: the workspace's name and invite code, read through a teacher-only function (AC 9).
+  const [invite, setInvite] = useState<WorkspaceInvite | null>(null);
+  useEffect(() => {
+    if (!isTeacher) return;
+    let live = true;
+    getWorkspaceInvite()
+      .then((w) => live && setInvite(w))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [isTeacher, getWorkspaceInvite]);
 
   // While the store is still loading, show a spinner rather than the denial.
   if (!dataLoaded) {
@@ -148,6 +163,7 @@ export default function RolesScreen() {
       stickySectionHeadersEnabled={false}
       ListHeaderComponent={
         <View style={{ gap: 8 }}>
+          {invite && <WorkspaceCard invite={invite} />}
           <TextInput
             accessibilityLabel={t('roles.searchLabel')}
             placeholder={t('roles.searchPlaceholder')}
@@ -275,5 +291,63 @@ export default function RolesScreen() {
         )
       }
     />
+  );
+}
+
+/** ARU-146 AC 8: the teacher's workspace and its invite code, with Copy and a short "Copied". */
+function WorkspaceCard({ invite }: { invite: WorkspaceInvite }) {
+  const { t } = useI18n();
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
+
+  async function copy() {
+    try {
+      await Clipboard.setStringAsync(invite.code);
+    } catch {
+      return; // the clipboard isn't available (e.g. a browser that refuses): no "Copied"
+    }
+    setCopied(true);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <View style={[styles.card, { marginBottom: 4 }]} testID="workspace-card">
+      <Text style={styles.label}>{t('roles.workspace').toUpperCase()}</Text>
+      <Text style={styles.title} numberOfLines={2}>
+        {invite.name}
+      </Text>
+      <Text style={[styles.label, { marginTop: 4 }]}>{t('roles.inviteCode').toUpperCase()}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <Text style={[styles.title, { flex: 1, letterSpacing: 2 }]} selectable testID="invite-code">
+          {invite.code}
+        </Text>
+        {copied && (
+          <Text style={{ color: colors.success, fontSize: 14 }} accessibilityLiveRegion="polite" testID="invite-copied">
+            {t('roles.copied')}
+          </Text>
+        )}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('roles.copyLabel')}
+          hitSlop={6}
+          onPress={copy}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+            minHeight: 32,
+            paddingHorizontal: 12,
+            borderRadius: 16,
+            backgroundColor: colors.primarySoft,
+          }}>
+          <Ionicons name="copy-outline" size={16} color={colors.primary} />
+          <Text style={{ color: colors.primary, fontSize: 14, ...font(500) }}>{t('roles.copy')}</Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }

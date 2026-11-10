@@ -4,9 +4,10 @@
 -- Switching users between student and mentor is done in the app: Profile -> Manage roles (teacher only, ARU-13).
 -- Workspaces (ARU-145): every account belongs to one workspace, and each workspace has at most one teacher.
 
--- 0. The workspaces, oldest first (until ARU-146 every sign-up joins the oldest one), with their teacher, if any.
-select w.id, w.name, w.created_at, t.full_name as teacher
+-- 0. The workspaces, oldest first, with their invite code (ARU-146) and their teacher, if any.
+select w.id, w.name, w.created_at, c.code as invite_code, t.full_name as teacher
 from workspaces w
+left join workspace_invite_codes c on c.workspace = w.id
 left join profiles t on t.workspace_id = w.id and t.role = 'teacher'
 order by w.created_at, w.id;
 
