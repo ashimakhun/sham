@@ -292,13 +292,17 @@ describe('AC8: shared content shows "Deleted account"', () => {
     expect(screen.queryByText(/Unknown/)).toBeNull();
   });
 
-  it('meeting notes: "Last edited by Deleted account"', async () => {
+  // ARU-142: one kind of notes; a note whose author deleted their account is signed "Deleted account".
+  it('meeting notes: signed "Deleted account"', async () => {
     params.id = 'A';
     params.meetingId = 'K';
-    const k = completed({ notes: 'Read chapter 1', notesUpdatedAt: '2026-10-21T10:00:00.000Z', notesUpdatedById: undefined });
-    setStore(fakeStore('S1', { meetings: [k], courseMembers: [member('A', 'S1')] }));
+    const k = completed({});
+    const note = { id: 'nk', meetingId: k.id, courseId: 'A', authorId: null, body: 'Read chapter 1',
+      createdAt: '2026-10-21T10:00:00.000Z', updatedAt: '2026-10-21T10:00:00.000Z' };
+    setStore(fakeStore('S1', { meetings: [k], courseMembers: [member('A', 'S1')], meetingListenerNotes: [note] }));
     await render(<MeetingNotesScreen />);
-    expect(screen.getByText(/^Last edited by Deleted account, /)).toBeTruthy();
+    expect(screen.getByText('Deleted account')).toBeTruthy();
+    expect(screen.getByText('Read chapter 1')).toBeTruthy();
   });
 
   it('personName: empty reference -> Deleted account; unreadable -> the screen\'s fallback', () => {

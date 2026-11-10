@@ -9,7 +9,7 @@ import { Alert } from 'react-native';
 import CourseDetailScreen from '@/app/courses/[id]';
 import MeetingNotesScreen from '@/app/courses/[id]/meetings/[meetingId]/notes';
 import { insertLink, notesCounter } from '@/lib/markdown';
-import type { Meeting } from '@/lib/types';
+import type { Meeting, MeetingListenerNote } from '@/lib/types';
 
 import { courseA, fakeStore, member } from './helpers/fakeStore';
 import { params, setStore } from './helpers/mocks';
@@ -166,32 +166,37 @@ describe('edge: unsaved changes', () => {
 });
 
 describe('AC7/AC9 and the owner change edge case', () => {
-  const withNotes = meeting({
-    id: 'CN',
-    startsAt: at(-60 * HOUR),
-    status: 'completed',
-    notes: '1. intro\n2. loops\n\nSee [the docs](https://docs.example.com)',
-    notesUpdatedById: 'M',
-    notesUpdatedAt: '2026-10-20T10:00:00.000Z',
-  });
+  // ARU-142: official notes are gone; the meeting's notes are the owner M's own entry.
+  const withNotes = meeting({ id: 'CN', startsAt: at(-60 * HOUR), status: 'completed' });
+  const mNote: MeetingListenerNote = {
+    id: 'nM',
+    meetingId: 'CN',
+    courseId: 'A',
+    authorId: 'M',
+    body: '1. intro\n2. loops\n\nSee [the docs](https://docs.example.com)',
+    createdAt: '2026-10-20T10:00:00.000Z',
+    updatedAt: '2026-10-20T10:00:00.000Z',
+  };
 
   it('the read view shows numbered lists and links formatted, never raw Markdown', async () => {
     Object.assign(params, { meetingId: 'CN' });
-    setStore(fakeStore('S1', { courseMembers: members, meetings: [withNotes] }));
+    setStore(fakeStore('S1', { courseMembers: members, meetings: [withNotes], meetingListenerNotes: [mNote] }));
     await render(<MeetingNotesScreen />);
     expect(screen.getByText('1.')).toBeTruthy();
     expect(screen.getByText('2.')).toBeTruthy();
     expect(screen.getByText('intro')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'the docs' })).toBeTruthy();
     expect(screen.queryByText(/\]\(|\*\*|^1\. intro/)).toBeNull();
-    // A student listener reads, but can't edit.
+    // ARU-142: a student listener reads M's note but can't edit or delete it.
     expect(screen.queryByRole('button', { name: /notes/i })).toBeNull();
   });
 
-  it('a student listener sees the Notes link in History, and it opens the read view (no edit mode)', async () => {
-    setStore(fakeStore('S1', { courseMembers: members, meetings: [withNotes] }));
+  // ARU-142: a listener now writes their own notes too: without a note of theirs the pencil says Add notes.
+  it('a student listener sees the Notes link, and it opens the read view; their pencil is Add notes', async () => {
+    setStore(fakeStore('S1', { courseMembers: members, meetings: [withNotes], meetingListenerNotes: [mNote] }));
     await render(<CourseDetailScreen />);
     expect(inMeeting('CN').queryByLabelText('Edit notes')).toBeNull();
+    expect(inMeeting('CN').getByLabelText('Add notes')).toBeTruthy();
     await fireEvent.press(inMeeting('CN').getByLabelText('Notes'));
     expect(router.push).toHaveBeenCalledWith({
       pathname: '/courses/[id]/meetings/[meetingId]/notes',
@@ -199,24 +204,35 @@ describe('AC7/AC9 and the owner change edge case', () => {
     });
   });
 
-  it('after a handover to N, the former owner M has no Edit notes and edit mode is refused; "Last edited by" keeps M', async () => {
+  // ARU-142: no «Last edited by» line. AC 6: the former owner M, now a mentor outside the course, no longer reads the
+  // notes (the database sends M none), so M sees "No notes yet"; the new owner sees M's note signed by M (below).
+  it('after a handover to N, the former owner M has no Notes or notes pencil and edit mode is refused', async () => {
     const handedOver = { ...courseA, createdById: 'N' };
     setStore(fakeStore('M', { courses: [handedOver], courseMembers: members, meetings: [withNotes] }));
     Object.assign(params, { meetingId: 'CN' });
     const view = await render(<MeetingNotesScreen />);
-    expect(screen.getByText(/Last edited by Mentor Max/)).toBeTruthy();
+    expect(screen.getByText('No notes yet')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Edit notes' })).toBeNull();
     await view.unmount();
+    const tile = await render(<CourseDetailScreen />);
+    expect(inMeeting('CN').queryByLabelText(/^(Add|Edit) notes$|^Notes$/)).toBeNull();
+    await tile.unmount();
     Object.assign(params, { edit: '1' });
     await render(<MeetingNotesScreen />);
-    expect(screen.getByText('Only the course owner or the teacher can edit notes.')).toBeTruthy();
+    expect(screen.getByText("Only the course's listeners, its owner and the teacher can write notes.")).toBeTruthy();
   });
 
-  it('the new owner N sees Edit notes on the same meeting', async () => {
+  // ARU-142: the pencil's label is about the viewer's own note; N has none yet, so it says Add notes.
+  it('the new owner N gets the notes pencil (Add notes) on the same meeting, and M\'s note stays signed by M', async () => {
     const handedOver = { ...courseA, createdById: 'N' };
-    setStore(fakeStore('N', { courses: [handedOver], courseMembers: members, meetings: [withNotes] }));
-    await render(<CourseDetailScreen />);
-    expect(inMeeting('CN').getByLabelText('Edit notes')).toBeTruthy();
+    const data = { courses: [handedOver], courseMembers: members, meetings: [withNotes], meetingListenerNotes: [mNote] };
+    setStore(fakeStore('N', data));
+    const tile = await render(<CourseDetailScreen />);
+    expect(inMeeting('CN').getByLabelText('Add notes')).toBeTruthy();
+    await tile.unmount();
+    Object.assign(params, { meetingId: 'CN' });
+    await render(<MeetingNotesScreen />);
+    expect(within(screen.getByTestId('listener-note-nM')).getByText('Mentor Max')).toBeTruthy();
   });
 });
 

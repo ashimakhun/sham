@@ -182,10 +182,9 @@ export type Store = {
   setMeetingStatus: (id: string, status: Exclude<MeetingStatus, 'scheduled'>) => Promise<void>;
   /** Course owner or teacher, Scheduled meetings only (ARU-15). A changed start must be in the future. */
   updateMeeting: (id: string, input: MeetingEdit) => Promise<void>;
-  /** Course owner or teacher, Completed meetings only (ARU-28). Blank text removes the notes. */
-  setMeetingNotes: (id: string, notes: string) => Promise<void>;
-  /** ARU-125: a current listener adds their own notes to a Completed meeting, or changes them (one entry per
-   *  meeting). The text is trimmed; blank or over 10,000 characters is refused. */
+  /** ARU-125 / ARU-142: a current listener, the course's owner or the teacher adds their own notes to a Completed
+   *  meeting, or changes them (one entry per meeting). The text is trimmed; blank or over 10,000 characters is
+   *  refused. */
   saveMyMeetingNotes: (meetingId: string, body: string) => Promise<void>;
   /** ARU-125: deletes listener notes: the author's own, or any on the course for its current owner and the teacher.
    *  Already deleted is fine. */
@@ -369,9 +368,6 @@ type MeetingRow = {
   status_changed_by: string | null;
   status_changed_at: string | null;
   rescheduled_at: string | null;
-  notes?: string | null;
-  notes_updated_by?: string | null;
-  notes_updated_at?: string | null;
   homework_checked_at?: string | null;
   homework_checked_by?: string | null;
 };
@@ -576,9 +572,6 @@ const toMeeting = (r: MeetingRow): Meeting => ({
   statusChangedById: r.status_changed_by ?? undefined,
   statusChangedAt: r.status_changed_at ?? undefined,
   rescheduledAt: r.rescheduled_at ?? undefined,
-  notes: r.notes ?? undefined,
-  notesUpdatedById: r.notes_updated_by ?? undefined,
-  notesUpdatedAt: r.notes_updated_at ?? undefined,
   homeworkCheckedAt: r.homework_checked_at ?? undefined,
   homeworkCheckedById: r.homework_checked_by ?? undefined,
 });
@@ -944,7 +937,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         supabase.from('materials').select('*').order('created_at', { ascending: false }),
         supabase.from('courses').select('*').order('created_at', { ascending: false }),
         supabase.from('course_members').select('*'),
-        supabase.from('course_meetings').select('*').order('starts_at'),
+        // ARU-142 AC 10: the old official-notes columns (notes, notes_updated_*) stay in the database as a backup only.
+        supabase
+          .from('course_meetings')
+          .select(
+            'id, course_id, starts_at, topic, location, status, created_by, created_at, status_changed_by, status_changed_at, rescheduled_at, homework_checked_at, homework_checked_by',
+          )
+          .order('starts_at'),
         supabase.from('homework_assignments').select('*').order('created_at', { ascending: false }),
         supabase.from('meeting_attendance').select('*'),
         supabase.from('material_files').select('*').order('created_at', { ascending: false }),
@@ -1701,12 +1700,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           new_location: input.location,
         }),
       );
-      await load();
-    },
-    setMeetingNotes: async (id, notes) => {
-      requireRole('teacher', 'mentor');
-      if (notes.length > NOTES_MAX) throw new Error('Notes can be at most 10,000 characters.');
-      check(await supabase.rpc('set_meeting_notes', { meeting: id, new_notes: notes }));
       await load();
     },
     saveMyMeetingNotes: async (meetingId, body) => {

@@ -8,7 +8,7 @@ import CourseDetailScreen from '@/app/courses/[id]';
 import MeetingNotesScreen from '@/app/courses/[id]/meetings/[meetingId]/notes';
 import { MarkdownText } from '@/components/MarkdownText';
 import { insertLink, notesCounter, parseMarkdown, toggleList, toggleWrap } from '@/lib/markdown';
-import type { Meeting } from '@/lib/types';
+import type { Meeting, MeetingListenerNote } from '@/lib/types';
 
 import { courseA, fakeStore, member } from './helpers/fakeStore';
 import { params, setStore } from './helpers/mocks';
@@ -31,14 +31,18 @@ const F1 = meeting({ id: 'F1', startsAt: at(48) });
 const F2 = meeting({ id: 'F2', startsAt: at(2) });
 const P = meeting({ id: 'P', startsAt: at(-1) });
 const C = meeting({ id: 'C', startsAt: at(-30), status: 'completed', topic: 'Done' });
-const CN = meeting({
-  id: 'CN',
-  startsAt: at(-60),
-  status: 'completed',
-  notes: '**Covered** _ch 1_\n- one\n- two',
-  notesUpdatedById: 'M',
-  notesUpdatedAt: '2026-10-20T10:00:00.000Z',
-});
+// ARU-142: official notes are gone; CN's notes are the owner M's own entry.
+const CN = meeting({ id: 'CN', startsAt: at(-60), status: 'completed' });
+const mNote: MeetingListenerNote = {
+  id: 'nM',
+  meetingId: 'CN',
+  courseId: 'A',
+  authorId: 'M',
+  body: '**Covered** _ch 1_\n- one\n- two',
+  createdAt: '2026-10-20T10:00:00.000Z',
+  updatedAt: '2026-10-20T10:00:00.000Z',
+};
+const notes = [mNote];
 const X = meeting({ id: 'X', startsAt: at(-5), status: 'canceled' });
 const members = [member('A', 'S1')];
 const inMeeting = (id: string) => within(screen.getByTestId(`meeting-${id}`));
@@ -135,12 +139,16 @@ describe('AC1/AC2 (as changed by ARU-60): meeting groups', () => {
 });
 
 describe('AC3/AC7/AC9/AC10: notes actions on completed meetings', () => {
-  it.each(['M', 'T'] as const)('%s sees Add notes / Edit notes on completed meetings only', async (who) => {
-    setStore(fakeStore(who, { courseMembers: members, meetings: [F1, P, C, CN, X] }));
+  // ARU-142: the pencil says Edit notes only for the writer who has their own note on the meeting (M on CN).
+  it.each([
+    ['M', 'Edit notes'],
+    ['T', 'Add notes'],
+  ] as const)('%s sees Add notes / Edit notes on completed meetings only (CN: %s)', async (who, onCN) => {
+    setStore(fakeStore(who, { courseMembers: members, meetings: [F1, P, C, CN, X], meetingListenerNotes: notes }));
     await render(<CourseDetailScreen />);
     // + ARU-32, + ARU-33, + ARU-60
     expect(labels('C')).toEqual(['Add notes', 'Assign homework', 'Attended 0 of 1', 'Mark homework checked']);
-    expect(labels('CN')).toEqual(['Notes', 'Edit notes', 'Assign homework', 'Attended 0 of 1', 'Mark homework checked']);
+    expect(labels('CN')).toEqual(['Notes', onCN, 'Assign homework', 'Attended 0 of 1', 'Mark homework checked']);
     expect(labels('X')).toEqual([]);
     expect(labels('F1')).not.toContain('Add notes');
     expect(labels('P')).not.toContain('Add notes');
@@ -151,15 +159,12 @@ describe('AC3/AC7/AC9/AC10: notes actions on completed meetings', () => {
     });
   });
 
-  // ARU-33: N (a mentor who isn't a listener) also sees the attendance count; S1 (a listener) "I attended".
-  // ARU-60: N may also mark the homework checked; S1 may not. ARU-125: S1 adds their own listener notes instead.
-  it.each([
-    ['N', ['Attended 0 of 1', 'Mark homework checked']],
-    ['S1', ['Add my notes', 'I attended']],
-  ] as const)('%s reads notes but has no Add/Edit notes', async (who, others) => {
-    setStore(fakeStore(who, { courseMembers: members, meetings: [C, CN] }));
+  // ARU-33: S1 (a listener) "I attended". ARU-142: S1 writes notes too, with the same single pencil.
+  it('S1 reads notes and gets the pencil', async () => {
+    const others = ['Add notes', 'I attended'];
+    setStore(fakeStore('S1', { courseMembers: members, meetings: [C, CN], meetingListenerNotes: notes }));
     await render(<CourseDetailScreen />);
-    expect(labels('C')).toEqual([...others]);
+    expect(labels('C')).toEqual(others);
     expect(labels('CN')).toEqual(['Notes', ...others]);
     await fireEvent.press(inMeeting('CN').getByRole('link', { name: 'Notes' }));
     expect(router.push).toHaveBeenLastCalledWith({
@@ -168,26 +173,39 @@ describe('AC3/AC7/AC9/AC10: notes actions on completed meetings', () => {
     });
   });
 
+  // ARU-33: N (a mentor who isn't a listener) sees the attendance count; ARU-60: N may mark the homework checked.
+  // ARU-142 AC 6: N no longer reads notes (the database sends N none), so N gets neither Notes nor a pencil.
+  it('N (a mentor outside the course) gets neither Notes nor a pencil', async () => {
+    setStore(fakeStore('N', { courseMembers: members, meetings: [C, CN] }));
+    await render(<CourseDetailScreen />);
+    expect(labels('C')).toEqual(['Attended 0 of 1', 'Mark homework checked']);
+    expect(labels('CN')).toEqual(['Attended 0 of 1', 'Mark homework checked']);
+  });
+
   it('AC8: notes saved elsewhere appear on the next store update', async () => {
     setStore(fakeStore('S1', { courseMembers: members, meetings: [C] }));
     const { rerender } = await render(<CourseDetailScreen />);
-    expect(labels('C')).toEqual(['Add my notes', 'I attended']); // ARU-33, ARU-125
-    setStore(fakeStore('S1', { courseMembers: members, meetings: [{ ...C, notes: 'New' }] }));
+    expect(labels('C')).toEqual(['Add notes', 'I attended']); // ARU-33, ARU-142
+    const newNote = { ...mNote, meetingId: 'C' };
+    setStore(fakeStore('S1', { courseMembers: members, meetings: [C], meetingListenerNotes: [newNote] }));
     await rerender(<CourseDetailScreen />);
-    expect(labels('C')).toEqual(['Notes', 'Add my notes', 'I attended']);
+    expect(labels('C')).toEqual(['Notes', 'Add notes', 'I attended']);
   });
 });
 
 describe('AC7: reading notes', () => {
-  it('shows notes formatted, never raw Markdown, with "Last edited by"', async () => {
+  // ARU-142: no «Last edited by» line any more; each note is signed by its author.
+  it('shows notes formatted, never raw Markdown, signed by the author', async () => {
     params.meetingId = 'CN';
-    setStore(fakeStore('S1', { courseMembers: members, meetings: [CN] }));
+    setStore(fakeStore('S1', { courseMembers: members, meetings: [CN], meetingListenerNotes: notes }));
     await render(<MeetingNotesScreen />);
     expect(screen.getByText('Covered')).toBeTruthy();
     expect(screen.getByText('one')).toBeTruthy();
     expect(screen.queryByText(/\*\*/)).toBeNull();
-    expect(screen.getByText(/Last edited by Mentor Max, /)).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Edit notes' })).toBeNull();
+    expect(within(screen.getByTestId('listener-note-nM')).getByText('Mentor Max')).toBeTruthy();
+    expect(screen.queryByText(/Last edited by/)).toBeNull();
+    // ARU-142: S1 can't change or delete someone else's note.
+    expect(screen.queryByRole('button', { name: /Delete/ })).toBeNull();
   });
 
   it('links open in the browser', async () => {
@@ -197,14 +215,14 @@ describe('AC7: reading notes', () => {
     expect(open).toHaveBeenCalledWith('https://x.io');
   });
 
-  it('the owner sees Edit notes, which replaces the view with the editor', async () => {
+  it('the owner with their own note sees Edit notes, which replaces the view with the editor', async () => {
     // ARU-126 AC 6: the pencil is in the header's right; render the Stack header's headerRight for this test.
     const { Stack } = jest.requireMock('expo-router') as { Stack: { Screen: unknown } };
     const original = Stack.Screen;
     Stack.Screen = ({ options }: { options?: { headerRight?: () => React.ReactNode } }) => options?.headerRight?.() ?? null;
     try {
       params.meetingId = 'CN';
-      setStore(fakeStore('M', { courseMembers: members, meetings: [CN] }));
+      setStore(fakeStore('M', { courseMembers: members, meetings: [CN], meetingListenerNotes: notes }));
       await render(<MeetingNotesScreen />);
       await fireEvent.press(screen.getByRole('button', { name: 'Edit notes' }));
       expect(router.replace).toHaveBeenCalledWith({
@@ -225,11 +243,22 @@ describe('AC7: reading notes', () => {
 });
 
 describe('AC9/AC10: edit mode guards', () => {
-  it.each(['N', 'S1'] as const)('%s opening edit mode sees the not-allowed message', async (who) => {
+  it('N (a mentor outside the course) opening edit mode sees the not-allowed message', async () => {
     Object.assign(params, { meetingId: 'C', edit: '1' });
-    setStore(fakeStore(who, { courseMembers: members, meetings: [C] }));
+    setStore(fakeStore('N', { courseMembers: members, meetings: [C] }));
     await render(<MeetingNotesScreen />);
-    expect(screen.getByText('Only the course owner or the teacher can edit notes.')).toBeTruthy();
+    expect(screen.getByText('Not allowed')).toBeTruthy();
+    expect(screen.getByText("Only the course's listeners, its owner and the teacher can write notes.")).toBeTruthy();
+    expect(screen.queryByLabelText('Notes')).toBeNull();
+  });
+
+  // ARU-142: a listener writes notes now, so S1 gets the editor instead of the not-allowed message.
+  it('S1 (a listener) opening edit mode gets the editor', async () => {
+    Object.assign(params, { meetingId: 'C', edit: '1' });
+    setStore(fakeStore('S1', { courseMembers: members, meetings: [C] }));
+    await render(<MeetingNotesScreen />);
+    expect(screen.getByLabelText('Notes')).toBeTruthy();
+    expect(screen.queryByText('Not allowed')).toBeNull();
   });
 
   it('a canceled meeting cannot get notes', async () => {
@@ -243,17 +272,17 @@ describe('AC9/AC10: edit mode guards', () => {
 describe('AC3-AC6: editor', () => {
   it('prefills, formats with the toolbar, saves and goes back', async () => {
     Object.assign(params, { meetingId: 'CN', edit: '1' });
-    const store = fakeStore('M', { courseMembers: members, meetings: [CN] });
+    const store = fakeStore('M', { courseMembers: members, meetings: [CN], meetingListenerNotes: notes });
     setStore(store);
     await render(<MeetingNotesScreen />);
     const input = screen.getByLabelText('Notes');
-    expect(input.props.value).toBe(CN.notes);
+    expect(input.props.value).toBe(mNote.body);
     await fireEvent.changeText(input, 'hello');
     await fireEvent(input, 'selectionChange', { nativeEvent: { selection: { start: 0, end: 5 } } });
     await fireEvent.press(screen.getByRole('button', { name: 'Bold' }));
     expect(screen.getByLabelText('Notes').props.value).toBe('**hello**');
     await fireEvent.press(screen.getByRole('button', { name: 'Save' }));
-    expect(store.setMeetingNotes).toHaveBeenCalledWith('CN', '**hello**');
+    expect(store.saveMyMeetingNotes).toHaveBeenCalledWith('CN', '**hello**');
     expect(router.back).toHaveBeenCalled();
   });
 
@@ -273,7 +302,7 @@ describe('AC3-AC6: editor', () => {
     const store = fakeStore('M', {
       courseMembers: members,
       meetings: [C],
-      setMeetingNotes: jest.fn(() => new Promise<void>((_, reject) => (fail = reject))),
+      saveMyMeetingNotes: jest.fn(() => new Promise<void>((_, reject) => (fail = reject))),
     });
     setStore(store);
     await render(<MeetingNotesScreen />);
@@ -281,7 +310,7 @@ describe('AC3-AC6: editor', () => {
     const save = screen.getByRole('button', { name: 'Save' });
     await fireEvent.press(save);
     await fireEvent.press(save);
-    expect(store.setMeetingNotes).toHaveBeenCalledTimes(1);
+    expect(store.saveMyMeetingNotes).toHaveBeenCalledTimes(1);
     await act(async () => fail(new Error('Network request failed')));
     expect(screen.getByText('Network request failed')).toBeTruthy();
     expect(screen.getByLabelText('Notes').props.value).toBe('draft');

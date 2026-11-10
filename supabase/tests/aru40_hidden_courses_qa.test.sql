@@ -130,8 +130,9 @@ select t.eq((select count(*) from homework where course_id = t.h() and student_i
 select t.login('M');
 select t.lives($$select change_course_owner(t.h(), t.id('N'))$$, 'AC9 the owner hands H to N');
 select t.eq((select count(*) from course_messages where course_id = t.h()), 0::bigint, 'AC9 the old owner loses the chat');
-select t.throws($$select set_meeting_notes(t.hm(1), 'x')$$, 'P0002', 'AC9 the old owner: set_meeting_notes "Meeting not found."');
+-- ARU-142: official notes (set_meeting_notes) are retired; meeting notes are written with add_meeting_listener_notes.
+select t.throws($$select add_meeting_listener_notes(t.hm(1), 'x')$$, 'P0002', 'AC9 the old owner: add_meeting_listener_notes "Meeting not found."');
 select t.login('N');
 select t.eq((select count(*) from course_meetings where course_id = t.h()), 7::bigint, 'AC9 the new owner sees H''s meetings');
-select t.lives($$select set_meeting_notes(t.hm(1), 'New owner notes')$$, 'AC9 the new owner writes notes');
+select t.lives($$select add_meeting_listener_notes(t.hm(1), 'New owner notes')$$, 'AC9 the new owner writes notes (ARU-142)');
 reset role;

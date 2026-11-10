@@ -105,19 +105,27 @@ export function isCourseListener(user: User | null | undefined, course: Course, 
   return !!user && members.some((m) => m.courseId === course.id && m.userId === user.id);
 }
 
-/** ARU-125: mirrors add_meeting_listener_notes() / update_meeting_listener_notes() (0055): a current listener of the
- *  course adds and edits their own notes on a Completed meeting. */
-export function canWriteListenerNotes(
+/** ARU-142: mirrors notes_writer() (supabase/migrations/0057_one_kind_of_notes.sql): a current listener of the
+ *  course, its current owner, or the teacher. They read the course's meeting notes and write their own. */
+export function isNotesWriter(user: User | null | undefined, course: Course, members: CourseMember[]) {
+  if (!user) return false;
+  return user.role === 'teacher' || course.createdById === user.id || isCourseListener(user, course, members);
+}
+
+/** ARU-142: mirrors add_ / update_meeting_listener_notes() (0057): a notes writer adds and edits their own notes on a
+ *  Completed meeting (one entry per person and meeting). */
+export function canWriteNotes(
   user: User | null | undefined,
   course: Course,
   members: CourseMember[],
   meeting: Pick<Meeting, 'status'>,
 ) {
-  return meeting.status === 'completed' && isCourseListener(user, course, members);
+  return meeting.status === 'completed' && isNotesWriter(user, course, members);
 }
 
-/** ARU-125: mirrors delete_meeting_listener_notes() (0055): the author while they still see it (a current listener,
- *  or a mentor), the course's current owner, or the teacher. */
+/** ARU-125: mirrors delete_meeting_listener_notes() (0055, unchanged by ARU-142): the author (a current listener, or
+ *  any mentor — since ARU-142 a mentor outside the course no longer reads the note, so can't reach it in the app),
+ *  the course's current owner, or the teacher. */
 export function canDeleteListenerNote(
   user: User | null | undefined,
   course: Course,

@@ -31,7 +31,6 @@ const meetingH: Meeting = {
   status: 'completed',
   createdById: 'M',
   createdAt: '2026-10-10T10:00:00.000Z',
-  notes: 'Secret notes',
 };
 
 beforeEach(() => {

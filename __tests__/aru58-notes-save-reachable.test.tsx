@@ -55,7 +55,8 @@ describe('Save in the header', () => {
     expect(mockOptions.headerRight).toBeDefined();
     const header = await render(mockOptions.headerRight!());
     await fireEvent.press(header.getByRole('button', { name: 'Save notes' }));
-    expect(store.setMeetingNotes).toHaveBeenCalledWith('C', 'Four\nlines\nof\nnotes');
+    // ARU-142: the owner and the teacher save their own signed notes.
+    expect(store.saveMyMeetingNotes).toHaveBeenCalledWith('C', 'Four\nlines\nof\nnotes');
   });
 });
 

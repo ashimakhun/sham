@@ -109,7 +109,8 @@ select t.throws($$select change_course_owner(t.h(), t.id('N'))$$, 'P0002', 'AC5/
 select t.throws($$select set_meeting_status(md5('meeting' || t.h()::text || '2')::uuid, 'canceled')$$, 'P0002',
   'AC5 set_meeting_status: "Meeting not found."');
 select t.throws($$select update_meeting(t.hm(), now() + interval '1 day', 'x', null)$$, 'P0002', 'AC5 update_meeting: "Meeting not found."');
-select t.throws($$select set_meeting_notes(t.hm(), 'x')$$, 'P0002', 'AC5 set_meeting_notes: "Meeting not found."');
+-- ARU-142: official notes (set_meeting_notes) are retired; meeting notes are written with add_meeting_listener_notes.
+select t.throws($$select add_meeting_listener_notes(t.hm(), 'x')$$, 'P0002', 'AC5 add_meeting_listener_notes: "Meeting not found."');
 select t.throws($$select * from listener_homework_photos(t.h(), t.id('S1'))$$, 'P0002',
   'AC5 listener_homework_photos: "Course not found."');
 select t.lives($$select remove_listener(t.h(), t.id('S1'))$$, 'AC5 remove_listener raises no error');
@@ -146,9 +147,9 @@ select t.lives($$insert into homework (student_id, course_id, assignment_id, tit
 select t.login('M');
 select t.lives($$insert into course_meetings (course_id, starts_at, created_by) values (t.h(), now() + interval '1 day', t.id('M'))$$,
   'AC6 the owner schedules a meeting');
-select t.lives($$select set_meeting_notes(t.hm(), 'Owner notes')$$, 'AC6 the owner writes notes');
+select t.lives($$select add_meeting_listener_notes(t.hm(), 'Owner notes')$$, 'AC6 the owner writes notes (ARU-142)');
 select t.login('T');
-select t.lives($$select set_meeting_notes(t.hm(), 'Teacher notes')$$, 'AC6 the teacher writes notes in H');
+select t.lives($$select add_meeting_listener_notes(t.hm(), 'Teacher notes')$$, 'AC6 the teacher writes notes in H (ARU-142)');
 select t.lives($$insert into course_messages (course_id, author_id, body) values (t.h(), t.id('T'), 'from T')$$,
   'AC6 the teacher posts in H''s chat');
 

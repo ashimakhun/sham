@@ -208,10 +208,6 @@ export type Meeting = {
   statusChangedAt?: string;
   /** Set when the start time was changed at least once (ARU-15). */
   rescheduledAt?: string;
-  /** Notes on a Completed meeting (ARU-28): Markdown subset (src/lib/markdown.ts); undefined = none. */
-  notes?: string;
-  notesUpdatedById?: string;
-  notesUpdatedAt?: string;
   /** ARU-60: a Completed meeting's homework was marked checked (moves it to MEETING HISTORY); undefined = not yet. */
   homeworkCheckedAt?: string;
   homeworkCheckedById?: string;

@@ -12,29 +12,19 @@ import { Button, Card, EmptyState, ErrorText, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import { confirmAction } from '@/lib/confirm';
 import { font } from '@/lib/fonts';
-import {
-  canDeleteListenerNote,
-  canManageMeetings,
-  canSeeMeetings,
-  isCourseListener,
-} from '@/lib/roles';
+import { canDeleteListenerNote, canSeeMeetings, canWriteNotes, isNotesWriter } from '@/lib/roles';
+import { NOTES_MAX } from '@/lib/markdown';
 import { useStore } from '@/lib/store';
 import { colors, formatDateTime } from '@/lib/theme';
 import type { Course, Meeting, MeetingListenerNote } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
 
-/** Notes on a completed meeting (ARU-28): read view for everyone who sees the meeting; `?edit=1` is the editor for
- *  the course's current owner or the teacher. ARU-125: the view also lists the listeners' notes; `?mine=1` is a
- *  current listener's editor for their own notes. */
+/** Meeting notes (ARU-28, ARU-125; one kind since ARU-142): the read view lists every signed note on a completed
+ *  meeting, oldest first; `?edit=1` is my own notes editor, for a current listener, the course's owner or the
+ *  teacher. */
 export default function MeetingNotesScreen() {
-  const {
-    id: courseId,
-    meetingId,
-    edit,
-    mine,
-  } = useLocalSearchParams<{ id: string; meetingId: string; edit?: string; mine?: string }>();
-  const { currentUser, courseMembers, getCourse, meetings, meetingListenerNotes, setMeetingNotes, saveMyMeetingNotes } =
-    useStore();
+  const { id: courseId, meetingId, edit } = useLocalSearchParams<{ id: string; meetingId: string; edit?: string }>();
+  const { currentUser, courseMembers, getCourse, meetings, meetingListenerNotes, saveMyMeetingNotes } = useStore();
   const { t } = useI18n();
 
   const course = getCourse(courseId);
@@ -42,29 +32,12 @@ export default function MeetingNotesScreen() {
   if (!course || !meeting || !canSeeMeetings(currentUser, course, courseMembers)) {
     return <EmptyState title={t('meetings.notFound')} />;
   }
-  const canEdit = canManageMeetings(currentUser, course);
-  const listenerNotes = (meetingListenerNotes ?? []).filter((n) => n.meetingId === meeting.id);
-  const myNote = currentUser ? listenerNotes.find((n) => n.authorId === currentUser.id) : undefined;
+  const notes = (meetingListenerNotes ?? []).filter((n) => n.meetingId === meeting.id);
+  const myNote = currentUser ? notes.find((n) => n.authorId === currentUser.id) : undefined;
 
   if (edit === '1') {
-    if (!canEdit) return <EmptyState title={t('meetings.notAllowed')} hint={t('notes.onlyEditHint')} />;
-    if (meeting.status !== 'completed') {
-      return <EmptyState title={t('notes.cantAdd')} hint={t('notes.cantAddHint')} />;
-    }
-    return (
-      <NotesEditor
-        course={course}
-        meeting={meeting}
-        initialText={meeting.notes ?? ''}
-        title={t(meeting.notes ? 'notes.edit' : 'notes.add')}
-        placeholder={t('notes.placeholder')}
-        onSave={(text) => setMeetingNotes(meeting.id, text)}
-      />
-    );
-  }
-  if (mine === '1') {
-    if (!isCourseListener(currentUser, course, courseMembers)) {
-      return <EmptyState title={t('meetings.notAllowed')} hint={t('notes.listenersOnlyHint')} />;
+    if (!isNotesWriter(currentUser, course, courseMembers)) {
+      return <EmptyState title={t('meetings.notAllowed')} hint={t('notes.onlyEditHint')} />;
     }
     if (meeting.status !== 'completed') {
       return <EmptyState title={t('notes.cantAdd')} hint={t('notes.cantAddHint')} />;
@@ -76,10 +49,6 @@ export default function MeetingNotesScreen() {
         course={course}
         meeting={meeting}
         initialText={myNote?.body ?? ''}
-        title={t(myNote ? 'notes.editMine' : 'notes.addMine')}
-        placeholder={t('notes.myPlaceholder')}
-        // AC 2: blank text can't be saved (the database refuses it too).
-        requireText
         onSave={(text) => saveMyMeetingNotes(meeting.id, text)}
       />
     );
@@ -88,8 +57,9 @@ export default function MeetingNotesScreen() {
     <NotesView
       course={course}
       meeting={meeting}
-      canEdit={canEdit && meeting.status === 'completed'}
-      listenerNotes={listenerNotes}
+      canWrite={canWriteNotes(currentUser, course, courseMembers, meeting)}
+      hasMine={!!myNote}
+      notes={notes}
     />
   );
 }
@@ -97,23 +67,18 @@ export default function MeetingNotesScreen() {
 function NotesView({
   course,
   meeting,
-  canEdit,
-  listenerNotes,
+  canWrite,
+  hasMine,
+  notes,
 }: {
   course: Course;
   meeting: Meeting;
-  canEdit: boolean;
-  listenerNotes: MeetingListenerNote[];
+  canWrite: boolean;
+  hasMine: boolean;
+  notes: MeetingListenerNote[];
 }) {
-  // ARU-125: a listener adds or edits their own notes from the meeting row ("Add my notes" / "Edit my notes").
-  const { currentUser, courseMembers, getUser } = useStore();
+  const { currentUser, courseMembers } = useStore();
   const { t } = useI18n();
-  // Notes edited by someone who then deleted their account have no editor any more (ARU-75): "Deleted account".
-  const editor = meeting.notesUpdatedById
-    ? (getUser(meeting.notesUpdatedById)?.name ?? t('common.unknown'))
-    : meeting.notes && meeting.notesUpdatedAt
-      ? t('common.deletedAccount')
-      : undefined;
   // Replace the view, so Save (which goes back) lands on the course details.
   const openEditor = () =>
     router.replace({
@@ -122,41 +87,24 @@ function NotesView({
     });
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic">
-      {/* ARU-126 AC 6: the owner and the teacher open the editor from a pencil at the header's right. */}
+      {/* ARU-142 AC 4: the pencil at the header's right opens my notes editor, for anyone who can write. */}
       <Stack.Screen
         options={{
           title: t('notes.title'),
-          headerRight: canEdit
-            ? () => <HeaderEdit label={t(meeting.notes ? 'notes.edit' : 'notes.add')} onPress={openEditor} />
+          headerRight: canWrite
+            ? () => <HeaderEdit label={t(hasMine ? 'notes.edit' : 'notes.add')} onPress={openEditor} />
             : undefined,
         }}
       />
       {/* ARU-129: the meeting is named by its date and time (no topic). */}
       <Text style={styles.title}>{formatDateTime(meeting.startsAt)}</Text>
-      {meeting.notes ? (
-        <Card>
-          <MarkdownText source={meeting.notes} />
-          {editor && meeting.notesUpdatedAt ? (
-            <Text style={[styles.muted, { paddingTop: 4 }]}>
-              {t('notes.lastEdited', { name: editor, when: formatDateTime(meeting.notesUpdatedAt) })}
-            </Text>
-          ) : null}
-        </Card>
-      ) : listenerNotes.length === 0 ? (
+      {/* ARU-142 AC 7: every note, oldest first, with no section heading. */}
+      {notes.length === 0 ? (
         <EmptyState title={t('notes.none')} />
-      ) : null}
-      {/* ARU-125 AC 6: below the owner's notes, every listener's entry, oldest first. */}
-      {listenerNotes.length > 0 && (
-        <View testID="listener-notes" style={{ gap: 12 }}>
-          <Text accessibilityRole="header" style={styles.label}>
-            {t('notes.listenersHeading').toUpperCase()}
-          </Text>
-          {listenerNotes.map((n) => (
-            <ListenerNoteCard
-              key={n.id}
-              note={n}
-              canDelete={canDeleteListenerNote(currentUser, course, courseMembers, n)}
-            />
+      ) : (
+        <View testID="meeting-notes" style={{ gap: 12 }}>
+          {notes.map((n) => (
+            <NoteCard key={n.id} note={n} canDelete={canDeleteListenerNote(currentUser, course, courseMembers, n)} />
           ))}
         </View>
       )}
@@ -164,9 +112,9 @@ function NotesView({
   );
 }
 
-/** ARU-125 AC 6: one listener's entry: the author, when it was added, "Edited <date and time>" once changed, and the
- *  text. Delete for the author (AC 4) and for the course's current owner and the teacher (AC 9). */
-function ListenerNoteCard({ note, canDelete }: { note: MeetingListenerNote; canDelete: boolean }) {
+/** ARU-125 AC 6: one entry: the author, when it was added, "Edited <date and time>" once changed, and the text.
+ *  Delete for the author (AC 4) and for the course's current owner and the teacher (AC 9). */
+function NoteCard({ note, canDelete }: { note: MeetingListenerNote; canDelete: boolean }) {
   const { currentUser, getUser, deleteMeetingListenerNotes } = useStore();
   const { busy, error, run } = useAction();
   const { t } = useI18n();
@@ -217,18 +165,11 @@ function NotesEditor({
   course,
   meeting,
   initialText,
-  title,
-  placeholder,
-  requireText = false,
   onSave,
 }: {
   course: Course;
   meeting: Meeting;
   initialText: string;
-  title: string;
-  placeholder: string;
-  /** ARU-125: Save is disabled while the text is blank (the owner's notes are cleared with blank text instead). */
-  requireText?: boolean;
   onSave: (text: string) => Promise<void>;
 }) {
   const { busy, error, run } = useAction();
@@ -238,7 +179,9 @@ function NotesEditor({
   const [draft, setDraft] = useState(initial);
   const saving = useRef(false);
   const dirty = draft !== initial;
-  const blocked = busy || (requireText && draft.trim() === '');
+  // Blank can't be saved (ARU-125 AC 2); nor can a note still over the limit (a merged note from ARU-142's migration
+  // must be shortened first: the editor never cuts it).
+  const blocked = busy || draft.trim() === '' || draft.trim().length > NOTES_MAX;
 
   // Leaving (after Save, or "Discard"): first turn the unsaved-changes prompt off, then navigate on the next render.
   const [leaving, setLeaving] = useState(false);
@@ -281,7 +224,8 @@ function NotesEditor({
     <KeyboardForm contentContainerStyle={styles.content}>
       <Stack.Screen
         options={{
-          title,
+          // ARU-142 AC 5: the editor's title is "Notes".
+          title: t('notes.title'),
           // Always above the keyboard, whatever the field's size (ARU-58); the Save below stays for when it's closed.
           headerRight: () => <HeaderSave busy={busy} disabled={blocked} onPress={save} />,
         }}
@@ -289,14 +233,15 @@ function NotesEditor({
       <Text style={styles.muted} numberOfLines={1}>
         {formatDateTime(meeting.startsAt)}
       </Text>
-      <MarkdownEditor value={draft} onChange={setDraft} placeholder={placeholder} />
+      <MarkdownEditor value={draft} onChange={setDraft} placeholder={t('notes.placeholder')} />
       <ErrorText error={error} />
       <Button title={t(busy ? 'common.saving' : 'common.save')} onPress={save} disabled={blocked} />
     </KeyboardForm>
   );
 }
 
-/** ARU-126 AC 6: the read view's pencil (Ionicons create-outline), labelled "Add notes" / "Edit notes". */
+/** ARU-126 AC 6 / ARU-142 AC 4: the read view's pencil (Ionicons create-outline), labelled "Add notes" / "Edit notes"
+ *  (hidden, never shown). */
 function HeaderEdit({ label, onPress }: { label: string; onPress: () => void }) {
   return (
     <Pressable

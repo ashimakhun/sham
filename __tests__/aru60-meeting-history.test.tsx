@@ -257,7 +257,9 @@ describe('AC8/AC9: who sees the check actions; the rest is unchanged', () => {
   });
 
   it('a checked meeting in history keeps notes, homework and attendance actions for the owner', async () => {
-    setStore(fakeStore('M', { courseMembers: members, meetings: [{ ...K, notes: 'Covered' }] }));
+    // ARU-142: the owner's own signed notes on the meeting (one kind of notes).
+    const mine = { id: 'nK', meetingId: K.id, courseId: K.courseId, authorId: 'M', body: 'Covered', createdAt: K.startsAt, updatedAt: K.startsAt };
+    setStore(fakeStore('M', { courseMembers: members, meetings: [K], meetingListenerNotes: [mine] }));
     await render(<CourseDetailScreen />);
     const labels = history()
       .queryAllByRole(/button|link/)

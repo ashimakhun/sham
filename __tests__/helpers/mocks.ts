@@ -22,7 +22,6 @@ export const params: {
   id?: string;
   meetingId?: string;
   edit?: string;
-  mine?: string;
   assignmentId?: string;
   email?: string;
 } = {};
