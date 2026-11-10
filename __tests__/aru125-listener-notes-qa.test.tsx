@@ -13,11 +13,13 @@ import {
   within,
 } from "@testing-library/react-native";
 import { usePreventRemove } from "expo-router";
-import { Alert } from "react-native";
+import { Alert, StyleSheet } from "react-native";
 
 import CourseDetailScreen from "@/app/courses/[id]";
 import MeetingNotesScreen from "@/app/courses/[id]/meetings/[meetingId]/notes";
+import { styles } from "@/components/ui";
 import { LanguageProvider } from "@/i18n/LanguageProvider";
+import { colors } from "@/lib/theme";
 import type { Meeting, MeetingListenerNote, User } from "@/lib/types";
 
 import { fakeStore, member, users } from "./helpers/fakeStore";
@@ -140,6 +142,29 @@ describe("Russian", () => {
         name: "Удалить заметки пользователя Mentor Mo",
       }),
     ).toBeTruthy();
+  });
+
+  it("ARU-136: the Delete link uses the shared upper-case link style in the danger colour; the text stays as written", async () => {
+    params.meetingId = "C";
+    as("M", "ru", {
+      courseMembers: [member("A", "S1")],
+      meetings: [C],
+      meetingListenerNotes: [samNote],
+    });
+    await render(inApp(<MeetingNotesScreen />));
+    const del = screen.getByRole("button", {
+      name: "Удалить заметки пользователя Student Sam",
+    });
+    const text = within(del).getByText("Удалить заметки");
+    const s = StyleSheet.flatten(text.props.style);
+    expect(s).toEqual(
+      expect.objectContaining({
+        ...StyleSheet.flatten(styles.linkText),
+        color: colors.danger,
+      }),
+    );
+    expect(s.textTransform).toBe("uppercase");
+    expect(s.fontWeight).toBeUndefined();
   });
 
   it("confirmations: own notes and someone else's, in Russian", async () => {
