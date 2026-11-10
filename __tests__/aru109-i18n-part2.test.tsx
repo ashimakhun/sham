@@ -121,7 +121,8 @@ describe('AC 1 / AC 8: screens in Russian, user text as written', () => {
     const view = await render(inApp(<HomeworkScreen />));
     await flush();
     expectNoCatalogEnglish();
-    expect(screen.getByRole('tab', { name: 'Ждут проверки (1)' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'В ожидании (1)' })).toBeTruthy();
+    expect(screen.queryByRole('tab', { name: /Ждут проверки/ })).toBeNull(); // ARU-140
     await view.unmount();
 
     as('M', 'ru', { courseMembers: [member('A', 'S1')], visibleHomework: [hw({ id: 'h1', courseId: 'A' })] });
