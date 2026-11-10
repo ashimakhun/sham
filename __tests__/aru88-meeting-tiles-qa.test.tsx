@@ -80,7 +80,8 @@ it('AC8: the teacher (not the owner) gets the same footer on a started meeting a
   setStore(fakeStore('T', { courseMembers: members, meetings: [P] }));
   await render(<CourseDetailScreen />);
   expect(labels()).toEqual(ownerLabels);
-  expect(ownerLabels[ownerLabels.length - 1]).toBe('Mark canceled');
+  // ARU-126 AC 9: Mark canceled is now the ✕ "Cancel meeting", still the last pill.
+  expect(ownerLabels[ownerLabels.length - 1]).toBe('Cancel meeting');
 });
 
 it('AC2/AC3: a canceled meeting in MEETING HISTORY has a grey bar and the Canceled badge', async () => {

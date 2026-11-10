@@ -133,10 +133,9 @@ describe('Who manages meetings', () => {
     setStore(fakeStore(who, { courses: [courseA, courseT1], courseMembers: members, meetings: list }));
     await render(<CourseDetailScreen />);
     expect(button('+ Schedule meeting')).toBeTruthy();
-    // AC 9: started and Scheduled → Mark completed / Mark canceled.
+    // AC 9: started and Scheduled → Mark completed / cancel (ARU-126: a ✕ icon labelled "Cancel meeting").
     expect(inMeeting('P').getByRole('button', { name: 'Mark completed' })).toBeTruthy();
-    expect(inMeeting('P').getByRole('button', { name: 'Mark canceled' })).toBeTruthy();
-    expect(inMeeting('P').queryByRole('button', { name: 'Cancel meeting' })).toBeNull();
+    expect(inMeeting('P').getByRole('button', { name: 'Cancel meeting' })).toBeTruthy();
     // AC 10: future → only Cancel meeting.
     expect(inMeeting('F').getByRole('button', { name: 'Cancel meeting' })).toBeTruthy();
     expect(inMeeting('F').queryByRole('button', { name: 'Mark completed' })).toBeNull();
@@ -209,7 +208,7 @@ describe('Setting the status', () => {
     const setMeetingStatus = jest.fn(async () => {});
     setStore(fakeStore('M', { courseMembers: members, meetings: all, setMeetingStatus }));
     await render(<CourseDetailScreen />);
-    await fireEvent.press(inMeeting('P').getByRole('button', { name: 'Mark canceled' }));
+    await fireEvent.press(inMeeting('P').getByRole('button', { name: 'Cancel meeting' }));
     await waitFor(() => expect(Alert.alert).toHaveBeenCalled());
     expect(setMeetingStatus).not.toHaveBeenCalled();
   });

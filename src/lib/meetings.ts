@@ -59,12 +59,13 @@ export function meetingBadge(meeting: Pick<Meeting, 'status' | 'startsAt'>, now:
     : { label: 'Scheduled', bg: colors.primarySoft, fg: colors.primary };
 }
 
-/** ARU-88: the colour of a meeting tile's left bar follows its group, not its badge (Awaiting homework check is amber
- *  although its badge says Completed); every MEETING HISTORY tile is grey. */
+/** ARU-88: the colour of a meeting tile's left bar follows its group, not its badge; every MEETING HISTORY tile is
+ *  grey. ARU-126: Awaiting homework check is the theme colour (it was amber). */
 export const meetingAccent = {
   inProgress: colors.success,
   upcoming: colors.primary,
-  awaitingCheck: colors.warning,
+  // ARU-126 AC 3: the theme colour instead of amber.
+  awaitingCheck: colors.primary,
   history: colors.border,
 } as const;
 export type MeetingGroup = keyof typeof meetingAccent;

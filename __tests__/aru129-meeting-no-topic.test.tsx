@@ -100,7 +100,8 @@ describe('AC 3: confirmation messages name the meeting by its date and time', ()
     await view.unmount();
     (Alert.alert as jest.Mock).mockClear();
     await render(<CourseDetailScreen />);
-    await fireEvent.press(inMeeting('P').getByRole('button', { name: 'Mark canceled' }));
+    // ARU-126 AC 9: the in-progress cancel is the single ✕ labelled "Cancel meeting".
+    await fireEvent.press(inMeeting('P').getByRole('button', { name: 'Cancel meeting' }));
     expect(message()).toBe(`Mark the meeting on ${formatDateTime(P.startsAt)} as canceled?`);
   });
 
@@ -118,12 +119,11 @@ describe('AC 3: confirmation messages name the meeting by its date and time', ()
     expect(message()).toBe(`Mark homework for the meeting on ${formatDateTime(C.startsAt)} as checked?`);
   });
 
-  it('undo check', async () => {
+  it('a checked meeting has no Undo check (ARU-126 AC 8), so there is no undo confirmation', async () => {
     const K = { ...C, id: 'K', homeworkCheckedAt: at(-2), homeworkCheckedById: 'M' };
     setStore(fakeStore('M', { courseMembers: members, meetings: [K] }));
     await render(<CourseDetailScreen />);
-    await fireEvent.press(screen.getByRole('button', { name: 'Undo check' }));
-    expect(message()).toBe(`Move the meeting on ${formatDateTime(K.startsAt)} back to Awaiting homework check?`);
+    expect(screen.queryByRole('button', { name: 'Undo check' })).toBeNull();
   });
 
   it('remove attendance (listener)', async () => {

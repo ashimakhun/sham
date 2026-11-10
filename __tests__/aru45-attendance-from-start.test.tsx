@@ -120,7 +120,7 @@ describe('appears on time (AC 2)', () => {
     await act(async () => {
       jest.advanceTimersByTime(90 * 1000);
     });
-    expect(inMeeting('P').getByText('Attended: 0 of 2')).toBeTruthy();
+    expect(inMeeting('P').getByRole('link', { name: 'Attended 0 of 2' })).toBeTruthy();
   });
 });
 
@@ -128,8 +128,8 @@ describe('who attended (AC 7)', () => {
   it.each(['M', 'T', 'N'] as const)('%s sees the count on started and completed meetings only', async (who) => {
     setStore(store(who, { attendance: [mark('R', 'S1'), mark('X', 'S1')] }));
     await render(<CourseDetailScreen />);
-    expect(inMeeting('R').getByText('Attended: 1 of 2')).toBeTruthy();
-    expect(inMeeting('D').getByText('Attended: 0 of 2')).toBeTruthy();
+    expect(inMeeting('R').getByRole('link', { name: 'Attended 1 of 2' })).toBeTruthy();
+    expect(inMeeting('D').getByRole('link', { name: 'Attended 0 of 2' })).toBeTruthy();
     for (const id of ['P', 'X']) expect(inMeeting(id).queryByText(/Attended:/)).toBeNull();
   });
 
