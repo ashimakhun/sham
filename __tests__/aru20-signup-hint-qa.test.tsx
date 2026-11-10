@@ -1,6 +1,7 @@
 // ARU-20 QA additions to aru20-signup-hint.test.tsx, following the TEST DESIGN: the Create account button's
 // disabled rules and "Please wait…" state, the error text above the button, nothing rendered after the button
 // in either mode (no empty gap), Sign in unchanged, and the signed-in / profile-error screens (regression).
+// ARU-146: Create account also needs a workspace choice, so the enabled cases pick "Create a workspace".
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import SignInScreen from '@/app/index';
@@ -20,6 +21,11 @@ const fill = async (name: string, email: string, password: string) => {
   await fireEvent.changeText(screen.getByPlaceholderText('you@example.com'), email);
   await fireEvent.changeText(screen.getByPlaceholderText('At least 6 characters'), password);
 };
+/** ARU-146: Create account also needs a workspace choice; this picks "Create a workspace" with a name. */
+const chooseWorkspace = async () => {
+  await fireEvent.press(screen.getByRole('tab', { name: 'Create a workspace' }));
+  await fireEvent.changeText(screen.getByPlaceholderText('My school'), 'School');
+};
 /** The last element in the form's scroll content must be the submit button: nothing (not even an empty Text) after it. */
 const lastFormChild = (container: Awaited<ReturnType<typeof render>>['container']) => {
   const scroll = container.queryAll((n) => n.type === 'RCTScrollView')[0];
@@ -34,6 +40,7 @@ describe('Create account mode', () => {
     setStore(fakeStore(null));
     await render(<SignInScreen />);
     await fireEvent.press(screen.getByText('Create account'));
+    await chooseWorkspace();
     await fill('', 'dana@example.com', 'secret1');
     expect(button('Create account')).toBeDisabled();
     await fill('   ', 'dana@example.com', 'secret1');
@@ -53,6 +60,7 @@ describe('Create account mode', () => {
     await render(<SignInScreen />);
     await fireEvent.press(screen.getByText('Create account'));
     await fill('Dana', 'dana@example.com', 'secret1');
+    await chooseWorkspace();
     // Not awaited: the sign-up promise stays pending until finish() is called.
     void fireEvent.press(button('Create account'));
     expect(await screen.findByRole('button', { name: 'Please wait…' })).toBeDisabled();
@@ -66,6 +74,7 @@ describe('Create account mode', () => {
     const { container } = await render(<SignInScreen />);
     await fireEvent.press(screen.getByText('Create account'));
     await fill('Dana', 'used@example.com', 'secret1');
+    await chooseWorkspace();
     await fireEvent.press(button('Create account'));
     expect(await screen.findByText('User already registered')).toBeTruthy();
     expect(screen.queryByText(/New accounts start as students|mentor or teacher/)).toBeNull();
@@ -97,6 +106,9 @@ describe('Create account mode', () => {
       'Full name',
       'Email',
       'Password',
+      // ARU-146: the workspace choice, nothing chosen yet.
+      'Create a workspace',
+      'Join a workspace',
       'Create account',
     ]);
   });

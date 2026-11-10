@@ -776,5 +776,19 @@
   "materials.heartUnlike_one": "Убрать лайк, {count} лайк",
   "materials.heartUnlike_few": "Убрать лайк, {count} лайка",
   "materials.heartUnlike_many": "Убрать лайк, {count} лайков",
-  "materials.heartUnlike_other": "Убрать лайк, {count} лайков"
+  "materials.heartUnlike_other": "Убрать лайк, {count} лайков",
+  "signIn.workspaceCreate": "Создать пространство",
+  "signIn.workspaceJoin": "Присоединиться",
+  "signIn.workspaceName": "Название пространства",
+  "signIn.workspaceNamePlaceholder": "Моя школа",
+  "signIn.inviteCode": "Код приглашения",
+  "signIn.inviteCodePlaceholder": "8 букв и цифр",
+  "roles.workspace": "Рабочее пространство",
+  "roles.inviteCode": "Код приглашения",
+  "roles.copy": "Копировать",
+  "roles.copyLabel": "Скопировать код приглашения",
+  "roles.copied": "Скопировано",
+  "db.invite_code_unknown": "Нет рабочего пространства с этим кодом приглашения.",
+  "db.signup_update_app": "Обновите приложение, чтобы создать аккаунт.",
+  "db.workspace_name_length": "Название рабочего пространства — от 1 до 80 символов."
 }

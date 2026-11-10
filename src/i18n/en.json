@@ -776,5 +776,19 @@
   "materials.heartUnlike_one": "Unlike, {count} like",
   "materials.heartUnlike_few": "Unlike, {count} likes",
   "materials.heartUnlike_many": "Unlike, {count} likes",
-  "materials.heartUnlike_other": "Unlike, {count} likes"
+  "materials.heartUnlike_other": "Unlike, {count} likes",
+  "signIn.workspaceCreate": "Create a workspace",
+  "signIn.workspaceJoin": "Join a workspace",
+  "signIn.workspaceName": "Workspace name",
+  "signIn.workspaceNamePlaceholder": "My school",
+  "signIn.inviteCode": "Invite code",
+  "signIn.inviteCodePlaceholder": "8 letters and digits",
+  "roles.workspace": "Workspace",
+  "roles.inviteCode": "Invite code",
+  "roles.copy": "Copy",
+  "roles.copyLabel": "Copy invite code",
+  "roles.copied": "Copied",
+  "db.invite_code_unknown": "No workspace has this invite code.",
+  "db.signup_update_app": "Update the app to create an account.",
+  "db.workspace_name_length": "Workspace name must be 1 to 80 characters."
 }

@@ -23,6 +23,10 @@ export const EMAIL_NOT_CONFIRMED = en('auth.emailNotConfirmed');
 export const weakPasswordMessage = (serverText?: string) =>
   en('auth.weakPassword', { min: Number(/at least (\d+)/i.exec(serverText ?? '')?.[1] ?? PASSWORD_MIN) });
 export const GENERIC_ERROR = en('common.genericError');
+// ARU-146: a sign-up the database refuses inside account creation.
+export const INVITE_CODE_UNKNOWN = en('db.invite_code_unknown');
+/** Workspace names: trimmed, 1–80 characters (the database checks it too). */
+export const WORKSPACE_NAME_MAX = 80;
 
 // ARU-77: the forgotten-password reset with a code from the email.
 export const CODE_INVALID = en('auth.codeInvalid');
@@ -83,4 +87,21 @@ export function authErrorMessage(error: AuthErrorLike): string {
   if (isRateLimited(error)) return RATE_LIMITED;
   if (isNetworkError(error)) return NETWORK_ERROR;
   return error.message || GENERIC_ERROR;
+}
+
+/** ARU-146: the account-creation trigger refused the sign-up. Supabase Auth hides its message and hint behind
+ *  "Database error saving new user" (500, unexpected_failure), so the app can't tell which rule failed. */
+export function isSignUpRefused(error: AuthErrorLike) {
+  return (
+    !!error &&
+    (error.code === 'unexpected_failure' || error.status === 500) &&
+    /database error saving new user/i.test(error.message ?? '')
+  );
+}
+
+/** ARU-146: a sign-up error. When joining, the database's refusal means the invite code matched no workspace
+ *  (AC 4); when creating, the name is checked in the app already, so it's the generic text. */
+export function signUpErrorMessage(error: AuthErrorLike, kind: 'create' | 'join'): string {
+  if (isSignUpRefused(error)) return kind === 'join' ? INVITE_CODE_UNKNOWN : GENERIC_ERROR;
+  return authErrorMessage(error);
 }

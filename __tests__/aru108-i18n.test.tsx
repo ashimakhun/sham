@@ -305,6 +305,8 @@ describe('AC 7 / AC 12: the part-1 screens in Russian and English', () => {
     await fireEvent.changeText(screen.getByPlaceholderText('Дана Серикова'), 'Аня');
     await fireEvent.changeText(screen.getByPlaceholderText('you@example.com'), 'a@b.c');
     await fireEvent.changeText(screen.getByPlaceholderText('Не менее 6 символов'), 'secret1');
+    await fireEvent.press(screen.getByRole('tab', { name: 'Создать пространство' }));
+    await fireEvent.changeText(screen.getByPlaceholderText('Моя школа'), 'Школа');
     await fireEvent.press(screen.getByRole('button', { name: 'Создать аккаунт' }));
     expect(await screen.findByText('Что-то пошло не так. Попробуйте снова.')).toBeTruthy();
     await view.unmount();
@@ -314,6 +316,8 @@ describe('AC 7 / AC 12: the part-1 screens in Russian and English', () => {
     await fireEvent.changeText(screen.getByPlaceholderText('Dana Serikova'), 'Anya');
     await fireEvent.changeText(screen.getByPlaceholderText('you@example.com'), 'a@b.c');
     await fireEvent.changeText(screen.getByPlaceholderText('At least 6 characters'), 'secret1');
+    await fireEvent.press(screen.getByRole('tab', { name: 'Create a workspace' }));
+    await fireEvent.changeText(screen.getByPlaceholderText('My school'), 'School');
     await fireEvent.press(screen.getAllByRole('button', { name: 'Create account' }).at(-1)!);
     expect(await screen.findByText('Signups not allowed for this instance')).toBeTruthy();
     expect(CYRILLIC.test(allText())).toBe(false);

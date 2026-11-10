@@ -99,6 +99,8 @@ const MESSAGE_IDS: [TextId, Params?][] = [
   ['profile.waitingApproval'],
   ['profile.languageSaveFailed'],
   ['signIn.accountDeleted'],
+  // ARU-146: the sign-up refusal the app words itself when joining (Supabase Auth hides the database's hint).
+  ['db.invite_code_unknown'],
 ];
 /**
  * ARU-109 AC 3: messages the app raises on the Homework, Courses, meetings and disciplines screens (the store's own

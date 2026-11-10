@@ -68,6 +68,7 @@ export function fakeStore(who: keyof typeof users | null, over: Partial<Store> =
     getCourse: (id) => courses.find((c) => c.id === id),
     signIn: jest.fn(),
     signUp: jest.fn(),
+    getWorkspaceInvite: jest.fn(async () => null),
     signOut: jest.fn(),
     deleteAccount: jest.fn(async () => {}),
     setLanguage: jest.fn(async () => {}),
