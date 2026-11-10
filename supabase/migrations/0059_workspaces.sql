@@ -116,6 +116,14 @@ create function workspace_guard() returns trigger
       -- A row never moves to another workspace.
       new.workspace_id := old.workspace_id;
       o := to_jsonb(old);
+      -- ARU-147: nor can a changed parent (a PDF's course, …) point into another workspace.
+      foreach src in array string_to_array(tg_argv[0], '|') loop
+        col := case when src like 'profile:%' then substr(src, 9) else src end;
+        if r ->> col is not null and o ->> col is distinct from r ->> col
+           and workspace_of(src, r) is distinct from new.workspace_id then
+          raise exception 'This belongs to another workspace.' using errcode = '42501', hint = 'sham:workspace_mismatch';
+        end if;
+      end loop;
     else
       foreach src in array string_to_array(tg_argv[0], '|') loop
         ws := workspace_of(src, r);
