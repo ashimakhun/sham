@@ -128,7 +128,9 @@ describe('notes pencil on the tile (AC 5)', () => {
     setStore(fakeStore('S1', { courseMembers: members, meetings: [CN] }));
     await render(<CourseDetailScreen />);
     expect(inMeeting('CN').getByRole('link', { name: 'Notes' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /notes/i })).toBeNull();
+    // No owner's pencil ("Add notes" / "Edit notes"); ARU-125's "Add my notes" is the listener's own action.
+    expect(screen.queryByRole('button', { name: /^(Add|Edit) notes$/ })).toBeNull();
+    expect(screen.queryByTestId('icon-create-outline')).toBeNull();
   });
 });
 

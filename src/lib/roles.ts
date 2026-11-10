@@ -1,5 +1,5 @@
 import { isOpenForAttendance } from './meetings';
-import type { Course, CourseMember, Homework, Meeting, Role, User } from './types';
+import type { Course, CourseMember, Homework, Meeting, MeetingListenerNote, Role, User } from './types';
 
 /** Mirrors the "teachers and mentors create courses" RLS policy (supabase/migrations/0003_courses.sql). */
 export function canCreateCourse(role: Role | undefined) {
@@ -103,6 +103,30 @@ export function canCheckMeetingHomework(user: User | null | undefined, course: C
 /** Mirrors is_member() (supabase/migrations/0004_course_members.sql): the user is a listener of the course. */
 export function isCourseListener(user: User | null | undefined, course: Course, members: CourseMember[]) {
   return !!user && members.some((m) => m.courseId === course.id && m.userId === user.id);
+}
+
+/** ARU-125: mirrors add_meeting_listener_notes() / update_meeting_listener_notes() (0055): a current listener of the
+ *  course adds and edits their own notes on a Completed meeting. */
+export function canWriteListenerNotes(
+  user: User | null | undefined,
+  course: Course,
+  members: CourseMember[],
+  meeting: Pick<Meeting, 'status'>,
+) {
+  return meeting.status === 'completed' && isCourseListener(user, course, members);
+}
+
+/** ARU-125: mirrors delete_meeting_listener_notes() (0055): the author while they still see it (a current listener,
+ *  or a mentor), the course's current owner, or the teacher. */
+export function canDeleteListenerNote(
+  user: User | null | undefined,
+  course: Course,
+  members: CourseMember[],
+  note: Pick<MeetingListenerNote, 'authorId'>,
+) {
+  if (!user) return false;
+  if (user.role === 'teacher' || course.createdById === user.id) return true;
+  return note.authorId === user.id && (user.role === 'mentor' || isCourseListener(user, course, members));
 }
 
 /** ARU-24: a student who is not a listener of a course sees only its title and description (app-only; the

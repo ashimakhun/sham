@@ -17,11 +17,15 @@ import { StoreProvider, useStore } from "@/lib/store";
 
 const fs = jest.requireActual<{
   readFileSync: (file: string, encoding: "utf8") => string;
+  readdirSync: (dir: string) => string[];
 }>("fs");
-const sql = fs.readFileSync(
-  "supabase/migrations/0053_db_error_codes.sql",
-  "utf8",
-);
+// 0053 and every later migration: later stories (ARU-112, ARU-125) raise their own sham: codes.
+const sql = fs
+  .readdirSync("supabase/migrations")
+  .filter((f) => /^\d{4}_.*\.sql$/.test(f) && Number(f.slice(0, 4)) >= 53)
+  .sort()
+  .map((f) => fs.readFileSync(`supabase/migrations/${f}`, "utf8"))
+  .join("\n");
 
 const EN = en as Record<string, string>;
 const RU = ru as Record<string, string>;

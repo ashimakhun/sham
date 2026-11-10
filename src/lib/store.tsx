@@ -49,6 +49,7 @@ import type {
   CourseFeedback,
   MeetingAttendance,
   MeetingEdit,
+  MeetingListenerNote,
   MeetingStatus,
   NewCourse,
   NewAssignment,
@@ -85,6 +86,8 @@ export type Store = {
   assignments: HomeworkAssignment[];
   /** Attendance marks (ARU-33): own marks for students, all for mentors and the teacher. */
   attendance: MeetingAttendance[];
+  /** ARU-125: listeners' own notes on completed meetings the user can see, oldest first. */
+  meetingListenerNotes: MeetingListenerNote[];
   /** Likes on Blog posts (ARU-52), newest first: every approved user sees all. */
   materialLikes: MaterialLike[];
   /** Course feedback (ARU-53), newest first: every approved user sees it for the courses they can see. */
@@ -175,6 +178,12 @@ export type Store = {
   updateMeeting: (id: string, input: MeetingEdit) => Promise<void>;
   /** Course owner or teacher, Completed meetings only (ARU-28). Blank text removes the notes. */
   setMeetingNotes: (id: string, notes: string) => Promise<void>;
+  /** ARU-125: a current listener adds their own notes to a Completed meeting, or changes them (one entry per
+   *  meeting). The text is trimmed; blank or over 10,000 characters is refused. */
+  saveMyMeetingNotes: (meetingId: string, body: string) => Promise<void>;
+  /** ARU-125: deletes listener notes: the author's own, or any on the course for its current owner and the teacher.
+   *  Already deleted is fine. */
+  deleteMeetingListenerNotes: (id: string) => Promise<void>;
   /** ARU-60: the teacher or a non-listener mentor marks a Completed meeting's homework checked (or undoes it). Marking
    *  a checked meeting or undoing an unchecked one is a no-op, so a retry is safe. */
   setMeetingHomeworkChecked: (id: string, checked: boolean) => Promise<void>;
@@ -361,6 +370,15 @@ type MeetingRow = {
   homework_checked_by?: string | null;
 };
 type AttendanceRow = { meeting_id: string; user_id: string; marked_at: string };
+type ListenerNoteRow = {
+  id: string;
+  meeting_id: string;
+  course_id: string;
+  author_id: string | null;
+  body: string;
+  created_at: string;
+  updated_at: string;
+};
 type MaterialLikeRow = { material_id: string; user_id: string; created_at: string };
 type FeedbackRow = {
   id: string;
@@ -550,6 +568,16 @@ const toMeeting = (r: MeetingRow): Meeting => ({
   notesUpdatedAt: r.notes_updated_at ?? undefined,
   homeworkCheckedAt: r.homework_checked_at ?? undefined,
   homeworkCheckedById: r.homework_checked_by ?? undefined,
+});
+
+const toListenerNote = (r: ListenerNoteRow): MeetingListenerNote => ({
+  id: r.id,
+  meetingId: r.meeting_id,
+  courseId: r.course_id,
+  authorId: r.author_id,
+  body: r.body,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
 });
 
 const toAttendance = (r: AttendanceRow): MeetingAttendance => ({
@@ -771,6 +799,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [assignments, setAssignments] = useState<HomeworkAssignment[]>([]);
   const [attendance, setAttendance] = useState<MeetingAttendance[]>([]);
+  const [meetingListenerNotes, setMeetingListenerNotes] = useState<MeetingListenerNote[]>([]);
   const [materialLikes, setMaterialLikes] = useState<MaterialLike[]>([]);
   const [courseFeedback, setCourseFeedback] = useState<CourseFeedback[]>([]);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
@@ -846,6 +875,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setMeetings([]);
         setAssignments([]);
         setAttendance([]);
+        setMeetingListenerNotes([]);
         setMaterialLikes([]);
         setCourseFeedback([]);
         setCourseBilling([]);
@@ -892,7 +922,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     try {
       // RLS returns nothing but the own profile to an account that isn't approved (ARU-43), so these all succeed
       // (empty) for it and the app shows the waiting screen.
-      const [profileRows, hw, mats, crs, members, mtgs, asgs, att, files, likes, fb, discs] = await Promise.all([
+      const [profileRows, hw, mats, crs, members, mtgs, asgs, att, files, likes, fb, discs, listenerNotes] = await Promise.all([
         // '*' so the app keeps working if the access_status column (0021) isn't there yet.
         supabase.from('profiles').select('*').order('full_name'),
         supabase.from('homework').select('*').order('created_at', { ascending: false }),
@@ -906,6 +936,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         supabase.from('material_likes').select('*').order('created_at', { ascending: false }),
         supabase.from('course_feedback').select('*').order('created_at', { ascending: false }),
         supabase.from('disciplines').select('*').order('name'),
+        // ARU-125: oldest first, as the Notes page lists them.
+        supabase.from('meeting_listener_notes').select('*').order('created_at').order('id'),
       ]);
       const all = rows<ProfileRow>(profileRows).map(toUser);
       const me = all.find((u) => u.id === userId);
@@ -933,6 +965,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setMeetings(rows<MeetingRow>(mtgs).map(toMeeting));
       setAssignments(rows<AssignmentRow>(asgs).map(toAssignment));
       setAttendance(rows<AttendanceRow>(att).map(toAttendance));
+      // Before 0055 runs there is no table: no listener notes, and the rest of the app keeps working.
+      setMeetingListenerNotes(
+        listenerNotes?.error ? [] : ((listenerNotes?.data as ListenerNoteRow[] | null) ?? []).map(toListenerNote),
+      );
       setMaterialFiles(rows<MaterialFileRow>(files).map(toMaterialFile));
       setMaterialLikes(rows<MaterialLikeRow>(likes).map(toMaterialLike));
       setCourseFeedback(rows<FeedbackRow>(fb).map(toFeedback));
@@ -1050,6 +1086,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       )
       // Any change (including an Undo, whose DELETE payload carries only the key) reloads (ARU-33).
       .on('postgres_changes', { event: '*', schema: 'public', table: 'meeting_attendance' }, () => load().catch(() => {}))
+      // ARU-125 AC 8a: listener notes added, edited or deleted on another device.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'meeting_listener_notes' }, () =>
+        load().catch(() => {}),
+      )
       // A chat message refetches only the counts (one request, batched), never the full load() (ARU-31).
       // Realtime applies RLS, so only messages of chats the user is in arrive; their own never count.
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'course_messages' }, (payload) => {
@@ -1183,6 +1223,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     meetings,
     assignments,
     attendance,
+    meetingListenerNotes,
     materialLikes,
     courseFeedback,
     disciplines: sortedDisciplines,
@@ -1637,6 +1678,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       requireRole('teacher', 'mentor');
       if (notes.length > NOTES_MAX) throw new Error('Notes can be at most 10,000 characters.');
       check(await supabase.rpc('set_meeting_notes', { meeting: id, new_notes: notes }));
+      await load();
+    },
+    saveMyMeetingNotes: async (meetingId, body) => {
+      if (!currentUser) throw new Error('Please sign in again.');
+      if (body.trim().length > NOTES_MAX) throw new Error('Notes can be at most 10,000 characters.');
+      const mine = meetingListenerNotes.find((n) => n.meetingId === meetingId && n.authorId === currentUser.id);
+      check(
+        mine
+          ? await supabase.rpc('update_meeting_listener_notes', { note: mine.id, new_body: body })
+          : await supabase.rpc('add_meeting_listener_notes', { meeting: meetingId, new_body: body }),
+      );
+      await load();
+    },
+    deleteMeetingListenerNotes: async (id) => {
+      const res = await supabase.rpc('delete_meeting_listener_notes', { note: id });
+      // "Not found": an earlier tap or someone else already deleted it.
+      if (res.error?.code !== NOT_FOUND) check(res);
       await load();
     },
     setMeetingHomeworkChecked: async (id, checked) => {

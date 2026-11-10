@@ -214,6 +214,21 @@ export type Meeting = {
   homeworkCheckedById?: string;
 };
 
+/** ARU-125: a listener's own signed notes on a Completed meeting, one per listener and meeting, read by everyone who
+ *  reads the meeting's notes. */
+export type MeetingListenerNote = {
+  id: string;
+  meetingId: string;
+  courseId: string;
+  /** Null when the author deleted their account (ARU-75): "Deleted account". */
+  authorId: string | null;
+  /** Markdown subset (src/lib/markdown.ts), stored trimmed. */
+  body: string;
+  createdAt: string;
+  /** Later than createdAt once the text was changed: "Edited <date and time>". */
+  updatedAt: string;
+};
+
 /** A listener's self-reported attendance of a Completed meeting (ARU-33). */
 export type MeetingAttendance = { meetingId: string; userId: string; markedAt: string };
 

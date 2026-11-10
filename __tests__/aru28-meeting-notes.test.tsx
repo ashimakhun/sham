@@ -152,10 +152,10 @@ describe('AC3/AC7/AC9/AC10: notes actions on completed meetings', () => {
   });
 
   // ARU-33: N (a mentor who isn't a listener) also sees the attendance count; S1 (a listener) "I attended".
-  // ARU-60: N may also mark the homework checked; S1 may not.
+  // ARU-60: N may also mark the homework checked; S1 may not. ARU-125: S1 adds their own listener notes instead.
   it.each([
     ['N', ['Attended 0 of 1', 'Mark homework checked']],
-    ['S1', ['I attended']],
+    ['S1', ['Add my notes', 'I attended']],
   ] as const)('%s reads notes but has no Add/Edit notes', async (who, others) => {
     setStore(fakeStore(who, { courseMembers: members, meetings: [C, CN] }));
     await render(<CourseDetailScreen />);
@@ -171,10 +171,10 @@ describe('AC3/AC7/AC9/AC10: notes actions on completed meetings', () => {
   it('AC8: notes saved elsewhere appear on the next store update', async () => {
     setStore(fakeStore('S1', { courseMembers: members, meetings: [C] }));
     const { rerender } = await render(<CourseDetailScreen />);
-    expect(labels('C')).toEqual(['I attended']); // ARU-33
+    expect(labels('C')).toEqual(['Add my notes', 'I attended']); // ARU-33, ARU-125
     setStore(fakeStore('S1', { courseMembers: members, meetings: [{ ...C, notes: 'New' }] }));
     await rerender(<CourseDetailScreen />);
-    expect(labels('C')).toEqual(['Notes', 'I attended']);
+    expect(labels('C')).toEqual(['Notes', 'Add my notes', 'I attended']);
   });
 });
 
