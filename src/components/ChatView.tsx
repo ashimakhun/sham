@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { type ReactNode, useState } from 'react';
 import {
@@ -5,13 +6,14 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   StyleSheet,
   View,
 } from 'react-native';
 
 import { Text, TextInput } from '@/components/AppText';
 
-import { Button, EmptyState, ErrorText, RoleBadge, styles } from '@/components/ui';
+import { EmptyState, ErrorText, RoleBadge, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import { newId } from '@/lib/id';
 import { personName } from '@/lib/deleteAccount';
@@ -116,12 +118,46 @@ export function ChatView<M extends ChatMessage>({
             multiline
             style={[styles.input, chatStyles.input]}
           />
-          <View style={chatStyles.send}>
-            <Button title={busy ? '…' : t('chat.send')} onPress={send} disabled={!text.trim() || busy} />
-          </View>
+          <SendButton label={t('chat.send')} busy={busy} disabled={!text.trim() || busy} onPress={send} />
         </View>
       </View>
     </KeyboardAvoidingView>
+  );
+}
+
+/**
+ * ARU-138: the composer's send button, a 44 × 44 indigo square (10 pt corners) with a white paper plane, the same in
+ * every language. While sending it shows "…" instead. The label stays "Send" / "Отправить" in every state, so screen
+ * readers never read "…". Fixed size, so the row doesn't jump between states or stretch when the field grows.
+ */
+function SendButton({
+  label,
+  busy,
+  disabled,
+  onPress,
+}: {
+  label: string;
+  busy: boolean;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled, busy }}
+      disabled={disabled}
+      onPress={onPress}
+      testID="chat-send"
+      style={({ pressed }) => [chatStyles.send, (pressed || disabled) && { opacity: disabled ? 0.4 : 0.8 }]}>
+      {busy ? (
+        <Text style={chatStyles.sendBusy} allowFontScaling={false} accessibilityElementsHidden importantForAccessibility="no">
+          …
+        </Text>
+      ) : (
+        <Ionicons name="send" size={22} color="#fff" accessibilityElementsHidden importantForAccessibility="no" />
+      )}
+    </Pressable>
   );
 }
 
@@ -163,7 +199,15 @@ const chatStyles = StyleSheet.create({
   },
   row: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
   input: { flex: 1, maxHeight: 120 },
-  send: { width: 80 },
+  send: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendBusy: { color: '#fff', fontSize: 18, lineHeight: 22 },
   bubble: {
     maxWidth: '85%',
     borderRadius: 14,
