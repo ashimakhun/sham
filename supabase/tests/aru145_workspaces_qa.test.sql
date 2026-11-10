@@ -211,6 +211,48 @@ select t.eq(pg_temp.err(format('update material_files set course_id = %L where i
   '42501 | sham:workspace_mismatch', 'AC7 a first-workspace PDF can''t be moved to a W2 course');
 reset role;
 select t.eq((select course_id from material_files where id = t.x('AF')), t.id('A'), 'AC7 the PDF still belongs to course A');
+-- ARU-147 re-test: the author can still unlink the PDF from its course and link it back (same workspace).
+select t.login('M');
+select t.eq(t.affected(format('update material_files set course_id = null, course_only = false where id = %L', t.x('AF'))), 1::bigint,
+  'ARU-147 the author can still unlink their PDF from its course');
+select t.eq(t.affected(format('update material_files set course_id = %L where id = %L', t.id('A'), t.x('AF'))), 1::bigint,
+  'ARU-147 the author can still link their PDF to their own course');
+reset role;
+-- ARU-147 re-test: every other parent column an app user may update can't be pointed into W2 either (refused, or the
+-- row is out of reach, or a column guard keeps the old parent); afterwards no row links the two workspaces.
+insert into course_messages (id, course_id, author_id, body) values (t.x('AM'), t.id('A'), t.id('M'), 'mine');
+insert into meeting_attendance (meeting_id, user_id) values (md5('meeting' || t.id('A')::text || '1')::uuid, t.id('S1'));
+insert into course_chat_reads (course_id, user_id, last_read_at) values (t.id('A'), t.id('S1'), now());
+select t.login('M');
+select pg_temp.err(format('update course_meetings set course_id = %L where id = %L', t.x('XC'), md5('meeting' || t.id('A')::text || '1')::uuid));
+select pg_temp.err(format('update homework_assignments set meeting_id = %L, course_id = %L where id = %L', t.x('XMT'), t.x('XC'), t.assignment(t.id('A'), 1)));
+select pg_temp.err(format('update course_messages set course_id = %L where id = %L', t.x('XC'), t.x('AM')));
+select pg_temp.err(format('update course_members set course_id = %L where course_id = %L', t.x('XC'), t.id('A')));
+select t.login('S1');
+select pg_temp.err(format('update meeting_attendance set meeting_id = %L where user_id = %L', t.x('XMT'), t.id('S1')));
+select pg_temp.err(format('update course_chat_reads set course_id = %L where user_id = %L', t.x('XC'), t.id('S1')));
+select t.login('T');
+select pg_temp.err(format('update courses set discipline_id = %L where id = %L', t.x('XD'), t.id('A')));
+select pg_temp.err(format('update course_meetings set course_id = %L where id = %L', t.x('XC'), md5('meeting' || t.id('A')::text || '2')::uuid));
+select pg_temp.err(format('update homework_assignments set meeting_id = %L where id = %L', t.x('XMT'), t.assignment(t.id('A'), 2)));
+reset role;
+select t.eq(
+    (select count(*) from homework_assignments a join course_meetings m on m.id = a.meeting_id where a.workspace_id <> m.workspace_id)
+  + (select count(*) from homework_assignments a join courses c on c.id = a.course_id where a.workspace_id <> c.workspace_id)
+  + (select count(*) from course_meetings m join courses c on c.id = m.course_id where m.workspace_id <> c.workspace_id)
+  + (select count(*) from course_messages m join courses c on c.id = m.course_id where m.workspace_id <> c.workspace_id)
+  + (select count(*) from course_members m join courses c on c.id = m.course_id where m.workspace_id <> c.workspace_id)
+  + (select count(*) from meeting_attendance a join course_meetings m on m.id = a.meeting_id where a.workspace_id <> m.workspace_id)
+  + (select count(*) from course_chat_reads r join courses c on c.id = r.course_id where r.workspace_id <> c.workspace_id)
+  + (select count(*) from courses c join disciplines d on d.id = c.discipline_id where c.workspace_id <> d.workspace_id)
+  + (select count(*) from material_files f join courses c on c.id = f.course_id where f.workspace_id <> c.workspace_id)
+  + (select count(*) from homework h join homework_assignments a on a.id = h.assignment_id where h.workspace_id <> a.workspace_id)
+  + (select count(*) from meeting_listener_notes n join course_meetings m on m.id = n.meeting_id where n.workspace_id <> m.workspace_id),
+  0::bigint, 'ARU-147 after every update attempt, no row points at a parent in the other workspace');
+select t.eq((select count(*) from course_messages where id = t.x('AM') and course_id = t.id('A'))
+  + (select count(*) from course_chat_reads where user_id = t.id('S1') and course_id = t.id('A'))
+  + (select count(*) from meeting_attendance where user_id = t.id('S1') and meeting_id = md5('meeting' || t.id('A')::text || '1')::uuid),
+  3::bigint, 'ARU-147 the first workspace''s message, read position and attendance still point at course A');
 select t.ok((select count(*) from course_payment_exemptions where course_id = t.x('XC')) = 1
   and (select count(*) from course_billing where course_id = t.x('XC')) = 1
   and (select count(*) from course_payments where course_id = t.x('XC')) = 1
