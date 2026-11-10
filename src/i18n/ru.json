@@ -642,7 +642,7 @@
   "accountant.notPaidTitle": "Курс не платный",
   "accountant.notPaidHint": "Этот курс не платный (или больше не платный).",
   "accountant.noListeners": "Слушателей пока нет",
-  "accountant.savePeriod": "Сохранить период",
+  "accountant.savePeriod": "Сохранить",
   "accountant.changePeriod": "Изменить период",
   "accountant.requestLine": "Запрос на оплату · {date}",
   "accountant.opening": "Открытие…",
