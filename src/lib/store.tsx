@@ -1609,8 +1609,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           id: input.id,
           course_id: input.courseId,
           starts_at: input.startsAt,
-          // The topic can't be blank in the database: an empty field means the default.
-          topic: input.topic.trim() || 'Meeting',
+          // No topic (ARU-129): the column default 'Meeting' is stored.
           location: input.location.trim() || null,
           created_by: owner.id,
         }),

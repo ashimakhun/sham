@@ -1,6 +1,6 @@
 import { router, Stack, useLocalSearchParams, usePreventRemove } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView } from 'react-native';
 
 import { Text } from '@/components/AppText';
 
@@ -52,10 +52,8 @@ function NotesView({ course, meeting, canEdit }: { course: Course; meeting: Meet
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic">
       <Stack.Screen options={{ title: t('notes.title') }} />
-      <View style={{ gap: 2 }}>
-        <Text style={styles.title}>{meeting.topic}</Text>
-        <Text style={styles.muted}>{formatDateTime(meeting.startsAt)}</Text>
-      </View>
+      {/* ARU-129: the meeting is named by its date and time (no topic). */}
+      <Text style={styles.title}>{formatDateTime(meeting.startsAt)}</Text>
       {meeting.notes ? (
         <Card>
           <MarkdownText source={meeting.notes} />
@@ -142,7 +140,7 @@ function NotesEditor({ course, meeting }: { course: Course; meeting: Meeting }) 
         }}
       />
       <Text style={styles.muted} numberOfLines={1}>
-        {meeting.topic} · {formatDateTime(meeting.startsAt)}
+        {formatDateTime(meeting.startsAt)}
       </Text>
       <MarkdownEditor value={draft} onChange={setDraft} placeholder={t('notes.placeholder')} />
       <ErrorText error={error} />

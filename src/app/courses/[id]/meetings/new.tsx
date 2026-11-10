@@ -15,7 +15,7 @@ export default function ScheduleMeetingScreen() {
   const { currentUser, getCourse, addMeeting } = useStore();
   // One id per form: a retry after a network error cannot schedule a second meeting.
   const [id] = useState(newId);
-  const [initial] = useState(() => ({ startsAt: nextFullHour(), topic: '', location: '' }));
+  const [initial] = useState(() => ({ startsAt: nextFullHour(), location: '' }));
   const { busy, error, run } = useAction();
   const { t } = useI18n();
 
@@ -38,7 +38,6 @@ export default function ScheduleMeetingScreen() {
             id,
             courseId: course.id,
             startsAt: values.startsAt.toISOString(),
-            topic: values.topic,
             location: values.location,
           });
           if (router.canGoBack()) router.back();

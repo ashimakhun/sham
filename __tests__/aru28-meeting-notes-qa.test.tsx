@@ -58,13 +58,14 @@ describe('AC1: Upcoming and History while the screen is open', () => {
     await render(<CourseDetailScreen />);
     expect(headings()).toEqual(['UPCOMING (1)', 'AWAITING HOMEWORK CHECK (1)']);
     const upcomingCard = () => within(screen.getByText('UPCOMING (1)').parent!);
-    expect(upcomingCard().getByText('Starts soon')).toBeTruthy();
+    // ARU-129: the tile is found by its testID; it is titled by its date and time, not the topic.
+    expect(upcomingCard().getByTestId('meeting-S')).toBeTruthy();
     await act(async () => {
       jest.advanceTimersByTime(31_000);
     });
     // Nothing is upcoming any more: the heading is hidden and the meeting is In progress.
     expect(headings()).toEqual(['IN PROGRESS (1)', 'AWAITING HOMEWORK CHECK (1)']);
-    expect(within(screen.getByText('IN PROGRESS (1)').parent!).getByText('Starts soon')).toBeTruthy();
+    expect(within(screen.getByText('IN PROGRESS (1)').parent!).getByTestId('meeting-S')).toBeTruthy();
     // ARU-88 AC 3: the started meeting's badge says In progress.
     expect(within(screen.getByTestId('meeting-S')).getByText('In progress')).toBeTruthy();
   });
