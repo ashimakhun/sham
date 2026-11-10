@@ -129,6 +129,7 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
     assignments,
     attendance,
     meetingListenerNotes,
+    assignmentSentCounts,
     setMeetingStatus,
     setMeetingHomeworkChecked,
     markAttendance,
@@ -441,6 +442,26 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
         )),
     ];
 
+    // ARU-130: "Homework sent: 5 of 8" on completed meetings with homework: under Due on awaiting tiles, under the
+    // title on history tiles. Hidden when the count didn't load (AC 6), so a wrong number is never shown. Plain text
+    // (AC 7): one accessible element with its own label and no button or link role.
+    const sent = m.status === 'completed' && assignment ? assignmentSentCounts[assignment.id] : undefined;
+    const sentLine = sent ? (
+      <View
+        testID={`homework-sent-${m.id}`}
+        accessible
+        accessibilityLabel={t('meetings.homeworkSentLabel', { sent: sent.sent, count: sent.listeners })}
+        style={tile.sent}>
+        <Ionicons name="document-text-outline" size={14} color={colors.muted} />
+        <Text style={styles.muted}>
+          {t('meetings.homeworkSent')}{' '}
+          <Text style={{ ...font(500), color: colors.text }}>
+            {t('meetings.homeworkSentOf', { sent: sent.sent, listeners: sent.listeners })}
+          </Text>
+        </Text>
+      </View>
+    ) : null;
+
     // ARU-88 AC 1/2: its own tile, with a left bar in the group's colour. Not `accessible` as a whole, so screen
     // readers still reach each action (ARU-27).
     return (
@@ -456,6 +477,7 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
             {t('meetings.rescheduled')}
           </Text>
         ) : null}
+        {group === 'history' ? sentLine : null}
         {m.location ? (
           isLink(m.location) ? (
             <Text
@@ -484,6 +506,7 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
             </Text>
           </View>
         ) : null}
+        {group !== 'history' ? sentLine : null}
         {/* AC 6: no divider and no footer when the meeting has no actions. "Saving…" replaces the footer. */}
         {footer.length > 0 && (
           <View testID={`actions-${m.id}`} style={tile.footer}>
@@ -497,6 +520,8 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
 
 const tile = StyleSheet.create({
   list: { gap: 10 },
+  // ARU-130: the grey document icon and the "Homework sent" text on one line.
+  sent: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   // AC 1: rounded, light background, 1 pt outline; AC 2: a 4 pt left bar (its colour is set per tile).
   tile: {
     backgroundColor: colors.bg,

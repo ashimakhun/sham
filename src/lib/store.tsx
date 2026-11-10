@@ -28,6 +28,7 @@ import { LANGUAGE_SAVE_FAILED, nameProblem } from './profileName';
 import { supabase } from './supabase';
 import type {
   AccessRequest,
+  AssignmentSentCount,
   Course,
   CourseMember,
   CourseBilling,
@@ -88,6 +89,11 @@ export type Store = {
   attendance: MeetingAttendance[];
   /** ARU-125: listeners' own notes on completed meetings the user can see, oldest first. */
   meetingListenerNotes: MeetingListenerNote[];
+  /**
+   * ARU-130: per homework assignment, how many current listeners sent homework and how many listeners there are.
+   * Counts only. An assignment missing here (the request failed, or 0056 hasn't run) shows no line.
+   */
+  assignmentSentCounts: Record<string, AssignmentSentCount>;
   /** Likes on Blog posts (ARU-52), newest first: every approved user sees all. */
   materialLikes: MaterialLike[];
   /** Course feedback (ARU-53), newest first: every approved user sees it for the courses they can see. */
@@ -379,6 +385,13 @@ type ListenerNoteRow = {
   created_at: string;
   updated_at: string;
 };
+type AssignmentSentCountRow = { assignment_id: string; sent: number | string; listeners: number | string };
+/** ARU-130: the count rows as a map by assignment id. */
+function toSentCounts(data: AssignmentSentCountRow[] | null): Record<string, AssignmentSentCount> {
+  return Object.fromEntries(
+    (data ?? []).map((r) => [r.assignment_id, { sent: Number(r.sent), listeners: Number(r.listeners) }]),
+  );
+}
 type MaterialLikeRow = { material_id: string; user_id: string; created_at: string };
 type FeedbackRow = {
   id: string;
@@ -800,6 +813,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [assignments, setAssignments] = useState<HomeworkAssignment[]>([]);
   const [attendance, setAttendance] = useState<MeetingAttendance[]>([]);
   const [meetingListenerNotes, setMeetingListenerNotes] = useState<MeetingListenerNote[]>([]);
+  const [assignmentSentCounts, setAssignmentSentCounts] = useState<Record<string, AssignmentSentCount>>({});
   const [materialLikes, setMaterialLikes] = useState<MaterialLike[]>([]);
   const [courseFeedback, setCourseFeedback] = useState<CourseFeedback[]>([]);
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
@@ -876,6 +890,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setAssignments([]);
         setAttendance([]);
         setMeetingListenerNotes([]);
+        setAssignmentSentCounts({});
         setMaterialLikes([]);
         setCourseFeedback([]);
         setCourseBilling([]);
@@ -975,6 +990,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // Before 0031_disciplines.sql runs there is no table: no disciplines, and the rest of the app keeps working.
       setDisciplines(discs.error ? [] : ((discs.data as DisciplineRow[] | null) ?? []).map(toDiscipline));
       if (me?.accessStatus !== 'approved') {
+        setAssignmentSentCounts({});
         setPhotoDeletionStart(null);
         setAccessRequests([]);
         setUnread({});
@@ -984,6 +1000,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setPaymentExemptions([]);
         setPaymentRequests([]);
         return;
+      }
+      // ARU-130 AC 4-6: one request for every loaded course. The function returns rows only for courses whose
+      // meetings the user may see. A failure (offline, or before 0056 runs) leaves the counts empty, so the
+      // "Homework sent" lines hide instead of showing a wrong number.
+      const courseIds = rows<CourseRow>(crs).map((c) => c.id);
+      if (courseIds.length) {
+        const counts = await Promise.resolve(supabase.rpc('assignment_sent_counts', { courses: courseIds })).catch(
+          () => ({ data: null, error: new Error('offline') }),
+        );
+        setAssignmentSentCounts(counts.error ? {} : toSentCounts(counts.data as AssignmentSentCountRow[] | null));
+      } else {
+        setAssignmentSentCounts({});
       }
       // ARU-107 AC 2: the deletion start date. Before 0050 runs there is no table: no date, so no deletion dates.
       const settings = await supabase.from('app_settings').select('photo_deletion_start');
@@ -1224,6 +1252,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     assignments,
     attendance,
     meetingListenerNotes,
+    assignmentSentCounts,
     materialLikes,
     courseFeedback,
     disciplines: sortedDisciplines,

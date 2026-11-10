@@ -58,6 +58,7 @@ export function fakeStore(who: keyof typeof users | null, over: Partial<Store> =
     assignments: [],
     attendance: [],
     meetingListenerNotes: [],
+    assignmentSentCounts: {},
     materialLikes: [],
     courseFeedback: [],
     loading: false,
