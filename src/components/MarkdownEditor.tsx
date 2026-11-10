@@ -44,7 +44,8 @@ const MIN_OPEN = 96;
  * Multi-line text editor with a formatting toolbar above it (ARU-28; reusable for ARU-30): Bold, Italic, Bulleted
  * list and Numbered list act on the selection or the current line and store Markdown (src/lib/markdown.ts). There is
  * no Link tool (ARU-64); links typed by hand as `[text](url)` are kept as plain text and still render when viewed.
- * Typing past `maxLength` is blocked, and a counter shows near the limit.
+ * Typing past `maxLength` is blocked, and a counter shows near the limit. ARU-142: a value that is already longer
+ * (notes merged by the migration) is never cut: it can only get shorter, and the counter shows red until it fits.
  */
 export function MarkdownEditor({
   value,
@@ -73,8 +74,13 @@ export function MarkdownEditor({
       : Math.max(160, closedMax);
   const minHeight = Math.min(160, maxHeight);
 
+  // ARU-142: an over-limit value may shrink but never grow, and the native field must not cut it (Android cuts a
+  // prefilled value to maxLength).
+  const nativeMax = Math.max(maxLength, value.length);
+  const grows = (text: string) => text.length > maxLength && text.length > value.length;
+
   function apply(edit: Edit) {
-    if (edit.text.length > maxLength) {
+    if (grows(edit.text)) {
       setError(tooLong);
       return;
     }
@@ -147,7 +153,7 @@ export function MarkdownEditor({
         value={value}
         placeholder={placeholder}
         placeholderTextColor={colors.muted}
-        maxLength={maxLength}
+        maxLength={nativeMax}
         selection={forced}
         onSelectionChange={(e) => {
           selection.current = e.nativeEvent.selection;
@@ -157,9 +163,12 @@ export function MarkdownEditor({
           if (forced) setForced(undefined);
           // Typing or pasting past the limit: keep what fits and say why the rest was not added (ARU-38). The native
           // maxLength already cuts on iOS / Android; this also covers web and reaching the limit exactly.
-          const hitLimit = text.length > maxLength || (text.length === maxLength && text.length > value.length);
+          const hitLimit = grows(text) || (text.length === maxLength && text.length > value.length);
           setError(hitLimit ? tooLong : null);
-          onChange(text.length > maxLength ? text.slice(0, maxLength) : text);
+          // Growing past the limit keeps what fits (or, over the limit already, the text as it was); shrinking is
+          // always accepted, so a migrated over-limit note can be shortened (ARU-142).
+          if (!grows(text)) onChange(text);
+          else onChange(value.length > maxLength ? value : text.slice(0, maxLength));
         }}
         scrollEnabled
         textAlignVertical="top"

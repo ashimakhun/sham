@@ -30,8 +30,17 @@ const done: Meeting = {
   status: 'completed',
   createdById: 'M',
   createdAt: new Date(Date.now() - 100 * 3600_000).toISOString(),
-  notes: LINKED,
 };
+// ARU-142: meeting notes are signed notes; `who` wrote this one.
+const linkedNote = (who: string) => ({
+  id: 'n1',
+  meetingId: 'C',
+  courseId: 'A',
+  authorId: who,
+  body: LINKED,
+  createdAt: done.startsAt,
+  updatedAt: done.startsAt,
+});
 const toolbar = () => within(screen.getByLabelText('Formatting')).getAllByRole('button').map((b) => b.props.accessibilityLabel);
 
 beforeEach(() => {
@@ -79,7 +88,7 @@ describe('AC 1 / AC 5: Share material', () => {
 describe('AC 2 / AC 5: meeting notes', () => {
   it.each(['M', 'T'] as const)('%s editing notes with a saved link: four tools, raw markup, and Save keeps it', async (who) => {
     Object.assign(params, { id: 'A', meetingId: 'C', edit: '1' });
-    const store = fakeStore(who, { courseMembers: [member('A', 'S1')], meetings: [done] });
+    const store = fakeStore(who, { courseMembers: [member('A', 'S1')], meetings: [done], meetingListenerNotes: [linkedNote(who)] });
     setStore(store);
     await render(<MeetingNotesScreen />);
     expect(toolbar()).toEqual(FOUR);
@@ -90,12 +99,12 @@ describe('AC 2 / AC 5: meeting notes', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Bold' }));
     expect(screen.getByLabelText('Notes').props.value).toBe('Read [docs](https://x.io) **first**');
     await fireEvent.press(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(store.setMeetingNotes).toHaveBeenCalledWith('C', 'Read [docs](https://x.io) **first**'));
+    await waitFor(() => expect(store.saveMyMeetingNotes).toHaveBeenCalledWith('C', 'Read [docs](https://x.io) **first**'));
   });
 
   it('a student listener reading the notes still sees and opens the link', async () => {
     Object.assign(params, { id: 'A', meetingId: 'C' });
-    setStore(fakeStore('S1', { courseMembers: [member('A', 'S1')], meetings: [done] }));
+    setStore(fakeStore('S1', { courseMembers: [member('A', 'S1')], meetings: [done], meetingListenerNotes: [linkedNote('M')] }));
     await render(<MeetingNotesScreen />);
     expect(screen.queryByLabelText('Formatting')).toBeNull();
     await fireEvent.press(screen.getByRole('link', { name: 'docs' }));

@@ -83,8 +83,17 @@ const done = meeting({
   id: "mc",
   startsAt: past,
   status: "completed",
-  notes: "Notes as typed",
 });
+// ARU-142: meeting notes are signed notes (meeting_listener_notes).
+const typedNote = {
+  id: "n1",
+  meetingId: "mc",
+  courseId: "A",
+  authorId: "M",
+  body: "Notes as typed",
+  createdAt: "2026-10-02T10:00:00.000Z",
+  updatedAt: "2026-10-02T10:00:00.000Z",
+};
 const math: Discipline = {
   id: "DM",
   name: "Math",
@@ -241,7 +250,7 @@ describe("AC 1 / AC 8: every in-scope screen in Russian has no Latin app text", 
       "M",
       () => <NotesScreen />,
       { id: "A", meetingId: "mc" },
-      { meetings: [done] },
+      { meetings: [done], meetingListenerNotes: [typedNote] },
     ],
     [
       "assign homework",

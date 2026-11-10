@@ -1,8 +1,8 @@
 // QA ARU-125: gaps in aru125-listener-notes.test.tsx:
-// - Russian: the row actions, the LISTENERS' NOTES heading, "Edited <date>", "Deleted account", the delete
-//   confirmations and the editor title read in Russian, with Russian dates; user text stays as written.
-// - AC 11: a removed mentor still sees their old note and can delete it, but gets no "Add/Edit my notes"; a removed
-//   student gets no actions; the owner and the teacher can delete a removed listener's or a deleted account's notes.
+// - Russian: the row actions, "Edited <date>", "Deleted account", the delete confirmations and the editor
+//   read in Russian, with Russian dates; user text stays as written. (ARU-142: the notes list has no heading.)
+// - AC 11: a removed mentor no longer sees the notes (ARU-142 AC 6) and gets no notes pencil; a removed student gets
+//   no actions; the owner and the teacher can delete a removed listener's or a deleted account's notes.
 // - AC 12: a deleted account's notes: the owner's confirmation names "Deleted account"; a listener gets no Delete.
 // - Edge cases: leaving the editor with unsaved changes asks to discard (the owner's prompt); a meeting of another
 //   course isn't shown.
@@ -97,16 +97,16 @@ beforeEach(() => {
   params.id = "A";
   params.meetingId = undefined;
   params.edit = undefined;
-  params.mine = undefined;
   alert = jest.spyOn(Alert, "alert").mockImplementation(() => {});
 });
 afterEach(() => alert.mockRestore());
 
 describe("Russian", () => {
-  it('the meeting row: "Добавить мои заметки", then "Изменить мои заметки" and "Заметки"', async () => {
+  // ARU-142: one pencil labelled "Добавить заметки" / "Изменить заметки"; no "… мои заметки".
+  it('the meeting row: "Добавить заметки", then "Изменить заметки" and "Заметки"', async () => {
     as("S1", "ru", { courseMembers: [member("A", "S1")], meetings: [C] });
     const view = await render(inApp(<CourseDetailScreen />));
-    expect(labels("C")).toContain("Добавить мои заметки");
+    expect(labels("C")).toContain("Добавить заметки");
     as("S1", "ru", {
       courseMembers: [member("A", "S1")],
       meetings: [C],
@@ -114,12 +114,15 @@ describe("Russian", () => {
     });
     await view.rerender(inApp(<CourseDetailScreen />));
     expect(labels("C")).toEqual(
-      expect.arrayContaining(["Изменить мои заметки", "Заметки"]),
+      expect.arrayContaining(["Изменить заметки", "Заметки"]),
     );
-    expect(labels("C")).not.toContain("Add my notes");
+    expect(labels("C").some((l) => /мои заметки|my notes/i.test(l ?? ""))).toBe(
+      false,
+    );
   });
 
-  it('the Notes page: heading, "Изменено", Russian dates, "Удалённый аккаунт"; names and text as written', async () => {
+  // ARU-142: the «ЗАМЕТКИ СЛУШАТЕЛЕЙ» heading is gone.
+  it('the Notes page: no heading, "Изменено", Russian dates, "Удалённый аккаунт"; names and text as written', async () => {
     params.meetingId = "C";
     as("M", "ru", {
       courseMembers: [member("A", "S1"), member("A", "M2")],
@@ -127,8 +130,8 @@ describe("Russian", () => {
       meetingListenerNotes: [samNote, moNote, goneNote],
     });
     await render(inApp(<MeetingNotesScreen />));
-    const section = within(screen.getByTestId("listener-notes"));
-    expect(section.getByText("ЗАМЕТКИ СЛУШАТЕЛЕЙ")).toBeTruthy();
+    expect(screen.getByTestId("meeting-notes")).toBeTruthy();
+    expect(screen.queryByText(/ЗАМЕТКИ СЛУШАТЕЛЕЙ/i)).toBeNull();
     const sam = within(screen.getByTestId("listener-note-n1"));
     expect(sam.getByText("Student Sam")).toBeTruthy();
     expect(sam.getByText(/^Изменено .*окт/)).toBeTruthy();
@@ -204,13 +207,12 @@ describe("Russian", () => {
     );
   });
 
+  // ARU-142: one editor for everyone, with the notes.placeholder text.
   it("the editor: Russian placeholder and Save", async () => {
-    Object.assign(params, { meetingId: "C", mine: "1" });
+    Object.assign(params, { meetingId: "C", edit: "1" });
     as("S1", "ru", { courseMembers: [member("A", "S1")], meetings: [C] });
     await render(inApp(<MeetingNotesScreen />));
-    expect(
-      screen.getByPlaceholderText("Что вы записали на этой встрече?"),
-    ).toBeTruthy();
+    expect(screen.getByPlaceholderText("Что разбирали на встрече?")).toBeTruthy();
     expect(
       screen.getAllByRole("button", { name: /Сохранить/ }).length,
     ).toBeGreaterThan(0);
@@ -218,31 +220,29 @@ describe("Russian", () => {
 });
 
 describe("AC 11: removed listeners", () => {
-  it('a removed mentor sees their old note with Delete, but no "Add/Edit my notes" on the row', async () => {
-    as("M2", "en", {
-      courseMembers: [member("A", "S1")],
-      meetings: [C],
-      meetingListenerNotes: [moNote],
-    });
+  // ARU-142 AC 6: a mentor outside the course no longer reads notes, their own included (the database sends none);
+  // the owner and the teacher can still delete them (below).
+  it('a removed mentor no longer sees their old note, and gets no "Add/Edit notes" pencil on the row', async () => {
+    as("M2", "en", { courseMembers: [member("A", "S1")], meetings: [C] });
     const view = await render(inApp(<CourseDetailScreen />));
-    expect(labels("C")).toContain("Notes");
-    expect(labels("C").some((l) => /my notes/.test(l ?? ""))).toBe(false);
+    expect(labels("C")).not.toContain("Notes");
+    expect(labels("C")).not.toContain("Add notes");
+    expect(labels("C")).not.toContain("Edit notes");
     await view.unmount();
     params.meetingId = "C";
     await render(inApp(<MeetingNotesScreen />));
-    expect(screen.getByRole("button", { name: "Delete notes" })).toBeTruthy();
+    expect(screen.getByText("No notes yet")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Delete/ })).toBeNull();
   });
 
-  it("a removed mentor opening the editor directly is told only listeners add notes", async () => {
-    Object.assign(params, { meetingId: "C", mine: "1" });
-    as("M2", "en", {
-      courseMembers: [member("A", "S1")],
-      meetings: [C],
-      meetingListenerNotes: [moNote],
-    });
+  it("a removed mentor opening the editor directly is told only listeners, the owner and the teacher write notes", async () => {
+    Object.assign(params, { meetingId: "C", edit: "1" });
+    as("M2", "en", { courseMembers: [member("A", "S1")], meetings: [C] });
     await render(inApp(<MeetingNotesScreen />));
     expect(
-      screen.getByText("Only listeners of this course can add notes."),
+      screen.getByText(
+        "Only the course's listeners, its owner and the teacher can write notes.",
+      ),
     ).toBeTruthy();
     expect(screen.queryByLabelText("Notes")).toBeNull();
   });
@@ -255,22 +255,25 @@ describe("AC 11: removed listeners", () => {
       meetingListenerNotes: [note({ id: "n4", authorId: "S3" })],
     });
     await render(inApp(<MeetingNotesScreen />));
-    expect(screen.queryByTestId("listener-notes")).toBeNull();
+    expect(screen.queryByTestId("meeting-notes")).toBeNull();
     expect(screen.queryByRole("button", { name: /Delete/ })).toBeNull();
   });
 
   it.each(["M", "T"] as const)(
-    "%s can delete a removed student's notes",
+    "%s can delete a removed student's or a removed mentor's notes",
     async (who) => {
       params.meetingId = "C";
       as(who, "en", {
         courseMembers: [member("A", "S1")],
         meetings: [C],
-        meetingListenerNotes: [note({ id: "n4", authorId: "S3" })],
+        meetingListenerNotes: [note({ id: "n4", authorId: "S3" }), moNote],
       });
       await render(inApp(<MeetingNotesScreen />));
       expect(
         screen.getByRole("button", { name: `Delete ${users.S3.name}'s notes` }),
+      ).toBeTruthy();
+      expect(
+        screen.getByRole("button", { name: "Delete Mentor Mo's notes" }),
       ).toBeTruthy();
     },
   );
@@ -312,8 +315,8 @@ describe("AC 12: a deleted account's notes", () => {
 });
 
 describe("edge cases", () => {
-  it("leaving the editor with unsaved changes asks to discard, as the owner's editor does", async () => {
-    Object.assign(params, { meetingId: "C", mine: "1" });
+  it("leaving the editor with unsaved changes asks to discard", async () => {
+    Object.assign(params, { meetingId: "C", edit: "1" });
     as("S1", "en", {
       courseMembers: [member("A", "S1")],
       meetings: [C],
@@ -343,6 +346,6 @@ describe("edge cases", () => {
       meetingListenerNotes: [samNote],
     });
     await render(inApp(<MeetingNotesScreen />));
-    expect(screen.queryByTestId("listener-notes")).toBeNull();
+    expect(screen.queryByTestId("meeting-notes")).toBeNull();
   });
 });

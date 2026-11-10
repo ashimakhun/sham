@@ -75,7 +75,7 @@ describe('edge case: rescheduled into the future after S1 marked it', () => {
 
 describe('regression: notes and homework stay Completed-only', () => {
   it.each(['M', 'T'] as const)('%s on a started Scheduled meeting: count, but no notes or Assign homework', async (who) => {
-    setStore(store(who, [meeting({ id: 'R', notes: undefined })]));
+    setStore(store(who, [meeting({ id: 'R' })]));
     await render(<CourseDetailScreen />);
     expect(inMeeting('R').getByRole('link', { name: 'Attended 0 of 2' })).toBeTruthy();
     // ARU-126: the notes pencil has no text, so look for it by its label.

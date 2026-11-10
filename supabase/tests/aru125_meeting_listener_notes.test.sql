@@ -85,16 +85,15 @@ select t.eq(pg_temp.add('00000000-0000-0000-0000-0000000125f1', 'x'),
 select t.eq(pg_temp.add('00000000-0000-0000-0000-0000000125a1', 'x'),
   '23514 | Notes can be added only to completed meetings. | sham:notes_completed', 'AC5 canceled meeting refused');
 
--- AC 10: non-listeners can't add: owner, teacher, other mentor; a student not in the course doesn't see the meeting.
+-- AC 10, changed by ARU-142 AC 2: the owner and the teacher write their own notes too; another mentor can't; a student
+-- not in the course doesn't see the meeting.
 select t.login('M');
-select t.eq(pg_temp.add('00000000-0000-0000-0000-0000000125c1', 'x'),
-  '42501 | Only listeners of this course can add notes. | sham:listener_notes_add_role', 'AC10 owner refused');
+select t.eq(pg_temp.add('00000000-0000-0000-0000-0000000125c1', 'Owner''s notes'), 'no error', 'ARU-142 AC2 owner adds');
 select t.login('T');
-select t.eq(pg_temp.add('00000000-0000-0000-0000-0000000125c1', 'x'),
-  '42501 | Only listeners of this course can add notes. | sham:listener_notes_add_role', 'AC10 teacher refused');
+select t.eq(pg_temp.add('00000000-0000-0000-0000-0000000125c1', 'Teacher''s notes'), 'no error', 'ARU-142 AC2 teacher adds');
 select t.login('N');
 select t.eq(pg_temp.add('00000000-0000-0000-0000-0000000125c1', 'x'),
-  '42501 | Only listeners of this course can add notes. | sham:listener_notes_add_role', 'AC10 other mentor refused');
+  '42501 | Only the course''s listeners, its owner and the teacher can add notes. | sham:notes_add_role', 'AC10 other mentor refused');
 select t.login('S2');
 select t.eq(pg_temp.add('00000000-0000-0000-0000-0000000125c1', 'x'),
   'P0002 | Meeting not found. | sham:meeting_not_found', 'AC10 student not in the course refused');
@@ -111,14 +110,15 @@ reset role;
 update profiles set access_status = 'approved' where id = t.id('S3');
 
 -- AC 6 / 7: who reads them.
+-- 5 notes on C: S1, M2, S3, the owner M and the teacher T.
 select t.login('S1');
-select t.eq((select count(*) from meeting_listener_notes), 3::bigint, 'AC7 listener reads every listener''s notes');
+select t.eq((select count(*) from meeting_listener_notes), 5::bigint, 'AC7 listener reads everyone''s notes');
 select t.login('M');
-select t.eq((select count(*) from meeting_listener_notes), 3::bigint, 'AC7 owner reads them');
+select t.eq((select count(*) from meeting_listener_notes), 5::bigint, 'AC7 owner reads them');
 select t.login('N');
-select t.eq((select count(*) from meeting_listener_notes), 3::bigint, 'AC7 other mentor reads them');
+select t.eq((select count(*) from meeting_listener_notes), 0::bigint, 'ARU-142 AC6 other mentor reads none');
 select t.login('T');
-select t.eq((select count(*) from meeting_listener_notes), 3::bigint, 'AC7 teacher reads them');
+select t.eq((select count(*) from meeting_listener_notes), 5::bigint, 'AC7 teacher reads them');
 select t.login('S2');
 select t.eq((select count(*) from meeting_listener_notes), 0::bigint, 'AC7 student not in the course reads none');
 
@@ -177,20 +177,22 @@ delete from meeting_listener_notes where body = 'Mismatch';
 -- AC 11: S3 (student) and M2 (mentor) are removed from A.
 delete from course_members where course_id = t.id('A') and user_id in (t.id('S3'), t.id('M2'));
 select t.login('S1');
-select t.eq((select count(*) from meeting_listener_notes where course_id = t.id('A')), 3::bigint,
+select t.eq((select count(*) from meeting_listener_notes where course_id = t.id('A')), 5::bigint,
   'AC11 removed listeners'' notes stay visible to others');
 select t.login('S3');
 select t.eq((select count(*) from meeting_listener_notes), 0::bigint, 'AC11 removed student sees no notes');
 select t.eq(pg_temp.upd(pg_temp.note('S3', '00000000-0000-0000-0000-0000000125c1'), 'x'),
-  '42501 | Only listeners of this course can edit notes. | sham:listener_notes_edit_role', 'AC11 removed student update refused');
+  '42501 | Only the course''s listeners, its owner and the teacher can edit notes. | sham:notes_edit_role', 'AC11 removed student update refused');
 select t.eq(pg_temp.del(pg_temp.note('S3', '00000000-0000-0000-0000-0000000125c1')),
   '42501 | You can''t delete these notes. | sham:listener_notes_cant_delete', 'AC11 removed student delete refused');
 select t.login('M2');
-select t.eq((select count(*) from meeting_listener_notes where author_id = t.id('M2')), 1::bigint, 'AC11 removed mentor sees own');
+-- ARU-142 AC6: a mentor who is neither the owner nor a listener reads no notes, their own included.
+select t.eq((select count(*) from meeting_listener_notes where author_id = t.id('M2')), 0::bigint,
+  'ARU-142 AC6 removed mentor no longer reads their own notes');
 select t.eq(pg_temp.upd(pg_temp.note('M2', '00000000-0000-0000-0000-0000000125c1'), 'x'),
-  '42501 | Only listeners of this course can edit notes. | sham:listener_notes_edit_role', 'AC11 removed mentor update refused');
+  '42501 | Only the course''s listeners, its owner and the teacher can edit notes. | sham:notes_edit_role', 'AC11 removed mentor update refused');
 select t.eq(pg_temp.add('00000000-0000-0000-0000-0000000125c2', 'x'),
-  '42501 | Only listeners of this course can add notes. | sham:listener_notes_add_role', 'AC11 removed mentor add refused');
+  '42501 | Only the course''s listeners, its owner and the teacher can add notes. | sham:notes_add_role', 'AC11 removed mentor add refused');
 select t.eq(pg_temp.del(pg_temp.note('M2', '00000000-0000-0000-0000-0000000125c1')), 'no error', 'AC11 removed mentor deletes own');
 
 -- AC 9: moderation. The owner deletes the removed student's notes; another mentor can't; after a change of owner the

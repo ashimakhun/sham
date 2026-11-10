@@ -37,7 +37,7 @@ const meeting = (over: Partial<Meeting> & { id: string }): Meeting => ({
   createdAt: at(-100),
   ...over,
 });
-const C = meeting({ id: 'C', startsAt: at(-30), status: 'completed', notes: 'Covered **ch 1**' });
+const C = meeting({ id: 'C', startsAt: at(-30), status: 'completed' });
 const F = meeting({ id: 'F', startsAt: at(5) });
 const P = meeting({ id: 'P', startsAt: at(-1) });
 const members = [member('A', 'S1')];

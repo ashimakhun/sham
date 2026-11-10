@@ -57,34 +57,43 @@ beforeEach(() => {
   params.id = 'A';
   params.meetingId = undefined;
   params.edit = undefined;
-  params.mine = undefined;
 });
 
 describe('AC 1, 3, 5, 8: the meeting row', () => {
-  it.each(['S1', 'M2'] as const)('%s (a listener) gets "Add my notes" on a completed meeting only', async (who) => {
+  // ARU-142: one pencil labelled "Add notes" (no "Add my notes"), opening my editor with edit=1.
+  it.each(['S1', 'M2'] as const)('%s (a listener) gets one "Add notes" pencil on completed meetings', async (who) => {
     setStore(fakeStore(who, { courseMembers: members, meetings: [C, F, X] }));
     await render(<CourseDetailScreen />);
-    expect(labels('C')).toContain('Add my notes');
+    expect(labels('C').filter((l) => /notes/i.test(l))).toEqual(['Add notes']);
     expect(labels('C')).not.toContain('Notes');
-    expect(labels('F')).not.toContain('Add my notes');
-    await fireEvent.press(within(screen.getByTestId('meeting-C')).getByRole('button', { name: 'Add my notes' }));
+    expect(labels('F')).not.toContain('Add notes');
+    expect(labels('X')).not.toContain('Add notes');
+    await fireEvent.press(within(screen.getByTestId('meeting-C')).getByRole('button', { name: 'Add notes' }));
     expect(router.push).toHaveBeenLastCalledWith({
       pathname: '/courses/[id]/meetings/[meetingId]/notes',
-      params: { id: 'A', meetingId: 'C', mine: '1' },
+      params: { id: 'A', meetingId: 'C', edit: '1' },
     });
   });
 
-  it.each(['M', 'T', 'N'] as const)('%s (not a listener) gets no "Add my notes"', async (who) => {
+  // ARU-142: the owner and the teacher write notes the same way; only a mentor outside the course (N) doesn't.
+  it.each(['M', 'T'] as const)('%s (owner / teacher) gets the same "Add notes" pencil', async (who) => {
     setStore(fakeStore(who, { courseMembers: members, meetings: [C] }));
     await render(<CourseDetailScreen />);
-    expect(labels('C')).not.toContain('Add my notes');
+    expect(labels('C').filter((l) => /notes/i.test(l))).toEqual(['Add notes']);
   });
 
-  it('with my notes the action is "Edit my notes"; any listener note shows Notes', async () => {
+  it('N (a mentor outside the course) gets no notes pencil', async () => {
+    setStore(fakeStore('N', { courseMembers: members, meetings: [C] }));
+    await render(<CourseDetailScreen />);
+    expect(labels('C')).not.toContain('Add notes');
+    expect(labels('C')).not.toContain('Edit notes');
+  });
+
+  it('with my notes the pencil is "Edit notes"; any note shows Notes', async () => {
     setStore(fakeStore('S1', { courseMembers: members, meetings: [C], meetingListenerNotes: [samNote] }));
     await render(<CourseDetailScreen />);
-    expect(labels('C')).toEqual(expect.arrayContaining(['Notes', 'Edit my notes']));
-    expect(labels('C')).not.toContain('Add my notes');
+    expect(labels('C').filter((l) => /notes/i.test(l))).toEqual(['Notes', 'Edit notes']);
+    expect(labels('C')).not.toContain('Add notes');
   });
 
   it('AC 8a: another listener\'s note appearing shows Notes without a refresh', async () => {
@@ -98,24 +107,25 @@ describe('AC 1, 3, 5, 8: the meeting row', () => {
 });
 
 describe('AC 6, 12: the Notes page', () => {
-  it('shows LISTENERS\' NOTES oldest first with name, time, Edited and formatted text', async () => {
+  // ARU-142: the owner's notes are one more signed entry in the same list; there is no section heading.
+  it('shows every note oldest first with name, time, Edited and formatted text, under no heading', async () => {
     params.meetingId = 'C';
+    const ownerNote = note({ id: 'n0', authorId: 'M', body: 'Owner notes', createdAt: '2026-10-19T10:00:00.000Z' });
     setStore(
       fakeStore('S2', {
         courseMembers: [...members, member('A', 'S2')],
-        meetings: [{ ...C, notes: 'Owner notes', notesUpdatedById: 'M', notesUpdatedAt: '2026-10-19T10:00:00.000Z' }],
-        meetingListenerNotes: [samNote, moNote, goneNote],
+        meetings: [C],
+        meetingListenerNotes: [ownerNote, samNote, moNote, goneNote],
       }),
     );
     await render(<MeetingNotesScreen />);
-    expect(screen.getByText('Owner notes')).toBeTruthy();
-    const section = within(screen.getByTestId('listener-notes'));
-    expect(section.getByText("LISTENERS' NOTES")).toBeTruthy();
-    expect(section.getAllByText(/Student Sam|Mentor Mo|Deleted account/).map((e) => e.props.children)).toEqual([
-      'Student Sam',
-      'Mentor Mo',
-      'Deleted account',
-    ]);
+    const section = within(screen.getByTestId('meeting-notes'));
+    expect(section.getByText('Owner notes')).toBeTruthy();
+    expect(screen.queryByText(/LISTENERS' NOTES/i)).toBeNull();
+    expect(screen.queryAllByRole('header')).toEqual([]);
+    expect(
+      section.getAllByText(/Mentor Max|Student Sam|Mentor Mo|Deleted account/).map((e) => e.props.children),
+    ).toEqual(['Mentor Max', 'Student Sam', 'Mentor Mo', 'Deleted account']);
     expect(within(screen.getByTestId('listener-note-n1')).queryByText(/^Edited/)).toBeNull();
     expect(within(screen.getByTestId('listener-note-n2')).getByText(/^Edited /)).toBeTruthy();
     expect(section.getByText('wrote')).toBeTruthy();
@@ -123,12 +133,21 @@ describe('AC 6, 12: the Notes page', () => {
     expect(screen.queryByRole('button', { name: /notes/i })).toBeNull();
   });
 
-  it('with only listener notes there is no "No notes yet"', async () => {
+  it('with a note there is no "No notes yet"', async () => {
     params.meetingId = 'C';
-    setStore(fakeStore('N', { courseMembers: members, meetings: [C], meetingListenerNotes: [samNote] }));
+    setStore(fakeStore('M2', { courseMembers: members, meetings: [C], meetingListenerNotes: [samNote] }));
     await render(<MeetingNotesScreen />);
     expect(screen.queryByText('No notes yet')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Add my notes' })).toBeNull();
+    expect(screen.getByTestId('meeting-notes')).toBeTruthy();
+  });
+
+  // ARU-142 AC 6: a mentor outside the course no longer reads notes (the database sends none).
+  it('N (a mentor outside the course) sees "No notes yet" and no notes', async () => {
+    params.meetingId = 'C';
+    setStore(fakeStore('N', { courseMembers: members, meetings: [C] }));
+    await render(<MeetingNotesScreen />);
+    expect(screen.getByText('No notes yet')).toBeTruthy();
+    expect(screen.queryByTestId('meeting-notes')).toBeNull();
   });
 });
 
@@ -171,14 +190,19 @@ describe('AC 4, 9: deleting', () => {
       expect.anything(),
     );
     expect(store.deleteMeetingListenerNotes).toHaveBeenCalledWith('n2');
-    // AC 9: no edit option for them.
-    expect(screen.queryByRole('button', { name: /my notes/ })).toBeNull();
+    // AC 9 / ARU-142: they can't edit someone else's note: Delete is the only action on it.
+    expect(
+      within(screen.getByTestId('listener-note-n2'))
+        .getAllByRole('button')
+        .map((b) => b.props.accessibilityLabel),
+    ).toEqual(["Delete Mentor Mo's notes"]);
     alert.mockRestore();
   });
 
+  // ARU-142 AC 6: a mentor outside the course no longer sees notes, so this is a mentor listener who isn't the author.
   it('another mentor can\'t delete', async () => {
     params.meetingId = 'C';
-    setStore(fakeStore('N', { courseMembers: members, meetings: [C], meetingListenerNotes: [samNote] }));
+    setStore(fakeStore('M2', { courseMembers: members, meetings: [C], meetingListenerNotes: [samNote] }));
     await render(<MeetingNotesScreen />);
     expect(screen.queryByRole('button', { name: /Delete/ })).toBeNull();
   });
@@ -186,7 +210,7 @@ describe('AC 4, 9: deleting', () => {
 
 describe('AC 1-3: the editor', () => {
   it('adds notes; Save is disabled while blank', async () => {
-    Object.assign(params, { meetingId: 'C', mine: '1' });
+    Object.assign(params, { meetingId: 'C', edit: '1' });
     const store = fakeStore('S1', { courseMembers: members, meetings: [C] });
     setStore(store);
     await render(<MeetingNotesScreen />);
@@ -205,14 +229,14 @@ describe('AC 1-3: the editor', () => {
   });
 
   it('opens my entry to edit it', async () => {
-    Object.assign(params, { meetingId: 'C', mine: '1' });
+    Object.assign(params, { meetingId: 'C', edit: '1' });
     setStore(fakeStore('S1', { courseMembers: members, meetings: [C], meetingListenerNotes: [samNote, moNote] }));
     await render(<MeetingNotesScreen />);
     expect(screen.getByLabelText('Notes').props.value).toBe('Sam **wrote**');
   });
 
   it('a failed save keeps the text and shows the error', async () => {
-    Object.assign(params, { meetingId: 'C', mine: '1' });
+    Object.assign(params, { meetingId: 'C', edit: '1' });
     let fail: (e: Error) => void = () => {};
     setStore(
       fakeStore('S1', {
@@ -229,11 +253,23 @@ describe('AC 1-3: the editor', () => {
     expect(screen.getByLabelText('Notes').props.value).toBe('draft');
   });
 
+  // ARU-142: the owner M writes notes now; a mentor outside the course (N) is the one refused.
+  it('M (the owner) opens the editor and saves', async () => {
+    Object.assign(params, { meetingId: 'C', edit: '1' });
+    const store = fakeStore('M', { courseMembers: members, meetings: [C] });
+    setStore(store);
+    await render(<MeetingNotesScreen />);
+    await fireEvent.changeText(screen.getByLabelText('Notes'), 'Owner notes');
+    await fireEvent.press(screen.getByRole('button', { name: 'Save' }));
+    expect(store.saveMyMeetingNotes).toHaveBeenCalledWith('C', 'Owner notes');
+    expect(router.back).toHaveBeenCalled();
+  });
+
   it.each([
-    ['M', 'C', 'Only listeners of this course can add notes.'],
+    ['N', 'C', "Only the course's listeners, its owner and the teacher can write notes."],
     ['S1', 'F', 'Notes can be added only to completed meetings.'],
   ] as const)('%s on %s is refused: %s', async (who, id, hint) => {
-    Object.assign(params, { meetingId: id, mine: '1' });
+    Object.assign(params, { meetingId: id, edit: '1' });
     setStore(fakeStore(who, { courseMembers: members, meetings: [C, F] }));
     await render(<MeetingNotesScreen />);
     expect(screen.getByText(hint)).toBeTruthy();

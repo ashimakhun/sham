@@ -1,8 +1,8 @@
 // QA ARU-126: gaps in aru126-meeting-tile-icons.test.tsx: the ✓ for the teacher and a non-listener mentor and none for
 // a mentor listener (AC 2, today's canCheckMeetingHomework rule); the icon pills' colours and a 44 × 44 pt touch area
 // on both axes; the people icon with "x of y" and its label, opening Attendance, not before the start or on a canceled
-// meeting, hidden from listeners (AC 4); no pencil for a non-owner mentor on the tile or the Notes page, and ?edit=1
-// still "Not allowed" (AC 5, 6); the two ✓ never on one tile, each with its own confirmation (AC 2, 10); the edit and
+// meeting, hidden from listeners (AC 4); no pencil for a mentor who neither owns nor listens to the course on the tile
+// or the Notes page, and ?edit=1 still "Not allowed" (AC 5, 6; ARU-142: listeners write notes, so they get one); the two ✓ never on one tile, each with its own confirmation (AC 2, 10); the edit and
 // notes pencils never on one tile (AC 11); footer order; and the icon pills' labels in Russian from the catalog.
 import {
   act,
@@ -22,6 +22,7 @@ import type {
   HomeworkAssignment,
   Meeting,
   MeetingAttendance,
+  MeetingListenerNote,
   User,
 } from "@/lib/types";
 
@@ -53,8 +54,18 @@ const C = meeting({
   startsAt: at(-20),
   status: "completed",
   topic: "Done",
-  notes: "Covered",
 });
+// ARU-142: official notes are gone; C's notes are the owner M's own entry.
+const mNote: MeetingListenerNote = {
+  id: "n-C",
+  meetingId: "C",
+  courseId: "A",
+  authorId: "M",
+  body: "Covered",
+  createdAt: at(-19),
+  updatedAt: at(-19),
+};
+const notes = [mNote];
 const X = meeting({
   id: "X",
   startsAt: at(-3),
@@ -143,7 +154,13 @@ describe("icon pills: colours and a 44 × 44 pt touch area", () => {
   };
 
   it("✓ (homework and completed) is green on successSoft, ✕ is red, pencils are indigo; none shows text", async () => {
-    setStore(fakeStore("M", { courseMembers: members, meetings: [P, F, C] }));
+    setStore(
+      fakeStore("M", {
+        courseMembers: members,
+        meetings: [P, F, C],
+        meetingListenerNotes: notes,
+      }),
+    );
     await render(<CourseDetailScreen />);
     const pills = [
       {
@@ -233,7 +250,7 @@ describe("AC 4: the people count", () => {
   });
 });
 
-describe("AC 5 / AC 6: no pencil for a mentor who does not own the course", () => {
+describe("AC 5 / AC 6: no pencil for a mentor who neither owns nor listens to the course", () => {
   // Render the Stack header's headerRight, which the shared mock leaves out (as in the dev test).
   const { Stack } = jest.requireMock("expo-router") as {
     Stack: { Screen: unknown };
@@ -250,15 +267,16 @@ describe("AC 5 / AC 6: no pencil for a mentor who does not own the course", () =
     Stack.Screen = original;
   });
 
-  it("tile: N reads Notes but gets no pencil", async () => {
+  // ARU-142 AC 6: N no longer reads notes (the database sends none), so N gets no Notes link either.
+  it("tile: N gets neither Notes nor a pencil", async () => {
     setStore(
       fakeStore("N", {
         courseMembers: members,
-        meetings: [C, { ...C, id: "C2", notes: undefined }],
+        meetings: [C, { ...C, id: "C2" }],
       }),
     );
     await render(<CourseDetailScreen />);
-    expect(inMeeting("C").getByRole("link", { name: "Notes" })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Notes" })).toBeNull();
     expect(
       screen.queryByRole("button", { name: /Add notes|Edit notes/ }),
     ).toBeNull();
@@ -266,9 +284,10 @@ describe("AC 5 / AC 6: no pencil for a mentor who does not own the course", () =
 
   it('Notes page: N gets no header pencil, and ?edit=1 is still "Not allowed"', async () => {
     params.meetingId = "C";
+    // ARU-142 AC 6: N reads no notes (the database sends none).
     setStore(fakeStore("N", { courseMembers: members, meetings: [C] }));
     const view = await render(<MeetingNotesScreen />);
-    expect(screen.getByText("Covered")).toBeTruthy();
+    expect(screen.getByText("No notes yet")).toBeTruthy();
     expect(screen.queryByTestId("notes-edit")).toBeNull();
     expect(
       screen.queryByRole("button", { name: /Add notes|Edit notes/ }),
@@ -282,12 +301,7 @@ describe("AC 5 / AC 6: no pencil for a mentor who does not own the course", () =
 
   it("Notes page: the teacher (not the owner) gets the pencil, labelled Add notes when there are none", async () => {
     params.meetingId = "C";
-    setStore(
-      fakeStore("T", {
-        courseMembers: members,
-        meetings: [{ ...C, notes: undefined }],
-      }),
-    );
+    setStore(fakeStore("T", { courseMembers: members, meetings: [C] }));
     await render(<MeetingNotesScreen />);
     const pencil = screen.getByTestId("notes-edit");
     expect(pencil.props.accessibilityLabel).toBe("Add notes");
@@ -360,7 +374,13 @@ describe("AC 2 / AC 10 / AC 11: icons that look alike never share a tile", () =>
   });
 
   it("completed (owner, with notes and homework): Notes, then the notes pencil, Assign/…, then the ✓", async () => {
-    setStore(fakeStore("M", { courseMembers: members, meetings: [C] }));
+    setStore(
+      fakeStore("M", {
+        courseMembers: members,
+        meetings: [C],
+        meetingListenerNotes: notes,
+      }),
+    );
     await render(<CourseDetailScreen />);
     const c = labels("C");
     expect(c.indexOf("Notes")).toBe(0);
@@ -371,6 +391,8 @@ describe("AC 2 / AC 10 / AC 11: icons that look alike never share a tile", () =>
 });
 
 describe("AC 12: listeners and students see none of the managing icons", () => {
+  // ARU-142: a listener writes their own notes, so the notes pencil ("Add notes": no note of theirs) is no longer a
+  // managing icon; it is their only pencil, on the completed tile only.
   it.each(["S1", "M2"] as const)(
     "%s on upcoming, in-progress and completed tiles",
     async (who) => {
@@ -382,9 +404,11 @@ describe("AC 12: listeners and students see none of the managing icons", () => {
         "Cancel meeting",
         "Edit meeting",
         "Edit notes",
-        "Add notes",
       ])
         expect(screen.queryByRole("button", { name })).toBeNull();
+      expect(screen.getAllByRole("button", { name: "Add notes" })).toEqual([
+        inMeeting("C").getByRole("button", { name: "Add notes" }),
+      ]);
     },
   );
 });
@@ -400,6 +424,7 @@ describe("Russian: the icon pills read their labels from the catalog", () => {
       courseMembers: members,
       meetings: [P, F, C],
       attendance: [mark("P", "S1")],
+      meetingListenerNotes: notes,
     });
     await render(inApp(<CourseDetailScreen />));
     await flush();

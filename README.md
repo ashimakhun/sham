@@ -198,7 +198,12 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    existing table or policy, deletes nothing; needs 0031 and, for its number, 0053 and 0054),
    `0056_assignment_sent_counts.sql` (ARU-130: the read-only function `assignment_sent_counts(uuid[])`, how many current
    listeners sent homework for each assignment, out of all current listeners; counts only, for courses whose meetings
-   the caller can see, empty otherwise; changes no table, policy or publication).
+   the caller can see, empty otherwise; changes no table, policy or publication),
+   `0057_one_kind_of_notes.sql` (ARU-142: one kind of meeting notes. The course's current listeners, its current owner
+   and the teacher write their own signed notes in `meeting_listener_notes` and are the only ones who read them
+   (mentors outside the course no longer do); copies the official notes (0012) into signed notes once, via
+   `copy_official_notes()`; relaxes the body check to 20,002 characters for merged notes; revokes
+   `set_meeting_notes()`; the old `course_meetings.notes*` columns and trigger stay as a backup, nothing is dropped).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
@@ -726,11 +731,10 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | See course meetings        | courses they're in | ✓ (all courses)  | ✓       |
 | Schedule meetings, mark completed / canceled | | own courses    | any course |
 | Edit / reschedule a scheduled meeting | | own courses           | any course |
-| Read meeting notes         | courses they're in | ✓ (all courses)  | ✓       |
-| Add / edit / clear notes on a completed meeting | | own courses | any course |
-| Add / edit / delete own listener notes on a completed meeting (ARU-125; one each; edit only while a listener) | courses they're in | courses they're in | (uses the owner's notes) |
-| Read listeners' notes (ARU-125) | courses they're in | ✓ (all courses; hidden: only if in it) | ✓ |
-| Delete any listener's notes (ARU-125) | | own courses | any course |
+| Read meeting notes (ARU-142: one kind of notes) | courses they're in | own courses + courses they're in | ✓ |
+| Add / edit own notes on a completed meeting (ARU-142; one each) | courses they're in | own courses + courses they're in | any course |
+| Delete own notes | courses they're in | ✓ | ✓ |
+| Delete anyone's notes (ARU-125) | | own courses | any course |
 | Mark a completed meeting's homework checked (ARU-126: no undo in the app) | | any course they can see, not one they're a listener of | any course |
 | Mark / undo own attendance of a started meeting | courses they're in | courses they're in |  |
 | See how many listeners sent homework for an assignment (ARU-130; count only) | courses they're in | all courses (not hidden ones they aren't in) | ✓ |

@@ -7,7 +7,7 @@ import { Alert, StyleSheet } from 'react-native';
 import CourseDetailScreen from '@/app/courses/[id]';
 import MeetingNotesScreen from '@/app/courses/[id]/meetings/[meetingId]/notes';
 import { colors, formatDateTime } from '@/lib/theme';
-import type { HomeworkAssignment, Meeting } from '@/lib/types';
+import type { HomeworkAssignment, Meeting, MeetingListenerNote } from '@/lib/types';
 
 import { fakeStore, member } from './helpers/fakeStore';
 import { params, setStore } from './helpers/mocks';
@@ -29,8 +29,19 @@ const meeting = (over: Partial<Meeting> & { id: string }): Meeting => ({
 const P = meeting({ id: 'P', startsAt: at(-1) });
 const F = meeting({ id: 'F', startsAt: at(5) });
 const C = meeting({ id: 'C', startsAt: at(-20), status: 'completed' });
-const CN = meeting({ id: 'CN', startsAt: at(-22), status: 'completed', notes: 'Covered' });
-const K = meeting({ id: 'K', startsAt: at(-40), status: 'completed', homeworkCheckedAt: at(-30), homeworkCheckedById: 'T', notes: 'Old' });
+const CN = meeting({ id: 'CN', startsAt: at(-22), status: 'completed' });
+const K = meeting({ id: 'K', startsAt: at(-40), status: 'completed', homeworkCheckedAt: at(-30), homeworkCheckedById: 'T' });
+// ARU-142: official notes are gone; CN's and K's notes are the owner M's own entries.
+const mNote = (meetingId: string, body: string): MeetingListenerNote => ({
+  id: `n-${meetingId}`,
+  meetingId,
+  courseId: 'A',
+  authorId: 'M',
+  body,
+  createdAt: at(-19),
+  updatedAt: at(-19),
+});
+const notes = [mNote('CN', 'Covered'), mNote('K', 'Old')];
 const asg = (meetingId: string, dueAt?: string): HomeworkAssignment => ({
   id: `a-${meetingId}`,
   meetingId,
@@ -107,7 +118,7 @@ describe('Awaiting homework check (AC 1–3)', () => {
 
 describe('notes pencil on the tile (AC 5)', () => {
   it('owner: Notes, then a pencil labelled Edit notes; without notes, a pencil labelled Add notes', async () => {
-    setStore(fakeStore('M', { courseMembers: members, meetings: [C, CN] }));
+    setStore(fakeStore('M', { courseMembers: members, meetings: [C, CN], meetingListenerNotes: notes }));
     await render(<CourseDetailScreen />);
     const edit = inMeeting('CN').getByRole('button', { name: 'Edit notes' });
     expect(within(edit).getByTestId('icon-create-outline')).toBeTruthy();
@@ -124,19 +135,33 @@ describe('notes pencil on the tile (AC 5)', () => {
     });
   });
 
-  it('a listener reads Notes but gets no pencil', async () => {
-    setStore(fakeStore('S1', { courseMembers: members, meetings: [CN] }));
+  // ARU-142: a listener writes their own notes with the same single pencil (no "Add my notes" text pill).
+  it('a listener reads Notes and gets one pencil, labelled Add notes until they have a note', async () => {
+    setStore(fakeStore('S1', { courseMembers: members, meetings: [CN], meetingListenerNotes: notes }));
     await render(<CourseDetailScreen />);
     expect(inMeeting('CN').getByRole('link', { name: 'Notes' })).toBeTruthy();
-    // No owner's pencil ("Add notes" / "Edit notes"); ARU-125's "Add my notes" is the listener's own action.
+    const add = inMeeting('CN').getByRole('button', { name: 'Add notes' });
+    expect(within(add).getByTestId('icon-create-outline')).toBeTruthy();
+    expect(within(add).queryByText(/./)).toBeNull();
+    expect(inMeeting('CN').getAllByTestId('icon-create-outline')).toHaveLength(1);
+    expect(screen.queryByText(/my notes/i)).toBeNull();
+  });
+
+  // ARU-142 AC 6: a mentor outside the course no longer reads notes (the database sends none): no Notes, no pencil.
+  it('a mentor outside the course gets neither Notes nor a pencil', async () => {
+    setStore(fakeStore('N', { courseMembers: members, meetings: [CN] }));
+    await render(<CourseDetailScreen />);
+    expect(inMeeting('CN').queryByRole('link', { name: 'Notes' })).toBeNull();
     expect(screen.queryByRole('button', { name: /^(Add|Edit) notes$/ })).toBeNull();
-    expect(screen.queryByTestId('icon-create-outline')).toBeNull();
+    // (Outside the tile N, a mentor, has the course's own edit pencils.)
+    expect(inMeeting('CN').queryByTestId('icon-create-outline')).toBeNull();
   });
 });
 
 describe('MEETING HISTORY (AC 7, AC 8)', () => {
   it('no homework line, no "Homework checked by" line and no Undo check; Notes, pencil and count stay', async () => {
-    setStore(fakeStore('M', { courseMembers: members, meetings: [K], assignments: [asg('K', at(-35))] }));
+    const assignments = [asg('K', at(-35))];
+    setStore(fakeStore('M', { courseMembers: members, meetings: [K], assignments, meetingListenerNotes: notes }));
     await render(<CourseDetailScreen />);
     const history = within(screen.getByTestId('meeting-history'));
     expect(history.queryByTestId('assignment-K')).toBeNull();
@@ -203,7 +228,7 @@ describe('Notes page header pencil (AC 6)', () => {
 
   it('owner: no bottom button, a pencil in the header opens the editor', async () => {
     params.meetingId = 'CN';
-    setStore(fakeStore('M', { courseMembers: members, meetings: [CN] }));
+    setStore(fakeStore('M', { courseMembers: members, meetings: [CN], meetingListenerNotes: notes }));
     await render(<MeetingNotesScreen />);
     const pencil = screen.getByTestId('notes-edit');
     expect(pencil.props.accessibilityLabel).toBe('Edit notes');
@@ -215,10 +240,20 @@ describe('Notes page header pencil (AC 6)', () => {
     });
   });
 
-  it('a listener gets no pencil', async () => {
+  // ARU-142: a listener writes notes too, so they get the pencil (Add notes: they have none yet).
+  it('a listener gets the pencil labelled Add notes', async () => {
     params.meetingId = 'CN';
-    setStore(fakeStore('S1', { courseMembers: members, meetings: [CN] }));
+    setStore(fakeStore('S1', { courseMembers: members, meetings: [CN], meetingListenerNotes: notes }));
     await render(<MeetingNotesScreen />);
+    expect(screen.getByTestId('notes-edit').props.accessibilityLabel).toBe('Add notes');
+  });
+
+  // ARU-142 AC 6: N reads no notes (the database sends none).
+  it('a mentor outside the course gets no pencil', async () => {
+    params.meetingId = 'CN';
+    setStore(fakeStore('N', { courseMembers: members, meetings: [CN] }));
+    await render(<MeetingNotesScreen />);
+    expect(screen.getByText('No notes yet')).toBeTruthy();
     expect(screen.queryByTestId('notes-edit')).toBeNull();
   });
 
@@ -226,7 +261,7 @@ describe('Notes page header pencil (AC 6)', () => {
     params.meetingId = 'CN';
     params.edit = '1';
     try {
-      setStore(fakeStore('M', { courseMembers: members, meetings: [CN] }));
+      setStore(fakeStore('M', { courseMembers: members, meetings: [CN], meetingListenerNotes: notes }));
       await act(async () => {
         await render(<MeetingNotesScreen />);
       });
