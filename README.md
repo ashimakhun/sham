@@ -728,7 +728,7 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 | Add / edit / delete own listener notes on a completed meeting (ARU-125; one each; edit only while a listener) | courses they're in | courses they're in | (uses the owner's notes) |
 | Read listeners' notes (ARU-125) | courses they're in | ✓ (all courses; hidden: only if in it) | ✓ |
 | Delete any listener's notes (ARU-125) | | own courses | any course |
-| Mark a completed meeting's homework checked / undo | | any course they can see, not one they're a listener of | any course |
+| Mark a completed meeting's homework checked (ARU-126: no undo in the app) | | any course they can see, not one they're a listener of | any course |
 | Mark / undo own attendance of a started meeting | courses they're in | courses they're in |  |
 | See who attended a meeting | own marks only | ✓ (own courses and courses they don't listen to; own marks only where a listener) | ✓ |
 | See materials              | ✓         | ✓                  | ✓       |

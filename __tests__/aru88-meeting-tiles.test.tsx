@@ -86,27 +86,33 @@ describe('tiles (AC 1, AC 2, AC 4, AC 8)', () => {
       });
     expect(tileStyle('P').borderLeftColor).toBe(colors.success);
     expect(tileStyle('F').borderLeftColor).toBe(colors.primary);
-    expect(tileStyle('C').borderLeftColor).toBe(colors.warning); // follows the group, though its badge says Completed
+    expect(tileStyle('C').borderLeftColor).toBe(colors.primary); // ARU-126 AC 3: the theme colour (was amber)
     expect(tileStyle('K').borderLeftColor).toBe(colors.border);
     expect(tileStyle('X').borderLeftColor).toBe(colors.border);
-    expect(meetingAccent).toEqual({ inProgress: colors.success, upcoming: colors.primary, awaitingCheck: colors.warning, history: colors.border });
+    expect(meetingAccent).toEqual({ inProgress: colors.success, upcoming: colors.primary, awaitingCheck: colors.primary, history: colors.border });
     // History tiles are inside MEETING HISTORY (same tile there).
     expect(within(screen.getByTestId('meeting-history')).getByTestId('meeting-K')).toBeTruthy();
   });
 
-  it('a tile reads topic first (bold, 2 lines) with the badge, then the muted date and Rescheduled', async () => {
+  it('ARU-129 AC 4: the date and time is the title (14 / 600) with the badge, no date line, Rescheduled on its own grey line', async () => {
     const R = { ...F, rescheduledAt: at(-2) };
     setStore(fakeStore('S1', { courseMembers: members, meetings: [P, R] }));
     await render(<CourseDetailScreen />);
     const tile = screen.getByTestId('meeting-F') as unknown as Node;
-    expect(texts(tile).slice(0, 2)).toEqual(['Future', 'Scheduled']);
-    const topic = inMeeting('F').getByText('Future');
-    expect(topic.props.numberOfLines).toBe(2);
-    expect(flat(topic.props.style)).toMatchObject({ fontSize: 16, ...font(600) }); // ARU-119: 700 became Inter SemiBold 600
-    const date = inMeeting('F').getByText(new RegExp(formatDateTime(F.startsAt).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-    expect(flat(date.props.style).color).toBe(colors.muted);
-    expect(inMeeting('F').getByText('Rescheduled')).toBeTruthy();
+    const when = formatDateTime(F.startsAt);
+    expect(texts(tile).slice(0, 3)).toEqual([when, 'Scheduled', 'Rescheduled']);
+    // The date and time appears once: the title, no separate date line; the old topic isn't shown.
+    expect(inMeeting('F').getAllByText(new RegExp(when.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))).toHaveLength(1);
+    expect(inMeeting('F').queryByText('Future')).toBeNull();
+    const title = inMeeting('F').getByText(when);
+    // A long localized date wraps instead of being cut.
+    expect(title.props.numberOfLines).toBeUndefined();
+    expect(flat(title.props.style)).toMatchObject({ fontSize: 14, ...font(600), color: colors.text });
+    const rescheduled = inMeeting('F').getByText('Rescheduled');
+    expect(flat(rescheduled.props.style).color).toBe(colors.muted);
     expect(flat(inMeeting('F').getByTestId('status-badge').props.style).flexShrink).toBe(0);
+    // Not rescheduled: no Rescheduled line.
+    expect(inMeeting('P').queryByText('Rescheduled')).toBeNull();
   });
 
   it('a started meeting shows In progress; it is still Scheduled in the data', async () => {
@@ -151,26 +157,27 @@ describe('group headings (AC 5)', () => {
 });
 
 describe('footer (AC 6, AC 7, AC 9)', () => {
-  it('owner on a started meeting: pills under a divider, Mark canceled last and red', async () => {
+  it('owner on a started meeting: pills under a divider, the ✕ last and red (ARU-126: icon pills)', async () => {
     setStore(fakeStore('M', { courseMembers: members, meetings: [P] }));
     await render(<CourseDetailScreen />);
     const footer = screen.getByTestId('actions-P');
     expect(flat(footer.props.style)).toMatchObject({ flexDirection: 'row', flexWrap: 'wrap', gap: 8, borderTopWidth: 1, borderTopColor: colors.border });
-    expect(footerItems('P')).toEqual(['Edit', 'Attended 0 of 1', 'Mark completed', 'Mark canceled']);
-    const pill = screen.getByRole('button', { name: 'Edit' });
-    expect(flat(pill.props.style)).toMatchObject({ backgroundColor: colors.primarySoft, borderRadius: 999 });
-    expect(flat(inMeeting('P').getByText('Edit').props.style)).toMatchObject({ color: colors.primary, fontSize: 12, ...font(500), textTransform: 'uppercase' }); // ARU-122, ARU-119
-    const cancel = screen.getByRole('button', { name: 'Mark canceled' });
+    expect(footerItems('P')).toEqual(['Edit meeting', 'Attended 0 of 1', 'Mark completed', 'Cancel meeting']);
+    const pill = screen.getByRole('button', { name: 'Edit meeting' });
+    expect(flat(pill.props.style)).toMatchObject({ backgroundColor: colors.primarySoft, borderRadius: 999, width: 30 });
+    expect(within(pill).getByTestId('icon-create-outline').props.color).toBe(colors.primary);
+    const cancel = screen.getByRole('button', { name: 'Cancel meeting' });
     expect(flat(cancel.props.style).backgroundColor).toBe('#FEF2F2');
-    expect(flat(inMeeting('P').getByText('Mark canceled').props.style).color).toBe(colors.danger);
-    // Tap target: about 30 pt pill + 8 pt slop above and below ≥ 44 pt.
+    expect(within(cancel).getByTestId('icon-close').props.color).toBe(colors.danger);
+    // Tap target: a 30 pt round pill + 7 pt slop on each side ≥ 44 pt both ways.
     expect(flat(pill.props.style).minHeight + pill.props.hitSlop.top + pill.props.hitSlop.bottom).toBeGreaterThanOrEqual(44);
+    expect(flat(pill.props.style).width + pill.props.hitSlop.left + pill.props.hitSlop.right).toBeGreaterThanOrEqual(44);
   });
 
   it('owner on an upcoming meeting: Edit, then Cancel meeting in red', async () => {
     setStore(fakeStore('M', { courseMembers: members, meetings: [F] }));
     await render(<CourseDetailScreen />);
-    expect(footerItems('F')).toEqual(['Edit', 'Cancel meeting']);
+    expect(footerItems('F')).toEqual(['Edit meeting', 'Cancel meeting']);
     expect(flat(screen.getByRole('button', { name: 'Cancel meeting' }).props.style).backgroundColor).toBe('#FEF2F2');
   });
 
@@ -184,17 +191,23 @@ describe('footer (AC 6, AC 7, AC 9)', () => {
     expect(flat(screen.getByRole('button', { name: 'Undo attendance' }).props.style).backgroundColor).toBe('#FEF2F2');
   });
 
-  it('Undo check keeps the normal pill style', async () => {
-    setStore(fakeStore('T', { courseMembers: members, meetings: [K] }));
+  it('ARU-126: Mark homework checked is a green ✓ pill; a checked meeting has no Undo check', async () => {
+    setStore(fakeStore('T', { courseMembers: members, meetings: [C, K] }));
     await render(<CourseDetailScreen />);
-    expect(flat(screen.getByRole('button', { name: 'Undo check' }).props.style).backgroundColor).toBe(colors.primarySoft);
+    const check = inMeeting('C').getByRole('button', { name: 'Mark homework checked' });
+    expect(flat(check.props.style).backgroundColor).toBe(colors.successSoft);
+    expect(within(check).getByTestId('icon-checkmark').props.color).toBe(colors.success);
+    expect(screen.queryByRole('button', { name: 'Undo check' })).toBeNull();
   });
 
   it('Attended count is a link pill that opens the attendance screen', async () => {
     setStore(fakeStore('T', { courseMembers: members, meetings: [C] }));
     await render(<CourseDetailScreen />);
     const link = screen.getByRole('link', { name: 'Attended 0 of 1' });
-    expect(inMeeting('C').getByText('Attended: 0 of 1')).toBeTruthy();
+    // ARU-126 AC 4: a people icon, then "0 of 1"; the screen reader label is unchanged.
+    expect(within(link).getByTestId('icon-people-outline')).toBeTruthy();
+    // ARU-122: the count's text is a pill text, upper case by style.
+    expect(flat(within(link).getByText('0 of 1').props.style)).toMatchObject({ fontSize: 12, textTransform: 'uppercase' });
     await fireEvent.press(link);
     expect(router.push).toHaveBeenCalledWith({
       pathname: '/courses/[id]/meetings/[meetingId]/attendance',
@@ -212,6 +225,6 @@ describe('footer (AC 6, AC 7, AC 9)', () => {
     setStore(fakeStore('M', { courseMembers: members, meetings: [P] }));
     await render(<CourseDetailScreen />);
     expect(screen.getByTestId('meeting-P').props.accessible).toBeUndefined();
-    for (const name of ['Edit', 'Mark completed', 'Mark canceled']) expect(screen.getByRole('button', { name })).toBeTruthy();
+    for (const name of ['Edit meeting', 'Mark completed', 'Cancel meeting']) expect(screen.getByRole('button', { name })).toBeTruthy();
   });
 });

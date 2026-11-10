@@ -282,12 +282,13 @@ describe('AC8: shared content shows "Deleted account"', () => {
     ...over,
   });
 
-  it('MeetingsSection: "Homework checked by Deleted account"', async () => {
+  it('MeetingsSection: a checked meeting whose checker deleted their account shows no checker line (ARU-126 AC 7)', async () => {
     params.id = 'A';
     const k = completed({ homeworkCheckedAt: '2026-10-21T10:00:00.000Z', homeworkCheckedById: undefined });
     setStore(fakeStore('S1', { meetings: [k], courseMembers: [member('A', 'S1')] }));
     await render(<CourseDetailScreen />);
-    expect(screen.getByText(/^Homework checked by Deleted account · /)).toBeTruthy();
+    // ARU-126 removed the "Homework checked by <name> · <date>" line from MEETING HISTORY.
+    expect(screen.queryByText(/Homework checked by/)).toBeNull();
     expect(screen.queryByText(/Unknown/)).toBeNull();
   });
 

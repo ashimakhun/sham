@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, Stack, useLocalSearchParams, usePreventRemove } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
@@ -113,13 +114,25 @@ function NotesView({
     : meeting.notes && meeting.notesUpdatedAt
       ? t('common.deletedAccount')
       : undefined;
+  // Replace the view, so Save (which goes back) lands on the course details.
+  const openEditor = () =>
+    router.replace({
+      pathname: '/courses/[id]/meetings/[meetingId]/notes',
+      params: { id: course.id, meetingId: meeting.id, edit: '1' },
+    });
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic">
-      <Stack.Screen options={{ title: t('notes.title') }} />
-      <View style={{ gap: 2 }}>
-        <Text style={styles.title}>{meeting.topic}</Text>
-        <Text style={styles.muted}>{formatDateTime(meeting.startsAt)}</Text>
-      </View>
+      {/* ARU-126 AC 6: the owner and the teacher open the editor from a pencil at the header's right. */}
+      <Stack.Screen
+        options={{
+          title: t('notes.title'),
+          headerRight: canEdit
+            ? () => <HeaderEdit label={t(meeting.notes ? 'notes.edit' : 'notes.add')} onPress={openEditor} />
+            : undefined,
+        }}
+      />
+      {/* ARU-129: the meeting is named by its date and time (no topic). */}
+      <Text style={styles.title}>{formatDateTime(meeting.startsAt)}</Text>
       {meeting.notes ? (
         <Card>
           <MarkdownText source={meeting.notes} />
@@ -132,19 +145,6 @@ function NotesView({
       ) : listenerNotes.length === 0 ? (
         <EmptyState title={t('notes.none')} />
       ) : null}
-      {canEdit && (
-        <Button
-          title={t(meeting.notes ? 'notes.edit' : 'notes.add')}
-          variant="secondary"
-          // Replace the view, so Save (which goes back) lands on the course details.
-          onPress={() =>
-            router.replace({
-              pathname: '/courses/[id]/meetings/[meetingId]/notes',
-              params: { id: course.id, meetingId: meeting.id, edit: '1' },
-            })
-          }
-        />
-      )}
       {/* ARU-125 AC 6: below the owner's notes, every listener's entry, oldest first. */}
       {listenerNotes.length > 0 && (
         <View testID="listener-notes" style={{ gap: 12 }}>
@@ -287,12 +287,27 @@ function NotesEditor({
         }}
       />
       <Text style={styles.muted} numberOfLines={1}>
-        {meeting.topic} · {formatDateTime(meeting.startsAt)}
+        {formatDateTime(meeting.startsAt)}
       </Text>
       <MarkdownEditor value={draft} onChange={setDraft} placeholder={placeholder} />
       <ErrorText error={error} />
       <Button title={t(busy ? 'common.saving' : 'common.save')} onPress={save} disabled={blocked} />
     </KeyboardForm>
+  );
+}
+
+/** ARU-126 AC 6: the read view's pencil (Ionicons create-outline), labelled "Add notes" / "Edit notes". */
+function HeaderEdit({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable
+      testID="notes-edit"
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      hitSlop={8}
+      onPress={onPress}
+      style={{ paddingHorizontal: 8, minHeight: 44, justifyContent: 'center' }}>
+      <Ionicons name="create-outline" size={22} color={colors.primary} />
+    </Pressable>
   );
 }
 

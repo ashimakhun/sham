@@ -1,5 +1,6 @@
 // QA ARU-60: gaps in aru60-meeting-history.test.tsx: the exact confirmation texts, accessibility of the new buttons
 // and headings, the top count, and a checked meeting coming back to Awaiting homework check after a live undo.
+// ARU-126 AC 8: Undo check is gone from the app, so those cases now check that no Undo check is offered.
 import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 
@@ -35,18 +36,19 @@ beforeEach(() => {
   params.id = 'A';
 });
 
-it('AC5 / AC7: the confirmation texts name the topic and the meeting time', async () => {
+// ARU-129 AC 3: the confirmations name the meeting by its date and time only (no topic).
+it('AC5 / AC7: the confirmation texts name the meeting time (ARU-129: no topic)', async () => {
   const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   setStore(fakeStore('T', { courseMembers: members, meetings: [C] }));
   const view = await render(<CourseDetailScreen />);
   await fireEvent.press(inMeeting('C').getByRole('button', { name: 'Mark homework checked' }));
-  expect(alert.mock.calls[0][1]).toBe(`Mark homework for Fractions on ${formatDateTime(C.startsAt)} as checked?`);
+  expect(alert.mock.calls[0][1]).toBe(`Mark homework for the meeting on ${formatDateTime(C.startsAt)} as checked?`);
   await view.unmount();
 
+  // ARU-126 AC 8: no Undo check on a checked meeting any more (the admin can still undo in Supabase).
   setStore(fakeStore('T', { courseMembers: members, meetings: [K] }));
   await render(<CourseDetailScreen />);
-  await fireEvent.press(inMeeting('C').getByRole('button', { name: 'Undo check' }));
-  expect(alert.mock.calls[1][1]).toBe(`Move Fractions on ${formatDateTime(C.startsAt)} back to Awaiting homework check?`);
+  expect(inMeeting('C').queryByRole('button', { name: 'Undo check' })).toBeNull();
 });
 
 it('edge a11y: group headings and MEETING HISTORY are headers; the actions are buttons', async () => {
@@ -56,7 +58,8 @@ it('edge a11y: group headings and MEETING HISTORY are headers; the actions are b
   // ARU-88: group headings are uppercase with their count.
   expect(headers).toEqual(expect.arrayContaining(['UPCOMING (1)', 'AWAITING HOMEWORK CHECK (1)', 'MEETING HISTORY (1)']));
   expect(screen.getByRole('button', { name: 'Mark homework checked' })).toBeTruthy();
-  expect(screen.getByRole('button', { name: 'Undo check' })).toBeTruthy();
+  // ARU-126 AC 8: Undo check is removed.
+  expect(screen.queryByRole('button', { name: 'Undo check' })).toBeNull();
 });
 
 it('AC1: the MEETINGS count leaves out history meetings', async () => {
@@ -68,7 +71,8 @@ it('AC1: the MEETINGS count leaves out history meetings', async () => {
 it('AC7: a live undo moves the meeting back from history to Awaiting homework check', async () => {
   setStore(fakeStore('S1', { courseMembers: members, meetings: [K] }));
   const view = await render(<CourseDetailScreen />);
-  expect(within(screen.getByTestId('meeting-history')).getByText('Fractions')).toBeTruthy();
+  // ARU-129: the history tile is found by its testID (it is titled by its date and time).
+  expect(within(screen.getByTestId('meeting-history')).getByTestId('meeting-C')).toBeTruthy();
   setStore(fakeStore('S1', { courseMembers: members, meetings: [C] }));
   await view.rerender(<CourseDetailScreen />);
   expect(screen.queryByTestId('meeting-history')).toBeNull();

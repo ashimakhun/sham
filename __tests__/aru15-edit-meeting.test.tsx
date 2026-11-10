@@ -62,11 +62,11 @@ describe('Edit action', () => {
     const list = all.map((m) => ({ ...m, courseId }));
     setStore(fakeStore(who, { courses: [courseA, courseT1], courseMembers: members, meetings: list }));
     await render(<CourseDetailScreen />);
-    expect(inMeeting('F').getByRole('button', { name: 'Edit' })).toBeTruthy();
-    expect(inMeeting('P').getByRole('button', { name: 'Edit' })).toBeTruthy(); // past but not yet marked
-    expect(inMeeting('C').queryByRole('button', { name: 'Edit' })).toBeNull();
-    expect(inMeeting('X').queryByRole('button', { name: 'Edit' })).toBeNull();
-    await fireEvent.press(inMeeting('F').getByRole('button', { name: 'Edit' }));
+    expect(inMeeting('F').getByRole('button', { name: 'Edit meeting' })).toBeTruthy();
+    expect(inMeeting('P').getByRole('button', { name: 'Edit meeting' })).toBeTruthy(); // past but not yet marked
+    expect(inMeeting('C').queryByRole('button', { name: 'Edit meeting' })).toBeNull();
+    expect(inMeeting('X').queryByRole('button', { name: 'Edit meeting' })).toBeNull();
+    await fireEvent.press(inMeeting('F').getByRole('button', { name: 'Edit meeting' }));
     expect(router.push).toHaveBeenCalledWith({
       pathname: '/courses/[id]/meetings/[meetingId]',
       params: { id: courseId, meetingId: 'F' },
@@ -76,7 +76,7 @@ describe('Edit action', () => {
   it.each(['N', 'S1'] as const)('AC1: %s (mentor not owning it, student listener) sees no Edit', async (who) => {
     setStore(fakeStore(who, { courseMembers: members, meetings: all }));
     await render(<CourseDetailScreen />);
-    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Edit meeting' })).toBeNull();
   });
 
   it('AC5: "Rescheduled" shows only on meetings whose time was changed', async () => {
@@ -111,20 +111,31 @@ describe('Edit meeting screen', () => {
     return updateMeeting;
   };
 
-  it('AC2: pre-filled with the meeting; topic/link change saves with the exact original time, then goes back', async () => {
+  it('AC2 / ARU-129: pre-filled, no Topic field; a link change saves with the exact original time and the stored topic unchanged', async () => {
     const updateMeeting = open('M', 'F');
     await render(<EditMeetingScreen />);
     expect(new Date(screen.getByTestId('starts-at').props.value).getTime()).toBe(new Date(F.startsAt).getTime());
-    expect(screen.getByDisplayValue('Future')).toBeTruthy();
-    expect(screen.getByDisplayValue('https://meet.example/x')).toBeTruthy();
-    await fireEvent.changeText(screen.getByDisplayValue('Future'), 'Exam prep');
+    expect(screen.queryByText('Topic (optional)')).toBeNull();
+    expect(screen.queryByDisplayValue('Future')).toBeNull();
+    await fireEvent.changeText(screen.getByDisplayValue('https://meet.example/x'), 'Room 7');
     await fireEvent.press(button('Save'));
     await waitFor(() => expect(router.back).toHaveBeenCalled());
     expect(updateMeeting).toHaveBeenCalledWith('F', {
       startsAt: '2099-01-02T10:00:00.123456+00:00',
-      topic: 'Exam prep',
-      location: 'https://meet.example/x',
+      topic: 'Future',
+      location: 'Room 7',
     });
+  });
+
+  it('ARU-129 AC 6: a time-only change also sends the stored topic unchanged', async () => {
+    const updateMeeting = open('M', 'F');
+    await render(<EditMeetingScreen />);
+    const when = new Date(Date.now() + 72 * HOUR);
+    await fireEvent.changeText(screen.getByTestId('starts-at'), when.toISOString());
+    await fireEvent.press(button('Save'));
+    await waitFor(() =>
+      expect(updateMeeting).toHaveBeenCalledWith('F', { startsAt: when.toISOString(), topic: 'Future', location: 'https://meet.example/x' }),
+    );
   });
 
   it('AC2/AC3: a new future time is sent as an ISO timestamp', async () => {
@@ -145,14 +156,14 @@ describe('Edit meeting screen', () => {
     expect(button('Save')).toBeDisabled();
   });
 
-  it('AC3: a past, unmarked meeting keeps Save enabled for a topic-only edit', async () => {
+  it('AC3: a past, unmarked meeting keeps Save enabled for a place-only edit', async () => {
     const updateMeeting = open('M', 'P');
     await render(<EditMeetingScreen />);
     expect(screen.queryByText('Pick a time in the future')).toBeNull();
     expect(button('Save')).toBeEnabled();
-    await fireEvent.changeText(screen.getByDisplayValue('Past'), 'Past fixed');
+    await fireEvent.changeText(screen.getByDisplayValue('Room 12'), 'Room 13');
     await fireEvent.press(button('Save'));
-    await waitFor(() => expect(updateMeeting).toHaveBeenCalledWith('P', { startsAt: P.startsAt, topic: 'Past fixed', location: 'Room 12' }));
+    await waitFor(() => expect(updateMeeting).toHaveBeenCalledWith('P', { startsAt: P.startsAt, topic: 'Past', location: 'Room 13' }));
   });
 
   it('AC3: moving a past meeting to another past time disables Save', async () => {
@@ -162,13 +173,12 @@ describe('Edit meeting screen', () => {
     expect(button('Save')).toBeDisabled();
   });
 
-  it('AC4: cleared topic and link are sent empty (the database stores "Meeting" and no link)', async () => {
+  it('AC4: a cleared link is sent empty (the database stores no link); the topic stays as stored', async () => {
     const updateMeeting = open('M', 'F');
     await render(<EditMeetingScreen />);
-    await fireEvent.changeText(screen.getByDisplayValue('Future'), '');
     await fireEvent.changeText(screen.getByDisplayValue('https://meet.example/x'), '');
     await fireEvent.press(button('Save'));
-    await waitFor(() => expect(updateMeeting).toHaveBeenCalledWith('F', expect.objectContaining({ topic: '', location: '' })));
+    await waitFor(() => expect(updateMeeting).toHaveBeenCalledWith('F', expect.objectContaining({ topic: 'Future', location: '' })));
   });
 
   it('edge: a rejection (e.g. canceled meanwhile) is shown, values kept, no crash', async () => {
@@ -178,7 +188,7 @@ describe('Edit meeting screen', () => {
       }),
     });
     await render(<EditMeetingScreen />);
-    await fireEvent.changeText(screen.getByDisplayValue('Future'), 'Kept');
+    await fireEvent.changeText(screen.getByDisplayValue('https://meet.example/x'), 'Kept');
     await fireEvent.press(button('Save'));
     expect(await screen.findByText("This meeting is already canceled; it can't be edited.")).toBeTruthy();
     expect(screen.getByDisplayValue('Kept')).toBeTruthy();

@@ -54,6 +54,7 @@ describe('edge case: rescheduled into the future after S1 marked it', () => {
     setStore(store('M', [R], { attendance: [mark('R', 'S1')] }));
     await render(<CourseDetailScreen />);
     expect(inMeeting('R').queryByText(/Attended/)).toBeNull();
+    expect(inMeeting('R').queryByRole('link', { name: /^Attended / })).toBeNull();
     params.meetingId = 'R';
     await render(<MeetingAttendanceScreen />);
     expect(screen.getByText('Attendance is available once the meeting has started.')).toBeTruthy();
@@ -76,8 +77,9 @@ describe('regression: notes and homework stay Completed-only', () => {
   it.each(['M', 'T'] as const)('%s on a started Scheduled meeting: count, but no notes or Assign homework', async (who) => {
     setStore(store(who, [meeting({ id: 'R', notes: undefined })]));
     await render(<CourseDetailScreen />);
-    expect(inMeeting('R').getByText('Attended: 0 of 2')).toBeTruthy();
-    expect(inMeeting('R').queryByText(/Add notes|Edit notes/)).toBeNull();
+    expect(inMeeting('R').getByRole('link', { name: 'Attended 0 of 2' })).toBeTruthy();
+    // ARU-126: the notes pencil has no text, so look for it by its label.
+    expect(inMeeting('R').queryByRole('button', { name: /Add notes|Edit notes/ })).toBeNull();
     expect(inMeeting('R').queryByRole('button', { name: 'Assign homework' })).toBeNull();
   });
 });
@@ -87,10 +89,10 @@ describe('AC 8: live on a started meeting', () => {
     const R = meeting({ id: 'R' });
     setStore(store('M', [R]));
     const card = await render(<CourseDetailScreen />);
-    expect(inMeeting('R').getByText('Attended: 0 of 2')).toBeTruthy();
+    expect(inMeeting('R').getByRole('link', { name: 'Attended 0 of 2' })).toBeTruthy();
     setStore(store('M', [R], { attendance: [mark('R', 'S1'), mark('R', 'M2')] }));
     await card.rerender(<CourseDetailScreen />);
-    expect(inMeeting('R').getByText('Attended: 2 of 2')).toBeTruthy();
+    expect(inMeeting('R').getByRole('link', { name: 'Attended 2 of 2' })).toBeTruthy();
     await card.unmount();
 
     params.meetingId = 'R';

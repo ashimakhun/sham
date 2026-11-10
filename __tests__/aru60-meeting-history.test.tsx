@@ -180,7 +180,7 @@ describe('AC5/AC6/AC7: mark homework checked and undo', () => {
     await render(<CourseDetailScreen />);
     await fireEvent.press(inMeeting('C2').getByRole('button', { name: 'Mark homework checked' }));
     expect(alert.mock.calls[0][0]).toBe('Mark homework checked');
-    expect(alert.mock.calls[0][1]).toBe(`Mark homework for New lesson on ${formatDateTime(C2.startsAt)} as checked?`);
+    expect(alert.mock.calls[0][1]).toBe(`Mark homework for the meeting on ${formatDateTime(C2.startsAt)} as checked?`);
     await waitFor(() => expect(store.setMeetingHomeworkChecked).toHaveBeenCalledWith('C2', true));
   });
 
@@ -194,7 +194,7 @@ describe('AC5/AC6/AC7: mark homework checked and undo', () => {
     expect(store.setMeetingHomeworkChecked).not.toHaveBeenCalled();
   });
 
-  it('a live update moves the checked meeting to history with "Homework checked by <name> · <date>"', async () => {
+  it('a live update moves the checked meeting to history (ARU-126 AC 7: with no "Homework checked by" line)', async () => {
     setStore(fakeStore('S1', { courseMembers: members, meetings: [C2] }));
     const view = await render(<CourseDetailScreen />);
     const checked = { ...C2, homeworkCheckedAt: '2026-11-02T09:00:00.000Z', homeworkCheckedById: 'N' };
@@ -202,14 +202,7 @@ describe('AC5/AC6/AC7: mark homework checked and undo', () => {
     await view.rerender(<CourseDetailScreen />);
     expect(screen.getByText('No current meetings')).toBeTruthy();
     expect(history().getByText('Completed')).toBeTruthy();
-    expect(history().getByText(`Homework checked by Mentor Nina · ${formatDate(checked.homeworkCheckedAt)}`)).toBeTruthy();
-  });
-
-  it('the checker shows as "Unknown" when their profile can\'t be read', async () => {
-    const ghost = { ...K, homeworkCheckedById: 'gone' };
-    setStore(fakeStore('S1', { courseMembers: members, meetings: [ghost] }));
-    await render(<CourseDetailScreen />);
-    expect(history().getByText(`Homework checked by Unknown · ${formatDate(K.homeworkCheckedAt!)}`)).toBeTruthy();
+    expect(history().queryByText(/Homework checked by/)).toBeNull();
   });
 
   it('canceled meetings show no "checked" line and no check actions', async () => {
@@ -219,14 +212,11 @@ describe('AC5/AC6/AC7: mark homework checked and undo', () => {
     expect(inMeeting('X').queryByRole('button', { name: /check/i })).toBeNull();
   });
 
-  it.each(['T', 'N'] as const)('%s undoes a check after confirming', async (who) => {
-    const alert = answer('Undo check');
-    const store = fakeStore(who, { courseMembers: members, meetings: all });
-    setStore(store);
+  it.each(['T', 'N'] as const)('ARU-126 AC 8: %s has no Undo check on a checked meeting', async (who) => {
+    setStore(fakeStore(who, { courseMembers: members, meetings: all }));
     await render(<CourseDetailScreen />);
-    await fireEvent.press(history().getByRole('button', { name: 'Undo check' }));
-    expect(alert.mock.calls[0][0]).toBe('Undo check');
-    await waitFor(() => expect(store.setMeetingHomeworkChecked).toHaveBeenCalledWith('K', false));
+    expect(history().queryByRole('button', { name: /undo check/i })).toBeNull();
+    expect(screen.queryByText(/Undo check/)).toBeNull();
   });
 
   it('a database error shows in the section\'s error text and the meeting stays where it was', async () => {
@@ -272,6 +262,6 @@ describe('AC8/AC9: who sees the check actions; the rest is unchanged', () => {
     const labels = history()
       .queryAllByRole(/button|link/)
       .map((b) => b.props.accessibilityLabel);
-    expect(labels).toEqual(['Notes', 'Edit notes', 'Assign homework', 'Attended 0 of 2', 'Undo check']);
+    expect(labels).toEqual(['Notes', 'Edit notes', 'Assign homework', 'Attended 0 of 2']); // ARU-126: no Undo check
   });
 });
