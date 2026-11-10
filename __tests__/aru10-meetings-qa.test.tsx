@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
 
 import CourseDetailScreen from '@/app/courses/[id]';
 import { DateTimeField } from '@/components/DateTimeField';
+import { formatDateTime } from '@/lib/theme';
 import type { Course, Meeting } from '@/lib/types';
 
 import { courseA, fakeStore, member } from './helpers/fakeStore';
@@ -93,7 +94,9 @@ describe('Teacher-owned course', () => {
     params.id = 'T1';
     setStore(fakeStore(who, { courses: [courseA, courseT1], courseMembers: [member('T1', 'N')], meetings: [past] }));
     await render(<CourseDetailScreen />);
-    expect(screen.getByText('Teacher past')).toBeTruthy();
+    // ARU-129: a meeting is named by its date and time, not its topic.
+    expect(screen.getByText(formatDateTime(past.startsAt))).toBeTruthy();
+    expect(screen.queryByText('Teacher past')).toBeNull();
     expect(screen.queryByRole('button', { name: '+ Schedule meeting' })).toBeNull();
     expect(screen.queryByRole('button', { name: /Mark|Cancel meeting/ })).toBeNull();
   });
@@ -103,6 +106,6 @@ describe('Teacher-owned course', () => {
     setStore(fakeStore('S1', { courses: [courseA, courseT1], courseMembers: [member('A', 'S1')], meetings: [past] }));
     await render(<CourseDetailScreen />);
     expect(screen.queryByText(/MEETINGS/)).toBeNull();
-    expect(screen.queryByText('Teacher past')).toBeNull();
+    expect(screen.queryByText(formatDateTime(past.startsAt))).toBeNull();
   });
 });

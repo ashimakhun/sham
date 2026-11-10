@@ -94,19 +94,25 @@ describe('tiles (AC 1, AC 2, AC 4, AC 8)', () => {
     expect(within(screen.getByTestId('meeting-history')).getByTestId('meeting-K')).toBeTruthy();
   });
 
-  it('a tile reads topic first (bold, 2 lines) with the badge, then the muted date and Rescheduled', async () => {
+  it('ARU-129 AC 4: the date and time is the title (14 / 600) with the badge, no date line, Rescheduled on its own grey line', async () => {
     const R = { ...F, rescheduledAt: at(-2) };
     setStore(fakeStore('S1', { courseMembers: members, meetings: [P, R] }));
     await render(<CourseDetailScreen />);
     const tile = screen.getByTestId('meeting-F') as unknown as Node;
-    expect(texts(tile).slice(0, 2)).toEqual(['Future', 'Scheduled']);
-    const topic = inMeeting('F').getByText('Future');
-    expect(topic.props.numberOfLines).toBe(2);
-    expect(flat(topic.props.style)).toMatchObject({ fontSize: 16, ...font(600) }); // ARU-119: 700 became Inter SemiBold 600
-    const date = inMeeting('F').getByText(new RegExp(formatDateTime(F.startsAt).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-    expect(flat(date.props.style).color).toBe(colors.muted);
-    expect(inMeeting('F').getByText('Rescheduled')).toBeTruthy();
+    const when = formatDateTime(F.startsAt);
+    expect(texts(tile).slice(0, 3)).toEqual([when, 'Scheduled', 'Rescheduled']);
+    // The date and time appears once: the title, no separate date line; the old topic isn't shown.
+    expect(inMeeting('F').getAllByText(new RegExp(when.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))).toHaveLength(1);
+    expect(inMeeting('F').queryByText('Future')).toBeNull();
+    const title = inMeeting('F').getByText(when);
+    // A long localized date wraps instead of being cut.
+    expect(title.props.numberOfLines).toBeUndefined();
+    expect(flat(title.props.style)).toMatchObject({ fontSize: 14, ...font(600), color: colors.text });
+    const rescheduled = inMeeting('F').getByText('Rescheduled');
+    expect(flat(rescheduled.props.style).color).toBe(colors.muted);
     expect(flat(inMeeting('F').getByTestId('status-badge').props.style).flexShrink).toBe(0);
+    // Not rescheduled: no Rescheduled line.
+    expect(inMeeting('P').queryByText('Rescheduled')).toBeNull();
   });
 
   it('a started meeting shows In progress; it is still Scheduled in the data', async () => {

@@ -36,12 +36,13 @@ beforeEach(() => {
   params.id = 'A';
 });
 
-it('AC5 / AC7: the confirmation texts name the topic and the meeting time', async () => {
+// ARU-129 AC 3: the confirmations name the meeting by its date and time only (no topic).
+it('AC5 / AC7: the confirmation texts name the meeting time (ARU-129: no topic)', async () => {
   const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   setStore(fakeStore('T', { courseMembers: members, meetings: [C] }));
   const view = await render(<CourseDetailScreen />);
   await fireEvent.press(inMeeting('C').getByRole('button', { name: 'Mark homework checked' }));
-  expect(alert.mock.calls[0][1]).toBe(`Mark homework for Fractions on ${formatDateTime(C.startsAt)} as checked?`);
+  expect(alert.mock.calls[0][1]).toBe(`Mark homework for the meeting on ${formatDateTime(C.startsAt)} as checked?`);
   await view.unmount();
 
   // ARU-126 AC 8: no Undo check on a checked meeting any more (the admin can still undo in Supabase).
@@ -70,7 +71,8 @@ it('AC1: the MEETINGS count leaves out history meetings', async () => {
 it('AC7: a live undo moves the meeting back from history to Awaiting homework check', async () => {
   setStore(fakeStore('S1', { courseMembers: members, meetings: [K] }));
   const view = await render(<CourseDetailScreen />);
-  expect(within(screen.getByTestId('meeting-history')).getByText('Fractions')).toBeTruthy();
+  // ARU-129: the history tile is found by its testID (it is titled by its date and time).
+  expect(within(screen.getByTestId('meeting-history')).getByTestId('meeting-C')).toBeTruthy();
   setStore(fakeStore('S1', { courseMembers: members, meetings: [C] }));
   await view.rerender(<CourseDetailScreen />);
   expect(screen.queryByTestId('meeting-history')).toBeNull();

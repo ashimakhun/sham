@@ -43,8 +43,8 @@ export default function MeetingAttendanceScreen() {
 
   const header = (
     <View style={{ gap: 2 }}>
-      <Text style={styles.title}>{meeting.topic}</Text>
-      <Text style={styles.muted}>{formatDateTime(meeting.startsAt)}</Text>
+      {/* ARU-129: the meeting is named by its date and time (no topic). */}
+      <Text style={styles.title}>{formatDateTime(meeting.startsAt)}</Text>
     </View>
   );
 

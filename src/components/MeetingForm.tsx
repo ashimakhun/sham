@@ -9,7 +9,8 @@ import { useI18n } from '@/i18n/context';
 import { colors } from '@/lib/theme';
 import { useNow } from '@/lib/useNow';
 
-export type MeetingFormValues = { startsAt: Date; topic: string; location: string };
+/** No topic (ARU-129): a meeting is named by its date and time. */
+export type MeetingFormValues = { startsAt: Date; location: string };
 export type MeetingFormResult = MeetingFormValues & { timeChanged: boolean };
 
 type Props = {
@@ -31,13 +32,12 @@ export function nextFullHour(now = new Date()) {
   return d;
 }
 
-/** Date and start time, topic and link/place of a meeting: "Schedule meeting" (ARU-10) and "Edit meeting"
+/** Date and start time and link/place of a meeting: "Schedule meeting" (ARU-10) and "Edit meeting"
  *  (ARU-15). The start must be in the future (device clock here; the database checks again with its own); when
  *  editing, only if it was changed. */
 export function MeetingForm({ initial, submitTitle, busyTitle, busy, error, onSubmit, checkTimeOnlyWhenChanged }: Props) {
   const { t } = useI18n();
   const [startsAt, setStartsAt] = useState(initial.startsAt);
-  const [topic, setTopic] = useState(initial.topic);
   const [location, setLocation] = useState(initial.location);
   const now = useNow(15_000);
   const timeChanged = startsAt.getTime() !== initial.startsAt.getTime();
@@ -47,13 +47,6 @@ export function MeetingForm({ initial, submitTitle, busyTitle, busy, error, onSu
     <KeyboardForm>
       <DateTimeField label={t('meetings.dateTimeLabel')} value={startsAt} onChange={setStartsAt} />
       {!timeOk && <Text style={{ color: colors.warning, fontSize: 14 }}>{t('meetings.pickFuture')}</Text>}
-      <Field
-        label={t('meetings.topicLabel')}
-        placeholder={t('meetings.topicPlaceholder')}
-        value={topic}
-        onChangeText={setTopic}
-        maxLength={200}
-      />
       <Field
         label={t('meetings.locationLabel')}
         placeholder={t('meetings.locationPlaceholder')}
@@ -66,7 +59,7 @@ export function MeetingForm({ initial, submitTitle, busyTitle, busy, error, onSu
       <ErrorText error={error} />
       <Button
         title={busy ? busyTitle : submitTitle}
-        onPress={() => onSubmit({ startsAt, topic, location, timeChanged })}
+        onPress={() => onSubmit({ startsAt, location, timeChanged })}
         disabled={!timeOk || busy}
       />
     </KeyboardForm>

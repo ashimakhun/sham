@@ -123,7 +123,7 @@ describe('listener marks attendance (AC1–AC5)', () => {
     await fireEvent.press(inMeeting('C').getByRole('button', { name: 'Undo attendance' }));
     expect(alert).toHaveBeenCalledWith(
       'Undo attendance',
-      `Remove your attendance for Done on ${formatDateTime(C.startsAt)}?`,
+      `Remove your attendance for the meeting on ${formatDateTime(C.startsAt)}?`,
       expect.arrayContaining([expect.objectContaining({ text: 'Remove' }), expect.objectContaining({ text: 'Not now' })]),
       expect.any(Object),
     );
@@ -190,10 +190,10 @@ describe('Attendance screen (AC6, AC8, AC9)', () => {
     params.meetingId = 'C';
   });
 
-  it('AC6: date, time, topic and listeners sorted by name under Attended / Not marked with roles', async () => {
+  it('AC6 / ARU-129: the date and time as the title (no topic) and listeners sorted by name under Attended / Not marked with roles', async () => {
     setStore(store('T', { attendance: [mark('C', 'S1'), mark('C', 'M2')] }));
     await render(<MeetingAttendanceScreen />);
-    expect(screen.getByText('Done')).toBeTruthy();
+    expect(screen.queryByText('Done')).toBeNull();
     expect(screen.getByText(formatDateTime(C.startsAt))).toBeTruthy();
     expect(screen.getByRole('header', { name: 'Attended' })).toBeTruthy();
     expect(screen.getByRole('header', { name: 'Not marked' })).toBeTruthy();

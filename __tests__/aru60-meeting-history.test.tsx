@@ -180,7 +180,7 @@ describe('AC5/AC6/AC7: mark homework checked and undo', () => {
     await render(<CourseDetailScreen />);
     await fireEvent.press(inMeeting('C2').getByRole('button', { name: 'Mark homework checked' }));
     expect(alert.mock.calls[0][0]).toBe('Mark homework checked');
-    expect(alert.mock.calls[0][1]).toBe(`Mark homework for New lesson on ${formatDateTime(C2.startsAt)} as checked?`);
+    expect(alert.mock.calls[0][1]).toBe(`Mark homework for the meeting on ${formatDateTime(C2.startsAt)} as checked?`);
     await waitFor(() => expect(store.setMeetingHomeworkChecked).toHaveBeenCalledWith('C2', true));
   });
 

@@ -56,14 +56,14 @@ beforeEach(() => {
 });
 
 describe('Meetings section', () => {
-  it('AC1: shows date/time in the device format, topic, link/place and the status badge', async () => {
+  it('AC1 / ARU-129: shows the date and time as the title (no topic), link/place and the status badge', async () => {
     setStore(fakeStore('S1', { courseMembers: members, meetings: all }));
     await render(<CourseDetailScreen />);
     // ARU-60: the canceled meeting moved to MEETING HISTORY, so the top card counts 4.
     expect(screen.getByText('MEETINGS (4)')).toBeTruthy();
     const f = inMeeting('F');
     expect(f.getByText(formatDateTime(future.startsAt))).toBeTruthy();
-    expect(f.getByText('Future')).toBeTruthy();
+    expect(f.queryByText('Future')).toBeNull();
     expect(f.getByText('Scheduled')).toBeTruthy();
     expect(inMeeting('C').getByText('Completed')).toBeTruthy();
     expect(inMeeting('X').getByText('Canceled')).toBeTruthy();
@@ -118,7 +118,7 @@ describe('Meetings section', () => {
     const view = await render(<CourseDetailScreen />);
     setStore(fakeStore('S1', { courseMembers: members, meetings: [future] }));
     await view.rerender(<CourseDetailScreen />);
-    expect(screen.getByText('Future')).toBeTruthy();
+    expect(inMeeting('F').getByText(formatDateTime(future.startsAt))).toBeTruthy();
   });
 });
 
@@ -178,7 +178,7 @@ describe('Setting the status', () => {
       buttons?.find((b) => b.text === choice)?.onPress?.();
     });
 
-  it('AC11: confirm "Mark <topic> on <date and time> as completed?" then save', async () => {
+  it('AC11 / ARU-129: confirm "Mark the meeting on <date and time> as completed?" then save', async () => {
     const alert = answer('Mark completed');
     const setMeetingStatus = jest.fn(async () => {});
     setStore(fakeStore('M', { courseMembers: members, meetings: all, setMeetingStatus }));
@@ -186,7 +186,7 @@ describe('Setting the status', () => {
     await fireEvent.press(inMeeting('P').getByRole('button', { name: 'Mark completed' }));
     expect(alert).toHaveBeenCalledWith(
       'Mark completed',
-      `Mark Past on ${formatDateTime(pastUnmarked.startsAt)} as completed?`,
+      `Mark the meeting on ${formatDateTime(pastUnmarked.startsAt)} as completed?`,
       expect.any(Array),
       expect.any(Object),
     );
@@ -199,7 +199,7 @@ describe('Setting the status', () => {
     setStore(fakeStore('T', { courseMembers: members, meetings: all, setMeetingStatus }));
     await render(<CourseDetailScreen />);
     await fireEvent.press(inMeeting('F').getByRole('button', { name: 'Cancel meeting' }));
-    expect(alert.mock.calls[0][1]).toBe(`Mark Future on ${formatDateTime(future.startsAt)} as canceled?`);
+    expect(alert.mock.calls[0][1]).toBe(`Mark the meeting on ${formatDateTime(future.startsAt)} as canceled?`);
     await waitFor(() => expect(setMeetingStatus).toHaveBeenCalledWith('F', 'canceled'));
   });
 
@@ -226,13 +226,14 @@ describe('Setting the status', () => {
 });
 
 describe('Schedule meeting screen', () => {
-  it('AC7: schedules with the picked time, topic and link, then goes back', async () => {
+  it('AC7 / ARU-129: schedules with the picked time and link (no Topic field, no topic sent), then goes back', async () => {
     const addMeeting = jest.fn(async () => {});
     setStore(fakeStore('M', { courseMembers: members, addMeeting }));
     await render(<ScheduleMeetingScreen />);
     const when = new Date(Date.now() + 3 * 24 * HOUR);
     await fireEvent.changeText(screen.getByTestId('starts-at'), when.toISOString());
-    await fireEvent.changeText(screen.getByPlaceholderText('Meeting'), 'Exam prep');
+    expect(screen.queryByText('Topic (optional)')).toBeNull();
+    expect(screen.queryByPlaceholderText('Meeting')).toBeNull();
     await fireEvent.changeText(screen.getByPlaceholderText('https://… or Room 12'), 'https://meet.example/y');
     await fireEvent.press(button('Schedule'));
     await waitFor(() => expect(router.back).toHaveBeenCalled());
@@ -240,7 +241,6 @@ describe('Schedule meeting screen', () => {
       id: expect.any(String),
       courseId: 'A',
       startsAt: when.toISOString(),
-      topic: 'Exam prep',
       location: 'https://meet.example/y',
     });
   });
@@ -268,7 +268,7 @@ describe('Schedule meeting screen', () => {
       .mockResolvedValueOnce(undefined);
     setStore(fakeStore('M', { courseMembers: members, addMeeting }));
     await render(<ScheduleMeetingScreen />);
-    await fireEvent.changeText(screen.getByPlaceholderText('Meeting'), 'Kept');
+    await fireEvent.changeText(screen.getByPlaceholderText('https://… or Room 12'), 'Kept');
     await fireEvent.press(button('Schedule'));
     expect(await screen.findByText('new row violates row-level security policy')).toBeTruthy();
     expect(screen.getByDisplayValue('Kept')).toBeTruthy();

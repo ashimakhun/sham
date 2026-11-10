@@ -109,7 +109,7 @@ describe('AC 1 / AC 8: screens in Russian, user text as written', () => {
     await render(inApp(<CourseDetailScreen />));
     await flush();
     expectNoCatalogEnglish();
-    expect(screen.getByText('Topic m1')).toBeTruthy();
+    expect(screen.getByTestId('meeting-m1')).toBeTruthy();
     expect(screen.getByText('Equations and more')).toBeTruthy();
   });
 
