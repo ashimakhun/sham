@@ -55,10 +55,10 @@ describe('AC 2 / AC 3: Russian', () => {
   });
 
   it.each([
-    [1, 'Mentor Max владеет 1 курсом: Алгебра. Сначала передайте его другому владельцу'],
-    [2, 'Mentor Max владеет 2 курсами: Алгебра. Сначала передайте их другим владельцам'],
-    [5, 'Mentor Max владеет 5 курсами: Алгебра. Сначала передайте их другим владельцам'],
-    [21, 'Mentor Max владеет 21 курсом: Алгебра. Сначала передайте его другому владельцу'],
+    [1, 'Mentor Max — куратор 1 курса: Алгебра. Сначала смените куратора'],
+    [2, 'Mentor Max — куратор 2 курсов: Алгебра. Сначала смените куратора'],
+    [5, 'Mentor Max — куратор 5 курсов: Алгебра. Сначала смените куратора'],
+    [21, 'Mentor Max — куратор 21 курса: Алгебра. Сначала смените куратора'],
   ])('owner with %i course(s): values in place, names as typed', (count, text) => {
     const details = JSON.stringify({ name: 'Mentor Max', count, titles: 'Алгебра' });
     expect(dbErrorMessage({ message: 'x', code: '23514', hint: 'sham:owner_owns_courses_titles', details }, 'ru')).toBe(text);

@@ -156,9 +156,14 @@ describe("AC 3: values", () => {
   });
 
   it.each([
-    [0, "курсами"],
-    [11, "курсами"],
-    [3, "курсами"],
+    // ARU-139: «куратор N курса/курсов» (1/21 → курса; 0/2/3/5/11 → курсов).
+    [0, "курсов"],
+    [1, "курса"],
+    [2, "курсов"],
+    [3, "курсов"],
+    [5, "курсов"],
+    [11, "курсов"],
+    [21, "курса"],
   ])(
     "owner with %i course(s): a Russian form, no placeholder left",
     (count, word) => {
@@ -172,7 +177,7 @@ describe("AC 3: values", () => {
         "ru",
       );
       expect(text).toContain(
-        `Анна владеет ${count} ${word}: Алгебра, Physics.`,
+        `Анна — куратор ${count} ${word}: Алгебра, Physics. Сначала смените куратора`,
       );
       expect(text).not.toMatch(/[{}]/);
     },
@@ -184,7 +189,7 @@ describe("AC 3: values", () => {
       { message: "x", hint: "sham:owner_owns_courses", details },
       "ru",
     );
-    expect(text).toMatch(/^Mentor Max .*2/);
+    expect(text).toBe("Mentor Max — куратор 2 курсов. Сначала смените куратора");
     expect(text).not.toMatch(/[{}]/);
   });
 

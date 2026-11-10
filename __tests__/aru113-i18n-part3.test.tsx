@@ -213,7 +213,7 @@ describe('AC 3: app errors', () => {
     expect(translateKnown('ru', PHOTO_PERMISSION)).toMatch(/^Sham нужен доступ/);
     expect(translateKnown('ru', 'Payment days must be between 1 and 28.')).toBe('Дни оплаты должны быть от 1 до 28.');
     expect(translateKnown('ru', ownedCoursesProblem(['Biology', 'Algebra'])!)).toBe(
-      'Вы владелец курсов: Algebra, Biology. Попросите преподавателя или ментора сначала сменить владельца.',
+      'Вы куратор курсов: Algebra, Biology. Попросите преподавателя или ментора сначала сменить куратора.',
     );
     expect(translateKnown('ru', 'permission denied for table materials')).toBe('permission denied for table materials');
   });
