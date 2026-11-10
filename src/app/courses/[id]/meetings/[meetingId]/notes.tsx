@@ -10,6 +10,7 @@ import { MarkdownText } from '@/components/MarkdownText';
 import { Button, Card, EmptyState, ErrorText, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import { confirmAction } from '@/lib/confirm';
+import { font } from '@/lib/fonts';
 import {
   canDeleteListenerNote,
   canManageMeetings,
@@ -190,7 +191,7 @@ function ListenerNoteCard({ note, canDelete }: { note: MeetingListenerNote; canD
   return (
     <Card testID={`listener-note-${note.id}`}>
       <View style={{ gap: 2 }}>
-        <Text style={{ fontWeight: '600', color: colors.text }}>{author}</Text>
+        <Text style={{ ...font(600), color: colors.text }}>{author}</Text>
         <Text style={styles.muted}>{formatDateTime(note.createdAt)}</Text>
         {edited ? <Text style={styles.muted}>{t('notes.edited', { when: formatDateTime(note.updatedAt) })}</Text> : null}
       </View>
@@ -205,7 +206,7 @@ function ListenerNoteCard({ note, canDelete }: { note: MeetingListenerNote; canD
           hitSlop={8}
           onPress={remove}
           style={{ alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center' }}>
-          <Text style={{ color: colors.danger, fontWeight: '600', opacity: busy ? 0.4 : 1 }}>{t('notes.deleteTitle')}</Text>
+          <Text style={[styles.linkText, { color: colors.danger, opacity: busy ? 0.4 : 1 }]}>{t('notes.deleteTitle')}</Text>
         </Pressable>
       )}
     </Card>
