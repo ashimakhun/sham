@@ -37,7 +37,8 @@ begin
 end $$;
 grant execute on function t.w2_rows(text) to authenticated;
 
--- W2, made as the admin. Its people sign up (they land in the oldest workspace, AC 4) and are moved.
+-- W2, made as the admin. Its people are added as the admin (an admin insert lands in the oldest workspace, AC 4;
+-- since ARU-146 a real sign-up must choose a workspace) and are moved.
 insert into workspaces (id, name, created_at) values (t.x('W2'), 'Other school', now());
 insert into auth.users (id, email, raw_user_meta_data) values
   (t.x('XT'), 'qxt@x.test', '{"full_name":"Xena Teacher"}'),
@@ -297,7 +298,39 @@ select t.eq(pg_temp.first_teacher('qzt@x.test', t.x('W3')), 1::bigint, 'AC2 mana
 select t.eq((select string_agg(access_status::text || '/' || role::text, ',') from profiles where id = t.x('ZT')), 'approved/teacher',
   'AC2 the new teacher is approved (ARU-43)');
 select t.eq((select count(*) from profiles where role = 'teacher'), 3::bigint, 'AC2 one teacher in each of the three workspaces');
-select t.eq((select id from workspaces order by created_at, id limit 1), signup_workspace(), 'AC4 sign-ups still go to the oldest workspace');
+-- AC 4, updated for ARU-146 (0060): only an admin insert (SQL Editor, these fixtures) still lands in the oldest
+-- workspace. A real sign-up goes through Supabase Auth (supabase_auth_admin) and must choose: no choice is refused,
+-- an invite code joins that workspace as a waiting student, a name creates a new workspace with them as its teacher.
+select t.eq((select id from workspaces order by created_at, id limit 1), signup_workspace(),
+  'AC4 (ARU-146) an admin insert with no choice still joins the oldest workspace');
+create function pg_temp.auth_signup(who text, meta jsonb) returns text language plpgsql as $$
+declare code text; msg text; result text := 'no error';
+begin
+  execute 'set session authorization supabase_auth_admin';
+  begin
+    insert into auth.users (id, email, raw_user_meta_data) values (md5('aru145qa' || who)::uuid, who || '@x.test', meta);
+  exception when others then
+    get stacked diagnostics code = returned_sqlstate, msg = message_text;
+    result := code || ' | ' || msg;
+  end;
+  execute 'reset session authorization';
+  return result;
+end $$;
+select t.eq(pg_temp.auth_signup('qnone', '{"full_name":"No Choice"}'), '22023 | Update the app to create an account.',
+  'AC4 (ARU-146) a sign-up with neither a workspace name nor a code is refused');
+select t.ok(not exists (select 1 from profiles where id = md5('aru145qaqnone')::uuid),
+  'AC4 (ARU-146) the refused sign-up lands in no workspace, not even the oldest');
+select t.eq(pg_temp.auth_signup('qjoin', jsonb_build_object('full_name', 'Joins W2', 'invite_code',
+    lower((select code from workspace_invite_codes where workspace = t.x('W2'))))), 'no error',
+  'AC4 (ARU-146) a sign-up with W2''s invite code (any case) is accepted');
+select t.eq((select (workspace_id = t.x('W2'))::text || '/' || role::text || '/' || access_status::text
+    from profiles where id = md5('aru145qaqjoin')::uuid), 'true/student/pending',
+  'AC4 (ARU-146) the invite code joins W2 as a waiting student');
+select t.eq(pg_temp.auth_signup('qmake', '{"full_name":"New Head","workspace_name":"  Third school  "}'), 'no error',
+  'AC4 (ARU-146) a sign-up with a workspace name is accepted');
+select t.eq((select w.name || '/' || p.role::text || '/' || p.access_status::text
+    from profiles p join workspaces w on w.id = p.workspace_id where p.id = md5('aru145qaqmake')::uuid),
+  'Third school/teacher/approved', 'AC4 (ARU-146) the name creates a new workspace with them as its approved teacher');
 
 -- AC 11: the global tables have no workspace and keep working for both workspaces.
 select t.ok((select count(*) from information_schema.columns where table_schema = 'public' and column_name = 'workspace_id'
