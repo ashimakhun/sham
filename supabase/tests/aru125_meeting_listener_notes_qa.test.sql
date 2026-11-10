@@ -156,9 +156,13 @@ select t.login('S2');
 select t.eq(pg_temp.del(pg_temp.orphan('00000000-0000-0000-0000-00000012a0c2')),
   '42501 | You can''t delete these notes. | sham:listener_notes_cant_delete', 'AC12 a student outside the course can''t delete a deleted account''s notes');
 reset role;
+select t.login('N');
+select t.eq(pg_temp.del(pg_temp.orphan('00000000-0000-0000-0000-00000012a0c2')),
+  '42501 | You can''t delete these notes. | sham:listener_notes_cant_delete', 'AC12 a mentor outside the course can''t delete a deleted account''s notes');
+reset role;
 select pg_temp.login_id('00000000-0000-0000-0000-00000012a0f1');
-select t.ok(pg_temp.del(pg_temp.orphan('00000000-0000-0000-0000-00000012a0c2')) <> 'no error',
-  'AC12 a Pending account can''t delete a deleted account''s notes');
+select t.eq(pg_temp.del(pg_temp.orphan('00000000-0000-0000-0000-00000012a0c2')),
+  '42501 | You can''t delete these notes. | sham:listener_notes_cant_delete', 'AC12 a Pending account can''t delete a deleted account''s notes');
 reset role;
 select t.eq((select count(*) from meeting_listener_notes where meeting_id = '00000000-0000-0000-0000-00000012a0c2' and author_id is null),
   1::bigint, 'AC12 the deleted account''s notes are still there');
@@ -166,6 +170,12 @@ select t.login('M');
 select t.eq(pg_temp.del((select id from meeting_listener_notes where meeting_id = '00000000-0000-0000-0000-00000012a0c2' and author_id is null)),
   'no error', 'AC12 the owner deletes a deleted account''s notes');
 reset role;
+select t.login('T');
+select t.eq(pg_temp.del(pg_temp.orphan('00000000-0000-0000-0000-00000012a0c1')), 'no error',
+  'AC12 the teacher deletes a deleted account''s notes');
+reset role;
+select t.eq((select count(*) from meeting_listener_notes where meeting_id = '00000000-0000-0000-0000-00000012a0c1' and author_id is null),
+  1::bigint, 'AC12 the teacher''s delete removed exactly one note');
 
 -- Data: deleting a meeting, then a course, removes their notes.
 delete from course_meetings where id = '00000000-0000-0000-0000-00000012a0c1';
