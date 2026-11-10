@@ -22,6 +22,9 @@ it('AC1/AC5: Create account mode shows no hint under the button, even with all f
   await fireEvent.changeText(screen.getByPlaceholderText('Dana Serikova'), 'Dana');
   await fireEvent.changeText(screen.getByPlaceholderText('you@example.com'), 'dana@example.com');
   await fireEvent.changeText(screen.getByPlaceholderText('At least 6 characters'), 'secret1');
+  // ARU-146: Create account also needs a workspace choice.
+  await fireEvent.press(screen.getByRole('radio', { name: 'Join a workspace' }));
+  await fireEvent.changeText(screen.getByPlaceholderText('8 characters from your teacher'), 'ABCD2345');
   expect(button('Create account')).toBeEnabled();
   expect(screen.queryByText(HINT)).toBeNull();
 });
@@ -56,6 +59,11 @@ it('AC4: sign-up still calls signUp with the entered details', async () => {
   await fireEvent.changeText(screen.getByPlaceholderText('Dana Serikova'), 'Dana');
   await fireEvent.changeText(screen.getByPlaceholderText('you@example.com'), 'dana@example.com');
   await fireEvent.changeText(screen.getByPlaceholderText('At least 6 characters'), 'secret1');
+  // ARU-146: with the workspace choice, which is passed on too.
+  await fireEvent.press(screen.getByRole('radio', { name: 'Join a workspace' }));
+  await fireEvent.changeText(screen.getByPlaceholderText('8 characters from your teacher'), 'ABCD2345');
   await fireEvent.press(button('Create account'));
-  await waitFor(() => expect(signUp).toHaveBeenCalledWith('Dana', 'dana@example.com', 'secret1'));
+  await waitFor(() =>
+    expect(signUp).toHaveBeenCalledWith('Dana', 'dana@example.com', 'secret1', { kind: 'join', code: 'ABCD2345' }),
+  );
 });

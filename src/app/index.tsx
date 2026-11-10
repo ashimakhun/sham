@@ -1,6 +1,7 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,8 +12,11 @@ import { PASSWORD_MIN } from '@/lib/password';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import { useAction } from '@/lib/useAction';
+import { WORKSPACE_NAME_MAX } from '@/lib/workspace';
 
 type Mode = 'signIn' | 'signUp';
+/** ARU-146: what the new account does with a workspace; null until the user picks one. */
+type WorkspaceKind = 'create' | 'join';
 
 export default function SignInScreen() {
   const { ready, session, currentUser, dataLoaded, refresh, signIn, signUp, signOut, accountNotice } = useStore();
@@ -20,6 +24,9 @@ export default function SignInScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [workspaceKind, setWorkspaceKind] = useState<WorkspaceKind | null>(null);
+  const [workspaceName, setWorkspaceName] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const { busy, error, run } = useAction();
   const { t, tm } = useI18n();
 
@@ -45,7 +52,38 @@ export default function SignInScreen() {
     );
   }
 
-  const canSubmit = email.trim() && password.length >= PASSWORD_MIN && (mode === 'signIn' || name.trim());
+  // ARU-146 AC 1: Create account also needs a workspace choice whose field has something other than spaces.
+  const workspaceReady =
+    (workspaceKind === 'create' && !!workspaceName.trim()) || (workspaceKind === 'join' && !!inviteCode.trim());
+  const canSubmit =
+    email.trim() && password.length >= PASSWORD_MIN && (mode === 'signIn' || (name.trim() && workspaceReady));
+
+  function submitSignUp() {
+    const choice =
+      workspaceKind === 'create' ? { kind: 'create' as const, name: workspaceName } : { kind: 'join' as const, code: inviteCode };
+    return signUp(name, email, password, choice);
+  }
+
+  const choiceOption = (kind: WorkspaceKind, label: string) => {
+    const selected = workspaceKind === kind;
+    return (
+      <Pressable
+        key={kind}
+        accessibilityRole="radio"
+        accessibilityLabel={label}
+        accessibilityState={{ checked: selected }}
+        testID={`workspace-${kind}`}
+        onPress={() => setWorkspaceKind(kind)}
+        style={[
+          styles.input,
+          { flexDirection: 'row', alignItems: 'center', gap: 10 },
+          selected && { borderColor: colors.primary },
+        ]}>
+        <Ionicons name={selected ? 'radio-button-on' : 'radio-button-off'} size={20} color={selected ? colors.primary : colors.muted} />
+        <Text style={styles.body}>{label}</Text>
+      </Pressable>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -106,6 +144,34 @@ export default function SignInScreen() {
             secureTextEntry
             autoComplete={mode === 'signIn' ? 'current-password' : 'new-password'}
           />
+          {mode === 'signUp' && (
+            // ARU-146 AC 1: create a workspace (and become its teacher) or join one with its invite code.
+            <View style={{ gap: 8 }} accessibilityRole="radiogroup">
+              {choiceOption('create', t('signIn.createWorkspace'))}
+              {workspaceKind === 'create' && (
+                <Field
+                  label={t('signIn.workspaceName')}
+                  placeholder={t('signIn.workspaceNamePlaceholder')}
+                  value={workspaceName}
+                  onChangeText={setWorkspaceName}
+                  maxLength={WORKSPACE_NAME_MAX}
+                  autoComplete="off"
+                />
+              )}
+              {choiceOption('join', t('signIn.joinWorkspace'))}
+              {workspaceKind === 'join' && (
+                <Field
+                  label={t('signIn.inviteCode')}
+                  placeholder={t('signIn.inviteCodePlaceholder')}
+                  value={inviteCode}
+                  onChangeText={setInviteCode}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  autoComplete="off"
+                />
+              )}
+            </View>
+          )}
           {mode === 'signIn' && (
             // ARU-77: reset a forgotten password with a code sent by email.
             <Text
@@ -120,7 +186,7 @@ export default function SignInScreen() {
           <Button
             title={busy ? t('common.pleaseWait') : mode === 'signIn' ? t('signIn.submit') : t('signIn.createAccount')}
             disabled={!canSubmit || busy}
-            onPress={() => run(() => (mode === 'signIn' ? signIn(email, password) : signUp(name, email, password)))}
+            onPress={() => run(() => (mode === 'signIn' ? signIn(email, password) : submitSignUp()))}
           />
         </ScrollView>
       </KeyboardAvoidingView>

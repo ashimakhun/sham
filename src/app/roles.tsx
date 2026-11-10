@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useState } from 'react';
+import * as Clipboard from 'expo-clipboard';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, SectionList, View } from 'react-native';
 
 import { Button, EmptyState, ErrorText, RoleBadge, styles, ThemedSwitch } from '@/components/ui';
@@ -9,10 +10,11 @@ import { confirmDestructive } from '@/lib/confirm';
 import { canManageRoles } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
-import type { AccessRequest, Role, User } from '@/lib/types';
+import type { AccessRequest, Role, User, WorkspaceInvite } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
 import { Text, TextInput } from '@/components/AppText';
 import { font } from '@/lib/fonts';
+import { COPIED_MS } from '@/lib/workspace';
 
 // Catalog ids, not texts, so the titles follow the chosen language (ARU-113).
 const SECTIONS: { role: Role; title: TextId }[] = [
@@ -35,6 +37,59 @@ const iconCircle = {
   justifyContent: 'center',
 } as const;
 
+/** ARU-146 AC 8: the workspace's name and invite code, with Copy and a short "Copied" confirmation. */
+function InviteCard({ invite }: { invite: WorkspaceInvite }) {
+  const { t } = useI18n();
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), COPIED_MS);
+    return () => clearTimeout(timer);
+  }, [copied]);
+
+  async function copy() {
+    if (await Clipboard.setStringAsync(invite.inviteCode).catch(() => false)) setCopied(true);
+  }
+
+  return (
+    <View style={[styles.card, { gap: 10 }]} testID="workspace-invite">
+      <View style={{ gap: 2 }}>
+        <Text style={styles.label}>{t('roles.workspace')}</Text>
+        <Text style={styles.title} numberOfLines={2}>
+          {invite.name}
+        </Text>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={styles.label}>{t('roles.inviteCode')}</Text>
+          <Text selectable style={{ fontSize: 20, letterSpacing: 2, color: colors.text, ...font(600) }} testID="invite-code">
+            {invite.inviteCode}
+          </Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('roles.copyLabel', { code: invite.inviteCode })}
+          hitSlop={6}
+          onPress={copy}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+            minHeight: 36,
+            paddingHorizontal: 12,
+            borderRadius: 18,
+            backgroundColor: copied ? colors.successSoft : colors.primarySoft,
+          }}>
+          <Ionicons name={copied ? 'checkmark' : 'copy-outline'} size={16} color={copied ? colors.success : colors.primary} />
+          <Text accessibilityLiveRegion="polite" style={[styles.linkText, { color: copied ? colors.success : colors.primary }]}>
+            {copied ? t('roles.copied') : t('roles.copy')}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 type Row ={ kind: 'user'; user: User } | { kind: 'request'; request: AccessRequest };
 
 /**
@@ -53,6 +108,7 @@ export default function RolesScreen() {
     accessRequests,
     setAccessStatus,
     setAccountant,
+    workspaceInvite,
   } = useStore();
   const { t } = useI18n();
   const [query, setQuery] = useState('');
@@ -148,6 +204,7 @@ export default function RolesScreen() {
       stickySectionHeadersEnabled={false}
       ListHeaderComponent={
         <View style={{ gap: 8 }}>
+          {workspaceInvite && <InviteCard invite={workspaceInvite} />}
           <TextInput
             accessibilityLabel={t('roles.searchLabel')}
             placeholder={t('roles.searchPlaceholder')}

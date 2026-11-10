@@ -85,6 +85,7 @@ const MESSAGE_IDS: [TextId, Params?][] = [
   ['auth.invalidCredentials'],
   ['auth.userExists'],
   ['auth.emailNotConfirmed'],
+  ['auth.inviteCodeUnknown'],
   ...Array.from({ length: 30 }, (_, i): [TextId, Params] => ['auth.weakPassword', { min: i + 1 }]),
   ['auth.rateLimited'],
   ['auth.network'],

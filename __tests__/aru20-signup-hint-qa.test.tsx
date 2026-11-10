@@ -15,10 +15,16 @@ jest.mock('expo-router', () => ({
 jest.mock('@/lib/store', () => require('./helpers/mocks').store);
 
 const button = (name: string) => screen.getByRole('button', { name });
+// ARU-146 (approved by the product owner): Create account also needs a workspace choice, so fill() joins a workspace
+// with a code; the tests otherwise check what they did before.
 const fill = async (name: string, email: string, password: string) => {
   await fireEvent.changeText(screen.getByPlaceholderText('Dana Serikova'), name);
   await fireEvent.changeText(screen.getByPlaceholderText('you@example.com'), email);
   await fireEvent.changeText(screen.getByPlaceholderText('At least 6 characters'), password);
+  if (!screen.queryByPlaceholderText('8 characters from your teacher')) {
+    await fireEvent.press(screen.getByRole('radio', { name: 'Join a workspace' }));
+  }
+  await fireEvent.changeText(screen.getByPlaceholderText('8 characters from your teacher'), 'ABCD2345');
 };
 /** The last element in the form's scroll content must be the submit button: nothing (not even an empty Text) after it. */
 const lastFormChild = (container: Awaited<ReturnType<typeof render>>['container']) => {
@@ -97,6 +103,9 @@ describe('Create account mode', () => {
       'Full name',
       'Email',
       'Password',
+      // ARU-146: the workspace choice.
+      'Create a workspace',
+      'Join a workspace',
       'Create account',
     ]);
   });

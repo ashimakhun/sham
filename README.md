@@ -216,7 +216,13 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    refuses any app write, also through a function, that touches or links another workspace. One teacher per
    workspace; `access_requests()`, the delete course / discipline helpers, the notification recipient functions and
    the homework / materials / payment-proofs files stay in the caller's or event's workspace. Nothing is deleted;
-   with one workspace the app behaves as before).
+   with one workspace the app behaves as before),
+   `0060_workspace_signup.sql` (ARU-146: workspaces, part 2. Adds `workspace_invite_codes` (one 8-character code
+   per workspace, made by the database; the existing workspace gets one; no app user reads the table) and
+   `my_workspace_invite()` (name and code, for the workspace's teacher only). `handle_new_user()` now reads the
+   sign-up's `workspace_name` (a new workspace; the user is its approved teacher) or `invite_code` (a waiting student
+   in that workspace) and refuses a wrong code, a blank or over-80-character name, both, or neither, so no account is
+   created then. An insert into `auth.users` from the SQL Editor with neither still joins the oldest workspace).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
@@ -621,12 +627,15 @@ Restart `npm start` after changing `.env.local`.
 **Workspaces (ARU-145).** Every account and all its data (courses, people, chats, materials, payments …) belong to
 one **workspace**, and nothing is shared between workspaces: the database only ever shows an account the rows of its
 own workspace and refuses anything that would link two workspaces. Each workspace has at most one teacher; "the
-teacher" below always means the teacher of the account's own workspace. Until ARU-146 adds the choice at sign-up,
-every new account joins the oldest workspace. An account's workspace can only be changed from the SQL Editor. The
+teacher" below always means the teacher of the account's own workspace. At sign-up (ARU-146) a user either
+**creates a workspace** (they become its teacher, accepted at once) or **joins a workspace** with its 8-character
+**invite code**, which its teacher sees and copies at the top of **Profile → Manage roles**. A sign-up with neither
+(an older app build, or a direct Auth API call, also **Authentication → Users → Add user** in the dashboard) is
+refused with "Update the app to create an account". An account's workspace can only be changed from the SQL Editor. The
 Telegram bot, the photo-deletion schedule and the daily jobs are shared; notifications only go to accounts of the
 event's workspace.
 
-Everyone who creates an account in the app starts as a **student** whose request to join **waits for the teacher**:
+Everyone who joins a workspace in the app starts as a **student** whose request to join **waits for the teacher**:
 until the teacher accepts it (**Profile → Manage roles → Requests**), the account sees only a "Waiting for approval"
 screen and the database returns nothing but its own profile. A declined account sees "Request declined"; the teacher
 can still accept it later from the Declined section. Make the first teacher once with the query in

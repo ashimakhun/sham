@@ -70,3 +70,9 @@ jest.mock('expo-splash-screen', () => ({
   hide: jest.fn(),
   setOptions: jest.fn(),
 }));
+
+// ARU-146: the invite code's Copy button (native clipboard module).
+jest.mock('expo-clipboard', () => ({
+  setStringAsync: jest.fn(async () => true),
+  getStringAsync: jest.fn(async () => ''),
+}));

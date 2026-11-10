@@ -776,5 +776,21 @@
   "materials.heartUnlike_one": "Blog card and material screen · the heart, screen reader label when liked (with the like count)",
   "materials.heartUnlike_few": "Blog card and material screen · the heart, screen reader label when liked (with the like count)",
   "materials.heartUnlike_many": "Blog card and material screen · the heart, screen reader label when liked (with the like count)",
-  "materials.heartUnlike_other": "Blog card and material screen · the heart, screen reader label when liked (with the like count)"
+  "materials.heartUnlike_other": "Blog card and material screen · the heart, screen reader label when liked (with the like count)",
+  "signIn.createWorkspace": "Sign-in · Create account · choice: start a new workspace and become its teacher (ARU-146)",
+  "signIn.joinWorkspace": "Sign-in · Create account · choice: join an existing workspace with its invite code (ARU-146)",
+  "signIn.workspaceName": "Sign-in · Create account · label of the new workspace's name field (ARU-146)",
+  "signIn.workspaceNamePlaceholder": "Sign-in · Create account · example text in the workspace name field (ARU-146)",
+  "signIn.inviteCode": "Sign-in · Create account · label of the invite code field (ARU-146)",
+  "signIn.inviteCodePlaceholder": "Sign-in · Create account · hint in the invite code field (ARU-146)",
+  "auth.inviteCodeUnknown": "Sign-in · Create account · error: the invite code matches no workspace (ARU-146)",
+  "roles.workspace": "Manage roles · label above the workspace's name in the invite card (ARU-146)",
+  "roles.inviteCode": "Manage roles · label above the workspace's invite code (ARU-146)",
+  "roles.copy": "Manage roles · button that copies the invite code (ARU-146)",
+  "roles.copyLabel": "Manage roles · screen-reader label of the Copy button, {code} is the code (ARU-146)",
+  "roles.copied": "Manage roles · short confirmation after copying the invite code (ARU-146)",
+  "db.invite_code_unknown": "Database error · sign-up with an invite code that matches no workspace (ARU-146)",
+  "db.update_app": "Database error · sign-up without a workspace choice, from an older build or the API (ARU-146)",
+  "db.workspace_name_invalid": "Database error · sign-up with a blank or too long workspace name (ARU-146; the app caps the field)",
+  "db.workspace_choice_both": "Database error · sign-up with both a workspace name and an invite code (ARU-146; not reachable from the app)"
 }

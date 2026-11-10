@@ -18,6 +18,8 @@ export const RATE_LIMITED = en('auth.rateLimited');
 export const INVALID_CREDENTIALS = en('auth.invalidCredentials');
 export const USER_EXISTS = en('auth.userExists');
 export const EMAIL_NOT_CONFIRMED = en('auth.emailNotConfirmed');
+// ARU-146: a wrong invite code at sign-up.
+export const INVITE_CODE_UNKNOWN = en('auth.inviteCodeUnknown');
 /** The server's minimum length when it states one ("Password should be at least 8 characters."), else ours. The
  *  analysis note on ARU-108: a stricter project setting must not be contradicted by "at least 6". */
 export const weakPasswordMessage = (serverText?: string) =>
@@ -69,6 +71,13 @@ export function isNetworkError(error: AuthErrorLike) {
 export function codeErrorMessage(error: AuthErrorLike) {
   if (isRateLimited(error) || isNetworkError(error)) return authErrorMessage(error);
   return CODE_INVALID;
+}
+
+/** ARU-146: the database refused the new account inside the sign-up (handle_new_user() raised). Supabase Auth answers
+ *  500 "Database error saving new user" (code unexpected_failure) and the sham: hint doesn't reach the app. */
+export function isSignUpRefusedByDatabase(error: AuthErrorLike) {
+  if (!error || isNetworkError(error) || isRateLimited(error)) return false;
+  return /database error saving new user/i.test(error.message ?? '') || (error.status === 500 && error.code === 'unexpected_failure');
 }
 
 /** A user-readable message for an Auth error: the server's own text, except for the cases the app words itself

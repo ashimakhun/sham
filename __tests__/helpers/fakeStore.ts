@@ -136,6 +136,7 @@ export function fakeStore(who: keyof typeof users | null, over: Partial<Store> =
     sendPaymentRequest: jest.fn(async () => {}),
     getPaymentProofUrl: jest.fn(async (path: string) => `https://signed.example/proofs/${path}`),
     accessRequests: [],
+    workspaceInvite: null,
     telegram: null,
     loadTelegram: jest.fn(async () => {}),
     createTelegramLinkCode: jest.fn(async () => 'CODE123'),

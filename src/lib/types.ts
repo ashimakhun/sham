@@ -76,6 +76,12 @@ export type AccessRequest = {
   status: Exclude<AccessStatus, 'approved'>;
 };
 
+/** ARU-146: the Create account choice: start a new workspace (and become its teacher) or join one with its code. */
+export type WorkspaceChoice = { kind: 'create'; name: string } | { kind: 'join'; code: string };
+
+/** ARU-146: the teacher's workspace and its invite code (Manage roles). */
+export type WorkspaceInvite = { name: string; inviteCode: string };
+
 export type HomeworkStatus = 'submitted' | 'checked';
 
 export type Homework = {

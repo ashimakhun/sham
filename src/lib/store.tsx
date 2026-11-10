@@ -18,7 +18,10 @@ import {
   authErrorMessage,
   cleanCode,
   codeErrorMessage,
+  GENERIC_ERROR,
+  INVITE_CODE_UNKNOWN,
   isInvalidCredentials,
+  isSignUpRefusedByDatabase,
   NETWORK_ERROR,
   SAME_PASSWORD,
   USER_EXISTS,
@@ -27,6 +30,8 @@ import {
 import { LANGUAGE_SAVE_FAILED, nameProblem } from './profileName';
 import { supabase } from './supabase';
 import type {
+  WorkspaceChoice,
+  WorkspaceInvite,
   AccessRequest,
   AssignmentSentCount,
   Course,
@@ -115,7 +120,9 @@ export type Store = {
   getUser: (id: string | undefined) => User | undefined;
   getCourse: (id: string | undefined) => Course | undefined;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (name: string, email: string, password: string) => Promise<void>;
+  /** ARU-146: the choice goes in the sign-up's user data (workspace_name or invite_code); the database sets up the
+   *  workspace or the request while the account is created, and refuses a wrong code (no account is made then). */
+  signUp: (name: string, email: string, password: string, workspace: WorkspaceChoice) => Promise<void>;
   signOut: () => Promise<void>;
   /** ARU-75: deletes the signed-in user's own account through the delete-account Edge Function, after checking the
    *  password there. On success this device is signed out and the sign-in screen shows `accountNotice`. On failure
@@ -221,6 +228,8 @@ export type Store = {
   subscribeToGeneralMessages: (onMessage: (m: GeneralMessage) => void) => () => void;
   /** Teacher only (ARU-43): accounts waiting for approval and declined ones, oldest first. Empty for others. */
   accessRequests: AccessRequest[];
+  /** Teacher only (ARU-146): the workspace's name and invite code for Manage roles. Null for everyone else. */
+  workspaceInvite: WorkspaceInvite | null;
   /** Teacher only (ARU-43): accept (approved) or decline (rejected) an account, then refetch. A retry is a no-op. */
   setAccessStatus: (userId: string, status: 'approved' | 'rejected') => Promise<void>;
   /** Teacher only (ARU-13): switches a user between student and mentor via set_user_role(), then refetches. */
@@ -801,6 +810,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // Every profile the database returns: approved accounts, plus all accounts for the teacher and the own row (ARU-43).
   const [profiles, setProfiles] = useState<User[]>([]);
   const [accessRequests, setAccessRequests] = useState<AccessRequest[]>([]);
+  const [workspaceInvite, setWorkspaceInvite] = useState<WorkspaceInvite | null>(null);
   const [telegram, setTelegram] = useState<TelegramLink | null | undefined>(undefined);
   const [homework, setHomework] = useState<Homework[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -1052,10 +1062,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       // Requests for the teacher's Manage roles screen. Not live: they refresh with every load.
       if (me.role === 'teacher') {
-        const req = await supabase.rpc('access_requests');
+        const [req, invite] = await Promise.all([supabase.rpc('access_requests'), supabase.rpc('my_workspace_invite')]);
         setAccessRequests(req.error ? [] : ((req.data as AccessRequestRow[] | null) ?? []).map(toAccessRequest));
+        // Before 0060 runs there is no function: no card.
+        const row = invite.error ? null : ((invite.data as { name: string; invite_code: string }[] | null) ?? [])[0];
+        setWorkspaceInvite(row ? { name: row.name, inviteCode: row.invite_code } : null);
       } else {
         setAccessRequests([]);
+        setWorkspaceInvite(null);
       }
       await Promise.all([loadUnread().catch(() => {}), loadGeneralUnread().catch(() => {})]);
     } finally {
@@ -1272,14 +1286,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const res = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (res.error) throw new Error(authErrorMessage(res.error));
     },
-    signUp: async (name, email, password) => {
+    signUp: async (name, email, password, workspace) => {
       setAccountNotice(null);
       const res = await supabase.auth.signUp({
         email: email.trim(),
         password,
-        options: { data: { full_name: name.trim() } },
+        options: {
+          data: {
+            full_name: name.trim(),
+            ...(workspace.kind === 'create'
+              ? { workspace_name: workspace.name.trim() }
+              : { invite_code: workspace.code.trim().toUpperCase() }),
+          },
+        },
       });
-      if (res.error) throw new Error(authErrorMessage(res.error));
+      if (res.error) {
+        // The database refused the account (handle_new_user()): in Join mode that is the invite code.
+        if (isSignUpRefusedByDatabase(res.error)) {
+          throw new Error(workspace.kind === 'join' ? INVITE_CODE_UNKNOWN : GENERIC_ERROR);
+        }
+        throw new Error(authErrorMessage(res.error));
+      }
       // With email confirmation on, Supabase answers an existing email with a user that has no identities instead of
       // an error (ARU-108 analysis note): the same message.
       if (res.data.user && Array.isArray(res.data.user.identities) && res.data.user.identities.length === 0) {
@@ -2038,6 +2065,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setTelegram(null);
     },
     accessRequests,
+    workspaceInvite,
     setAccessStatus: async (target, status) => {
       requireRole('teacher');
       check(await supabase.rpc('set_access_status', { target, new_status: status }));
