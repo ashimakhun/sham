@@ -65,6 +65,7 @@ When a story's last open bug is closed, the story goes back to Ready for QA for 
 - A story failing QA a third time goes to Needs Clarification (with its new bugs) for a person.
 - A bug reopened twice goes to Needs Clarification.
 - The dev agent never edits a QA test to make it pass; if it thinks the test is wrong, the bug goes to requirements analysis.
+- Before checking a story or bug fix, the QA agent merges the latest `main` locally and rewrites older tests whose expectations the newer requirements deliberately changed (listed in its report). An older test that fails for any other reason is a regression and gets a Bug.
 - After two `ANALYSIS: CHANGES NEEDED` rounds on the same story, the third problem goes to Needs Clarification instead of back to Idea.
 - The dev agent never codes a story that hasn't passed analysis.
 
