@@ -68,6 +68,8 @@ When a story's last open bug is closed, the story goes back to Ready for QA for 
 - Before checking a story or bug fix, the QA agent merges the latest `main` locally and rewrites older tests whose expectations the newer requirements deliberately changed (listed in its report). An older test that fails for any other reason is a regression and gets a Bug.
 - After two `ANALYSIS: CHANGES NEEDED` rounds on the same story, the third problem goes to Needs Clarification instead of back to Idea.
 - The dev agent never codes a story that hasn't passed analysis.
+- Requirements analysis and the dev agent skip a story while any issue it's `blocked by` isn't Done, Canceled or Duplicate. They check this before sorting by difficulty, so a blocked story never comes up first. Bugs are never skipped for this.
+- Text tables never reword an existing `db.*` error text; new wording gets a new key, because an error code keeps one message for good (ARU-111).
 
 ## How the agents run
 
