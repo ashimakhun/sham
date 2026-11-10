@@ -13,8 +13,9 @@ Only reviewed work reaches **Ready for Dev**: stories that passed requirements a
 
 ## Choosing the issue
 1. Using the Linear connector, list Sham issues in **Ready for Dev** without `agent:working`. Never pick up anything in Requirements ready: it hasn't been reviewed.
-2. Take **bugs first** (label `Bug`): severity blocker → major → minor (from the bug's Severity section), then oldest. Otherwise the oldest story. If none, stop and report "nothing to do".
-3. Add `agent:working` and move the issue to **In Dev**.
+2. Drop every **story** that is blocked: it has a `blocked by` relation to an issue that isn't resolved yet (resolved = Done, Canceled or Duplicate). Check this before choosing, so a blocked story is never picked. It waits in Ready for Dev until its blockers are resolved. Bugs are never skipped for this.
+3. Take **bugs first** (label `Bug`): severity blocker → major → minor (from the bug's Severity section), then oldest. Otherwise the oldest remaining story. If none, stop and report "nothing to do" (and list any stories skipped as blocked, with their open blockers, in the run summary).
+4. Add `agent:working` and move the issue to **In Dev**.
 
 ## Setup (both cases)
 Attach and clone ashimakhun/sham. Before `npm ci`, `npm install` or `npx expo install`, run `export NO_PROXY=localhost,127.0.0.1 no_proxy=localhost,127.0.0.1 npm_config_noproxy=localhost,127.0.0.1`: in the cloud sandbox npm only reaches the registry through the proxy, and a "getaddrinfo ENOTFOUND registry.npmjs.org" error means this step was skipped.
