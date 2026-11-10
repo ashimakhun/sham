@@ -51,6 +51,9 @@ create function pg_temp.del(note uuid) returns text language sql as $$
 -- The id of someone's note on a meeting (author by uuid; null for a deleted account's), read as the admin.
 create function pg_temp.note(who uuid, meeting text) returns uuid language sql security definer as $$
   select id from public.meeting_listener_notes where author_id = who and meeting_id = meeting::uuid $$;
+-- A deleted account's note on a meeting, read past RLS, so a caller who can't see it still gets its real id.
+create function pg_temp.orphan(meeting text) returns uuid language sql security definer as $$
+  select id from public.meeting_listener_notes where author_id is null and meeting_id = meeting::uuid limit 1 $$;
 create function pg_temp.login_id(who uuid) returns void language plpgsql as $$
 begin
   perform set_config('request.jwt.claims', json_build_object('sub', who, 'role', 'authenticated')::text, false);
@@ -150,11 +153,11 @@ select t.eq(pg_temp.del((select id from meeting_listener_notes where meeting_id 
 reset role;
 -- A student outside the course, and a Pending account, can't either (ARU-135: the author check is null there).
 select t.login('S2');
-select t.eq(pg_temp.del((select id from meeting_listener_notes where meeting_id = '00000000-0000-0000-0000-00000012a0c2' and author_id is null)),
+select t.eq(pg_temp.del(pg_temp.orphan('00000000-0000-0000-0000-00000012a0c2')),
   '42501 | You can''t delete these notes. | sham:listener_notes_cant_delete', 'AC12 a student outside the course can''t delete a deleted account''s notes');
 reset role;
 select pg_temp.login_id('00000000-0000-0000-0000-00000012a0f1');
-select t.ok(pg_temp.del((select id from meeting_listener_notes where meeting_id = '00000000-0000-0000-0000-00000012a0c2' and author_id is null)) <> 'no error',
+select t.ok(pg_temp.del(pg_temp.orphan('00000000-0000-0000-0000-00000012a0c2')) <> 'no error',
   'AC12 a Pending account can''t delete a deleted account''s notes');
 reset role;
 select t.eq((select count(*) from meeting_listener_notes where meeting_id = '00000000-0000-0000-0000-00000012a0c2' and author_id is null),
