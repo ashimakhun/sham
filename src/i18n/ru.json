@@ -143,7 +143,7 @@
   "disciplines.detailTitle": "Дисциплина",
   "homework.tabOwner": "Куратор",
   "homework.filterNew": "Новые ({n})",
-  "homework.filterWaiting": "Ждут проверки ({n})",
+  "homework.filterWaiting": "В ожидании ({n})",
   "homework.filterToCheck": "Проверить ({n})",
   "homework.filterChecked": "Проверено",
   "homework.allCourses": "Все курсы",
