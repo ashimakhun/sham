@@ -1164,9 +1164,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       );
     }
     channel.subscribe();
-    // Back from the background: realtime may have missed messages, so refetch the counts.
+    // Back from the background: realtime may have missed changes and messages. ARU-156: after a real trip to the
+    // background, reload everything once, so missed changes arrive and homework photos get fresh signed links (they
+    // last an hour); load() refetches the counts too. Other returns to 'active' (e.g. iOS's brief 'inactive' for
+    // Control Center or a system prompt) only refetch the counts.
+    let previousState: string | null | undefined = AppState.currentState;
     const appState = AppState.addEventListener('change', (state) => {
+      const wasInBackground = previousState === 'background';
+      previousState = state;
       if (state !== 'active') return;
+      if (wasInBackground) {
+        load().catch(() => {});
+        return;
+      }
       loadUnread().catch(() => {});
       loadGeneralUnread().catch(() => {});
     });

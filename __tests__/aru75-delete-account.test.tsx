@@ -356,7 +356,12 @@ describe('AC12 b: a homework photo whose file is gone', () => {
   it('or when the image fails to load', async () => {
     params.id = 'h1';
     const item = hw({ id: 'h1', courseId: 'A', photoPath: 'S1/h1.jpg', photoUrl: 'https://signed.example/x' });
-    setStore(fakeStore('S1', { visibleHomework: [item], courseMembers: [member('A', 'S1')] }));
+    const store = fakeStore('S1', { visibleHomework: [item], courseMembers: [member('A', 'S1')] });
+    // The file is gone, so the fresh link ARU-156 asks for once can't be made either.
+    store.getPhotoUrl = jest.fn(async () => {
+      throw new Error('Object not found');
+    });
+    setStore(store);
     await render(<HomeworkDetailScreen />);
     const img = screen.getByTestId('homework-photo');
     await act(async () => img.props.onError?.({ nativeEvent: { error: 'not found' } }));
