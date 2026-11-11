@@ -1,13 +1,15 @@
 // Shared Telegram sending helper (ARU-48). Used by every Edge Function that sends a Sham notification (ARU-41 meeting
 // started, ARU-44 chat message, ARU-49 homework reviewed, ARU-50 new homework, ARU-84 new account,
-// ARU-89 homework submitted, ARU-87 general chat, ARU-112 photo deletion). No Deno-only imports: the service-role
-// client, the bot token and fetch are passed in, so Jest can test it (supabase/functions/_shared/*.test.ts).
+// ARU-89 homework submitted, ARU-87 general chat, ARU-112 photo deletion, ARU-151 meeting notes). No Deno-only
+// imports: the service-role client, the bot token and fetch are passed in, so Jest can test it
+// (supabase/functions/_shared/*.test.ts).
 
 export type NotificationKind = 'meeting_started' | 'chat_message' | 'homework_reviewed' | 'new_homework' | 'new_account'
   | 'homework_submitted'
   | 'general_chat'
   | 'new_material'
-  | 'photo_deletion';
+  | 'photo_deletion'
+  | 'meeting_notes';
 
 import { recipientLanguage, type TelegramLanguage } from './telegram-texts.ts';
 
@@ -58,6 +60,7 @@ export const SWITCH_COLUMN: Record<NotificationKind, string> = {
   general_chat: 'notify_general_chat',
   new_material: 'notify_new_material',
   photo_deletion: 'notify_photo_deletion',
+  meeting_notes: 'notify_meeting_notes',
 };
 
 type LinkRow = { user_id: string; chat_id: number | string } & Record<string, unknown>;

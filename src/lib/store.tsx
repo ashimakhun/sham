@@ -441,6 +441,8 @@ type TelegramLinkRow = {
   notify_new_material?: boolean;
   /** ARU-112 (0053); undefined before that migration runs. */
   notify_photo_deletion?: boolean;
+  /** ARU-151 (0062); undefined before that migration runs. */
+  notify_meeting_notes?: boolean;
 };
 const toTelegramLink = (r: TelegramLinkRow): TelegramLink => ({
   linkedAt: r.linked_at,
@@ -454,6 +456,7 @@ const toTelegramLink = (r: TelegramLinkRow): TelegramLink => ({
     general_chat: r.notify_general_chat ?? true,
     new_material: r.notify_new_material ?? true,
     photo_deletion: r.notify_photo_deletion ?? true,
+    meeting_notes: r.notify_meeting_notes ?? true,
   },
 });
 type MaterialRow = {

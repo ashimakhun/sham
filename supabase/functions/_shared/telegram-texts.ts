@@ -56,6 +56,12 @@ export const TELEGRAM_TEXTS = {
     ru: 'Новый файл в базе знаний от {name}: {title}',
     note: 'New materials · to everyone who may read it when a PDF is added to the knowledge base',
   },
+  // ARU-151: when someone publishes notes on a course meeting (once per note).
+  meetingNotesPublished: {
+    en: 'New notes from {name} on a {course} meeting',
+    ru: 'Новые заметки от {name} к встрече курса {course}',
+    note: 'Meeting notes · to the course (listeners, owner, teacher; not the author) when someone publishes notes on a meeting',
+  },
   // ARU-112 / ARU-133: the photo-deletion warning, in three plural forms (Russian one / few / many; English uses
   // "photo" for 1 and "photos" otherwise). photo-deletion.ts picks the form and fills {count} and {date}.
   photoDeletionOne: {
