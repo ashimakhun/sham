@@ -298,9 +298,15 @@ export type MaterialFileEdit = { name: string; description: string; courseId?: s
 /** Telegram notification types from ARU-48. */
 type BaseTelegramKind = 'meeting_started' | 'new_homework' | 'homework_reviewed' | 'chat_message';
 /** Types added later (ARU-84 new_account, ARU-89 homework_submitted, ARU-87 general_chat, ARU-102 new_material,
- * ARU-112 photo_deletion).
+ * ARU-112 photo_deletion, ARU-151 meeting_notes).
  * Optional in a link's switches: a missing one reads as on (the default). */
-export type LaterTelegramKind = 'new_account' | 'homework_submitted' | 'general_chat' | 'new_material' | 'photo_deletion';
+export type LaterTelegramKind =
+  | 'new_account'
+  | 'homework_submitted'
+  | 'general_chat'
+  | 'new_material'
+  | 'photo_deletion'
+  | 'meeting_notes';
 /** Telegram notification types; each one has its own on/off switch. */
 export type TelegramKind = BaseTelegramKind | LaterTelegramKind;
 /** The signed-in user's link to the Sham Telegram bot (ARU-48). */

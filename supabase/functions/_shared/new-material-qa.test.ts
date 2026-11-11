@@ -89,7 +89,9 @@ it('AC 5: New materials is listed for every role, right after General chat (teac
     const i = kinds.indexOf('new_material');
     expect(i).toBeGreaterThan(0);
     expect(kinds[i - 1]).toBe('general_chat');
-    if (role === 'teacher') expect(kinds[i + 1]).toBe('new_account');
+    // ARU-151 AC 7: Meeting notes now sits right below New materials, so for the teacher New accounts comes after it.
+    expect(kinds[i + 1]).toBe('meeting_notes');
+    if (role === 'teacher') expect(kinds[i + 2]).toBe('new_account');
     else expect(kinds.includes('new_account')).toBe(false);
   }
   expect(telegramSwitchesFor('student').find((s) => s.kind === 'new_material')?.label).toBe('New materials');

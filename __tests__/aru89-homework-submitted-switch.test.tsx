@@ -34,6 +34,7 @@ describe('telegramSwitchesFor', () => {
       'chat_message',
       'general_chat',
       'new_material',
+      'meeting_notes',
       'new_account',
     ]);
   });
@@ -48,6 +49,7 @@ describe('telegramSwitchesFor', () => {
       'Chat messages',
       'General chat',
       'New materials',
+      'Meeting notes',
     ]);
   });
 
@@ -60,6 +62,7 @@ describe('telegramSwitchesFor', () => {
       'Chat messages',
       'General chat',
       'New materials',
+      'Meeting notes',
     ]);
   });
 });

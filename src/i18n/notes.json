@@ -443,6 +443,7 @@
   "telegram.switch.chat_message": "Telegram notifications · switch label",
   "telegram.switch.general_chat": "Telegram notifications · switch label",
   "telegram.switch.new_material": "Telegram notifications · switch label",
+  "telegram.switch.meeting_notes": "Telegram notifications · switch label",
   "telegram.switch.new_account": "Telegram notifications · switch label",
   "deleteAccount.ownedCourses": "Delete account · error when the user still owns courses, {titles} are course titles",
   "files.pdfRule": "Materials · error when the picked file is not a PDF or too large",

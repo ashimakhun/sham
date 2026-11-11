@@ -443,6 +443,7 @@
   "telegram.switch.chat_message": "Chat messages",
   "telegram.switch.general_chat": "General chat",
   "telegram.switch.new_material": "New materials",
+  "telegram.switch.meeting_notes": "Meeting notes",
   "telegram.switch.new_account": "New accounts",
   "deleteAccount.ownedCourses": "You own courses: {titles}. Ask the teacher or a mentor to change their owner first.",
   "files.pdfRule": "The file must be a PDF up to 25 MB.",

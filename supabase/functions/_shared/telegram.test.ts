@@ -15,6 +15,7 @@ type Link = {
   notify_homework_submitted: boolean;
   notify_general_chat: boolean;
   notify_new_material: boolean;
+  notify_meeting_notes: boolean;
 };
 const link = (userId: string, chatId: number, over: Partial<Link> = {}): Link => ({
   user_id: userId,
@@ -27,6 +28,7 @@ const link = (userId: string, chatId: number, over: Partial<Link> = {}): Link =>
   notify_homework_submitted: true,
   notify_general_chat: true,
   notify_new_material: true,
+  notify_meeting_notes: true,
   ...over,
 });
 
@@ -110,6 +112,7 @@ describe('sendTelegramMessages', () => {
     ['homework_submitted', 'notify_homework_submitted'],
     ['general_chat', 'notify_general_chat'],
     ['new_material', 'notify_new_material'],
+    ['meeting_notes', 'notify_meeting_notes'],
   ] as const)('%s follows the %s switch', async (kind, column) => {
     const { client } = fakeClient([link('on', 1), link('off', 2, { [column]: false })]);
     const fetchFn = jest.fn(async () => ok());

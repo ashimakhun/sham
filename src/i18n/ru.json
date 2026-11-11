@@ -443,6 +443,7 @@
   "telegram.switch.chat_message": "Сообщения в чатах",
   "telegram.switch.general_chat": "Общий чат",
   "telegram.switch.new_material": "Новые материалы",
+  "telegram.switch.meeting_notes": "Заметки к встречам",
   "telegram.switch.new_account": "Новые аккаунты",
   "deleteAccount.ownedCourses": "Вы куратор курсов: {titles}. Попросите преподавателя или ментора сначала сменить куратора.",
   "files.pdfRule": "Файл должен быть в формате PDF и не больше 25 МБ.",

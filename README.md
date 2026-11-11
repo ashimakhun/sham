@@ -226,7 +226,13 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    Anything else is refused and no account is created. Only an auth user added in the SQL Editor without either
    still joins the oldest workspace),
    `0061_payment_overdue.sql` (ARU-148: `my_payment_dues(today)` also returns the caller's unpaid courses after the
-   period's end day until the end of the month, with a new `overdue` column; same access and grants; changes no data).
+   period's end day until the end of the month, with a new `overdue` column; same access and grants; changes no data),
+   `0062_meeting_notes_notifications.sql` (ARU-151: Telegram message to the course when someone publishes meeting
+   notes; adds `telegram_links.notify_meeting_notes` (default true), the kind `meeting_notes` in
+   `set_telegram_notification()` (keeps every earlier kind), `meeting_listener_notes.announced` (set by the database;
+   every note that is public when it runs counts as announced), `meeting_notes_recipients()` and the triggers that
+   queue the `pg_net` call; no RLS changes; needs the Vault secrets and the function from
+   [Telegram notifications](#telegram-notifications) → Meeting notes).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
@@ -528,6 +534,41 @@ failed send is dropped, never retried.
 
 To change a Vault value later: `select vault.update_secret((select id from vault.secrets where name = 'new_material_notify_secret'), '<new>');`.
 
+#### Meeting notes (ARU-151)
+
+When someone publishes notes on a course meeting (saves them with **Publish** on, or turns Publish on later), the
+people who can read them in the app (the course's current listeners, its current owner and the teacher; Approved, same
+workspace), except the author, get "New notes from <author name> on a <course title> meeting" in their language within
+seconds, if they connected Telegram and left **Meeting notes** on (every role sees this switch). A note sends at most
+one message in its life: text edits, notes made private, and notes made private and public again send nothing, and
+notes that were already public when 0062 ran never send. Before-insert/update and after-insert/update triggers on
+`meeting_listener_notes` mark the note announced and queue one `pg_net` POST `{"id": "<note id>"}` with
+`Authorization: Bearer <secret>` to the Edge Function `meeting-notes-notifications`, which asks
+`meeting_notes_recipients()` (service role only) who gets it at that moment and sends. A note that is private, deleted
+or has lost its author by then sends nothing. Saving notes never fails because of this; a failed send is dropped,
+never retried.
+
+1. Dashboard → **Database → Extensions**: make sure **pg_net** is on.
+2. Run `supabase/migrations/0062_meeting_notes_notifications.sql` (after 0058 and 0059).
+3. Make a random secret (`openssl rand -hex 24`) and set it as the function's secret:
+   ```bash
+   npx supabase secrets set MEETING_NOTES_NOTIFY_SECRET=<secret>
+   ```
+4. Deploy the function (the trigger sends `Authorization: Bearer <secret>`, not a Supabase JWT):
+   ```bash
+   npx supabase functions deploy meeting-notes-notifications --no-verify-jwt
+   ```
+5. Store the URL and the same secret in Vault (SQL Editor). Until both exist the trigger sends nothing:
+   ```sql
+   select vault.create_secret('https://<project-ref>.supabase.co/functions/v1/meeting-notes-notifications', 'meeting_notes_notify_url');
+   select vault.create_secret('<secret>', 'meeting_notes_notify_secret');
+   ```
+6. Check: publish notes on a completed meeting, then
+   `select status_code, content from net._http_response order by created desc limit 5;` shows `200` with
+   `{"recipients":…,"sent":…}`. A `401` means the two secrets differ.
+
+To change a Vault value later: `select vault.update_secret((select id from vault.secrets where name = 'meeting_notes_notify_secret'), '<new>');`.
+
 ### Delete account (ARU-75)
 
 The Delete account screen calls the Edge Function `delete-account` with the user's access token and password. It
@@ -796,6 +837,7 @@ teacher" is that workspace's teacher, and nobody can see or change anything in a
 | Get "New account waiting for your approval" in Telegram (ARU-84; linked, **New accounts** on) |  |  | ✓ (every new sign-up) |
 | Get "New homework to check" in Telegram (ARU-89; linked, **Homework submitted** on) | never | courses they own | courses they own |
 | Get "New blog post" / "New file in the knowledge base" in Telegram (ARU-102; linked, **New materials** on) | items they can see, not their own | items they can see, not their own | items they can see, not their own |
+| Get "New notes from … on a … meeting" in Telegram (ARU-151; linked, **Meeting notes** on) | courses they're in, not their own notes | courses they own or are in, not their own notes | all courses, not their own notes |
 | Turn Accountant on / off for a mentor (ARU-65) | |         | ✓       |
 | Select / unselect paid courses |         | accountants (any course they can see) |  |
 | See paid courses, change their payment period | | accountants (all they can see) | ✓ (all) |
