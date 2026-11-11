@@ -471,7 +471,8 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
           </Text>
         ) : null}
         {group === 'history' ? sentLine : null}
-        {m.location ? (
+        {/* ARU-149: a history tile shows no meeting link (the stored location is untouched); plain text stays. */}
+        {m.location && !(group === 'history' && isLink(m.location)) ? (
           isLink(m.location) ? (
             <Text
               accessibilityRole="link"
