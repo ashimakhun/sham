@@ -40,7 +40,6 @@ export type PaymentExemption = {
   userId: string;
 };
 
-/** ARU-66: one of the signed-in listener's own due courses (from my_payment_dues). `deadline` is YYYY-MM-DD. */
 /** ARU-99: a listener's payment request for one paid course and month (YYYY-MM-01), with one proof. */
 export type PaymentRequest = {
   id: string;
@@ -62,9 +61,14 @@ export type PickedProof = {
   size?: number | null;
 };
 
+/**
+ * ARU-66: one of the signed-in listener's own due courses (from my_payment_dues). `deadline` is YYYY-MM-DD, this
+ * month's last payment day. ARU-148: `overdue` is true once that day has passed in the same month (still unpaid).
+ */
 export type PaymentDue = {
   courseId: string;
   deadline: string;
+  overdue?: boolean;
 };
 
 /** A new account waiting for the teacher, or one the teacher declined (ARU-43). Teacher only. */

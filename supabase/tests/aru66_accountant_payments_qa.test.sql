@@ -41,10 +41,11 @@ reset role;
 
 -- Deadlines are built from the device-local date: year end, February, end day 28.
 select t.login('S1');
-select t.eq(pg_temp.dues('2026-12-31'), '', 'AC7 31 Dec is after day 28: nothing due');
+-- ARU-148 changed the after-the-period rule: still unpaid after day 28 in the same month is overdue, not nothing.
+select t.eq(pg_temp.dues('2026-12-31'), 'Algebra@2026-12-28', 'AC7 / ARU-148 31 Dec is after day 28: overdue, deadline 28 Dec');
 select t.eq(pg_temp.dues('2027-01-01'), 'Algebra@2027-01-28', 'AC7 new year: the deadline is 28 Jan 2027');
 select t.eq(pg_temp.dues('2027-02-28'), 'Algebra@2027-02-28', 'AC7 February: due on the 28th');
-select t.eq(pg_temp.dues('2028-02-29'), '', 'AC7 29 Feb (leap year) is after the period');
+select t.eq(pg_temp.dues('2028-02-29'), 'Algebra@2028-02-28', 'AC7 / ARU-148 29 Feb (leap year) is after the period: overdue, deadline 28 Feb');
 reset role;
 
 -- AC 9: dues are always the caller's own. S2 is exempt; S1 owes. Neither sees the other's.

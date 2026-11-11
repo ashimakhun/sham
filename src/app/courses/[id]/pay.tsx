@@ -20,7 +20,7 @@ import { useAction } from '@/lib/useAction';
 /**
  * ARU-99 AC 2 / AC 3: a listener attaches one proof of payment (a photo or a PDF, up to 10 MB) and sends it to the
  * accountant. With a request already sent this month, sending replaces it (one request per course and month).
- * Opened from Pay / Send again on course details, which shows only while the course is due.
+ * Opened from Pay / Send again on course details, which shows only while the course is due or overdue (ARU-148).
  */
 export default function PayScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();

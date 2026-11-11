@@ -429,6 +429,7 @@
   "picker.date": "Выбрать дату",
   "picker.time": "Выбрать время",
   "courses.paymentDueBy": "Оплатить до {date}",
+  "courses.paymentOverdue": "Оплата просрочена: срок был до {date}",
   "files.untitled": "Без названия",
   "files.size.b": "{n} Б",
   "files.size.kb": "{n} КБ",

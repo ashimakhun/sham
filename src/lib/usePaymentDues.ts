@@ -8,7 +8,8 @@ import { useNow } from './useNow';
 
 /**
  * ARU-66 AC 7 / AC 8: the signed-in listener's own due courses (course id -> deadline, YYYY-MM-DD), from
- * my_payment_dues() with the device-local date. Not live: it reloads when the device-local date changes (checked
+ * my_payment_dues() with the device-local date. ARU-148: a course stays due after its deadline until the end of that
+ * month (unpaid and overdue); `overdue` holds the ids of those courses. Not live: it reloads when the device-local date changes (checked
  * every 30 s, so a period starting or ending shows within a minute), when the app returns to the foreground, and
  * whenever the caller calls `reload` (the Courses tab does on focus). An error shows no highlight and no banner.
  */
@@ -53,8 +54,15 @@ export function usePaymentDues() {
     return () => sub.remove();
   }, [reload]);
 
-  // A due whose deadline has passed is dropped at once, before the reload answers.
+  // ARU-148: a due from an earlier month is dropped at once (the 1st starts fresh, AC 6), before the reload answers.
+  // One whose deadline has passed in this month turns overdue at once, so the card keeps its border at midnight (AC 5).
+  const month = today.slice(0, 7);
   const map = new Map<string, string>();
-  for (const d of dues) if (d.deadline >= today) map.set(d.courseId, d.deadline);
-  return { dues: map, reload };
+  const overdue = new Set<string>();
+  for (const d of dues) {
+    if (d.deadline.slice(0, 7) < month) continue;
+    map.set(d.courseId, d.deadline);
+    if (d.overdue || d.deadline < today) overdue.add(d.courseId);
+  }
+  return { dues: map, overdue, reload };
 }

@@ -74,11 +74,18 @@ describe('AC7: the listener\'s card', () => {
     expect(screen.getByText(`Payment due by ${formatDate(new Date(2026, 10, 5).toISOString())}`)).toBeTruthy();
   });
 
-  it('a deadline that has already passed is never shown', async () => {
-    setStore(forUser('S1', { loadPaymentDues: jest.fn(async () => [{ courseId: 'A', deadline: '2026-11-02' }]) }));
-    await render(<CoursesScreen />);
+  // ARU-148 changed this rule: a deadline passed earlier this month now shows as overdue (not dropped); only a
+  // deadline from an earlier month is never shown.
+  it('a deadline from an earlier month is never shown; one passed this month shows as overdue (ARU-148)', async () => {
+    setStore(forUser('S1', { loadPaymentDues: jest.fn(async () => [{ courseId: 'A', deadline: '2026-10-28' }]) }));
+    const view = await render(<CoursesScreen />);
     await act(async () => {});
     expect(screen.queryByTestId('payment-due-A')).toBeNull();
+    await view.unmount();
+    setStore(forUser('S1', { loadPaymentDues: jest.fn(async () => [{ courseId: 'A', deadline: '2026-11-02' }]) }));
+    await render(<CoursesScreen />);
+    await waitFor(() => expect(screen.getByTestId('payment-due-A')).toBeTruthy());
+    expect(screen.getByTestId('payment-due-A').props.children).toBe(`Payment overdue: was due ${formatDay('2026-11-02')}`);
   });
 
   it('the deadline is shown for its local day (no time-zone shift)', () => {

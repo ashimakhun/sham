@@ -9,7 +9,7 @@ import { DisciplineLabel } from '@/components/Disciplines';
 import { RatingSummary } from '@/components/RatingSummary';
 import { Card, HiddenBadge, OwnerLine, UnreadBadge, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
-import { paymentDueText } from '@/lib/billing';
+import { paymentDueText, paymentOverdueText } from '@/lib/billing';
 import { feedbackFor } from '@/lib/feedback';
 import { inCourseChat, seesOnlyCourseSummary } from '@/lib/roles';
 import { useStore } from '@/lib/store';
@@ -27,12 +27,14 @@ type Props = {
   onOpen?: () => void;
   /** ARU-66: the signed-in listener owes this course; the deadline (YYYY-MM-DD). Red border and a "Payment due" line. */
   paymentDue?: string;
+  /** ARU-148: the deadline has passed this month and the course is still unpaid; "Payment overdue" replaces the line. */
+  paymentOverdue?: boolean;
 };
 
 /** A second tap within this window is ignored, so a quick double tap opens only one screen (ARU-25). */
 const TAP_GUARD_MS = 800;
 
-export function CourseCard({ course, tag, onOpen, paymentDue }: Props) {
+export function CourseCard({ course, tag, onOpen, paymentDue, paymentOverdue }: Props) {
   const { getUser, currentUser, courseMembers, unreadCount, courseFeedback } = useStore();
   const { t, lang } = useI18n();
   // A student who is not a listener sees only the title and description (ARU-24).
@@ -85,15 +87,15 @@ export function CourseCard({ course, tag, onOpen, paymentDue }: Props) {
         <OwnerLine name={getUser(course.createdById)?.name ?? t('common.unknown')} date={formatDate(course.createdAt)} />
       )}
       <RatingSummary items={feedback} style={styles.muted} />
-      {/* ARU-66 AC 7: read with the card's other text by screen readers. */}
+      {/* ARU-66 AC 7 / ARU-148 AC 2: read with the card's other text by screen readers. */}
       {paymentDue ? (
         <Text testID={`payment-due-${course.id}`} style={{ color: colors.danger, fontSize: 14, ...font(500) }}>
-          {paymentDueText(paymentDue, lang)}
+          {paymentOverdue ? paymentOverdueText(paymentDue, lang) : paymentDueText(paymentDue, lang)}
         </Text>
       ) : null}
     </>
   );
-  // A thin (1 pt) red border in the theme's red.
+  // A thin (1 pt) red border in the theme's red, while due and while overdue (ARU-148).
   const dueBorder = paymentDue ? { borderWidth: 1, borderColor: colors.danger } : null;
 
   if (!showChat)

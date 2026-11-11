@@ -429,6 +429,7 @@
   "picker.date": "Schedule / Edit meeting, Assign homework · screen reader name of the date button (Android, web)",
   "picker.time": "Schedule / Edit meeting, Assign homework · screen reader name of the time button (Android, web)",
   "courses.paymentDueBy": "Courses tab · course card · red line when this month's payment is due",
+  "courses.paymentOverdue": "Courses tab · course card · red line when this month's payment period has passed unpaid",
   "files.untitled": "Upload PDF · name prefilled when the picked file has none",
   "files.size.b": "Materials, files · file size in bytes",
   "files.size.kb": "Materials, files · file size in kilobytes",

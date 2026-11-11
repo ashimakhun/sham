@@ -42,7 +42,7 @@ export default function CoursesScreen() {
     openedFromHere.current = true;
   };
   // ARU-66: the listener's own payment deadlines; reloaded on every focus (and by the hook on foreground / new day).
-  const { dues, reload: reloadDues } = usePaymentDues();
+  const { dues, overdue, reload: reloadDues } = usePaymentDues();
   useFocusEffect(
     useCallback(() => {
       reloadDues();
@@ -131,7 +131,12 @@ export default function CoursesScreen() {
         section.title ? <Text style={[styles.label, { marginTop: 8 }]}>{section.title.toUpperCase()}</Text> : null
       }
       renderItem={({ item, section }) => (
-        <CourseCard course={item} onOpen={openFromHere} paymentDue={dues.get(item.id)} />
+        <CourseCard
+          course={item}
+          onOpen={openFromHere}
+          paymentDue={dues.get(item.id)}
+          paymentOverdue={overdue.has(item.id)}
+        />
       )}
       ListEmptyComponent={<EmptyState title={t(myEmpty[role].title)} hint={t(myEmpty[role].hint)} />}
     />

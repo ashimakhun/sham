@@ -22,9 +22,9 @@ export function requestSentText(r: Pick<PaymentRequest, 'sentAt'>, lang: Languag
 
 /**
  * ARU-99 AC 1 / AC 3 / AC 4: on course details, an unpaid listener of a paid course in its payment period sees Pay,
- * or, once they sent a request this month, when it was sent and "Send again". Shown only while the course is due
- * (my_payment_dues(), the same rule as the red deadline on the course card); it disappears with the period and
- * once the accountant marks them Paid or Exempt. Reloaded when the screen gains focus and when the app comes back.
+ * or, once they sent a request this month, when it was sent and "Send again". Shown only while the course is due or
+ * overdue (my_payment_dues(), the same rule as the red line on the course card; ARU-148 AC 8); it disappears at the
+ * end of the month and once the accountant marks them Paid or Exempt. Reloaded when the screen gains focus and when the app comes back.
  */
 export function PaySection({ course }: { course: Course }) {
   const { loadMyPaymentRequest } = useStore();

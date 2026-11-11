@@ -22,9 +22,11 @@ An educational mobile app where teachers, mentors and students work together:
   each a monthly payment period (Profile tab).
 - **Payments** (ARU-66): accountants and the teacher open a paid course from the Accountant section and mark each
   listener Paid for the month, undo it, or set them Exempt; "Unpaid this month" lists who still owes during the
-  payment period. An unpaid listener's course card on the Courses tab gets a red border and "Payment due by <date>".
-- **Payment requests** (ARU-99): during the payment period an unpaid listener taps **Pay** on course details and sends
-  a proof (a photo or a PDF, up to 10 MB); **Send again** replaces it. In the Accountant section each paid course is
+  payment period. An unpaid listener's course card on the Courses tab gets a red border and "Payment due by <date>";
+  after the period it keeps the border with "Payment overdue: was due <date>" until Paid / Exempt or the month ends
+  (ARU-148).
+- **Payment requests** (ARU-99): during the payment period (and, since ARU-148, while overdue) an unpaid listener
+  taps **Pay** on course details and sends a proof (a photo or a PDF, up to 10 MB); **Send again** replaces it. In the Accountant section each paid course is
   a row with ">" and a count of waiting requests; its payments page has the period, Change period, Unselect and,
   under each listener, their request with View proof.
 - **New accounts** wait for the teacher's approval before they can use the app.
@@ -222,7 +224,9 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    the workspace's teacher only) and a new `handle_new_user()`: a sign-up must carry `workspace_name` (creates a
    workspace; the account is its approved teacher) or `invite_code` (joins that workspace as a waiting student).
    Anything else is refused and no account is created. Only an auth user added in the SQL Editor without either
-   still joins the oldest workspace).
+   still joins the oldest workspace),
+   `0061_payment_overdue.sql` (ARU-148: `my_payment_dues(today)` also returns the caller's unpaid courses after the
+   period's end day until the end of the month, with a new `overdue` column; same access and grants; changes no data).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
@@ -796,7 +800,7 @@ teacher" is that workspace's teacher, and nobody can see or change anything in a
 | Select / unselect paid courses |         | accountants (any course they can see) |  |
 | See paid courses, change their payment period | | accountants (all they can see) | ✓ (all) |
 | See / set / undo Paid marks and exemptions, see "Unpaid this month" (ARU-66) | | accountants (paid courses they can see) | ✓ (all paid courses) |
-| See own payment deadline on a course card (`my_payment_dues`, ARU-66) | as a listener | as a listener |  |
+| See own payment deadline or overdue line on a course card (`my_payment_dues`, ARU-66 / ARU-148) | as a listener | as a listener |  |
 | Send / replace own payment request with a proof (ARU-99; unpaid, in the period) | as a listener | as a listener |  |
 | See payment requests and proofs, request count (ARU-99) | own only | accountants (current listeners of paid courses they can see) | ✓ (all) |
 | Delete payment proofs (only by deleting a course or discipline, ARU-99) | | | ✓ |

@@ -113,7 +113,9 @@ select t.login('S1');
 select t.eq(pg_temp.dues('2026-11-03'), '', 'AC9 S1 marked Paid in November: nothing due');
 select t.eq(pg_temp.dues('2026-12-01'), 'Algebra@2026-12-05', 'AC2 next month S1 is Unpaid again (first day of the period)');
 select t.eq(pg_temp.dues('2026-12-05'), 'Algebra@2026-12-05', 'AC7 due on the deadline day');
-select t.eq(pg_temp.dues('2026-12-06'), '', 'AC8 nothing after the period');
+-- ARU-148: after the period an unpaid listener is overdue until the month ends (aru148_payment_overdue.test.sql).
+select t.eq(pg_temp.dues('2026-12-06'), 'Algebra@2026-12-05', 'AC8 (ARU-148) still owed after the period: overdue');
+select t.eq(pg_temp.dues('2027-01-01'), 'Algebra@2027-01-05', 'AC8 (ARU-148) the next month starts fresh');
 select t.eq(pg_temp.dues(null), '', 'AC9 no date: nothing');
 select t.login('S2');
 select t.eq(pg_temp.dues('2026-12-03'), '', 'AC2 Exempt lasts into the next month');
