@@ -318,7 +318,7 @@ type ProfileRow = {
 type BillingRow = { course_id: string; start_day: number; end_day: number; selected_by: string | null; selected_at: string };
 type PaymentRow = { course_id: string; user_id: string; month: string; marked_by: string | null; marked_at: string };
 type ExemptionRow = { course_id: string; user_id: string };
-type DueRow = { course_id: string; deadline: string };
+type DueRow = { course_id: string; deadline: string; overdue?: boolean | null };
 type PaymentRequestRow = {
   id: string;
   course_id: string;
@@ -2028,6 +2028,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return ((res.data as DueRow[] | null) ?? []).map((r) => ({
         courseId: r.course_id,
         deadline: String(r.deadline).slice(0, 10),
+        // ARU-148: 0061 adds the flag; a server without it still works (the hook also compares the dates).
+        ...(r.overdue != null ? { overdue: !!r.overdue } : {}),
       }));
     },
     setUserRole: async (userId, role) => {

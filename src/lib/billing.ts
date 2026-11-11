@@ -63,6 +63,11 @@ export function paymentDueText(deadline: string, lang: Language = currentLanguag
   return translate(lang, 'courses.paymentDueBy', { date: formatDay(deadline) });
 }
 
+/** ARU-148 AC 1: "Payment overdue: was due 5 Nov 2026", in the app's language (same date format as above). */
+export function paymentOverdueText(deadline: string, lang: Language = currentLanguage()) {
+  return translate(lang, 'courses.paymentOverdue', { date: formatDay(deadline) });
+}
+
 export type PaymentStatus = { kind: 'exempt' } | { kind: 'paid'; payment: CoursePayment } | { kind: 'unpaid' };
 
 /** A listener's state for a course and month. Exempt wins over a Paid mark (ANALYSIS note 2). */

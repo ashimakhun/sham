@@ -429,6 +429,7 @@
   "picker.date": "Pick date",
   "picker.time": "Pick time",
   "courses.paymentDueBy": "Payment due by {date}",
+  "courses.paymentOverdue": "Payment overdue: was due {date}",
   "files.untitled": "Untitled",
   "files.size.b": "{n} B",
   "files.size.kb": "{n} KB",
