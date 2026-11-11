@@ -21,7 +21,9 @@ const msg = (id: string, authorId: string, body: string, minute: number): Course
   courseId: 'A',
   authorId,
   body,
-  createdAt: `2026-10-28T10:${String(minute).padStart(2, '0')}:00.000Z`,
+  // 28 Oct 2026, 10:0x in the device's local time, so the time the chat shows is 10:0x in any time zone (a fixed
+  // UTC string only showed 10:0x when the tests ran in UTC).
+  createdAt: new Date(2026, 9, 28, 10, minute).toISOString(),
 });
 const button = (name: string | RegExp) => screen.getByRole('button', { name });
 
