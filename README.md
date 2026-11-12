@@ -244,7 +244,10 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `set_telegram_notification()` (keeps every earlier kind), `meeting_listener_notes.announced` (set by the database;
    every note that is public when it runs counts as announced), `meeting_notes_recipients()` and the triggers that
    queue the `pg_net` call; no RLS changes; needs the Vault secrets and the function from
-   [Telegram notifications](#telegram-notifications) → Meeting notes).
+   [Telegram notifications](#telegram-notifications) → Meeting notes),
+   `0063_revoke_anon_security_definer.sql` (ARU-154: signed-out visitors can no longer execute `handle_new_user()`,
+   `homework_assignments_before_insert()`, `my_role()` or `is_my_student()`; signed-in users keep the last two; no RLS
+   or data changes).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
