@@ -2,7 +2,7 @@
 
 Sham is built by three Claude agents (requirements, dev and QA; the QA agent has two jobs) that move work through Linear. They never talk to each other directly: the issue status in Linear is the handoff, and a person reviews and merges every PR.
 
-- Linear workspace: team **Sham** (key `ARU`), project **Sham**. The project document "Sham: product documentation" describes how the app behaves today.
+- Linear workspace: team **Sham** (key `ARU`), project **Sham**. The project documents "Sham: product documentation" (how the app behaves today) and "Sham: role checklists" (a manual test checklist per role) are kept up to date by hand after features ship; older Done issues carry a "Current behaviour" note naming the later issues that changed them.
 - Agent instructions: [`.claude/skills/`](../.claude/skills/) (`sham-requirements` with `sham-merge-issues`, `sham-requirements-analysis`, `sham-dev`, `sham-qa`).
 
 ## Workflow
@@ -35,9 +35,10 @@ When a story's last open bug is closed, the story goes back to Ready for QA for 
 
 ### How the requirements agent picks an idea
 
+0. Merges ideas that describe the same or overlapping work (`sham-merge-issues`, at most 3 merges per run; the others become Duplicate).
 1. Rates every unrated idea with a `difficulty` label.
 2. Skips ideas blocked by an issue still in Idea or Needs Clarification.
-3. Sorts the rest by difficulty (current policy: **easy first**, set in the skill's "Current priority policy" line), then by how many issues each one unblocks, then related work already in progress, then oldest.
+3. Sorts the rest: stories sent back by analysis (`ANALYSIS: CHANGES NEEDED`) first, then by difficulty (current policy: **easy first**, set in the skill's "Current priority policy" line), then by how many issues each one unblocks, then related work already in progress, then oldest.
 4. Lists its top 3 candidates and why in each run, and adds blocks / blocked-by links when it finds a missing dependency.
 
 ## Linear setup

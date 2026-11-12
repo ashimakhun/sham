@@ -2,9 +2,16 @@
 
 An educational mobile app where teachers, mentors and students work together:
 
+- **Workspaces** (ARU-145, ARU-146): each school is a workspace with its own teacher, people and data. At sign-up a
+  user creates a workspace (and becomes its teacher) or joins one with its invite code, which the teacher copies
+  from Manage roles.
 - **Teachers and mentors** create courses and add students and mentors to them as listeners.
-- **The course owner** (or the teacher) schedules meetings; after a completed meeting they add notes and assign
-  homework, and listeners mark that they attended.
+- **The course owner** (or the teacher) schedules meetings, named by their date and time (ARU-129); after a
+  completed meeting they assign homework, and listeners mark that they attended. The pencil in the course name card
+  opens **Edit course** (discipline and owner, ARU-103).
+- **Meeting notes** (ARU-142, ARU-143): listeners, the owner and the teacher each write their own signed notes on a
+  completed meeting; a **Publish** switch keeps them private or shares them with the course (and can send a Telegram
+  message, ARU-151).
 - **Listeners** send homework (text + optional photo) for an assignment from the **New** list on the Homework tab.
 - **Mentors and the teacher** see all homework, leave a comment and mark it as checked (never their own).
 - **All homework lives on the Homework tab** (ARU-80; course details no longer lists it); its **Checked** list has a
@@ -37,6 +44,11 @@ An educational mobile app where teachers, mentors and students work together:
   password checked first.
 - **Forgot password?** (ARU-77): on the sign-in screen, anyone resets their password with a code sent by email (needs
   the [Password reset email](#password-reset-email) setup).
+- **Homework photos** (ARU-105, ARU-107, ARU-112): compressed when picked and deleted 6 months after the homework is
+  checked; senders get a warning banner (and Telegram warnings) and can download their photos as a ZIP.
+- **Telegram notifications** from the Sham bot (ARU-48 and later): meeting started, new homework, homework reviewed,
+  photo deletion, homework submitted, chat messages, new materials, meeting notes and new accounts.
+- **English and Russian** (ARU-108 to ARU-113): the phone's language by default, with a Language switch on Profile.
 
 How each feature behaves today is described in the Linear project document **Sham: product documentation**.
 
@@ -827,6 +839,9 @@ teacher" is that workspace's teacher, and nobody can see or change anything in a
 | Delete Knowledge base PDFs (ARU-86) |      | ✓ (own)   | ✓ (any) |
 | Make a course-linked PDF course-only | | ✓ (own)       | ✓ (own) |
 | See a course-only Knowledge base PDF | if in its course | if in its course, or its author | ✓ |
+| Create a workspace at sign-up (and become its teacher, ARU-146) | | | ✓ |
+| Join a workspace with its invite code at sign-up (waits for approval) | ✓ | (joins as a student) | |
+| See / copy the workspace's invite code (Manage roles, ARU-146) | | | ✓ |
 | Switch student ↔ mentor    |           |                    | ✓       |
 | Accept or reject new accounts |        |                    | ✓       |
 | Connect Telegram and choose own notifications | ✓ (own) | ✓ (own) | ✓ (own) |
@@ -849,7 +864,7 @@ teacher" is that workspace's teacher, and nobody can see or change anything in a
 | Choose the app language (Profile → Language, saved in `profiles.language`, ARU-108) | own | own | own |
 | Change own password (Supabase Auth, current password required, ARU-76) | own | own | own |
 | Reset a forgotten password with an emailed code (signed out, any approval state, ARU-77) | own | own | own |
-| Become / stop being teacher |          |                    | (nobody) |
+| Become / stop being teacher (other than by creating a workspace at sign-up) |          |                    | (nobody) |
 | Delete own account (ARU-75; password again; also waiting / declined accounts) | ✓ | ✓ (not while owning a course) | (never) |
 | Delete someone else's account |         |                    | (nobody) |
 
@@ -863,18 +878,21 @@ New work goes through three Claude agents (requirements → dev → QA) coordina
 reviewed and merged by a person. See [`docs/agent-pipeline.md`](docs/agent-pipeline.md); the agents'
 instructions are in [`.claude/skills/`](.claude/skills/).
 
-Two rules are enforced in the app only: a student sees only the title and description of courses they are not in
-(course titles stay readable so they can be listed), and a mentor who is a listener of a course doesn't see the
-others' attendance there. Also, the homework update rule doesn't check the status, so the database would let a
-mentor or the teacher change homework that is already checked; the app never offers it.
+A few rules are enforced in the app only, not by the database: a student sees only the title and description of
+courses they are not in (course titles stay readable so they can be listed); a mentor who is a listener of a course
+doesn't see the others' attendance there; checked homework and a meeting's homework check can't be undone in the app
+(the database would allow it); Pay shows only from the payment period's first day to the month's end; and Set
+exempt shows only on Unpaid listeners. The full list is in section 5 of "Sham: product documentation".
 
 ## Work in progress
 
-- **Telegram notifications** (instead of push notifications, which were canceled): linking a Sham account to the
-  Sham Telegram bot (ARU-48, in QA, PR #46; it uses migration 0023), then notifications for new chat messages
-  (ARU-44), checked homework (ARU-49), new homework assignments (ARU-50) and meetings starting (ARU-41). The
-  product owner starts this work; the dev agent skips it until then.
-- **Full formatted posts on Blog cards** (ARU-54): in development.
+- **Bug ARU-153:** saving your first note on a meeting doesn't close the Notes editor (it stays open with Save
+  greyed out). In the dev pipeline.
+- Waiting for the product owner (Needs Clarification): several photos per homework (ARU-150) and moving file
+  storage to Cloudflare R2 (ARU-106).
+
+How every feature behaves today is described in the Linear project documents **Sham: product documentation** and
+**Sham: role checklists** (one manual test checklist per role).
 
 ## Next steps
 
