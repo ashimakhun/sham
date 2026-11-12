@@ -839,6 +839,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [accountNotice, setAccountNotice] = useState<string | null>(null);
 
   const userId = session?.user.id;
+  // ARU-157: the signed-in user as the auth handler last set it (synchronously, unlike `session`), so a load that
+  // finishes after a sign-out or a switch of user can tell its answer belongs to someone else.
+  const authUser = useRef<string | undefined>(undefined);
+  // ARU-157: only the latest load()'s answer is used (bumped by every load and by signing out).
+  const loadRequest = useRef(0);
+  const applySession = useCallback((s: Session | null) => {
+    authUser.current = s?.user.id;
+    setSession(s);
+  }, []);
 
   // ARU-75 AC 9: the stored session is used without asking the server, so on start, on returning to the app and when
   // the own profile is missing, ask Auth whether the user still exists. If it was deleted (e.g. on another device),
@@ -874,7 +883,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       .then(({ data }) => {
         holdingSession.current = false;
         parkedSession.current = null;
-        setSession(data.session);
+        applySession(data.session);
         setReady(true);
       });
     const { data } = supabase.auth.onAuthStateChange((_event, s) => {
@@ -883,9 +892,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (!s) parkedSession.current = null;
-      setSession(s);
+      applySession(s);
       if (!s) {
-        // Signed out: drop the previous user's data.
+        // Signed out: drop the previous user's data, and any load still running for them (ARU-157).
+        loadRequest.current++;
         setProfiles([]);
         setAccessRequests([]);
         setTelegram(undefined);
@@ -913,7 +923,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
     });
     return () => data.subscription.unsubscribe();
-  }, []);
+  }, [applySession]);
 
   // New-message counts for all the user's chats in one request (ARU-31). Only the latest request's answer is used,
   // so an older answer arriving late can't bring back a count that was just cleared. Errors keep the last counts.
@@ -939,9 +949,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [userId]);
 
   // Fetches everything the signed-in user may see. State is only set after the
-  // awaits, so it is safe to call from an effect.
+  // awaits, so it is safe to call from an effect. ARU-157: after every await, an answer is dropped if a newer load
+  // has started or the user signed out (or changed) meanwhile, so an older reload can't overwrite a newer one and a
+  // reload finishing after sign-out can't bring the previous user's data back.
   const load = useCallback(async () => {
     if (!userId) return;
+    const request = ++loadRequest.current;
+    const current = () => request === loadRequest.current && authUser.current === userId;
     try {
       // RLS returns nothing but the own profile to an account that isn't approved (ARU-43), so these all succeed
       // (empty) for it and the app shows the waiting screen.
@@ -968,6 +982,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // ARU-125: oldest first, as the Notes page lists them.
         supabase.from('meeting_listener_notes').select('*').order('created_at').order('id'),
       ]);
+      if (!current()) return;
+      const signedHomework = await withSignedPhotoUrls(rows<HomeworkRow>(hw).map(toHomework));
+      if (!current()) return;
       const all = rows<ProfileRow>(profileRows).map(toUser);
       const me = all.find((u) => u.id === userId);
       // ARU-110 AC 2: once per sign-in (app start), save the phone language for Telegram messages of a user who never
@@ -987,7 +1004,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         verifyUser().catch(() => {});
       }
       setProfiles(all);
-      setHomework(await withSignedPhotoUrls(rows<HomeworkRow>(hw).map(toHomework)));
+      setHomework(signedHomework);
       setMaterials(rows<MaterialRow>(mats).map(toMaterial));
       setCourses(rows<CourseRow>(crs).map(toCourse));
       setCourseMembers(rows<CourseMemberRow>(members).map(toCourseMember));
@@ -1023,12 +1040,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const counts = await Promise.resolve(supabase.rpc('assignment_sent_counts', { courses: courseIds })).catch(
           () => ({ data: null, error: new Error('offline') }),
         );
+        if (!current()) return;
         setAssignmentSentCounts(counts.error ? {} : toSentCounts(counts.data as AssignmentSentCountRow[] | null));
       } else {
         setAssignmentSentCounts({});
       }
       // ARU-107 AC 2: the deletion start date. Before 0050 runs there is no table: no date, so no deletion dates.
       const settings = await supabase.from('app_settings').select('photo_deletion_start');
+      if (!current()) return;
       setPhotoDeletionStart(
         settings.error ? null : ((settings.data as { photo_deletion_start: string | null }[] | null)?.[0]?.photo_deletion_start ?? null),
       );
@@ -1042,6 +1061,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           // ARU-99: RLS returns only current listeners' requests of paid courses the caller can see.
           supabase.from('course_payment_requests').select('*'),
         ]);
+        if (!current()) return;
         // Before 0032 / 0039 run there is no table: no paid courses, marks or exemptions.
         setCourseBilling(bill.error ? [] : ((bill.data as BillingRow[] | null) ?? []).map(toBilling));
         setCoursePayments(pays.error ? [] : ((pays.data as PaymentRow[] | null) ?? []).map(toPayment));
@@ -1063,13 +1083,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // Requests for the teacher's Manage roles screen. Not live: they refresh with every load.
       if (me.role === 'teacher') {
         const req = await supabase.rpc('access_requests');
+        if (!current()) return;
         setAccessRequests(req.error ? [] : ((req.data as AccessRequestRow[] | null) ?? []).map(toAccessRequest));
       } else {
         setAccessRequests([]);
       }
       await Promise.all([loadUnread().catch(() => {}), loadGeneralUnread().catch(() => {})]);
     } finally {
-      setLoadedFor(userId);
+      // A dropped answer leaves "loaded" to the load that replaced it (or to the next user's first load).
+      if (current()) setLoadedFor(userId);
     }
   }, [userId, loadUnread, loadGeneralUnread, verifyUser]);
 
@@ -1375,7 +1397,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         holdingSession.current = false;
         parkedSession.current = null;
         // Now the app opens as after a normal sign-in: Homework, or the waiting / declined screen (ARU-43).
-        setSession(next);
+        applySession(next);
       } catch (e) {
         if (e instanceof Error && e.message) throw e;
         throw new Error(NETWORK_ERROR);
