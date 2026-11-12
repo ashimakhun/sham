@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Image, Pressable, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
@@ -17,11 +17,16 @@ import { colors, formatDate, formatDateTime } from '@/lib/theme';
 
 export default function HomeworkDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { visibleHomework, currentUser, getUser, getCourse, checkHomework, assignments, meetings } = useStore();
+  const { visibleHomework, currentUser, getUser, getCourse, checkHomework, assignments, meetings, getPhotoUrl } =
+    useStore();
   const [comment, setComment] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
   // The photo's file is gone (or its link couldn't be made): show "Photo unavailable" instead of an empty box.
   const [photoFailed, setPhotoFailed] = useState(false);
+  // ARU-156: the loaded link may have expired (links last an hour). On the first error, ask once for a fresh link and
+  // show "Photo unavailable" only if that one fails too.
+  const [freshPhotoUrl, setFreshPhotoUrl] = useState<string | null>(null);
+  const retriedPhoto = useRef(false);
   const { busy, error, run } = useAction();
   const { t, lang } = useI18n();
 
@@ -34,6 +39,17 @@ export default function HomeworkDetailScreen() {
   // The assignment it was sent for (ARU-32); none for homework sent before assignments existed.
   const assignment = assignments.find((a) => a.id === item.assignmentId);
   const meeting = meetings.find((m) => m.id === assignment?.meetingId);
+  const photoUrl = freshPhotoUrl ?? item.photoUrl;
+
+  function onPhotoError() {
+    const path = item?.photoPath;
+    if (retriedPhoto.current || !path) {
+      setPhotoFailed(true);
+      return;
+    }
+    retriedPhoto.current = true;
+    getPhotoUrl(path).then(setFreshPhotoUrl, () => setPhotoFailed(true));
+  }
 
   return (
     <View style={styles.screen}>
@@ -80,13 +96,13 @@ export default function HomeworkDetailScreen() {
           {item.photoPath && (
             // The whole photo, letterboxed (ARU-18 AC 1); tap for the full-screen preview.
             <Pressable accessibilityRole="imagebutton" accessibilityLabel={t('homework.openPhoto')} onPress={() => setPreviewOpen(true)}>
-              {item.photoUrl && !photoFailed ? (
+              {photoUrl && !photoFailed ? (
                 <Image
                   testID="homework-photo"
-                  source={{ uri: item.photoUrl }}
+                  source={{ uri: photoUrl }}
                   resizeMode="contain"
                   style={{ width: '100%', height: 260, borderRadius: 10, backgroundColor: colors.border }}
-                  onError={() => setPhotoFailed(true)}
+                  onError={onPhotoError}
                 />
               ) : (
                 <View
