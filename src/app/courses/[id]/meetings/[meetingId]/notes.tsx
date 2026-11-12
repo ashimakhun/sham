@@ -27,6 +27,10 @@ export default function MeetingNotesScreen() {
   const { currentUser, courseMembers, getCourse, meetings, meetingListenerNotes, saveMyMeetingNotes, refreshMeetingNotes } =
     useStore();
   const { t } = useI18n();
+  // ARU-153: the editor's key, frozen while my own save is in flight (and after it succeeds, as the editor is leaving).
+  // My save adds my note to the store, which would change the key from 'new' to the note's id, remount the editor and
+  // lose the navigation it scheduled. A note saved on another device still changes the key (nothing is frozen then).
+  const [pinnedKey, setPinnedKey] = useState<string | null>(null);
   // ARU-143 AC 10: a note made private on another device disappears the next time this screen opens (realtime doesn't
   // tell a client that lost access to a row).
   useFocusEffect(
@@ -50,16 +54,28 @@ export default function MeetingNotesScreen() {
     if (meeting.status !== 'completed') {
       return <EmptyState title={t('notes.cantAdd')} hint={t('notes.cantAddHint')} />;
     }
+    const liveKey = myNote?.id ?? 'new';
+    const onSave = async (text: string, isPublic: boolean) => {
+      setPinnedKey(liveKey);
+      try {
+        await saveMyMeetingNotes(meeting.id, text, isPublic);
+      } catch (e) {
+        // A failed save keeps the editor open, so it follows the live entry again.
+        setPinnedKey(null);
+        throw e;
+      }
+    };
     return (
       <NotesEditor
-        // A fresh editor once the entry exists (e.g. saved on another device), so Save changes that entry.
-        key={myNote?.id ?? 'new'}
+        // A fresh editor once the entry exists (e.g. saved on another device), so Save changes that entry; but not
+        // because of my own save (ARU-153).
+        key={pinnedKey ?? liveKey}
         course={course}
         meeting={meeting}
         initialText={myNote?.body ?? ''}
         // ARU-143 AC 1 / 2: a new note starts private; my existing note shows its current state.
         initialPublic={myNote?.isPublic ?? false}
-        onSave={(text, isPublic) => saveMyMeetingNotes(meeting.id, text, isPublic)}
+        onSave={onSave}
       />
     );
   }
