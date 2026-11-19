@@ -10,7 +10,6 @@ import { canChangeCourseDiscipline, DisciplineLabel, EditCoursePencil } from '@/
 import { FeedbackSection } from '@/components/FeedbackSection';
 import { ListenersSection } from '@/components/ListenersSection';
 import { MeetingsSection } from '@/components/MeetingsSection';
-import { PaySection } from '@/components/PaySection';
 import { Card, EmptyState, HiddenBadge, OwnerLine, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import { canChangeOwner, seesOnlyCourseSummary } from '@/lib/roles';
@@ -78,8 +77,7 @@ export default function CourseDetailScreen() {
             <DisciplineLabel course={course} />
             {course.description ? <Text style={styles.body}>{course.description}</Text> : null}
           </Card>
-          {/* ARU-99 AC 1: Pay (or "request sent") for an unpaid listener of a paid course in its payment period. */}
-          <PaySection course={course} />
+          {/* ARU-161: no Pay or "request sent" for listeners (ARU-99's listener side removed). */}
           {/* ARU-103 AC 8: the discipline and the owner are changed from Edit course (the pencil above). */}
           <MeetingsSection course={course} />
           <ListenersSection course={course} />

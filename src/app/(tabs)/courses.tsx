@@ -13,7 +13,6 @@ import { canCreateCourse } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import type { Course } from '@/lib/types';
-import { usePaymentDues } from '@/lib/usePaymentDues';
 
 /** ARU-63: "Courses" (was "My courses", plus courses with no discipline) and "Disciplines" (replaces "All courses"). */
 type CoursesView = 'courses' | 'disciplines';
@@ -41,14 +40,12 @@ export default function CoursesScreen() {
   const openFromHere = () => {
     openedFromHere.current = true;
   };
-  // ARU-66: the listener's own payment deadlines; reloaded on every focus (and by the hook on foreground / new day).
-  const { dues, overdue, reload: reloadDues } = usePaymentDues();
+  // ARU-161: no payment deadlines for listeners any more (ARU-66's my_payment_dues() is no longer loaded).
   useFocusEffect(
     useCallback(() => {
-      reloadDues();
       if (openedFromHere.current) openedFromHere.current = false;
       else setView('courses');
-    }, [reloadDues]),
+    }, []),
   );
 
   // Courses I own (current owner) win over memberships, so no course is ever listed twice.
@@ -131,12 +128,7 @@ export default function CoursesScreen() {
         section.title ? <Text style={[styles.label, { marginTop: 8 }]}>{section.title.toUpperCase()}</Text> : null
       }
       renderItem={({ item, section }) => (
-        <CourseCard
-          course={item}
-          onOpen={openFromHere}
-          paymentDue={dues.get(item.id)}
-          paymentOverdue={overdue.has(item.id)}
-        />
+        <CourseCard course={item} onOpen={openFromHere} />
       )}
       ListEmptyComponent={<EmptyState title={t(myEmpty[role].title)} hint={t(myEmpty[role].hint)} />}
     />

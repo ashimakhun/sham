@@ -1,6 +1,6 @@
-// QA ARU-66: gaps in aru66-accountant-payments.test.tsx: the red border in the 1 pt theme red on the due card only,
-// the due line read by screen readers with a chat-row card, a deadline already passed dropped at once, a listener
-// removed while the payments screen is open, a paid course the accountant can't read (hidden) kept out of the Unpaid list, a listener without a profile, and a long title wrapping.
+// QA ARU-66: gaps in aru66-accountant-payments.test.tsx (the listener card part rewritten for ARU-161: no due line or
+// border for listeners), a listener
+// removed while the payments screen is open, a paid course the accountant can't read (hidden) kept out of the Unpaid list, a listener without a profile.
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
@@ -9,7 +9,7 @@ import ProfileScreen from '@/app/(tabs)/profile';
 import CoursePaymentsScreen from '@/app/accountant/[id]';
 import { formatDay, unpaidThisMonth } from '@/lib/billing';
 import { colors, formatDate } from '@/lib/theme';
-import type { Course, CourseBilling, User } from '@/lib/types';
+import type { CourseBilling, User } from '@/lib/types';
 
 import { courseA, courseB, fakeStore, member, users } from './helpers/fakeStore';
 import { params, setStore } from './helpers/mocks';
@@ -51,59 +51,35 @@ beforeEach(() => {
 });
 afterEach(() => jest.restoreAllMocks());
 
-describe('AC7: the listener\'s card', () => {
-  it('the due card has a 1 pt border in the theme red; the other card keeps the normal border', async () => {
-    setStore(forUser('S1', { loadPaymentDues: jest.fn(async () => [{ courseId: 'A', deadline: '2026-11-05' }]) }));
+// ARU-161 replaced ARU-66 AC 7's listener card: no due line and no red border for listeners any more, and the
+// Courses tab no longer loads my_payment_dues(). The deadline formatting stays (the accountant screens use it).
+describe('AC7 (since ARU-161): the listener\'s card shows no payment', () => {
+  it('an owed course has no due line and no red border, like a paid one; dues are not even loaded', async () => {
+    const loadPaymentDues = jest.fn(async () => [{ courseId: 'A', deadline: '2026-11-05' }]);
+    setStore(forUser('S1', { loadPaymentDues }));
     await render(<CoursesScreen />);
-    await waitFor(() => expect(screen.getByTestId('payment-due-A')).toBeTruthy());
-    expect(borderOf(screen.getByTestId('payment-due-A') as never)).toEqual(
-      expect.objectContaining({ borderWidth: 1, borderColor: colors.danger }),
-    );
-    expect(borderOf(screen.getByText(courseB.title) as never)?.borderColor).not.toBe(colors.danger);
-  });
-
-  it('a chat-row card: the due line is inside the content button screen readers read (no label hiding it)', async () => {
-    setStore(forUser('S1', { loadPaymentDues: jest.fn(async () => [{ courseId: 'A', deadline: '2026-11-05' }]) }));
-    await render(<CoursesScreen />);
-    await waitFor(() => expect(screen.getByTestId('payment-due-A')).toBeTruthy());
-    expect(screen.getByRole('button', { name: `Open chat for ${courseA.title}` })).toBeTruthy();
-    let n = screen.getByTestId('payment-due-A').parent;
-    while (n && n.props.accessibilityRole !== 'button') n = n.parent;
-    expect(n).toBeTruthy();
-    expect(n!.props.accessibilityLabel).toBeUndefined();
-    expect(screen.getByText(`Payment due by ${formatDate(new Date(2026, 10, 5).toISOString())}`)).toBeTruthy();
-  });
-
-  // ARU-148 changed this rule: a deadline passed earlier this month now shows as overdue (not dropped); only a
-  // deadline from an earlier month is never shown.
-  it('a deadline from an earlier month is never shown; one passed this month shows as overdue (ARU-148)', async () => {
-    setStore(forUser('S1', { loadPaymentDues: jest.fn(async () => [{ courseId: 'A', deadline: '2026-10-28' }]) }));
-    const view = await render(<CoursesScreen />);
     await act(async () => {});
+    expect(screen.getByText(courseA.title)).toBeTruthy();
     expect(screen.queryByTestId('payment-due-A')).toBeNull();
-    await view.unmount();
+    expect(screen.queryByText(/Payment (due|overdue)/)).toBeNull();
+    expect(borderOf(screen.getByText(courseA.title) as never)?.borderColor).not.toBe(colors.danger);
+    expect(loadPaymentDues).not.toHaveBeenCalled();
+  });
+
+  it('a chat-row card: still no due line, and the content button keeps no label hiding the card text', async () => {
     setStore(forUser('S1', { loadPaymentDues: jest.fn(async () => [{ courseId: 'A', deadline: '2026-11-02' }]) }));
     await render(<CoursesScreen />);
-    await waitFor(() => expect(screen.getByTestId('payment-due-A')).toBeTruthy());
-    expect(screen.getByTestId('payment-due-A').props.children).toBe(`Payment overdue: was due ${formatDay('2026-11-02')}`);
+    await act(async () => {});
+    expect(screen.getByRole('button', { name: `Open chat for ${courseA.title}` })).toBeTruthy();
+    expect(screen.queryByTestId('payment-due-A')).toBeNull();
+    let n = screen.getByText(courseA.title).parent;
+    while (n && n.props.accessibilityRole !== 'button') n = n.parent;
+    expect(n!.props.accessibilityLabel).toBeUndefined();
   });
 
   it('the deadline is shown for its local day (no time-zone shift)', () => {
     expect(formatDay('2027-02-28')).toBe(formatDate(new Date(2027, 1, 28).toISOString()));
     expect(formatDay('2026-12-31')).toBe(formatDate(new Date(2026, 11, 31).toISOString()));
-  });
-
-  it('a long course title still shows the due line', async () => {
-    const long: Course = { ...courseA, title: 'Advanced '.repeat(12).trim() };
-    setStore(
-      forUser('S1', {
-        courses: [long, courseB],
-        loadPaymentDues: jest.fn(async () => [{ courseId: 'A', deadline: '2026-11-05' }]),
-      }),
-    );
-    await render(<CoursesScreen />);
-    await waitFor(() => expect(screen.getByTestId('payment-due-A')).toBeTruthy());
-    expect(screen.getByText(long.title).props.numberOfLines).not.toBe(1);
   });
 });
 

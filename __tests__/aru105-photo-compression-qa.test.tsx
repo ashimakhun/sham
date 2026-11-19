@@ -1,6 +1,6 @@
 // QA ARU-105: gaps in aru105-photo-compression.test.tsx: while a photo is being prepared the screen says so and
-// Send / the other pick buttons are disabled (and enabled again once it ends); the Pay picker asks for the full-quality, compatible (JPEG) asset; a
-// PDF proof never goes through the image manipulator; a PNG is saved as JPEG; the result keeps the 1600 px limit
+// Send / the other pick buttons are disabled (and enabled again once it ends); since ARU-161 the old Pay address shows
+// no proof picker at all; a PNG is saved as JPEG; the result keeps the 1600 px limit
 // at the boundaries (1601 px is resized, 1600 px is not).
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import * as DocumentPicker from 'expo-document-picker';
@@ -110,48 +110,22 @@ describe('Add homework while preparing', () => {
   });
 });
 
-describe('Pay screen', () => {
+// ARU-161 removed the listener's Pay form (ARU-99); the old address now only redirects to the course, so there is no
+// proof picker left to compress for. Homework photos above still go through preparePhoto.
+describe('Pay screen (since ARU-161)', () => {
   const billing: CourseBilling = { courseId: 'A', startDay: 1, endDay: 28, selectedById: 'N', selectedAt: '2026-11-01T10:00:00.000Z' };
-  const open = () => {
+
+  it('the old Pay address shows no picker, opens no picker and goes to the course', async () => {
     params.id = 'A';
     setStore(fakeStore('S1', { courseMembers: [member('A', 'S1')], courseBilling: [billing] }));
-  };
-
-  it('asks the picker for the full-quality, compatible asset', async () => {
-    open();
-    manipulator.__setImage('file:///p.heic', { width: 4000, height: 3000, bytes: 300_000 });
-    pick('file:///p.heic');
+    const { Redirect } = jest.requireMock('expo-router') as { Redirect: jest.Mock };
     await render(<PayScreen />);
-    await fireEvent.press(screen.getByRole('button', { name: 'Attach a photo' }));
-    await screen.findByTestId('proof-thumbnail');
-    expect(picker.launchImageLibraryAsync).toHaveBeenCalledWith(
-      expect.objectContaining({ mediaTypes: ['images'], quality: 1, preferredAssetRepresentationMode: 'compatible' }),
-    );
-  });
-
-  it('while a photo is preparing, both pick buttons and Send are disabled', async () => {
-    open();
-    pick('file:///slow.heic');
-    const release = hang();
-    await render(<PayScreen />);
-    await startPress('Attach a photo');
-    expect(screen.getByRole('button', { name: 'Preparing…' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Attach a PDF' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Send request' })).toBeDisabled();
-    await act(async () => release());
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Attach a PDF' })).toBeEnabled());
-  });
-
-  it('a PDF proof is attached as is, without the image manipulator', async () => {
-    open();
-    docs.getDocumentAsync.mockResolvedValueOnce({
-      canceled: false,
-      assets: [{ uri: 'file:///bill.pdf', name: 'bill.pdf', mimeType: 'application/pdf', size: 900_000 }],
-    } as never);
-    await render(<PayScreen />);
-    await fireEvent.press(screen.getByRole('button', { name: 'Attach a PDF' }));
-    expect(await screen.findByText('bill.pdf')).toBeTruthy();
-    expect(manipulator.ImageManipulator.manipulate).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Send request' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Attach a photo' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Attach a PDF' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Send request' })).toBeNull();
+    expect(picker.launchImageLibraryAsync).not.toHaveBeenCalled();
+    expect(docs.getDocumentAsync).not.toHaveBeenCalled();
+    const calls = Redirect.mock.calls as unknown as [{ href: unknown }][];
+    expect(calls[calls.length - 1][0]).toEqual({ href: { pathname: '/courses/[id]', params: { id: 'A' } } });
   });
 });
