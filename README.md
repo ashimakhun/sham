@@ -247,7 +247,12 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    [Telegram notifications](#telegram-notifications) → Meeting notes),
    `0063_revoke_anon_security_definer.sql` (ARU-154: signed-out visitors can no longer execute `handle_new_user()`,
    `homework_assignments_before_insert()`, `my_role()` or `is_my_student()`; signed-in users keep the last two; no RLS
-   or data changes).
+   or data changes),
+   `0064_offensive_word_filter.sql` (ARU-163: new table `blocked_words` with a starting English and Russian list (RLS
+   on, no policies: no app role can read or change it), and before insert / update triggers that refuse course and
+   general chat messages, meeting notes and Blog post titles / texts containing a listed word with the new code
+   `sham:text_not_allowed`; updates that don't change the text aren't checked; existing rows aren't changed; see
+   [Offensive word filter](#offensive-word-filter-aru-163)).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
@@ -703,6 +708,15 @@ exactly one teacher per workspace, and after that the database rejects any chang
 (**Profile → Manage roles**). A mentor who owns courses can't be made a student until their courses are given a
 new owner. A user sees their new role after pull-to-refresh or reopening the app. There is no per-student
 mentor: adding someone to a course as a listener makes the course owner their mentor for that course.
+
+### Offensive word filter (ARU-163)
+
+Course and general chat messages, meeting notes and Blog posts (title and text) that contain a word from the
+offensive word list are refused: "This text contains words that aren't allowed. Please change it." The check runs in
+the database (migration `0064_offensive_word_filter.sql`), so it applies to every app version and API call. Words
+match as whole words, ignoring case (Latin and Cyrillic). There is one global list, in the table `blocked_words`; no
+app screen shows it. Add, remove or list words in the SQL Editor with
+[`supabase/manage-words.sql`](supabase/manage-words.sql); a change applies to the next send or save.
 
 ## Checks
 

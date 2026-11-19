@@ -792,5 +792,6 @@
   "roles.copied": "Manage roles · workspace card · short confirmation after copying (ARU-146)",
   "db.invite_code_unknown": "Sign-in · Create account · Join: the invite code matches no workspace (ARU-146)",
   "db.signup_update_app": "Database error · a sign-up without a workspace choice, from an old app or the Auth API (ARU-146; not shown by this app)",
-  "db.workspace_name_length": "Database error · a workspace name blank or over 80 characters sent from outside the app (ARU-146)"
+  "db.workspace_name_length": "Database error · a workspace name blank or over 80 characters sent from outside the app (ARU-146)",
+  "db.text_not_allowed": "Chats, meeting notes, Blog · the text contains a word from the offensive word list (ARU-163)"
 }

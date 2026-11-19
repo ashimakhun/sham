@@ -792,5 +792,6 @@
   "roles.copied": "Copied",
   "db.invite_code_unknown": "No workspace has this invite code.",
   "db.signup_update_app": "Update the app to create an account.",
-  "db.workspace_name_length": "Workspace name must be 1 to 80 characters."
+  "db.workspace_name_length": "Workspace name must be 1 to 80 characters.",
+  "db.text_not_allowed": "This text contains words that aren't allowed. Please change it."
 }
