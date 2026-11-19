@@ -78,7 +78,7 @@ describe('Validation (AC 5–7)', () => {
     expect(disabled(save())).toBe(false);
     expect(screen.queryByText(NAME_TOO_LONG)).toBeNull();
     await fireEvent.changeText(screen.getByDisplayValue(`  ${'a'.repeat(80)}  `), 'a'.repeat(81));
-    expect(screen.getByText('Name must be 80 characters or fewer')).toBeTruthy();
+    expect(screen.getByText('Display name must be 80 characters or fewer')).toBeTruthy();
     expect(disabled(save())).toBe(true);
   });
 

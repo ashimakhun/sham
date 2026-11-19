@@ -17,7 +17,9 @@ declare code text; msg text; hint text; result text := 'no error';
 begin
   execute 'set session authorization supabase_auth_admin';
   begin
-    insert into auth.users (id, email, raw_user_meta_data) values (md5('aru146' || who)::uuid, who || '@x.test', meta);
+    insert into auth.users (id, email, raw_user_meta_data) values (md5('aru146' || who)::uuid,
+      'u' || left(md5(who), 20) || '@users.sham.invalid', jsonb_build_object('username', 'u' || left(md5(who), 20), 'full_name', 'User ' || who) || meta);
+    -- ARU-164: every sign-up carries a username, its internal address and a display name.
   exception when others then
     get stacked diagnostics code = returned_sqlstate, msg = message_text, hint = pg_exception_hint;
     result := concat_ws(' | ', code, msg, hint);

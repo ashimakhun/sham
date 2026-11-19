@@ -10,14 +10,17 @@ import { NAME_MAX } from '@/lib/profileName';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import { useAction } from '@/lib/useAction';
+import { usernameFromAddress } from '@/lib/username';
 
 /** ARU-71: the pencil next to the name (the same `create-outline` as ARU-70's discipline edit icon). */
 export const EDIT_NAME_ICON = 'create-outline' as const;
 
-/** The Profile tab's name card (name, email, role) with an "Edit name" pencil for the signed-in user (ARU-55, ARU-71). Only approved
+/** The Profile tab's name card (display name, username, role) with an "Edit name" pencil for the signed-in user (ARU-55, ARU-71). Only approved
  *  users reach the Profile tab: pending and rejected accounts see only the waiting screen (ARU-43). */
 export function ProfileNameCard() {
   const { currentUser, session, updateMyName } = useStore();
+  // ARU-164: a username account's Auth address is <username>@<internal domain>; an older account's email shows nothing.
+  const username = usernameFromAddress(session?.user.email);
   const { busy, error, run } = useAction();
   const { t, tm } = useI18n();
   const [editing, setEditing] = useState(false);
@@ -75,7 +78,7 @@ export function ProfileNameCard() {
       {editing && (
         <View style={{ gap: 10 }}>
           <Field
-            label={t('profile.nameLabel')}
+            label={t('profile.displayNameLabel')}
             value={text}
             onChangeText={setText}
             autoFocus
@@ -87,7 +90,7 @@ export function ProfileNameCard() {
             editable={!busy}
           />
           {tooLong && (
-            <Text style={{ color: colors.danger, fontSize: 14 }}>{t('profile.nameTooLong', { max: NAME_MAX })}</Text>
+            <Text style={{ color: colors.danger, fontSize: 14 }}>{t('profile.displayNameTooLong', { max: NAME_MAX })}</Text>
           )}
           <ErrorText error={tm(error)} />
           <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -100,7 +103,12 @@ export function ProfileNameCard() {
           </View>
         </View>
       )}
-      <Text style={styles.muted}>{session?.user.email}</Text>
+      {/* ARU-164 AC 10: the own username, never an email; nothing for an older account without one. */}
+      {username ? (
+        <Text style={styles.muted} testID="profile-username">
+          {`@${username}`}
+        </Text>
+      ) : null}
       <RoleBadge role={currentUser.role} label={t(`role.${currentUser.role}`)} />
     </Card>
   );

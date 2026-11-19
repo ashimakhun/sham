@@ -19,8 +19,8 @@ it('AC1/AC5: Create account mode shows no hint under the button, even with all f
   await render(<SignInScreen />);
   await fireEvent.press(screen.getByText('Create account'));
   expect(screen.queryByText(HINT)).toBeNull();
-  await fireEvent.changeText(screen.getByPlaceholderText('Dana Serikova'), 'Dana');
-  await fireEvent.changeText(screen.getByPlaceholderText('you@example.com'), 'dana@example.com');
+  await fireEvent.changeText(screen.getByPlaceholderText('Dana S.'), 'Dana');
+  await fireEvent.changeText(screen.getByPlaceholderText('dana_s'), 'dana_s'); // ARU-164: a username
   await fireEvent.changeText(screen.getByPlaceholderText('At least 6 characters'), 'secret1');
   // ARU-146: plus a workspace choice.
   await fireEvent.press(screen.getByRole('tab', { name: 'Join a workspace' }));
@@ -35,8 +35,9 @@ it('AC2: the rest of Create account mode is unchanged', async () => {
   await fireEvent.press(screen.getByText('Create account'));
   expect(screen.getByText('Sham')).toBeTruthy();
   expect(screen.getByText('Homework, checks and lessons in one place.')).toBeTruthy();
-  expect(screen.getByText('Full name')).toBeTruthy();
-  expect(screen.getByText('Email')).toBeTruthy();
+  // ARU-164: Display name and Username replace Full name and Email.
+  expect(screen.getByText('Display name')).toBeTruthy();
+  expect(screen.getByText('Username')).toBeTruthy();
   expect(screen.getByText('Password')).toBeTruthy();
   expect(button('Create account')).toBeDisabled();
 });
@@ -48,7 +49,7 @@ it('AC3: toggling Sign in and Create account leaves no text under either button'
     await fireEvent.press(screen.getAllByText(mode)[0]);
     expect(screen.queryByText(HINT)).toBeNull();
   }
-  expect(screen.queryByText('Full name')).toBeNull();
+  expect(screen.queryByText('Display name')).toBeNull();
 });
 
 it('AC4: sign-up still calls signUp with the entered details', async () => {
@@ -56,13 +57,13 @@ it('AC4: sign-up still calls signUp with the entered details', async () => {
   setStore(fakeStore(null, { signUp }));
   await render(<SignInScreen />);
   await fireEvent.press(screen.getByText('Create account'));
-  await fireEvent.changeText(screen.getByPlaceholderText('Dana Serikova'), 'Dana');
-  await fireEvent.changeText(screen.getByPlaceholderText('you@example.com'), 'dana@example.com');
+  await fireEvent.changeText(screen.getByPlaceholderText('Dana S.'), 'Dana');
+  await fireEvent.changeText(screen.getByPlaceholderText('dana_s'), 'dana_s'); // ARU-164: a username
   await fireEvent.changeText(screen.getByPlaceholderText('At least 6 characters'), 'secret1');
   await fireEvent.press(screen.getByRole('tab', { name: 'Create a workspace' }));
   await fireEvent.changeText(screen.getByPlaceholderText('My school'), 'School');
   await fireEvent.press(button('Create account'));
   await waitFor(() =>
-    expect(signUp).toHaveBeenCalledWith('Dana', 'dana@example.com', 'secret1', { kind: 'create', name: 'School' }),
+    expect(signUp).toHaveBeenCalledWith('Dana', 'dana_s', 'secret1', { kind: 'create', name: 'School' }),
   );
 });

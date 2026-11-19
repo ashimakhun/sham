@@ -873,5 +873,22 @@
   "block.errorTitle": "Alert when blocking fails (e.g. offline) · title; the error follows",
   "block.profileRow": "Profile · button that opens the Blocked people list; also that screen's title",
   "block.none": "Blocked people · empty list",
-  "block.unblock": "Blocked people · button next to each person"
+  "block.unblock": "Blocked people · button next to each person",
+  "signIn.displayName": "Sign-in · Create account · the name others see (ARU-164)",
+  "signIn.displayNameHint": "Sign-in · Create account · hint under Display name (ARU-164)",
+  "signIn.displayNamePlaceholder": "Sign-in · Create account · Display name example (ARU-164)",
+  "signIn.username": "Sign-in · the username field, both modes (ARU-164)",
+  "signIn.usernamePlaceholder": "Sign-in · Username example (ARU-164)",
+  "signIn.usernameRule": "Sign-in · Create account · the username breaks a rule (ARU-164)",
+  "signIn.legacyEmailHint": "Sign-in · hint under Username for accounts made before usernames (ARU-164, removed in ARU-168)",
+  "auth.invalidUsernameCredentials": "Sign-in · wrong username or password (ARU-164)",
+  "auth.usernameTaken": "Sign-in · Create account · the username is already used (ARU-164)",
+  "profile.displayNameLabel": "Profile · Edit display name · field label (ARU-164)",
+  "profile.displayNameEmpty": "Profile · Edit display name · blank (ARU-164)",
+  "profile.displayNameTooLong": "Profile · Edit display name · too long (ARU-164)",
+  "db.username_invalid": "Database error · a sign-up with a username that breaks the rules, from outside the app (ARU-164)",
+  "db.signup_email_mismatch": "Database error · a sign-up whose Auth address isn't the username's internal address (ARU-164)",
+  "db.display_name_invalid": "Database error · a sign-up with a blank or too long display name, from outside the app (ARU-164)",
+  "db.username_taken": "Database error · a sign-up with a username already used (ARU-164)",
+  "db.address_change_refused": "Database error · a change of the account's Auth address from outside the app (ARU-175)"
 }

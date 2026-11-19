@@ -20,15 +20,15 @@ const ru = (ui: React.ReactElement) => <I18nContext.Provider value={make('ru')}>
 async function openSignUp() {
   await render(<SignInScreen />);
   await fireEvent.press(screen.getByText('Create account'));
-  await fireEvent.changeText(screen.getByPlaceholderText('Dana Serikova'), 'Dana');
-  await fireEvent.changeText(screen.getByPlaceholderText('you@example.com'), 'dana@example.com');
+  await fireEvent.changeText(screen.getByPlaceholderText('Dana S.'), 'Dana');
+  await fireEvent.changeText(screen.getByPlaceholderText('dana_s'), 'dana_s'); // ARU-164: a username
   await fireEvent.changeText(screen.getByPlaceholderText('At least 6 characters'), 'secret1');
 }
 
 beforeEach(() => jest.clearAllMocks());
 
 describe('AC 1: the choice', () => {
-  it('below name, email and password; nothing chosen at first; Create account waits for a choice and its field', async () => {
+  it('below display name, username and password; nothing chosen at first; Create account waits for a choice and its field', async () => {
     setStore(fakeStore(null));
     await openSignUp();
     const create = screen.getByRole('tab', { name: 'Create a workspace' });
@@ -77,7 +77,7 @@ describe('AC 1: the choice', () => {
     await fireEvent.changeText(screen.getByPlaceholderText('8 letters and digits'), ' abcd2345 ');
     await fireEvent.press(button('Create account'));
     await waitFor(() =>
-      expect(signUp).toHaveBeenCalledWith('Dana', 'dana@example.com', 'secret1', { kind: 'join', code: ' abcd2345 ' }),
+      expect(signUp).toHaveBeenCalledWith('Dana', 'dana_s', 'secret1', { kind: 'join', code: ' abcd2345 ' }),
     );
   });
 
@@ -88,8 +88,8 @@ describe('AC 1: the choice', () => {
     setStore(fakeStore(null, { signUp }));
     await render(ru(<SignInScreen />));
     await fireEvent.press(screen.getByText('Регистрация'));
-    await fireEvent.changeText(screen.getByPlaceholderText('Дана Серикова'), 'Аня');
-    await fireEvent.changeText(screen.getByPlaceholderText('you@example.com'), 'a@b.c');
+    await fireEvent.changeText(screen.getByPlaceholderText('Дана С.'), 'Аня');
+    await fireEvent.changeText(screen.getByPlaceholderText('например, dana_s'), 'anya'); // ARU-164: a username
     await fireEvent.changeText(screen.getByPlaceholderText('Не менее 6 символов'), 'secret1');
     await fireEvent.press(screen.getByRole('tab', { name: 'Присоединиться' }));
     expect(screen.getByText('Код приглашения')).toBeTruthy();

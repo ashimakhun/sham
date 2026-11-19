@@ -151,14 +151,14 @@ const messages: ChatMessage[] = [
 const pending: AccessRequest = {
   id: "S9",
   name: "New Person",
-  email: "new@x.test",
+  username: "new_person", // ARU-164: requests show the username, not an email
   createdAt: "2026-11-01T10:00:00.000Z",
   status: "pending",
 };
 const declined: AccessRequest = {
   id: "S8",
   name: "Old Person",
-  email: "old@x.test",
+  username: "old_person",
   createdAt: "2026-10-01T10:00:00.000Z",
   status: "rejected",
 };
@@ -208,9 +208,9 @@ const USER = [
   "Old message",
   "Привет all",
   pending.name,
-  pending.email,
+  `@${pending.username}`,
   declined.name,
-  declined.email,
+  `@${declined.username}`,
   "zzz-nobody",
   "Connect Telegram",
   "Disconnect",

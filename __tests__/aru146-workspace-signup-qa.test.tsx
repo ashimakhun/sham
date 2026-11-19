@@ -23,7 +23,7 @@ import {
   INVITE_CODE_UNKNOWN,
   NETWORK_ERROR,
   RATE_LIMITED,
-  USER_EXISTS,
+  USERNAME_TAKEN,
   signUpErrorMessage,
   weakPasswordMessage,
 } from "@/lib/password";
@@ -100,7 +100,8 @@ describe("AC 4 / AC 6: sign-up error mapping", () => {
           },
           kind,
         ),
-      ).toBe(USER_EXISTS);
+        // ARU-164 AC 4: a used address is a taken username.
+      ).toBe(USERNAME_TAKEN);
       expect(
         signUpErrorMessage(
           {
@@ -170,12 +171,12 @@ async function openSignUp() {
   await render(<SignInScreen />);
   await fireEvent.press(screen.getByText("Create account"));
   await fireEvent.changeText(
-    screen.getByPlaceholderText("Dana Serikova"),
+    screen.getByPlaceholderText("Dana S."),
     "Dana",
   );
   await fireEvent.changeText(
-    screen.getByPlaceholderText("you@example.com"),
-    "dana@example.com",
+    screen.getByPlaceholderText("dana_s"),
+    "dana_s", // ARU-164: a username
   );
   await fireEvent.changeText(
     screen.getByPlaceholderText("At least 6 characters"),
@@ -190,7 +191,7 @@ describe("AC 1: sign-up screen", () => {
     await render(<SignInScreen />);
     expect(screen.queryByTestId("workspace-choice")).toBeNull();
     await fireEvent.changeText(
-      screen.getByPlaceholderText("you@example.com"),
+      screen.getByPlaceholderText("dana_s"),
       "dana@example.com",
     );
     await fireEvent.changeText(
@@ -212,7 +213,7 @@ describe("AC 1: sign-up screen", () => {
     );
     expect(button("Create account")).toBeEnabled();
     await fireEvent.changeText(
-      screen.getByPlaceholderText("Dana Serikova"),
+      screen.getByPlaceholderText("Dana S."),
       "   ",
     );
     expect(button("Create account")).toBeDisabled();
@@ -240,7 +241,7 @@ describe("AC 1: sign-up screen", () => {
     await waitFor(() => expect(signUp).toHaveBeenCalledTimes(1));
     expect(signUp).toHaveBeenLastCalledWith(
       "Dana",
-      "dana@example.com",
+      "dana_s",
       "secret1",
       { kind: "create", name: "My school" },
     );
@@ -256,7 +257,7 @@ describe("AC 1: sign-up screen", () => {
     await waitFor(() => expect(signUp).toHaveBeenCalledTimes(2));
     expect(signUp).toHaveBeenLastCalledWith(
       "Dana",
-      "dana@example.com",
+      "dana_s",
       "secret1",
       { kind: "join", code: "ABCD2345" },
     );
@@ -270,12 +271,12 @@ describe("AC 1: sign-up screen", () => {
     await render(inRu(<SignInScreen />));
     await fireEvent.press(screen.getByText("Регистрация"));
     await fireEvent.changeText(
-      screen.getByPlaceholderText("Дана Серикова"),
+      screen.getByPlaceholderText("Дана С."),
       "Аня",
     );
     await fireEvent.changeText(
-      screen.getByPlaceholderText("you@example.com"),
-      "a@b.c",
+      screen.getByPlaceholderText("например, dana_s"),
+      "anya", // ARU-164: a username
     );
     await fireEvent.changeText(
       screen.getByPlaceholderText("Не менее 6 символов"),

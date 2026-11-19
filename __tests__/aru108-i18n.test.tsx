@@ -280,17 +280,19 @@ describe('AC 7 / AC 12: the part-1 screens in Russian and English', () => {
   it('sign-in: Russian texts, no English; an Auth error in Russian', async () => {
     phone('ru-RU');
     const signIn = jest.fn(async () => {
-      throw new Error('Incorrect email or password.');
+      throw new Error('Incorrect username or password.');
     });
     setStore(fakeStore(null, { signIn }));
     await render(inApp(<SignInScreen />));
-    for (const text of ['Домашние задания, проверки и занятия в одном месте.', 'Вход', 'Регистрация', 'Пароль', 'Забыли пароль?', 'Войти']) {
+    for (const text of ['Домашние задания, проверки и занятия в одном месте.', 'Вход', 'Регистрация', 'Пароль', 'Войти']) {
       expect(screen.getByText(text)).toBeTruthy();
     }
-    await fireEvent.changeText(screen.getByPlaceholderText('you@example.com'), 'a@b.c');
+    // ARU-164: Username replaces Email; no Forgot password? (AC 9).
+    expect(screen.queryByText('Забыли пароль?')).toBeNull();
+    await fireEvent.changeText(screen.getByPlaceholderText('например, dana_s'), 'dana_s');
     await fireEvent.changeText(screen.getByPlaceholderText('Не менее 6 символов'), 'secret1');
     await fireEvent.press(screen.getByRole('button', { name: 'Войти' }));
-    expect(await screen.findByText('Неверный email или пароль.')).toBeTruthy();
+    expect(await screen.findByText('Неверное имя пользователя или пароль.')).toBeTruthy();
     expect(/Sign in|Password|Forgot|Incorrect/.test(allText())).toBe(false);
   });
 
@@ -302,8 +304,8 @@ describe('AC 7 / AC 12: the part-1 screens in Russian and English', () => {
     setStore(fakeStore(null, { signUp }));
     const view = await render(inApp(<SignInScreen />));
     await fireEvent.press(screen.getByText('Регистрация'));
-    await fireEvent.changeText(screen.getByPlaceholderText('Дана Серикова'), 'Аня');
-    await fireEvent.changeText(screen.getByPlaceholderText('you@example.com'), 'a@b.c');
+    await fireEvent.changeText(screen.getByPlaceholderText('Дана С.'), 'Аня');
+    await fireEvent.changeText(screen.getByPlaceholderText('например, dana_s'), 'anya');
     await fireEvent.changeText(screen.getByPlaceholderText('Не менее 6 символов'), 'secret1');
     await fireEvent.press(screen.getByRole('tab', { name: 'Создать пространство' }));
     await fireEvent.changeText(screen.getByPlaceholderText('Моя школа'), 'Школа');
@@ -313,8 +315,8 @@ describe('AC 7 / AC 12: the part-1 screens in Russian and English', () => {
     phone('en-US');
     await render(inApp(<SignInScreen />));
     await fireEvent.press(screen.getByText('Create account'));
-    await fireEvent.changeText(screen.getByPlaceholderText('Dana Serikova'), 'Anya');
-    await fireEvent.changeText(screen.getByPlaceholderText('you@example.com'), 'a@b.c');
+    await fireEvent.changeText(screen.getByPlaceholderText('Dana S.'), 'Anya');
+    await fireEvent.changeText(screen.getByPlaceholderText('dana_s'), 'anya');
     await fireEvent.changeText(screen.getByPlaceholderText('At least 6 characters'), 'secret1');
     await fireEvent.press(screen.getByRole('tab', { name: 'Create a workspace' }));
     await fireEvent.changeText(screen.getByPlaceholderText('My school'), 'School');

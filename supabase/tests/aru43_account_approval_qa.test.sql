@@ -157,8 +157,9 @@ select t.fails($$select set_access_status(t.u('P'), 'rejected')$$, 'AC7 a studen
 
 -- AC 5 / AC 6: the teacher.
 select t.login('T');
-select t.eq((select string_agg(full_name || ':' || email || ':' || access_status, ',') from access_requests()),
-  'Pat Two:p2@x.test:pending,Pat Pending:p@x.test:pending,Rob Rejected:r@x.test:rejected', 'AC5 requests oldest first, with email');
+-- ARU-164 AC 11: the second value is the username (none for these accounts, made without one), never the email.
+select t.eq((select string_agg(full_name || ':' || coalesce(username, '') || ':' || access_status, ',') from access_requests()),
+  'Pat Two::pending,Pat Pending::pending,Rob Rejected::rejected', 'AC5 requests oldest first (ARU-164: username, no email)');
 select t.eq((select count(*) from profiles where access_status <> 'approved'), 3::bigint, 'the teacher sees waiting profiles');
 select t.throws($$select set_access_status(t.u('P'), 'pending')$$, '22023', 'AC6 nothing can be set back to Pending');
 select t.throws($$select set_access_status(t.id('T'), 'rejected')$$, '42501', 'AC7 the teacher''s own access can''t change');
