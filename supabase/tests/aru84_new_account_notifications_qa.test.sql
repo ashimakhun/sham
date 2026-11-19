@@ -42,9 +42,10 @@ select t.eq(t.calls(), 2::bigint, 'AC8 two sign-ups in one statement: two calls'
 select t.eq((select array_agg(body ->> 'user_id' order by body ->> 'user_id') from net.requests),
   (select array_agg(x::text order by x::text) from unnest(array[t.uid('p'), t.uid('q')]) x), 'AC8 each call has its own id');
 
--- No name in the sign-up metadata: handle_new_user uses the email, and that is the name sent.
+-- No name in the sign-up metadata (an admin insert): ARU-164 AC 5, handle_new_user no longer falls back to the email,
+-- so the name sent is empty and the email is never sent.
 insert into auth.users (id, email, raw_user_meta_data) values (t.uid('noname'), 'noname@x.test', '{}');
-select t.eq(t.recipients(t.uid('noname')), 'noname@x.test>' || t.id('T')::text, 'edge: no name given: the email is used');
+select t.eq(t.recipients(t.uid('noname')), '>' || t.id('T')::text, 'edge: no name given: the email is not used (ARU-164)');
 
 -- Only the teacher is ever a recipient (never the mentor or student who also linked Telegram).
 select t.eq(t.recipients(t.uid('p')), 'Pat>' || t.id('T')::text, 'AC2 only the teacher');

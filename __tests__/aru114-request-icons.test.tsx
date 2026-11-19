@@ -16,7 +16,7 @@ jest.mock('@/lib/store', () => require('./helpers/mocks').store);
 const req = (id: string, name: string, status: AccessRequest['status']): AccessRequest => ({
   id,
   name,
-  email: `${id.toLowerCase()}@x.test`,
+  username: id.toLowerCase(), // ARU-164: requests show the username, not an email
   createdAt: '2026-10-30T10:00:00.000Z',
   status,
 });

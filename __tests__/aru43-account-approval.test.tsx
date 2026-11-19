@@ -20,7 +20,7 @@ const rae: User = { id: 'R', name: 'Rejected Rae', role: 'student', accessStatus
 const req = (id: string, name: string, status: AccessRequest['status'], createdAt: string): AccessRequest => ({
   id,
   name,
-  email: `${id.toLowerCase()}@x.test`,
+  username: id.toLowerCase(), // ARU-164: requests show the username, not an email
   createdAt,
   status,
 });
@@ -93,13 +93,13 @@ describe('Waiting and declined screens (AC 1–3)', () => {
 });
 
 describe('Requests on Manage roles (AC 5–7)', () => {
-  it('Requests come first (oldest first), Declined last, with name, email and sign-up date', async () => {
+  it('Requests come first (oldest first), Declined last, with name, username (ARU-164) and sign-up date', async () => {
     setStore(fakeStore('T', { accessRequests: requests }));
     await render(<RolesScreen />);
     expect(labels()).toEqual(['REQUESTS', 'TEACHER', 'MENTORS', 'STUDENTS', 'DECLINED']);
     const names = screen.getAllByText(/^(Pending|Rejected) /).map((n) => n.props.children);
     expect(names).toEqual(['Pending Pat', 'Pending Quinn', 'Rejected Rae']);
-    expect(screen.getByText('p@x.test')).toBeTruthy();
+    expect(screen.getByText('@p')).toBeTruthy();
     expect(screen.getAllByText(/^Signed up /)).toHaveLength(3);
   });
 
