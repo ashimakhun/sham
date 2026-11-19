@@ -157,7 +157,7 @@ export function canDeleteChatMessage(user: User | null | undefined, course?: Pic
 }
 
 /** ARU-162 AC 1 / 6: Block shows on content whose author is someone else (not a deleted account: no author), for
- *  approved accounts. The database refuses self-blocks and other workspaces too (0065). */
+ *  approved accounts. The database refuses self-blocks and other workspaces too (0066). */
 export function canBlock(user: User | null | undefined, authorId: string | null | undefined) {
   return canReport(user, authorId);
 }

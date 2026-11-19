@@ -853,6 +853,7 @@
   "db.report_dismiss_own": "Database error · Reports screen · the teacher dismisses a report about their own content",
   "db.report_content_exists": "Database error · Reports screen · marking Removed while the content still exists",
   "db.content_cant_delete": "Database error · Reports screen and chats · the user may not delete this content",
+  "db.text_not_allowed": "Chats, meeting notes, Blog · the text contains a word from the offensive word list (ARU-163)",
   "block.menuBlock": "Chat message long-press menu and the ⋯ menu on notes, Blog posts, PDFs and reviews · item that blocks the author ({name}); also the screen reader action",
   "block.confirmTitle": "Block confirmation · title ({name}: the person)",
   "block.confirmMessage": "Block confirmation · text ({name}: the person)",

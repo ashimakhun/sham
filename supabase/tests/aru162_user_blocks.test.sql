@@ -1,4 +1,4 @@
--- ARU-162: block a person. Rules under test: supabase/migrations/0065_user_blocks.sql.
+-- ARU-162: block a person. Rules under test: supabase/migrations/0066_user_blocks.sql.
 -- Course A (owner M): listeners S1, S2. T is the teacher. W2: another workspace with student XS. P: a waiting account.
 select t.seed();
 create function t.r(n text) returns uuid language sql immutable as $$ select md5('aru162' || n)::uuid $$;

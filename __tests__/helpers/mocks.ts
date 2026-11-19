@@ -47,4 +47,6 @@ export const expoRouter = {
   // The unsaved-changes prompt (ARU-28) is tested through the callback the screen passes.
   usePreventRemove: jest.fn(),
   Stack: { Screen: () => null },
+  // Renders nothing; a test reads where it would go from the mock's calls (ARU-161: the old Pay address).
+  Redirect: jest.fn(() => null),
 };

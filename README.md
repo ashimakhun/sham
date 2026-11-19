@@ -29,13 +29,13 @@ An educational mobile app where teachers, mentors and students work together:
   each a monthly payment period (Profile tab).
 - **Payments** (ARU-66): accountants and the teacher open a paid course from the Accountant section and mark each
   listener Paid for the month, undo it, or set them Exempt; "Unpaid this month" lists who still owes during the
-  payment period. An unpaid listener's course card on the Courses tab gets a red border and "Payment due by <date>";
-  after the period it keeps the border with "Payment overdue: was due <date>" until Paid / Exempt or the month ends
-  (ARU-148).
-- **Payment requests** (ARU-99): during the payment period (and, since ARU-148, while overdue) an unpaid listener
-  taps **Pay** on course details and sends a proof (a photo or a PDF, up to 10 MB); **Send again** replaces it. In the Accountant section each paid course is
-  a row with ">" and a count of waiting requests; its payments page has the period, Change period, Unselect and,
-  under each listener, their request with View proof.
+  payment period. Since ARU-161 listeners see no payment deadline, overdue line or red border in the app (on iOS,
+  Android and web): they pay and send proof outside the app, and the accountant marks them Paid.
+- **Payment requests** (ARU-99): since ARU-161 listeners no longer send payment requests in the app (no **Pay** or
+  **Send again**; the old `/courses/<id>/pay` address opens the course). Requests sent before stay visible to staff:
+  in the Accountant section each paid course is a row with ">" and a count of waiting requests; its payments page has
+  the period, Change period, Unselect and, under each listener, their request with View proof. The database rules
+  are unchanged.
 - **New accounts** wait for the teacher's approval before they can use the app.
 - **Delete account** (ARU-75): students and mentors (and waiting or declined accounts) delete their own account after
   re-entering their password. Personal data is removed; chat messages and work done for others stay, shown as
@@ -253,7 +253,12 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    teacher deletes any course or general chat message, Blog post or review and a course's owner any message in its
    chat (no new delete policies: direct deletes keep their earlier rules); changes no data; see
    [Handling reports](#handling-reports-aru-158)),
-   `0065_user_blocks.sql` (ARU-162: blocking a person. Adds `user_blocks` (own rows only: each user reads, adds and
+   `0065_offensive_word_filter.sql` (ARU-163: new table `blocked_words` with a starting English and Russian list (RLS
+   on, no policies: no app role can read or change it), and before insert / update triggers that refuse course and
+   general chat messages, meeting notes and Blog post titles / texts containing a listed word with the new code
+   `sham:text_not_allowed`; updates that don't change the text aren't checked; existing rows aren't changed; see
+   [Offensive word filter](#offensive-word-filter-aru-163)),
+   `0066_user_blocks.sql` (ARU-162: blocking a person. Adds `user_blocks` (own rows only: each user reads, adds and
    removes their own blocks; approved accounts, never oneself, only people of their workspace; removed with either
    account), leaves blocked authors out of the blocker's new-message counts (`chat_unread_counts()`,
    `general_chat_unread_count()`) and Telegram recipients (`chat_message_recipients()`, `general_message_recipients()`,
@@ -733,6 +738,15 @@ exactly one teacher per workspace, and after that the database rejects any chang
 new owner. A user sees their new role after pull-to-refresh or reopening the app. There is no per-student
 mentor: adding someone to a course as a listener makes the course owner their mentor for that course.
 
+### Offensive word filter (ARU-163)
+
+Course and general chat messages, meeting notes and Blog posts (title and text) that contain a word from the
+offensive word list are refused: "This text contains words that aren't allowed. Please change it." The check runs in
+the database (migration `0065_offensive_word_filter.sql`), so it applies to every app version and API call. Words
+match as whole words, ignoring case (Latin and Cyrillic). There is one global list, in the table `blocked_words`; no
+app screen shows it. Add, remove or list words in the SQL Editor with
+[`supabase/manage-words.sql`](supabase/manage-words.sql); a change applies to the next send or save.
+
 ## Checks
 
 ```bash
@@ -804,7 +818,7 @@ src/app/                  screens (Expo Router — every file is a route)
   accountant/courses.tsx  an accountant selects / unselects paid courses
   accountant/[id].tsx     a paid course's period (Change period, Unselect) and listeners: Paid / Unpaid / Exempt this
                           month, payment requests with View proof (accountants and the teacher)
-  courses/[id]/pay.tsx    an unpaid listener sends (or replaces) a payment request with a proof (ARU-99)
+  courses/[id]/pay.tsx    the old Pay address: redirects to the course (ARU-161; listeners no longer pay in the app)
   materials/new.tsx       teacher or mentor shares a Blog post
   materials/[id].tsx      Blog post details and likes
   materials/files/        Knowledge base PDFs: new.tsx upload, [id].tsx details and Open PDF, [id]/edit.tsx edit
@@ -895,9 +909,9 @@ teacher" is that workspace's teacher, and nobody can see or change anything in a
 | Select / unselect paid courses |         | accountants (any course they can see) |  |
 | See paid courses, change their payment period | | accountants (all they can see) | ✓ (all) |
 | See / set / undo Paid marks and exemptions, see "Unpaid this month" (ARU-66) | | accountants (paid courses they can see) | ✓ (all paid courses) |
-| See own payment deadline or overdue line on a course card (`my_payment_dues`, ARU-66 / ARU-148) | as a listener | as a listener |  |
-| Send / replace own payment request with a proof (ARU-99; unpaid, in the period) | as a listener | as a listener |  |
-| See payment requests and proofs, request count (ARU-99) | own only | accountants (current listeners of paid courses they can see) | ✓ (all) |
+| See own payment deadline or overdue line on a course card (`my_payment_dues`, ARU-66 / ARU-148) | not in the app since ARU-161 | not in the app since ARU-161 |  |
+| Send / replace own payment request with a proof (ARU-99) | not in the app since ARU-161 (the database still accepts one) | not in the app since ARU-161 |  |
+| See payment requests and proofs, request count (ARU-99) | none in the app (ARU-161) | accountants (current listeners of paid courses they can see) | ✓ (all) |
 | Delete payment proofs (only by deleting a course or discipline, ARU-99) | | | ✓ |
 | Choose the app language (Profile → Language, saved in `profiles.language`, ARU-108) | own | own | own |
 | Change own password (Supabase Auth, current password required, ARU-76) | own | own | own |

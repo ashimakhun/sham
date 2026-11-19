@@ -1184,7 +1184,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setAccessRequests([]);
         setContentReports([]);
       }
-      // ARU-162: my blocks (RLS: own rows only). On an error (offline, or before 0065 runs) the last known blocks stay,
+      // ARU-162: my blocks (RLS: own rows only). On an error (offline, or before 0066 runs) the last known blocks stay,
       // so a blocked person's content doesn't come back because of one failed request.
       const blocks = await Promise.resolve(supabase.from('user_blocks').select('blocked_id')).catch(() => null);
       if (!current()) return;

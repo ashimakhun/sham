@@ -12,7 +12,7 @@
 --   3. AC 4: the Telegram recipient functions leave out recipients who blocked the author: chat_message_recipients(),
 --      general_message_recipients(), new_material_recipients() (latest in 0059) and meeting_notes_recipients() (0062).
 --      Otherwise unchanged (grants are kept by create or replace).
--- Numbered 0065: after 0064 (ARU-158).
+-- Numbered 0066: after 0065 (ARU-163's word filter, merged first; ARU-172).
 
 -- 1. Blocks.
 create table user_blocks (
