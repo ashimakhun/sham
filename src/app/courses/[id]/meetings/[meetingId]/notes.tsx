@@ -5,6 +5,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 
+import { ReportMenu } from '@/components/ContentMenu';
 import { KeyboardForm } from '@/components/KeyboardForm';
 import { MarkdownEditor } from '@/components/MarkdownEditor';
 import { MarkdownText } from '@/components/MarkdownText';
@@ -164,23 +165,27 @@ function NoteCard({ note, canDelete }: { note: MeetingListenerNote; canDelete: b
 
   return (
     <Card testID={`listener-note-${note.id}`}>
-      <View style={{ gap: 2 }}>
-        {/* ARU-143 AC 6 / 11: my own private notes carry a "Private" badge, read together with my name. */}
-        {note.isPublic ? (
-          <Text style={{ ...font(600), color: colors.text }}>{author}</Text>
-        ) : (
-          <View
-            accessible
-            accessibilityLabel={`${author}, ${t('notes.privateBadge')}`}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+        <View style={{ gap: 2, flex: 1 }}>
+          {/* ARU-143 AC 6 / 11: my own private notes carry a "Private" badge, read together with my name. */}
+          {note.isPublic ? (
             <Text style={{ ...font(600), color: colors.text }}>{author}</Text>
-            <View testID="private-badge" style={{ backgroundColor: colors.primarySoft, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
-              <Text style={[styles.caps, { fontSize: 11, color: colors.primary }]}>{t('notes.privateBadge')}</Text>
+          ) : (
+            <View
+              accessible
+              accessibilityLabel={`${author}, ${t('notes.privateBadge')}`}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <Text style={{ ...font(600), color: colors.text }}>{author}</Text>
+              <View testID="private-badge" style={{ backgroundColor: colors.primarySoft, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
+                <Text style={[styles.caps, { fontSize: 11, color: colors.primary }]}>{t('notes.privateBadge')}</Text>
+              </View>
             </View>
-          </View>
-        )}
-        <Text style={styles.muted}>{formatDateTime(note.createdAt)}</Text>
-        {edited ? <Text style={styles.muted}>{t('notes.edited', { when: formatDateTime(note.updatedAt) })}</Text> : null}
+          )}
+          <Text style={styles.muted}>{formatDateTime(note.createdAt)}</Text>
+          {edited ? <Text style={styles.muted}>{t('notes.edited', { when: formatDateTime(note.updatedAt) })}</Text> : null}
+        </View>
+        {/* ARU-158 AC 1: Report on someone else's notes. */}
+        <ReportMenu kind="meeting_note" id={note.id} authorId={note.authorId} />
       </View>
       <MarkdownText source={note.body} />
       <ErrorText error={error} />

@@ -1,9 +1,10 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Pressable, ScrollView } from 'react-native';
 
 import { Text } from '@/components/AppText';
 
+import { ReportMenu } from '@/components/ContentMenu';
 import { Button, Card, EmptyState, ErrorText, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import { confirmDestructive } from '@/lib/confirm';
@@ -62,6 +63,8 @@ export default function MaterialFileScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic">
+      {/* ARU-158 AC 1: the ⋯ menu (Report) at the header's right, on someone else's PDF. */}
+      <Stack.Screen options={{ headerRight: () => <ReportMenu kind="pdf" id={item.id} authorId={item.authorId} /> }} />
       <Card>
         <Text style={styles.h1}>{item.name}</Text>
         <Text style={styles.muted}>

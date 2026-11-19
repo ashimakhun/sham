@@ -97,7 +97,8 @@ describe('Chat screen', () => {
     });
     setStore(fakeStore('M2', { courseMembers: members, subscribeToMessages }));
     await render(<CourseChatScreen />);
-    expect(subscribeToMessages).toHaveBeenCalledWith('A', expect.any(Function));
+    // The second callback removes deleted messages (ARU-158).
+    expect(subscribeToMessages).toHaveBeenCalledWith('A', expect.any(Function), expect.any(Function));
     await act(async () => push(msg('live', 'S1', 'Live hello', 5)));
     expect(screen.getByText('Live hello')).toBeTruthy();
   });
