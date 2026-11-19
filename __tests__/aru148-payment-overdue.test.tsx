@@ -39,80 +39,24 @@ describe('texts', () => {
   });
 });
 
-describe('Courses tab card', () => {
-  it('AC 1 / AC 2: an overdue course keeps the red line, now "Payment overdue", in the card', async () => {
-    setStore(fakeStore('S1', { courseMembers: members, loadPaymentDues: jest.fn(async () => [overdueRow]) }));
+// ARU-161: listeners no longer see the due or overdue line, its border or Pay (the texts above stay in the catalog).
+describe('ARU-161: nothing for an overdue listener', () => {
+  it('Courses tab: no overdue line or border, and no dues loaded', async () => {
+    const loadPaymentDues = jest.fn(async () => [overdueRow]);
+    setStore(fakeStore('S1', { courseMembers: members, loadPaymentDues }));
     await render(<CoursesScreen />);
-    await waitFor(() => expect(screen.getByTestId('payment-due-A')).toBeTruthy());
-    expect(screen.getByText(`Payment overdue: was due ${nov5}`)).toBeTruthy();
-    expect(screen.queryByText(/Payment due by/)).toBeNull();
-  });
-
-  it('AC 3: a due row (in the period) still reads "Payment due by"', async () => {
-    jest.spyOn(Date, 'now').mockReturnValue(new Date(2026, 10, 3, 10).getTime());
-    setStore(
-      fakeStore('S1', {
-        courseMembers: members,
-        loadPaymentDues: jest.fn(async () => [{ courseId: 'A', deadline: '2026-11-05', overdue: false }]),
-      }),
-    );
-    await render(<CoursesScreen />);
-    await waitFor(() => expect(screen.getByText(`Payment due by ${nov5}`)).toBeTruthy());
-  });
-
-  it('AC 7: marked Paid elsewhere: the overdue line goes on the next focus', async () => {
-    let rows = [overdueRow];
-    setStore(fakeStore('S1', { courseMembers: members, loadPaymentDues: jest.fn(async () => rows) }));
-    await render(<CoursesScreen />);
-    await waitFor(() => expect(screen.getByTestId('payment-due-A')).toBeTruthy());
-    rows = [];
+    await act(async () => {});
+    expect(screen.getByText('Algebra')).toBeTruthy();
+    expect(screen.queryByTestId('payment-due-A')).toBeNull();
+    expect(screen.queryByText(/Payment overdue|Payment due by/)).toBeNull();
     await refocus();
-    await waitFor(() => expect(screen.queryByTestId('payment-due-A')).toBeNull());
+    expect(loadPaymentDues).not.toHaveBeenCalled();
   });
 
-  it('AC 5 / AC 6: the line turns overdue past the deadline, and goes when the month ends', async () => {
-    jest.restoreAllMocks();
-    jest.useFakeTimers({
-      now: new Date(2026, 10, 5, 23, 59, 50),
-      doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'],
-    });
-    try {
-      // The server answers like 0061: due on the 5th, overdue later in November, nothing on 1 Dec.
-      const loadPaymentDues = jest.fn(async (today: string) => {
-        if (today === '2026-11-05') return [{ courseId: 'A', deadline: '2026-11-05', overdue: false }];
-        if (today.startsWith('2026-11')) return [overdueRow];
-        return [];
-      });
-      setStore(fakeStore('S1', { courseMembers: members, loadPaymentDues }));
-      await render(<CoursesScreen />);
-      await act(async () => {});
-      expect(screen.getByText(`Payment due by ${nov5}`)).toBeTruthy();
-      // Midnight: the card switches without losing the line (and so the border).
-      await act(async () => {
-        jest.advanceTimersByTime(30_000);
-      });
-      await act(async () => {});
-      expect(loadPaymentDues).toHaveBeenLastCalledWith('2026-11-06');
-      expect(screen.getByText(`Payment overdue: was due ${nov5}`)).toBeTruthy();
-
-      // 30 Nov 23:59:50 → 1 Dec: the highlight disappears.
-      jest.setSystemTime(new Date(2026, 10, 30, 23, 59, 50));
-      await act(async () => {
-        jest.advanceTimersByTime(30_000);
-      });
-      await act(async () => {});
-      expect(loadPaymentDues).toHaveBeenLastCalledWith('2026-12-01');
-      expect(screen.queryByTestId('payment-due-A')).toBeNull();
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-});
-
-describe('course details', () => {
-  it('AC 8: an overdue listener still sees Pay', async () => {
+  it('course details: no Pay', async () => {
     setStore(fakeStore('S1', { courseMembers: members, loadPaymentDues: jest.fn(async () => [overdueRow]) }));
     await render(<CourseDetailScreen />);
-    expect(await screen.findByRole('button', { name: 'Pay' })).toBeTruthy();
+    await screen.findByText('Algebra');
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Pay' })).toBeNull());
   });
 });
