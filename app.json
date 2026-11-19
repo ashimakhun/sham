@@ -7,8 +7,10 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true,
-      "infoPlist": {},
+      "supportsTablet": false,
+      "infoPlist": {
+        "CFBundleAllowMixedLocalizations": true
+      },
       "bundleIdentifier": "com.ashimakhun.sham"
     },
     "android": {
@@ -19,10 +21,11 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": [
-        "android.permission.RECORD_AUDIO"
-      ],
-      "package": "com.ashimakhun.sham"
+      "package": "com.ashimakhun.sham",
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -33,12 +36,27 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Sham uses your photos so you can attach pictures of your homework."
+          "photosPermission": "Sham uses your photos so you can attach pictures of your homework.",
+          "cameraPermission": false,
+          "microphonePermission": false
         }
       ],
       "@react-native-community/datetimepicker",
-      "expo-localization"
+      [
+        "expo-localization",
+        {
+          "supportedLocales": {
+            "ios": [
+              "en",
+              "ru"
+            ]
+          }
+        }
+      ]
     ],
+    "locales": {
+      "ru": "./locales/ios/ru.json"
+    },
     "scheme": "sham",
     "experiments": {
       "typedRoutes": true
