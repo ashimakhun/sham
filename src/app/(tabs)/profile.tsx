@@ -12,12 +12,14 @@ import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
 
 export default function ProfileScreen() {
-  const { currentUser, signOut, accessRequests, generalUnreadCount } = useStore();
+  const { currentUser, signOut, accessRequests, generalUnreadCount, contentReports } = useStore();
   const { busy, error, run } = useAction();
   const { t, tm } = useI18n();
   if (!currentUser) return null;
 
   const pending = accessRequests.filter((r) => r.status === 'pending').length;
+  // ARU-158 AC 5: open reports in the teacher's workspace.
+  const openReports = contentReports.filter((r) => r.status === 'open').length;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -53,6 +55,14 @@ export default function ProfileScreen() {
             title={pending > 0 ? t('profile.manageRolesCount', { count: pending }) : t('profile.manageRoles')}
             variant="secondary"
             onPress={() => router.push('/roles')}
+          />
+        )}
+        {/* ARU-158 AC 5: the teacher's Reports list, with the number of open reports like Manage roles. */}
+        {currentUser.role === 'teacher' && (
+          <Button
+            title={openReports > 0 ? t('reports.profileRowCount', { count: openReports }) : t('reports.profileRow')}
+            variant="secondary"
+            onPress={() => router.push('/reports')}
           />
         )}
         {/* ARU-76: own password only; waiting / declined accounts never get here (AccessGate). */}

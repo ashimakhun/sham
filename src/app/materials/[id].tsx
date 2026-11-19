@@ -1,6 +1,7 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Linking, ScrollView } from 'react-native';
 
+import { ReportMenu } from '@/components/ContentMenu';
 import { LikerRow, LikeRow, likesOf } from '@/components/LikeHeart';
 import { MarkdownText } from '@/components/MarkdownText';
 import { Button, Card, EmptyState, ErrorText, styles } from '@/components/ui';
@@ -29,6 +30,10 @@ export default function MaterialDetailScreen() {
       style={styles.screen}
       contentContainerStyle={styles.content}
       contentInsetAdjustmentBehavior="automatic">
+      {/* ARU-158 AC 1: the ⋯ menu (Report) at the header's right, on someone else's post. */}
+      <Stack.Screen
+        options={{ headerRight: () => <ReportMenu kind="blog_post" id={item.id} authorId={item.teacherId} /> }}
+      />
       <Card>
         <Text style={styles.h1}>{item.title}</Text>
         {/* ARU-120: the like heart and count sit at the right of the author · date line; its error shows here. */}
