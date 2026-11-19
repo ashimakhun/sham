@@ -263,6 +263,9 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    account), leaves blocked authors out of the blocker's new-message counts (`chat_unread_counts()`,
    `general_chat_unread_count()`) and Telegram recipients (`chat_message_recipients()`, `general_message_recipients()`,
    `new_material_recipients()`, `meeting_notes_recipients()`); changes no data; not in the realtime publication).
+   `0068_no_session_ip.sql` (ARU-167: a `before insert or update` trigger on Supabase Auth's `auth.sessions` sets `ip`
+   and `user_agent` to null, and existing sessions are cleared (nobody is signed out); no public table, RLS or app
+   changes),
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
@@ -830,6 +833,11 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 ```
 
 ## Roles and access
+
+**Sham never stores IP addresses or user agents (ARU-167).** Supabase Auth's `auth.sessions` gets them cleared at
+write time by the `clear_session_ip()` trigger (migration `0068_no_session_ip.sql`), and a CI check
+(`__tests__/aru167-no-ip-guard.test.ts`, part of `npm test`) fails on any `public` column named `ip`, `ip_address` or
+`user_agent` or of type `inet` / `cidr`, and on any reading of `x-forwarded-for`, `x-real-ip` or `cf-connecting-ip`.
 
 Every rule below applies within the account's own workspace (ARU-145): "all" means all of that workspace, "the
 teacher" is that workspace's teacher, and nobody can see or change anything in another workspace.

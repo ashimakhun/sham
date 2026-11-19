@@ -71,6 +71,7 @@ When a story's last open bug is closed, the story goes back to Ready for QA for 
 - The dev agent never codes a story that hasn't passed analysis.
 - Requirements analysis and the dev agent skip a story while any issue it's `blocked by` isn't Done, Canceled or Duplicate. They check this before sorting by difficulty, so a blocked story never comes up first. Bugs are never skipped for this.
 - Text tables never reword an existing `db.*` error text; new wording gets a new key, because an error code keeps one message for good (ARU-111).
+- Never store IP addresses or user agents: no such column in `public`, and no reading of `x-forwarded-for`, `x-real-ip` or `cf-connecting-ip` (ARU-167).
 
 ## How the agents run
 
