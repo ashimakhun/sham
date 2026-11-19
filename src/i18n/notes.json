@@ -852,5 +852,13 @@
   "db.report_not_found": "Database error · Reports screen · the report doesn't exist in my workspace",
   "db.report_dismiss_own": "Database error · Reports screen · the teacher dismisses a report about their own content",
   "db.report_content_exists": "Database error · Reports screen · marking Removed while the content still exists",
-  "db.content_cant_delete": "Database error · Reports screen and chats · the user may not delete this content"
+  "db.content_cant_delete": "Database error · Reports screen and chats · the user may not delete this content",
+  "block.menuBlock": "Chat message long-press menu and the ⋯ menu on notes, Blog posts, PDFs and reviews · item that blocks the author ({name}); also the screen reader action",
+  "block.confirmTitle": "Block confirmation · title ({name}: the person)",
+  "block.confirmMessage": "Block confirmation · text ({name}: the person)",
+  "block.confirmButton": "Block confirmation · button that blocks",
+  "block.errorTitle": "Alert when blocking fails (e.g. offline) · title; the error follows",
+  "block.profileRow": "Profile · button that opens the Blocked people list; also that screen's title",
+  "block.none": "Blocked people · empty list",
+  "block.unblock": "Blocked people · button next to each person"
 }
