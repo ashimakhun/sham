@@ -29,13 +29,13 @@ An educational mobile app where teachers, mentors and students work together:
   each a monthly payment period (Profile tab).
 - **Payments** (ARU-66): accountants and the teacher open a paid course from the Accountant section and mark each
   listener Paid for the month, undo it, or set them Exempt; "Unpaid this month" lists who still owes during the
-  payment period. An unpaid listener's course card on the Courses tab gets a red border and "Payment due by <date>";
-  after the period it keeps the border with "Payment overdue: was due <date>" until Paid / Exempt or the month ends
-  (ARU-148).
-- **Payment requests** (ARU-99): during the payment period (and, since ARU-148, while overdue) an unpaid listener
-  taps **Pay** on course details and sends a proof (a photo or a PDF, up to 10 MB); **Send again** replaces it. In the Accountant section each paid course is
-  a row with ">" and a count of waiting requests; its payments page has the period, Change period, Unselect and,
-  under each listener, their request with View proof.
+  payment period. Since ARU-161 listeners see no payment deadline, overdue line or red border in the app (on iOS,
+  Android and web): they pay and send proof outside the app, and the accountant marks them Paid.
+- **Payment requests** (ARU-99): since ARU-161 listeners no longer send payment requests in the app (no **Pay** or
+  **Send again**; the old `/courses/<id>/pay` address opens the course). Requests sent before stay visible to staff:
+  in the Accountant section each paid course is a row with ">" and a count of waiting requests; its payments page has
+  the period, Change period, Unselect and, under each listener, their request with View proof. The database rules
+  are unchanged.
 - **New accounts** wait for the teacher's approval before they can use the app.
 - **Delete account** (ARU-75): students and mentors (and waiting or declined accounts) delete their own account after
   re-entering their password. Personal data is removed; chat messages and work done for others stay, shown as
@@ -248,7 +248,12 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `0063_revoke_anon_security_definer.sql` (ARU-154: signed-out visitors can no longer execute `handle_new_user()`,
    `homework_assignments_before_insert()`, `my_role()` or `is_my_student()`; signed-in users keep the last two; no RLS
    or data changes),
-   `0064_offensive_word_filter.sql` (ARU-163: new table `blocked_words` with a starting English and Russian list (RLS
+   `0064_content_reports.sql` (ARU-158: reporting content. Adds `content_reports` (the teacher of the workspace reads
+   it; written only through `report_content()` and `resolve_report()`), and `delete_content()`, through which the
+   teacher deletes any course or general chat message, Blog post or review and a course's owner any message in its
+   chat (no new delete policies: direct deletes keep their earlier rules); changes no data; see
+   [Handling reports](#handling-reports-aru-158)),
+   `0065_offensive_word_filter.sql` (ARU-163: new table `blocked_words` with a starting English and Russian list (RLS
    on, no policies: no app role can read or change it), and before insert / update triggers that refuse course and
    general chat messages, meeting notes and Blog post titles / texts containing a listed word with the new code
    `sham:text_not_allowed`; updates that don't change the text aren't checked; existing rows aren't changed; see
@@ -609,6 +614,25 @@ the foreground (it asks Auth whether the user still exists).
 3. Check: sign in as a test student and delete the account from Profile → **Delete account**; the user disappears
    from **Authentication → Users** and from `profiles`, and its files from the `homework` bucket.
 
+### Handling reports (ARU-158)
+
+Users report a chat message, meeting notes, a Blog post, a Knowledge base PDF or a course review (long-press a chat
+message, or the **⋯** menu elsewhere) with a reason and an optional comment. Each report keeps the content's text and
+author as they were, so it stays readable after the content changes or is deleted. The workspace's teacher handles
+reports in **Profile → Reports** (the button shows the number of open reports): **Delete content** deletes it for
+everyone (a PDF with its file) and marks every open report on it Removed; **Dismiss** keeps the content. A report about
+the teacher's own content can be deleted by the teacher but only dismissed by the operator.
+
+**Reports must be answered within 24 hours** (the Terms of Use promise this). The operator checks every workspace's
+open reports with the queries in [`supabase/reports.sql`](supabase/reports.sql) in the SQL Editor at least once a
+day: (a) lists open reports of all workspaces, oldest first, with how long each has been open and whether its author
+is the teacher; (b) marks a report Removed or Dismissed (including reports about the teacher's own content); (c)
+deletes reported content (a PDF's file is then deleted in **Storage → materials**). No notification is sent about new
+reports yet. The app never shows one workspace's reports to another.
+
+1. Run `supabase/migrations/0064_content_reports.sql` (after 0063). Deleted chat messages disappear live from open
+   chats: `course_messages` and `general_messages` are already in the realtime publication.
+
 ### Download my photos (ARU-107)
 
 Homework photos are kept for 6 months after the homework is checked (the deletion itself is ARU-112's daily job;
@@ -713,7 +737,7 @@ mentor: adding someone to a course as a listener makes the course owner their me
 
 Course and general chat messages, meeting notes and Blog posts (title and text) that contain a word from the
 offensive word list are refused: "This text contains words that aren't allowed. Please change it." The check runs in
-the database (migration `0064_offensive_word_filter.sql`), so it applies to every app version and API call. Words
+the database (migration `0065_offensive_word_filter.sql`), so it applies to every app version and API call. Words
 match as whole words, ignoring case (Latin and Cyrillic). There is one global list, in the table `blocked_words`; no
 app screen shows it. Add, remove or list words in the SQL Editor with
 [`supabase/manage-words.sql`](supabase/manage-words.sql); a change applies to the next send or save.
@@ -789,7 +813,7 @@ src/app/                  screens (Expo Router — every file is a route)
   accountant/courses.tsx  an accountant selects / unselects paid courses
   accountant/[id].tsx     a paid course's period (Change period, Unselect) and listeners: Paid / Unpaid / Exempt this
                           month, payment requests with View proof (accountants and the teacher)
-  courses/[id]/pay.tsx    an unpaid listener sends (or replaces) a payment request with a proof (ARU-99)
+  courses/[id]/pay.tsx    the old Pay address: redirects to the course (ARU-161; listeners no longer pay in the app)
   materials/new.tsx       teacher or mentor shares a Blog post
   materials/[id].tsx      Blog post details and likes
   materials/files/        Knowledge base PDFs: new.tsx upload, [id].tsx details and Open PDF, [id]/edit.tsx edit
@@ -832,7 +856,12 @@ teacher" is that workspace's teacher, and nobody can see or change anything in a
 | See course listeners       | own courses | ✓                | ✓       |
 | Add / remove listeners     |           | ✓ (any course they can reach¹) | ✓       |
 | Course chat (read / post)  | courses they're in | own courses + courses they're in | all |
-| General chat (read / post; no edit or delete) | ✓ | ✓ | ✓ |
+| General chat (read / post; no edit) | ✓ | ✓ | ✓ |
+| Delete any course chat message (ARU-158; nobody deletes their own) | | own courses (current owner) | ✓ (all courses) |
+| Delete any general chat message (ARU-158) | | | ✓ |
+| Report a chat message, notes, a Blog post, a PDF or a review they can see, not their own (ARU-158) | ✓ | ✓ | ✓ |
+| See reports (Profile → Reports), delete reported content, dismiss reports (ARU-158; not about their own content: operator only) | | | ✓ |
+| Delete any Blog post or course review (ARU-158) | | | ✓ |
 | General chat new message count (`general_chat_reads`, own row only) | ✓ | ✓ | ✓ |
 | See course meetings        | courses they're in | ✓ (all courses)  | ✓       |
 | Schedule meetings, mark completed / canceled | | own courses    | any course |
@@ -874,9 +903,9 @@ teacher" is that workspace's teacher, and nobody can see or change anything in a
 | Select / unselect paid courses |         | accountants (any course they can see) |  |
 | See paid courses, change their payment period | | accountants (all they can see) | ✓ (all) |
 | See / set / undo Paid marks and exemptions, see "Unpaid this month" (ARU-66) | | accountants (paid courses they can see) | ✓ (all paid courses) |
-| See own payment deadline or overdue line on a course card (`my_payment_dues`, ARU-66 / ARU-148) | as a listener | as a listener |  |
-| Send / replace own payment request with a proof (ARU-99; unpaid, in the period) | as a listener | as a listener |  |
-| See payment requests and proofs, request count (ARU-99) | own only | accountants (current listeners of paid courses they can see) | ✓ (all) |
+| See own payment deadline or overdue line on a course card (`my_payment_dues`, ARU-66 / ARU-148) | not in the app since ARU-161 | not in the app since ARU-161 |  |
+| Send / replace own payment request with a proof (ARU-99) | not in the app since ARU-161 (the database still accepts one) | not in the app since ARU-161 |  |
+| See payment requests and proofs, request count (ARU-99) | none in the app (ARU-161) | accountants (current listeners of paid courses they can see) | ✓ (all) |
 | Delete payment proofs (only by deleting a course or discipline, ARU-99) | | | ✓ |
 | Choose the app language (Profile → Language, saved in `profiles.language`, ARU-108) | own | own | own |
 | Change own password (Supabase Auth, current password required, ARU-76) | own | own | own |

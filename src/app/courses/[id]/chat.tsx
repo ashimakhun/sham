@@ -7,7 +7,7 @@ import { Text } from '@/components/AppText';
 import { ChatView } from '@/components/ChatView';
 import { useI18n } from '@/i18n/context';
 import { EmptyState, styles } from '@/components/ui';
-import { inCourseChat } from '@/lib/roles';
+import { canDeleteChatMessage, inCourseChat } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import type { Course, CourseMessage } from '@/lib/types';
@@ -66,6 +66,7 @@ function useMarkChatRead(courseId: string, newestId: string | undefined) {
 
 function Chat({ course }: { course: Course }) {
   const { t } = useI18n();
+  const { currentUser } = useStore();
   const chat = useCourseChat(course.id, true);
   useMarkChatRead(course.id, chat.messages[0]?.id);
   return (
@@ -73,6 +74,9 @@ function Chat({ course }: { course: Course }) {
       chat={chat}
       emptyText={t('chat.courseEmpty')}
       unknownAuthor={t('chat.formerMember')}
+      kind="course_message"
+      // ARU-158 AC 11: the teacher and the course's current owner delete any message here.
+      canDelete={canDeleteChatMessage(currentUser, course)}
       badges={(message: CourseMessage) =>
         // A deleted author (null, ARU-75) is never the owner.
         message.authorId != null && message.authorId === course.createdById ? (

@@ -1,19 +1,18 @@
-// QA ARU-148: gaps in aru148-payment-overdue.test.tsx: the overdue card keeps the 1 pt theme-red border, even at
-// midnight before the reload answers (AC 5) and drops it at once on the 1st (AC 6); the Russian line on the card; a
-// waiting request keeps the card overdue and shows "Payment request sent … · Send again" (AC 8 / AC 9); Pay goes on
-// the 1st; Paid elsewhere clears on foreground (AC 7); a failed load shows nothing. Course A (paid, days 1-5), S1.
-import { act, render, screen, waitFor } from '@testing-library/react-native';
+// QA ARU-148, rewritten for ARU-161: listeners no longer see a due or overdue line, a red border, Pay or the
+// "Payment request sent" card (App Store 3.1.1 / 3.1.3(d)). These tests keep ARU-148's situations (overdue, in
+// Russian, at midnight, on the 1st, back from the background, a waiting request) and check that none of them shows
+// anything about paying, and that the listener's dues and own request are never loaded. Course A (paid, days 1-5), S1.
+import { act, render, screen } from '@testing-library/react-native';
 import { AppState, StyleSheet } from 'react-native';
 
 import CoursesScreen from '@/app/(tabs)/courses';
 import CourseDetailScreen from '@/app/courses/[id]';
 import { setCurrentLanguage } from '@/i18n';
 import { I18nContext, make } from '@/i18n/context';
-import { formatDay } from '@/lib/billing';
 import { colors } from '@/lib/theme';
 import type { PaymentDue, PaymentRequest } from '@/lib/types';
 
-import { fakeStore, member } from './helpers/fakeStore';
+import { courseA, fakeStore, member } from './helpers/fakeStore';
 import { params, setStore } from './helpers/mocks';
 
 jest.mock('expo-router', () => require('./helpers/mocks').expoRouter);
@@ -24,7 +23,7 @@ const NOV_10 = new Date(2026, 10, 10, 10, 0).getTime();
 const members = [member('A', 'S1')];
 const overdueRow: PaymentDue = { courseId: 'A', deadline: '2026-11-05', overdue: true };
 const ru = (ui: React.ReactElement) => <I18nContext.Provider value={make('ru')}>{ui}</I18nContext.Provider>;
-const never = () => new Promise<PaymentDue[]>(() => {});
+const PAYMENT_TEXT = /pay|payment|оплат|просроч/i;
 
 function borderOf(node: { props: { style?: unknown }; parent: unknown } | null) {
   let n = node as { props: { style?: unknown }; parent: unknown } | null;
@@ -35,9 +34,25 @@ function borderOf(node: { props: { style?: unknown }; parent: unknown } | null) 
   }
   return null;
 }
-const redBorder = () => expect(borderOf(screen.getByTestId('payment-due-A') as never)).toEqual(
-  expect.objectContaining({ borderWidth: 1, borderColor: colors.danger }),
-);
+
+/** Every string rendered on screen (hidden ones too), to look for payment wording. */
+function allText(): string {
+  const out: string[] = [];
+  const walk = (n: unknown) => {
+    if (typeof n === 'string') out.push(n);
+    else if (Array.isArray(n)) n.forEach(walk);
+    else if (n && typeof n === 'object' && 'children' in n) walk((n as { children: unknown }).children);
+  };
+  walk(screen.toJSON());
+  return out.join(' | ');
+}
+
+const noPaymentOnCard = () => {
+  expect(screen.getByText(courseA.title)).toBeTruthy();
+  expect(screen.queryByTestId('payment-due-A')).toBeNull();
+  expect(borderOf(screen.getByText(courseA.title) as never)?.borderColor).not.toBe(colors.danger);
+  expect(allText()).not.toMatch(PAYMENT_TEXT);
+};
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -49,127 +64,103 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-describe('Courses tab card', () => {
-  it('AC 1: the overdue card keeps the 1 pt theme-red border', async () => {
-    setStore(fakeStore('S1', { courseMembers: members, loadPaymentDues: jest.fn(async () => [overdueRow]) }));
+describe('Courses tab card (ARU-161)', () => {
+  it('an overdue course: no line, no red border, and my_payment_dues is never loaded', async () => {
+    const loadPaymentDues = jest.fn(async () => [overdueRow]);
+    setStore(fakeStore('S1', { courseMembers: members, loadPaymentDues }));
     await render(<CoursesScreen />);
-    await waitFor(() => expect(screen.getByTestId('payment-due-A')).toBeTruthy());
-    redBorder();
+    await act(async () => {});
+    noPaymentOnCard();
+    expect(loadPaymentDues).not.toHaveBeenCalled();
   });
 
-  it('AC 1 / AC 2: in Russian the card reads «Оплата просрочена: срок был до …» with a Russian date', async () => {
-    // The app's I18n provider sets the app-wide language that dates use; the test context alone doesn't.
+  it('in Russian: no «Оплатить до» / «Оплата просрочена» on the card', async () => {
     setCurrentLanguage('ru');
     try {
       setStore(fakeStore('S1', { courseMembers: members, loadPaymentDues: jest.fn(async () => [overdueRow]) }));
       await render(ru(<CoursesScreen />));
-      await waitFor(() => expect(screen.getByTestId('payment-due-A')).toBeTruthy());
-      const text = screen.getByTestId('payment-due-A').props.children as string;
-      expect(text.startsWith('Оплата просрочена: срок был до ')).toBe(true);
-      expect(text).not.toMatch(/[A-Za-z]/);
-      expect(screen.getByTestId('payment-due-A').props.accessibilityLabel).toBeUndefined();
+      await act(async () => {});
+      noPaymentOnCard();
     } finally {
       setCurrentLanguage('en');
     }
   });
 
-  it('AC 5: at midnight after the end day the card turns overdue at once, border kept, before the reload answers', async () => {
-    jest.restoreAllMocks();
-    jest.useFakeTimers({ now: new Date(2026, 10, 5, 23, 59, 50), doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
-    const loadPaymentDues = jest.fn((today: string) =>
-      today === '2026-11-05' ? Promise.resolve([{ courseId: 'A', deadline: '2026-11-05', overdue: false }]) : never(),
-    );
-    setStore(fakeStore('S1', { courseMembers: members, loadPaymentDues }));
-    await render(<CoursesScreen />);
-    await act(async () => {});
-    expect(screen.getByTestId('payment-due-A').props.children).toBe(`Payment due by ${formatDay('2026-11-05')}`);
-    await act(async () => {
-      jest.advanceTimersByTime(30_000);
-    });
-    expect(loadPaymentDues).toHaveBeenLastCalledWith('2026-11-06');
-    expect(screen.getByTestId('payment-due-A').props.children).toBe(`Payment overdue: was due ${formatDay('2026-11-05')}`);
-    redBorder();
-  });
-
-  it('AC 6: on the 1st the overdue highlight goes at once, before the reload answers', async () => {
+  it('at midnight after the end day and on the 1st: nothing is reloaded and nothing appears', async () => {
     jest.restoreAllMocks();
     jest.useFakeTimers({ now: new Date(2026, 10, 30, 23, 59, 50), doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
-    const loadPaymentDues = jest.fn((today: string) => (today === '2026-11-30' ? Promise.resolve([overdueRow]) : never()));
+    const loadPaymentDues = jest.fn(async () => [overdueRow]);
     setStore(fakeStore('S1', { courseMembers: members, loadPaymentDues }));
     await render(<CoursesScreen />);
     await act(async () => {});
-    expect(screen.getByTestId('payment-due-A')).toBeTruthy();
     await act(async () => {
       jest.advanceTimersByTime(30_000);
     });
-    expect(loadPaymentDues).toHaveBeenLastCalledWith('2026-12-01');
-    expect(screen.queryByTestId('payment-due-A')).toBeNull();
+    expect(loadPaymentDues).not.toHaveBeenCalled();
+    noPaymentOnCard();
   });
 
-  it('AC 7: marked Paid elsewhere, the overdue line goes when the app returns to the foreground', async () => {
+  it('back from the background: no payment reload and no reminder', async () => {
     const listeners: ((s: string) => void)[] = [];
     jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, cb) => {
       listeners.push(cb as (s: string) => void);
       return { remove: () => {} } as ReturnType<typeof AppState.addEventListener>;
     });
-    let rows = [overdueRow];
-    setStore(fakeStore('S1', { courseMembers: members, loadPaymentDues: jest.fn(async () => rows) }));
+    const loadPaymentDues = jest.fn(async () => [overdueRow]);
+    setStore(fakeStore('S1', { courseMembers: members, loadPaymentDues }));
     await render(<CoursesScreen />);
-    await waitFor(() => expect(screen.getByTestId('payment-due-A')).toBeTruthy());
-    rows = [];
     await act(async () => {
+      for (const l of listeners) l('background');
       for (const l of listeners) l('active');
     });
-    await waitFor(() => expect(screen.queryByTestId('payment-due-A')).toBeNull());
-  });
-
-  it('edge: a failed load shows no highlight and no error', async () => {
-    setStore(fakeStore('S1', { courseMembers: members, loadPaymentDues: jest.fn(async () => Promise.reject(new Error('x'))) }));
-    await render(<CoursesScreen />);
-    await act(async () => {});
-    expect(screen.queryByTestId('payment-due-A')).toBeNull();
-    expect(screen.queryByText(/x$/)).toBeNull();
+    expect(loadPaymentDues).not.toHaveBeenCalled();
+    noPaymentOnCard();
   });
 });
 
-describe('course details', () => {
-  it('AC 8 / AC 9: overdue with a waiting request: "Payment request sent … · Send again", and the card stays overdue', async () => {
-    const req: PaymentRequest = {
-      id: 'r1',
-      courseId: 'A',
-      userId: 'S1',
-      month: '2026-11-01',
-      proofPath: 'S1/p.jpg',
-      proofType: 'image',
-      sentAt: new Date(2026, 10, 8, 12).toISOString(),
-    };
+describe('course details (ARU-161)', () => {
+  const req: PaymentRequest = {
+    id: 'r1',
+    courseId: 'A',
+    userId: 'S1',
+    month: '2026-11-01',
+    proofPath: 'S1/p.jpg',
+    proofType: 'image',
+    sentAt: new Date(2026, 10, 8, 12).toISOString(),
+  };
+
+  it('overdue with a request sent before the change: no "request sent" card, no Send again, no Pay; nothing loaded', async () => {
     const store = fakeStore('S1', {
       courseMembers: members,
       loadPaymentDues: jest.fn(async () => [overdueRow]),
       loadMyPaymentRequest: jest.fn(async () => req),
     });
     setStore(store);
-    const view = await render(<CourseDetailScreen />);
-    expect(await screen.findByText(/^Payment request sent /)).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Send again/ })).toBeTruthy();
-    expect(store.loadMyPaymentRequest).toHaveBeenCalledWith('A', '2026-11-01');
-    await view.unmount();
-    await render(<CoursesScreen />);
-    await waitFor(() => expect(screen.getByTestId('payment-due-A').props.children).toMatch(/^Payment overdue/));
-  });
-
-  it('AC 8: Pay goes on the 1st of the next month', async () => {
-    jest.restoreAllMocks();
-    jest.useFakeTimers({ now: new Date(2026, 10, 30, 23, 59, 50), doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
-    const loadPaymentDues = jest.fn(async (today: string) => (today.startsWith('2026-11') ? [overdueRow] : []));
-    setStore(fakeStore('S1', { courseMembers: members, loadPaymentDues }));
     await render(<CourseDetailScreen />);
     await act(async () => {});
-    expect(screen.getByRole('button', { name: 'Pay' })).toBeTruthy();
-    await act(async () => {
-      jest.advanceTimersByTime(30_000);
-    });
-    await act(async () => {});
     expect(screen.queryByRole('button', { name: 'Pay' })).toBeNull();
+    expect(screen.queryByText(/^Payment request sent /)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Send again/ })).toBeNull();
+    expect(store.loadMyPaymentRequest).not.toHaveBeenCalled();
+    expect(store.loadPaymentDues).not.toHaveBeenCalled();
+    expect(allText()).not.toMatch(PAYMENT_TEXT);
+  });
+
+  it('in Russian: no «Оплатить», no «Запрос на оплату отправлен»', async () => {
+    setCurrentLanguage('ru');
+    try {
+      setStore(
+        fakeStore('S1', {
+          courseMembers: members,
+          loadPaymentDues: jest.fn(async () => [overdueRow]),
+          loadMyPaymentRequest: jest.fn(async () => req),
+        }),
+      );
+      await render(ru(<CourseDetailScreen />));
+      await act(async () => {});
+      expect(allText()).not.toMatch(PAYMENT_TEXT);
+    } finally {
+      setCurrentLanguage('en');
+    }
   });
 });

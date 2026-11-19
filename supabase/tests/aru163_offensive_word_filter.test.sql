@@ -1,4 +1,4 @@
--- ARU-163: offensive word filter. Rules under test: supabase/migrations/0064_offensive_word_filter.sql.
+-- ARU-163: offensive word filter. Rules under test: supabase/migrations/0065_offensive_word_filter.sql.
 -- The tests use their own words (zzbadword, ззплохо, plus "ass" for the whole-word case), never the real list.
 select t.seed();
 insert into course_members (course_id, user_id, added_by) values (t.id('A'), t.id('S1'), t.id('M'));

@@ -61,7 +61,8 @@ function AppStack() {
           <Stack.Screen name="courses/[id]/owner" options={{ title: t('courses.changeOwner'), presentation: 'modal' }} />
           <Stack.Screen name="courses/[id]/feedback" options={{ title: t('feedback.title'), presentation: 'modal' }} />
           <Stack.Screen name="courses/[id]/members" options={{ title: t('listeners.title') }} />
-          <Stack.Screen name="courses/[id]/pay" options={{ title: t('payments.payTitle'), presentation: 'modal' }} />
+          {/* ARU-161: the old Pay address only redirects to the course; no payment wording in its header. */}
+          <Stack.Screen name="courses/[id]/pay" options={{ title: t('courses.detailTitle') }} />
           <Stack.Screen name="courses/[id]/listeners" options={{ title: t('listeners.addTitle'), presentation: 'modal' }} />
           <Stack.Screen
             name="courses/[id]/meetings/new"
@@ -82,6 +83,9 @@ function AppStack() {
           <Stack.Screen name="materials/files/[id]" options={{ title: t('files.detailTitle') }} />
           <Stack.Screen name="materials/files/[id]/edit" options={{ title: t('files.editTitle'), presentation: 'modal' }} />
           <Stack.Screen name="roles" options={{ title: t('profile.manageRoles') }} />
+          {/* ARU-158: report a piece of content (modal), and the teacher's Reports list. */}
+          <Stack.Screen name="report" options={{ title: t('report.title'), presentation: 'modal' }} />
+          <Stack.Screen name="reports" options={{ title: t('reports.title') }} />
           <Stack.Screen name="delete-account" options={{ title: t('common.deleteAccount') }} />
           <Stack.Screen name="accountant/courses" options={{ title: t('accountant.selectTitle') }} />
           <Stack.Screen name="accountant/[id]" options={{ title: t('accountant.paymentsTitle') }} />
