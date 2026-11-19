@@ -341,6 +341,9 @@ export type LaterTelegramKind =
   | 'meeting_notes';
 /** Telegram notification types; each one has its own on/off switch. */
 export type TelegramKind = BaseTelegramKind | LaterTelegramKind;
+/** ARU-170: every notification switch on the Notifications page: the Telegram-era kinds plus Homework due soon, a
+ *  reminder the phone schedules itself (no Telegram or push counterpart). */
+export type NotificationKind = TelegramKind | 'homework_due';
 /** The signed-in user's link to the Sham Telegram bot (ARU-48). */
 export type TelegramLink = {
   linkedAt: string;

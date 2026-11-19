@@ -1,11 +1,9 @@
-// ARU-112: deletes homework photos 6 months after checking, warns their senders on Telegram 30 and 7 days before, and
-// removes leftover photos from failed sends. Called once a day by the pg_cron job from migration 0053 (through
-// pg_net, with the secret in x-cron-secret). The logic is in ../_shared/photo-deletion.ts (tested with Jest); this
-// file only wires it to Supabase, Storage and Telegram.
+// ARU-112: deletes homework photos 6 months after checking and removes leftover photos from failed sends. ARU-170: the
+// 30- and 7-day warnings are local reminders on the sender's phone now; this function sends nothing.
+// Called once a day by the pg_cron job from migration 0053 (through pg_net, with the secret in x-cron-secret). The logic is in ../_shared/photo-deletion.ts (tested with Jest); this
+// file only wires it to Supabase and Storage.
 //
 // Secrets (Supabase dashboard → Edge Functions → Secrets, or `npx supabase secrets set ...`):
-//   EXPO_ACCESS_TOKEN    optional (ARU-166): only if push security is turned on in Expo. Since ARU-166 this
-//                        function sends push notifications, not Telegram: TELEGRAM_BOT_TOKEN is no longer read.
 //   PHOTO_DELETION_SECRET  a random string; the same value goes into Vault as 'photo_deletion_secret'
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase.
 //
@@ -14,10 +12,8 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-import { type DuePhoto, handlePhotoDeletionRequest, type PhotoWarning } from '../_shared/photo-deletion.ts';
-import { type PushServiceClient, sendPushMessages } from '../_shared/push.ts';
+import { type DuePhoto, handlePhotoDeletionRequest } from '../_shared/photo-deletion.ts';
 
-const accessToken = Deno.env.get('EXPO_ACCESS_TOKEN') || undefined;
 const secret = Deno.env.get('PHOTO_DELETION_SECRET') ?? '';
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
   auth: { persistSession: false },
@@ -54,10 +50,6 @@ Deno.serve((request) =>
         photo_paths: photos.map((p) => p.photo_path),
       });
     },
-    async claimWarnings() {
-      return (await rpc<PhotoWarning[]>('claim_photo_deletion_warnings')) ?? [];
-    },
-    send: (messages) => sendPushMessages(supabase as unknown as PushServiceClient, fetch, messages, { accessToken }),
     log: (line) => console.log(line),
   }),
 );

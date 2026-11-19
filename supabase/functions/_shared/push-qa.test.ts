@@ -9,11 +9,9 @@ import { chatMessageMessages, generalMessageMessages } from './chat-message';
 import { homeworkReviewedMessages } from './homework-reviewed';
 import { homeworkSubmittedMessages } from './homework-submitted';
 import { handleMeetingNotesRequest, meetingNotesMessages } from './meeting-notes';
-import { meetingStartMessages } from './meeting-start';
 import { newAccountMessages } from './new-account';
 import { newHomeworkMessages } from './new-homework';
 import { newMaterialMessages } from './new-material';
-import { photoDeletionMessages } from './photo-deletion';
 import { EXPO_PUSH_URL, type PushServiceClient, sendPushMessages } from './push';
 import { type NotificationKind, SWITCH_COLUMN, type TelegramMessage } from './telegram';
 
@@ -78,10 +76,9 @@ const NAMES = ['Aigerim', 'Nurlanovna', 'Sam', 'Student', 'Dana', 'Serikova', 'Ð
 const U = 'U1'; // never linked Telegram: the sender doesn't care (AC 9)
 
 const KINDS: [NotificationKind, TelegramMessage[]][] = [
-  ['meeting_started', meetingStartMessages([{ meeting_id: 'm', course_title: 'Algebra', listener_ids: [U] }])],
+  // ARU-170: meeting started and photo deletion are local reminders on the phone now, never pushed.
   ['new_homework', newHomeworkMessages([{ user_id: U, course_title: 'Algebra' }])],
   ['homework_reviewed', homeworkReviewedMessages([{ user_id: U, course_title: 'Algebra' }])],
-  ['photo_deletion', photoDeletionMessages([{ user_id: U, photo_count: 3, earliest: '2026-12-01' }])],
   [
     'homework_submitted',
     homeworkSubmittedMessages([

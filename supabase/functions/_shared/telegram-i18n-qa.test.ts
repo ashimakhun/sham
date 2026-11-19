@@ -10,7 +10,6 @@
 import { handleChatMessageRequest } from "./chat-message";
 import { handleHomeworkReviewedRequest } from "./homework-reviewed";
 import { handleHomeworkSubmittedRequest } from "./homework-submitted";
-import { handleMeetingStartRequest } from "./meeting-start";
 import { handleNewAccountRequest } from "./new-account";
 import { handleNewHomeworkRequest } from "./new-homework";
 import { handleNewMaterialRequest } from "./new-material";
@@ -21,12 +20,20 @@ import {
   handleTelegramUpdate,
 } from "./telegram-bot";
 import {
+  localizedMessage,
   sendTelegramMessages,
   type ServiceClient,
   type TelegramMessage,
 } from "./telegram";
+import { telegramTexts } from "./telegram-texts";
 import { homeworkSubmittedMessages } from "./homework-submitted";
-import { meetingStartMessages } from "./meeting-start";
+
+// ARU-170: the meeting-start Edge Function is gone (meeting started is a local reminder on the phone now). Its message
+// builder is rebuilt here from the kept Telegram catalog text, so these Telegram language checks keep their event.
+const meetingStartMessages = (meetings: { meeting_id: string; course_title: string; listener_ids: string[] }[]) =>
+  meetings.flatMap((m) =>
+    m.listener_ids.map((userId) => localizedMessage(userId, "meeting_started", telegramTexts("meetingStarted", { course: m.course_title }))),
+  );
 
 const SECRET = "s3cret";
 const ID = "11111111-1111-4111-8111-111111111111";
@@ -114,22 +121,6 @@ const kinds: [
   string,
   string,
 ][] = [
-  [
-    "meeting started",
-    (send) =>
-      handleMeetingStartRequest(post({}, { "x-cron-secret": SECRET }), SECRET, {
-        claim: async () => [
-          {
-            meeting_id: "m",
-            course_title: "Алгебра",
-            listener_ids: ["RU", "EN"],
-          },
-        ],
-        send,
-      } as never),
-    "Встреча курса Алгебра началась",
-    "Алгебра meeting has started",
-  ],
   [
     "course chat message",
     (send) =>

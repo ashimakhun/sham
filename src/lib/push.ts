@@ -52,8 +52,21 @@ export async function pushPermission(): Promise<PushPermission> {
   }
 }
 
-/** AC 1: Android needs the channel before the prompt (Android 13+). Sound on, no badge. */
-async function ensureChannel() {
+/**
+ * ARU-170: the permission for local reminders. Unlike push, reminders also work in Expo Go (iOS and Android, not the
+ * web), so only the platform is checked here. Never throws.
+ */
+export async function reminderPermission(): Promise<PushPermission> {
+  if (Platform.OS !== 'ios' && Platform.OS !== 'android') return 'unsupported';
+  try {
+    return toPermission(await Notifications.getPermissionsAsync());
+  } catch {
+    return 'denied';
+  }
+}
+
+/** AC 1: Android needs the channel before the prompt (Android 13+). Sound on, no badge. ARU-170's reminders use it too. */
+export async function ensureChannel() {
   if (Platform.OS !== 'android') return;
   await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
     name: 'General',

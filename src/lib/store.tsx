@@ -12,6 +12,8 @@ import { dbErrorMessage, phoneLanguage, translate } from '@/i18n';
 import { PHOTO_TOO_LARGE } from './compressPhoto';
 import { newId } from './id';
 import { syncPushRegistration, unregisterThisPhone, type PushRpc } from './push';
+import { cancelAllReminders, syncReminders } from './reminderScheduler';
+import { remindersFor } from './reminders';
 import { PHOTOS_ZIP_ERROR } from './photoRetention';
 import { isAllowedProof, PROOF_MAX_BYTES, PROOF_RULE, proofFormat } from './paymentProof';
 import { NOTES_MAX } from './markdown';
@@ -67,6 +69,7 @@ import type {
   NewMaterial,
   NewMaterialFile,
   NewMeeting,
+  NotificationKind,
   TelegramKind,
   TelegramLink,
   User,
@@ -255,11 +258,11 @@ export type Store = {
   disconnectTelegram: () => Promise<void>;
   /** ARU-166: the signed-in user's notification switches (saved on the account): undefined until loaded. An account
    *  that never set one has no row, which reads as every switch on (AC 8). */
-  notificationSettings: Record<TelegramKind, boolean> | undefined;
+  notificationSettings: Record<NotificationKind, boolean> | undefined;
   /** ARU-166: refetches the switches (the Notifications page calls it on focus). An error keeps what was loaded. */
   loadNotificationSettings: () => Promise<void>;
   /** ARU-166: turns one notification kind on or off for the account (set_notification). Throws when saving fails. */
-  setNotification: (kind: TelegramKind, enabled: boolean) => Promise<void>;
+  setNotification: (kind: NotificationKind, enabled: boolean) => Promise<void>;
   /** ARU-166: registers this phone for push (or removes its registration when notifications are off). Never throws. */
   syncPushDevice: () => Promise<void>;
   /** ARU-107 AC 2: the app-wide deletion start date (YYYY-MM-DD, UTC), or null until ARU-112's daily job first runs.
@@ -507,9 +510,11 @@ type TelegramLinkRow = {
   notify_meeting_notes?: boolean;
 };
 // ARU-166: notification_settings columns, in the app's kinds. A missing row or column reads as on (AC 8).
-const NOTIFICATION_KINDS: TelegramKind[] = [
+const NOTIFICATION_KINDS: NotificationKind[] = [
   'meeting_started',
   'new_homework',
+  // ARU-170 (0072): Homework due soon, a local reminder only.
+  'homework_due',
   'homework_reviewed',
   'photo_deletion',
   'homework_submitted',
@@ -520,7 +525,7 @@ const NOTIFICATION_KINDS: TelegramKind[] = [
   'new_account',
 ];
 const toNotificationSettings = (row: Record<string, unknown> | undefined) =>
-  Object.fromEntries(NOTIFICATION_KINDS.map((k) => [k, row?.[`notify_${k}`] !== false])) as Record<TelegramKind, boolean>;
+  Object.fromEntries(NOTIFICATION_KINDS.map((k) => [k, row?.[`notify_${k}`] !== false])) as Record<NotificationKind, boolean>;
 // ARU-166: the two database calls src/lib/push.ts makes.
 const pushRpc: PushRpc = (fn, args) => supabase.rpc(fn, args);
 
@@ -911,6 +916,9 @@ async function finishInterruptedReset() {
   }
 }
 
+/** ARU-170: how long the store waits for a burst of loads to settle before rescheduling reminders. */
+export const REMINDER_DEBOUNCE_MS = 1500;
+
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
@@ -921,7 +929,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // ARU-162: the people I've blocked (ids).
   const [blockedIds, setBlockedIds] = useState<string[]>([]);
   const [telegram, setTelegram] = useState<TelegramLink | null | undefined>(undefined);
-  const [notificationSettings, setNotificationSettings] = useState<Record<TelegramKind, boolean> | undefined>(undefined);
+  const [notificationSettings, setNotificationSettings] = useState<Record<NotificationKind, boolean> | undefined>(undefined);
   const [homework, setHomework] = useState<Homework[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [materialFiles, setMaterialFiles] = useState<MaterialFile[]>([]);
@@ -974,6 +982,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         e.code === 'user_not_found' || /user from sub claim in jwt does not exist|user not found/i.test(e.message ?? '');
       if (!gone) return false;
       setAccountNotice(ACCOUNT_DELETED);
+      // ARU-170 AC 3: the deleted account's reminders go before the session does.
+      await cancelAllReminders();
       await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
       return true;
     } catch {
@@ -1004,6 +1014,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (!s) parkedSession.current = null;
       applySession(s);
       if (!s) {
+        // ARU-170 AC 3: however the session ended, no reminder of the previous account stays (sign-out cancels first).
+        cancelAllReminders().catch(() => {});
         // Signed out: drop the previous user's data, and any load still running for them (ARU-157).
         loadRequest.current++;
         setProfiles([]);
@@ -1450,6 +1462,55 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => sub.remove();
   }, [userId, firstLoadDone, syncPushDevice]);
 
+  // ARU-170: local reminders. After every load (app start, pull to refresh, a live update, back to the foreground), a
+  // language change or a switch flip, the set is computed from the loaded data and put on the phone (AC 1). Debounced,
+  // because live updates come in bursts; an unchanged set isn't rescheduled (analysis note 2). The switches aren't part
+  // of load(): until they are loaded nothing changes on the phone, and every data change tries loading them again.
+  const reminderUser = profiles.find((u) => u.id === userId);
+  const reminderApproved = reminderUser?.accessStatus === 'approved';
+  const reminderLang = reminderUser?.language ?? phoneLanguage();
+  useEffect(() => {
+    if (!userId || !firstLoadDone || !reminderUser) return;
+    const timer = setTimeout(() => {
+      if (reminderApproved && !notificationSettings) {
+        loadNotificationSettings().catch(() => {});
+        return;
+      }
+      const reminders =
+        reminderApproved && notificationSettings
+          ? remindersFor({
+              userId,
+              role: reminderUser.role,
+              settings: notificationSettings,
+              courses,
+              courseMembers,
+              meetings,
+              assignments,
+              homework,
+              photoDeletionStart,
+              now: new Date(),
+              lang: reminderLang,
+            })
+          : [];
+      syncReminders({ approved: reminderApproved, reminders }).catch(() => {});
+    }, REMINDER_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [
+    userId,
+    firstLoadDone,
+    reminderUser,
+    reminderApproved,
+    reminderLang,
+    notificationSettings,
+    loadNotificationSettings,
+    courses,
+    courseMembers,
+    meetings,
+    assignments,
+    homework,
+    photoDeletionStart,
+  ]);
+
   const markChatRead = useCallback<Store['markChatRead']>(
     async (courseId, upToMessageId) => {
       // Clear at once (and drop any count request in flight), then save; the refetch after the save is the truth.
@@ -1572,6 +1633,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
     },
     signOut: async () => {
+      // ARU-170 AC 3: every reminder on this phone is cancelled first (local, so offline too).
+      await cancelAllReminders();
       // ARU-166 AC 4: this phone's registration goes first; offline (or slow), sign-out still happens.
       await unregisterThisPhone(pushRpc).catch(() => {});
       check(await supabase.auth.signOut());
@@ -1600,6 +1663,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         throw new Error(message);
       }
       setAccountNotice(ACCOUNT_DELETED);
+      // ARU-170 AC 3 (analysis note 7): the reminders go before the local session is cleared.
+      await cancelAllReminders();
       // The server already ended the account; only this device's stored session is left to remove.
       await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
     },
