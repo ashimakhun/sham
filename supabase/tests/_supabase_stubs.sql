@@ -15,6 +15,17 @@ create table auth.users (
   raw_user_meta_data jsonb default '{}'::jsonb
 );
 
+-- Supabase Auth's sessions (ARU-167): just the columns the IP-clearing trigger touches, plus the cascade from auth.users.
+create table auth.sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  refreshed_at timestamp,
+  ip inet,
+  user_agent text
+);
+
 -- Same resolution order as Supabase's auth.uid().
 create function auth.uid() returns uuid language sql stable as $$
   select coalesce(
@@ -56,6 +67,7 @@ grant usage on schema public, auth, storage to anon, authenticated, service_role
 grant execute on function auth.uid() to anon, authenticated;
 grant usage on schema auth to supabase_auth_admin;
 grant select, insert, update, delete on auth.users to supabase_auth_admin;
+grant select, insert, update, delete on auth.sessions to supabase_auth_admin;
 grant all on storage.objects, storage.buckets to anon, authenticated, service_role;
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;

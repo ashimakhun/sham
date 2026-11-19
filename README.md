@@ -272,6 +272,9 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `<username>@users.sham.invalid` and a display name of 1–80 characters, and no longer uses the email as the name
    (SQL Editor inserts stay exempt); `access_requests()` returns `username` instead of `email`; turn off Confirm email
    first, see step 3; deletes no data),
+   `0068_no_session_ip.sql` (ARU-167: a `before insert or update` trigger on Supabase Auth's `auth.sessions` sets `ip`
+   and `user_agent` to null, and existing sessions are cleared (nobody is signed out); no public table, RLS or app
+   changes),
    `0069_push_notifications.sql` (ARU-166: push notifications. Adds `push_devices` (one row per phone: a random
    install id, the Expo push token, the platform and the time; nothing else) and `notification_settings` (one switch
    per notification kind; no row means every switch on); both are read by their owner only and written only through
@@ -895,6 +898,11 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 ```
 
 ## Roles and access
+
+**Sham never stores IP addresses or user agents (ARU-167).** Supabase Auth's `auth.sessions` gets them cleared at
+write time by the `clear_session_ip()` trigger (migration `0068_no_session_ip.sql`), and a CI check
+(`__tests__/aru167-no-ip-guard.test.ts`, part of `npm test`) fails on any `public` column named `ip`, `ip_address` or
+`user_agent` or of type `inet` / `cidr`, and on any reading of `x-forwarded-for`, `x-real-ip` or `cf-connecting-ip`.
 
 Every rule below applies within the account's own workspace (ARU-145): "all" means all of that workspace, "the
 teacher" is that workspace's teacher, and nobody can see or change anything in another workspace.
