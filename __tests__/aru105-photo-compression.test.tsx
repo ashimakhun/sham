@@ -4,9 +4,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import * as ImageManipulatorModule from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 
-import PayScreen from '@/app/courses/[id]/pay';
 import NewHomeworkScreen from '@/app/homework/new';
-import { localMonth } from '@/lib/billing';
 import {
   base64Bytes,
   PHOTO_MAX_SIDE,
@@ -15,7 +13,7 @@ import {
   preparePhoto,
   resizeFor,
 } from '@/lib/compressPhoto';
-import type { CourseBilling, HomeworkAssignment } from '@/lib/types';
+import type { HomeworkAssignment } from '@/lib/types';
 
 import { fakeStore, member } from './helpers/fakeStore';
 import { params, setStore } from './helpers/mocks';
@@ -196,54 +194,5 @@ describe('Add homework (AC 1–3, AC 6)', () => {
   });
 });
 
-describe('Pay screen (AC 5, AC 6)', () => {
-  const billing: CourseBilling = { courseId: 'A', startDay: 1, endDay: 28, selectedById: 'N', selectedAt: '2026-11-01T10:00:00.000Z' };
-  const open = (over = {}) => {
-    params.id = 'A';
-    const store = fakeStore('S1', { courseMembers: [member('A', 'S1')], courseBilling: [billing], ...over });
-    setStore(store);
-    return store;
-  };
-
-  it('a 12 MB original is accepted once compressed; the thumbnail and the request use the compressed JPEG', async () => {
-    const store = open();
-    manipulator.__setImage('file:///huge.heic', { width: 4000, height: 3000, bytes: 350_001, out: 'file:///cache/proof.jpg' });
-    pick('file:///huge.heic', { fileSize: 12 * MB });
-    await render(<PayScreen />);
-    await fireEvent.press(screen.getByRole('button', { name: 'Attach a photo' }));
-    expect((await screen.findByTestId('proof-thumbnail')).props.source).toEqual({ uri: 'file:///cache/proof.jpg' });
-    expect(screen.queryByText('The proof must be a photo or a PDF up to 10 MB.')).toBeNull();
-    await fireEvent.press(screen.getByRole('button', { name: 'Send request' }));
-    await waitFor(() =>
-      expect(store.sendPaymentRequest).toHaveBeenCalledWith(
-        'A',
-        localMonth(),
-        expect.objectContaining({ uri: 'file:///cache/proof.jpg', kind: 'image', mimeType: 'image/jpeg', size: 350_001 }),
-      ),
-    );
-  });
-
-  it('a photo still over 10 MB after compression shows the proof rule and nothing is attached', async () => {
-    open();
-    manipulator.__setImage('file:///giant.jpg', { width: 1000, height: 1000, bytes: 10 * MB + 3 });
-    pick('file:///giant.jpg');
-    await render(<PayScreen />);
-    await fireEvent.press(screen.getByRole('button', { name: 'Attach a photo' }));
-    expect(await screen.findByText('The proof must be a photo or a PDF up to 10 MB.')).toBeTruthy();
-    expect(screen.queryByTestId('proof-preview')).toBeNull();
-  });
-
-  it('AC 6: a photo that can\'t be prepared shows the message and keeps the proof attached earlier', async () => {
-    open();
-    manipulator.__setImage('file:///ok.jpg', { width: 2000, height: 1500, out: 'file:///cache/ok.jpg' });
-    manipulator.__setImage('file:///bad.jpg', { fail: true });
-    pick('file:///ok.jpg');
-    pick('file:///bad.jpg');
-    await render(<PayScreen />);
-    await fireEvent.press(screen.getByRole('button', { name: 'Attach a photo' }));
-    await fireEvent.press(await screen.findByRole('button', { name: 'Replace photo' }));
-    expect(await screen.findByText(PHOTO_PREPARE_ERROR)).toBeTruthy();
-    expect(screen.getByTestId('proof-thumbnail').props.source).toEqual({ uri: 'file:///cache/ok.jpg' });
-    expect(screen.getByRole('button', { name: 'Send request' })).toBeEnabled();
-  });
-});
+// ARU-161: the listener's Pay screen is gone (the old address redirects to the course), so its proof-photo tests
+// went with it; the proof rules stay covered in aru99-payment-requests.test.tsx.

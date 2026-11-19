@@ -191,12 +191,13 @@ describe('AC 4, 9: deleting', () => {
       expect.anything(),
     );
     expect(store.deleteMeetingListenerNotes).toHaveBeenCalledWith('n2');
-    // AC 9 / ARU-142: they can't edit someone else's note: Delete is the only action on it.
+    // AC 9 / ARU-142: they can't edit someone else's note: Delete is the only action on it, besides ARU-158's ⋯
+    // menu (Report).
     expect(
       within(screen.getByTestId('listener-note-n2'))
         .getAllByRole('button')
         .map((b) => b.props.accessibilityLabel),
-    ).toEqual(["Delete Mentor Mo's notes"]);
+    ).toEqual(['More actions', "Delete Mentor Mo's notes"]);
     alert.mockRestore();
   });
 

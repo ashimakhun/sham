@@ -3,6 +3,7 @@ import { View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 
+import { ReportMenu } from '@/components/ContentMenu';
 import { RatingSummary } from '@/components/RatingSummary';
 import { Button, Card, ErrorText, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
@@ -64,7 +65,11 @@ export function FeedbackSection({ course }: { course: Course }) {
           key={f.id}
           testID={`feedback-${f.id}`}
           style={[{ gap: 2, paddingTop: 8 }, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-          <Text style={styles.body}>{getUser(f.userId)?.name ?? t('common.unknown')}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <Text style={[styles.body, { flexShrink: 1 }]}>{getUser(f.userId)?.name ?? t('common.unknown')}</Text>
+            {/* ARU-158 AC 1: Report on someone else's review. */}
+            <ReportMenu kind="review" id={f.id} authorId={f.userId} />
+          </View>
           <Text style={{ color: colors.star, fontSize: 16 }} accessibilityLabel={starsLabel(f.rating, lang)}>
             {stars(f.rating)}
           </Text>

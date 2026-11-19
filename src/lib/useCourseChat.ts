@@ -22,7 +22,8 @@ export function mergeMessages<M extends ChatMessage>(list: M[], more: M[]) {
 /** Where a chat's messages come from: the store functions for one course's chat or for the general chat. */
 export type ChatSource<M extends ChatMessage> = {
   load: (store: Store, before?: M) => Promise<{ messages: M[]; hasMore: boolean }>;
-  subscribe: (store: Store, onMessage: (m: M) => void) => () => void;
+  /** Live inserts, and ARU-158 deletions (an id that may not be in this chat: ignored). */
+  subscribe: (store: Store, onMessage: (m: M) => void, onDelete: (id: string) => void) => () => void;
   send: (store: Store, id: string, body: string) => Promise<void>;
 };
 
@@ -31,7 +32,7 @@ export function useCourseChat(courseId: string, enabled: boolean) {
   const source = useMemo<ChatSource<CourseMessage>>(
     () => ({
       load: (store, before) => store.loadMessages(courseId, before),
-      subscribe: (store, onMessage) => store.subscribeToMessages(courseId, onMessage),
+      subscribe: (store, onMessage, onDelete) => store.subscribeToMessages(courseId, onMessage, onDelete),
       send: (store, id, body) => store.sendMessage({ id, courseId, body }),
     }),
     [courseId],
@@ -41,7 +42,7 @@ export function useCourseChat(courseId: string, enabled: boolean) {
 
 const generalSource: ChatSource<ChatMessage> = {
   load: (store, before) => store.loadGeneralMessages(before),
-  subscribe: (store, onMessage) => store.subscribeToGeneralMessages(onMessage),
+  subscribe: (store, onMessage, onDelete) => store.subscribeToGeneralMessages(onMessage, onDelete),
   send: (store, id, body) => store.sendGeneralMessage({ id, body }),
 };
 
@@ -85,8 +86,20 @@ export function useChat<M extends ChatMessage>(source: ChatSource<M>, enabled: b
         setMessages(page.messages);
         setHasMore(page.hasMore);
       } else {
-        // Overlaps what is shown: just add what was missed; whether older pages exist is unchanged.
-        setMessages((list) => mergeMessages(list, page.messages));
+        // Overlaps what is shown: just add what was missed; whether older pages exist is unchanged. ARU-158: a shown
+        // message within the fresh page's range that the page no longer has was deleted meanwhile (one that arrived
+        // live after the fetch is newer than the page, so it stays).
+        setMessages((list) => {
+          const newest = page.messages[0];
+          const oldest = page.messages[page.messages.length - 1];
+          if (!newest || !oldest) return list;
+          const fresh = new Set(page.messages.map((m) => m.id));
+          const inRange = (m: M) => newestFirst(m, oldest) <= 0 && newestFirst(newest, m) <= 0;
+          return mergeMessages(
+            list.filter((m) => fresh.has(m.id) || !inRange(m)),
+            page.messages,
+          );
+        });
       }
       setError(null);
     } catch (e) {
@@ -112,11 +125,16 @@ export function useChat<M extends ChatMessage>(source: ChatSource<M>, enabled: b
     }
   }, [source, enabled, hasMore, loadingOlder]);
 
-  // Live inserts on this chat's own channel only.
+  // ARU-158 AC 11: a deleted message leaves the list (an id this chat doesn't show changes nothing).
+  const remove = useCallback((id: string) => {
+    setMessages((list) => (list.some((m) => m.id === id) ? list.filter((m) => m.id !== id) : list));
+  }, []);
+
+  // Live inserts on this chat's own channel only, and deletions.
   useEffect(() => {
     if (!enabled) return;
-    return source.subscribe(api.current, (m) => setMessages((list) => mergeMessages(list, [m])));
-  }, [source, enabled]);
+    return source.subscribe(api.current, (m) => setMessages((list) => mergeMessages(list, [m])), remove);
+  }, [source, enabled, remove]);
 
   // First load, and again whenever the screen regains focus (e.g. back from another screen).
   useFocusEffect(
@@ -142,5 +160,5 @@ export function useChat<M extends ChatMessage>(source: ChatSource<M>, enabled: b
     [source, loadLatest],
   );
 
-  return { messages, hasMore, loaded, loadingOlder, error, loadOlder, send };
+  return { messages, hasMore, loaded, loadingOlder, error, loadOlder, send, remove };
 }

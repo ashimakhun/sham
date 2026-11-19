@@ -1,6 +1,6 @@
 // ARU-164: sign-up and sign-in with a username instead of an email. Supabase Auth needs an email, so each account gets
 // an internal address <username>@USERNAME_DOMAIN that can never receive mail (.invalid, RFC 2606). It is never shown
-// in the app and nothing is sent to it. The same domain is in supabase/migrations/0064_username_sign_in.sql: keep both
+// in the app and nothing is sent to it. The same domain is in supabase/migrations/0065_username_sign_in.sql: keep both
 // in step.
 
 export const USERNAME_DOMAIN = 'users.sham.invalid';

@@ -149,6 +149,12 @@ export function fakeStore(who: keyof typeof users | null, over: Partial<Store> =
     generalUnreadCount: 0,
     markGeneralChatRead: jest.fn(async () => {}),
     setGeneralChatOpen: jest.fn(),
+    contentReports: [],
+    loadReports: jest.fn(async () => {}),
+    reportContent: jest.fn(async () => {}),
+    dismissReport: jest.fn(async () => {}),
+    deleteReportedContent: jest.fn(async () => {}),
+    deleteChatMessage: jest.fn(async () => {}),
     ...over,
   };
 }

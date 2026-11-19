@@ -2,8 +2,6 @@
 // store in aru99-store-payment-requests.test.tsx. A is a paid course (owner M) with listeners S1 and S2; N is an
 // accountant; T the teacher.
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import * as DocumentPicker from 'expo-document-picker';
-import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { Linking } from 'react-native';
 
@@ -55,8 +53,6 @@ const staff = (who: 'N' | 'T', over = {}) => {
   return { ...base, currentUser: who === 'N' ? accountantN : users.T, users: all, getUser: (id?: string) => all.find((u) => u.id === id) };
 };
 const due = (courseId = 'A') => jest.fn(async () => [{ courseId, deadline: '2099-12-28' }]);
-const picker = ImagePicker as jest.Mocked<typeof ImagePicker>;
-const docs = DocumentPicker as jest.Mocked<typeof DocumentPicker>;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -84,134 +80,45 @@ describe('helpers', () => {
   });
 });
 
-describe('listener: Pay on course details (AC 1, 3, 4)', () => {
-  it('AC 1: an unpaid listener in the period sees Pay; it opens the Pay screen', async () => {
-    setStore(fakeStore('S1', { courseMembers: members, loadPaymentDues: due() }));
+// ARU-161: the listener side of ARU-99 is gone on every platform: no Pay, no "request sent" card, and the old Pay
+// address only redirects to the course. Nothing payment-related is loaded for the listener.
+describe('listener: no Pay on course details (ARU-161 AC 1, 2, 7)', () => {
+  it.each([
+    ['due, no request', null],
+    ['due, a request sent this month', 'sent'],
+  ] as const)('%s: no Pay, no "request sent" card, no Send again', async (_what, sent) => {
+    const loadPaymentDues = due();
+    const loadMyPaymentRequest = jest.fn(async () => (sent ? req('S1') : null));
+    setStore(fakeStore('S1', { courseMembers: members, loadPaymentDues, loadMyPaymentRequest }));
     await render(<CourseDetailScreen />);
-    await fireEvent.press(await screen.findByRole('button', { name: 'Pay' }));
-    expect(router.push).toHaveBeenCalledWith({ pathname: '/courses/[id]/pay', params: { id: 'A' } });
-  });
-
-  it('AC 1 / AC 4: not due (outside the period, Paid, Exempt or not a paid course): no Pay', async () => {
-    const loadMyPaymentRequest = jest.fn(async () => null);
-    setStore(fakeStore('S1', { courseMembers: members, loadPaymentDues: jest.fn(async () => []), loadMyPaymentRequest }));
-    await render(<CourseDetailScreen />);
-    await waitFor(() => expect(loadMyPaymentRequest).toHaveBeenCalled());
+    await screen.findByText('Algebra');
     expect(screen.queryByRole('button', { name: 'Pay' })).toBeNull();
     expect(screen.queryByTestId('payment-request-sent')).toBeNull();
-  });
-
-  it('AC 3: with a request this month: when it was sent, waiting, and Send again (no Pay)', async () => {
-    const loadMyPaymentRequest = jest.fn(async () => req('S1'));
-    setStore(fakeStore('S1', { courseMembers: members, loadPaymentDues: due(), loadMyPaymentRequest }));
-    await render(<CourseDetailScreen />);
-    expect(
-      await screen.findByText(`Payment request sent ${formatDate('2026-11-02T10:00:00.000Z')} · waiting for the accountant`),
-    ).toBeTruthy();
-    expect(loadMyPaymentRequest).toHaveBeenCalledWith('A', month);
-    expect(screen.queryByRole('button', { name: 'Pay' })).toBeNull();
-    await fireEvent.press(screen.getByRole('button', { name: 'Send again' }));
-    expect(router.push).toHaveBeenCalledWith({ pathname: '/courses/[id]/pay', params: { id: 'A' } });
-  });
-
-  it('AC 3: a request but no longer due (period over or marked Paid): neither line nor Pay', async () => {
-    setStore(
-      fakeStore('S1', {
-        courseMembers: members,
-        loadPaymentDues: jest.fn(async () => []),
-        loadMyPaymentRequest: jest.fn(async () => req('S1')),
-      }),
-    );
-    await render(<CourseDetailScreen />);
-    await waitFor(() => expect(screen.queryByTestId('payment-request-sent')).toBeNull());
-    expect(screen.queryByRole('button', { name: 'Pay' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Send again' })).toBeNull();
+    expect(screen.queryByText(/Payment request sent/)).toBeNull();
+    // AC 7: neither the dues nor the own request is loaded.
+    expect(loadPaymentDues).not.toHaveBeenCalled();
+    expect(loadMyPaymentRequest).not.toHaveBeenCalled();
   });
 });
 
-describe('listener: the Pay screen (AC 2)', () => {
-  it('Send is disabled until a proof is attached; a photo shows a thumbnail and is sent for this month', async () => {
-    const store = fakeStore('S1', { courseMembers: members });
+describe('the old Pay address (ARU-161 AC 3)', () => {
+  const { Redirect } = jest.requireMock('expo-router') as { Redirect: jest.Mock };
+  it.each(['S1', 'M', 'T'] as const)('%s is sent to the course; no proof form, nothing sent', async (who) => {
+    const store = fakeStore(who, { courseMembers: members });
     setStore(store);
-    picker.launchImageLibraryAsync.mockResolvedValue({
-      canceled: false,
-      assets: [{ uri: 'file:///p.jpg', width: 1, height: 1, mimeType: 'image/jpeg', fileSize: 1000, fileName: 'p.jpg' }],
-    } as never);
     await render(<PayScreen />);
-    expect(screen.getByRole('button', { name: 'Send request' })).toBeDisabled();
-    await fireEvent.press(screen.getByRole('button', { name: 'Attach a photo' }));
-    expect(await screen.findByTestId('proof-thumbnail')).toBeTruthy();
-    expect(picker.launchImageLibraryAsync).toHaveBeenCalledWith(
-      expect.objectContaining({ mediaTypes: ['images'], preferredAssetRepresentationMode: 'compatible' }),
-    );
-    await fireEvent.press(screen.getByRole('button', { name: 'Send request' }));
-    await waitFor(() =>
-      expect(store.sendPaymentRequest).toHaveBeenCalledWith('A', month, expect.objectContaining({ uri: 'file:///p.jpg', kind: 'image' })),
-    );
-    expect(router.back).toHaveBeenCalled();
+    expect(Redirect.mock.calls[0][0]).toEqual({ href: { pathname: '/courses/[id]', params: { id: 'A' } } });
+    expect(screen.queryByRole('button', { name: /Send|Photo|PDF/ })).toBeNull();
+    expect(store.sendPaymentRequest).not.toHaveBeenCalled();
   });
 
-  it('a PDF shows its file name; it can be removed again', async () => {
-    setStore(fakeStore('S1', { courseMembers: members }));
-    docs.getDocumentAsync.mockResolvedValue({
-      canceled: false,
-      assets: [{ uri: 'file:///r.pdf', name: 'receipt.pdf', mimeType: 'application/pdf', size: 2000 }],
-    } as never);
+  it('no course id: to the Courses tab', async () => {
+    const { Redirect: R } = jest.requireMock('expo-router') as { Redirect: jest.Mock };
+    params.id = undefined;
+    setStore(fakeStore('S1'));
     await render(<PayScreen />);
-    await fireEvent.press(screen.getByRole('button', { name: 'Attach a PDF' }));
-    expect(await screen.findByText('receipt.pdf')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Replace PDF' })).toBeTruthy();
-    await fireEvent.press(screen.getByRole('button', { name: 'Remove proof' }));
-    expect(screen.queryByText('receipt.pdf')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Send request' })).toBeDisabled();
-  });
-
-  it('a file over 10 MB shows the rule and nothing is attached', async () => {
-    setStore(fakeStore('S1', { courseMembers: members }));
-    docs.getDocumentAsync.mockResolvedValue({
-      canceled: false,
-      assets: [{ uri: 'file:///big.pdf', name: 'big.pdf', mimeType: 'application/pdf', size: 11 * 1024 * 1024 }],
-    } as never);
-    await render(<PayScreen />);
-    await fireEvent.press(screen.getByRole('button', { name: 'Attach a PDF' }));
-    expect(await screen.findByText('The proof must be a photo or a PDF up to 10 MB.')).toBeTruthy();
-    expect(screen.queryByTestId('proof-preview')).toBeNull();
-  });
-
-  it('edge: photo access denied explains Settings; the PDF option still works', async () => {
-    setStore(fakeStore('S1', { courseMembers: members }));
-    picker.requestMediaLibraryPermissionsAsync.mockResolvedValueOnce({ granted: false } as never);
-    await render(<PayScreen />);
-    await fireEvent.press(screen.getByRole('button', { name: 'Attach a photo' }));
-    expect(await screen.findByText(/Allow it in Settings, or attach a PDF instead/)).toBeTruthy();
-    expect(picker.launchImageLibraryAsync).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Attach a PDF' })).toBeEnabled();
-  });
-
-  it('edge: a failed send shows the error and keeps the proof', async () => {
-    setStore(
-      fakeStore('S1', {
-        courseMembers: members,
-        sendPaymentRequest: jest.fn(async () => {
-          throw new Error('Network request failed');
-        }),
-      }),
-    );
-    docs.getDocumentAsync.mockResolvedValue({
-      canceled: false,
-      assets: [{ uri: 'file:///r.pdf', name: 'receipt.pdf', mimeType: 'application/pdf', size: 2000 }],
-    } as never);
-    await render(<PayScreen />);
-    await fireEvent.press(screen.getByRole('button', { name: 'Attach a PDF' }));
-    await fireEvent.press(await screen.findByRole('button', { name: 'Send request' }));
-    expect(await screen.findByText('Network request failed')).toBeTruthy();
-    expect(screen.getByText('receipt.pdf')).toBeTruthy();
-    expect(router.back).not.toHaveBeenCalled();
-  });
-
-  it('someone who isn\'t a listener gets "Not allowed"', async () => {
-    setStore(fakeStore('S3', { courseMembers: members }));
-    await render(<PayScreen />);
-    expect(screen.getByText('Not allowed')).toBeTruthy();
+    expect(R.mock.calls[0][0]).toEqual({ href: '/courses' });
   });
 });
 

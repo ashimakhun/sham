@@ -172,6 +172,8 @@ const APP_MESSAGE_IDS: [TextId, Params?][] = [
   ['chat.loadError'],
   ['chat.loadOlderError'],
   ['homework.photosZipError'],
+  // ARU-158: a delete the database refused (Reports list, chats).
+  ['reports.cantDelete'],
 ];
 /**
  * ARU-113: app messages that carry a value only known at run time; the named groups fill the text's placeholders.

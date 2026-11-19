@@ -792,41 +792,17 @@ describe("AC 3: app errors on the real screens are in Russian", () => {
     courseBilling: [billing],
   };
 
-  it("Pay: a PDF over 10 MB shows the proof rule in Russian", async () => {
-    DocumentPicker.getDocumentAsync.mockResolvedValueOnce({
-      canceled: false,
-      assets: [
-        {
-          uri: "file:///big.pdf",
-          name: "big.pdf",
-          mimeType: "application/pdf",
-          size: 11 * 1024 * 1024,
-        },
-      ],
-    } as never);
+  // ARU-161 removed the listener's Pay form: the old address shows no picker (so none of its errors) in Russian either.
+  it("Pay (since ARU-161): the old address shows no proof pickers and no payment text in Russian", async () => {
     as("S1", "ru", payStore);
     params.id = "A";
     await render(inApp(<PayScreen />));
     await flush();
-    await fireEvent.press(screen.getByRole("button", { name: /PDF/ }));
-    await flush();
-    // The intro and the error both name the limit; the error is the second.
-    expect(screen.getAllByText(/10 МБ/)).toHaveLength(2);
-    expect(latinLeft()).toEqual([]);
-  });
-
-  it("Pay: photo access denied shows the permission message in Russian", async () => {
-    ImagePicker.requestMediaLibraryPermissionsAsync.mockResolvedValueOnce({
-      granted: false,
-    } as never);
-    as("S1", "ru", payStore);
-    params.id = "A";
-    await render(inApp(<PayScreen />));
-    await flush();
-    await fireEvent.press(screen.getByRole("button", { name: /фото/i }));
-    await flush();
-    expect(screen.getByText(/^Sham нужен доступ/)).toBeTruthy();
-    expect(latinLeft()).toEqual([]);
+    expect(screen.queryByRole("button", { name: /PDF/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /фото/i })).toBeNull();
+    expect(screen.queryByText(/10 МБ|оплат/i)).toBeNull();
+    expect(DocumentPicker.getDocumentAsync).not.toHaveBeenCalled();
+    expect(ImagePicker.requestMediaLibraryPermissionsAsync).not.toHaveBeenCalled();
   });
 
   it("File: opening fails offline, the message is in Russian", async () => {

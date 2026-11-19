@@ -32,6 +32,9 @@ import { normalizeUsername, signInAddress, usernameAddress } from './username';
 import type {
   AccessRequest,
   AssignmentSentCount,
+  ContentKind,
+  ContentReport,
+  ReportReason,
   WorkspaceChoice,
   WorkspaceInvite,
   Course,
@@ -222,13 +225,17 @@ export type Store = {
   /** Posts as the current user. `id` is generated once per message so a retry cannot post twice. */
   sendMessage: (input: { id: string; courseId: string; body: string }) => Promise<void>;
   /** Live inserts for one course's chat (its own channel, not the global refetch). Returns an unsubscribe. */
-  subscribeToMessages: (courseId: string, onMessage: (m: CourseMessage) => void) => () => void;
+  subscribeToMessages: (
+    courseId: string,
+    onMessage: (m: CourseMessage) => void,
+    onDelete?: (id: string) => void,
+  ) => () => void;
   /** General chat (ARU-61), for every approved user: a page of messages, newest first, older than `before`. */
   loadGeneralMessages: (before?: GeneralMessage) => Promise<{ messages: GeneralMessage[]; hasMore: boolean }>;
   /** Posts to the general chat as the current user; `id` is kept across retries so a retry cannot post twice. */
   sendGeneralMessage: (input: { id: string; body: string }) => Promise<void>;
   /** Live inserts in the general chat, on its own channel (not the store's refetch or ARU-31 counters). */
-  subscribeToGeneralMessages: (onMessage: (m: GeneralMessage) => void) => () => void;
+  subscribeToGeneralMessages: (onMessage: (m: GeneralMessage) => void, onDelete?: (id: string) => void) => () => void;
   /** Teacher only (ARU-43): accounts waiting for approval and declined ones, oldest first. Empty for others. */
   accessRequests: AccessRequest[];
   /** Teacher only (ARU-43): accept (approved) or decline (rejected) an account, then refetch. A retry is a no-op. */
@@ -299,6 +306,19 @@ export type Store = {
   markGeneralChatRead: (upToMessageId: string) => Promise<void>;
   /** Whether the general chat is open on screen: its messages are read as they arrive, so it never shows a count. */
   setGeneralChatOpen: (open: boolean) => void;
+  /** ARU-158: the teacher's reports: open ones and those resolved in the last 30 days (empty for everyone else). */
+  contentReports: ContentReport[];
+  /** Refetches the teacher's reports (the Reports screen, on focus). */
+  loadReports: () => Promise<void>;
+  /** ARU-158 AC 2-4: reports content I can see and didn't write. The database refuses duplicates and the rest. */
+  reportContent: (input: { kind: ContentKind; contentId: string; reason: ReportReason; comment: string }) => Promise<void>;
+  /** ARU-158 AC 8 / 9: the teacher dismisses a report (refused for a report about their own content). */
+  dismissReport: (reportId: string) => Promise<void>;
+  /** ARU-158 AC 7: the teacher deletes the reported content (a PDF with its file), then every open report on it
+   *  becomes Removed. Content already gone counts as deleted; a refused delete leaves the reports open. */
+  deleteReportedContent: (report: ContentReport) => Promise<void>;
+  /** ARU-158 AC 11: the teacher (any chat) or a course's owner (its chat) deletes a chat message. */
+  deleteChatMessage: (kind: 'course_message' | 'general_message', id: string) => Promise<void>;
 };
 
 /** Live count refetches are batched: one request at most this often while messages arrive (ARU-31). */
@@ -414,6 +434,25 @@ type FeedbackRow = {
 };
 // ARU-75: references to people are null once that person deleted their account.
 type MessageRow = { id: string; course_id: string; author_id: string | null; body: string; created_at: string };
+type ReportRow = {
+  id: string;
+  reporter_id: string | null;
+  content_kind: ContentKind;
+  content_id: string;
+  author_id: string | null;
+  content_title: string | null;
+  content_text: string | null;
+  content_rating: number | null;
+  course_id: string | null;
+  course_title: string | null;
+  meeting_at: string | null;
+  reason: ReportReason;
+  comment: string | null;
+  status: ContentReport['status'];
+  created_at: string;
+  resolved_by: string | null;
+  resolved_at: string | null;
+};
 type GeneralMessageRow = { id: string; author_id: string | null; body: string; created_at: string };
 type UnreadRow = { course_id: string; unread: number | string };
 type MaterialFileRow = {
@@ -633,6 +672,32 @@ const toGeneralMessage = (r: GeneralMessageRow): GeneralMessage => ({
   createdAt: r.created_at,
 });
 
+const toReport = (r: ReportRow): ContentReport => ({
+  id: r.id,
+  reporterId: r.reporter_id,
+  kind: r.content_kind,
+  contentId: r.content_id,
+  authorId: r.author_id,
+  title: r.content_title ?? undefined,
+  text: r.content_text ?? '',
+  rating: r.content_rating ?? undefined,
+  courseId: r.course_id ?? undefined,
+  courseTitle: r.course_title ?? undefined,
+  meetingAt: r.meeting_at ?? undefined,
+  reason: r.reason,
+  comment: r.comment ?? undefined,
+  status: r.status,
+  createdAt: r.created_at,
+  resolvedById: r.resolved_by,
+  resolvedAt: r.resolved_at ?? undefined,
+});
+
+/** ARU-158 AC 6: resolved reports stay listed this long. */
+const RESOLVED_REPORT_DAYS = 30;
+
+/** ARU-158: a PDF delete RLS refused (the row is still there). */
+export const CANT_DELETE_CONTENT = "You can't delete this content.";
+
 const toMessage = (r: MessageRow): CourseMessage => ({
   id: r.id,
   courseId: r.course_id,
@@ -814,6 +879,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // Every profile the database returns: approved accounts, plus all accounts for the teacher and the own row (ARU-43).
   const [profiles, setProfiles] = useState<User[]>([]);
   const [accessRequests, setAccessRequests] = useState<AccessRequest[]>([]);
+  const [contentReports, setContentReports] = useState<ContentReport[]>([]);
   const [telegram, setTelegram] = useState<TelegramLink | null | undefined>(undefined);
   const [homework, setHomework] = useState<Homework[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -901,6 +967,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         loadRequest.current++;
         setProfiles([]);
         setAccessRequests([]);
+        setContentReports([]);
         setTelegram(undefined);
         setHomework([]);
         setMaterials([]);
@@ -950,6 +1017,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (res.error || request !== generalUnreadRequest.current) return;
     setGeneralUnread(Number(res.data ?? 0) || 0);
   }, [userId]);
+
+  // ARU-158 AC 6: open reports and those resolved in the last 30 days (RLS: the teacher's workspace only). Null on error.
+  const fetchReports = useCallback(async (): Promise<ContentReport[] | null> => {
+    const since = new Date(Date.now() - RESOLVED_REPORT_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    const res = await Promise.resolve(
+      supabase.from('content_reports').select('*').or(`status.eq.open,resolved_at.gte.${since}`).order('created_at'),
+    ).catch(() => null);
+    if (!res || res.error) return null;
+    return ((res.data as ReportRow[] | null) ?? []).map(toReport);
+  }, []);
 
   // Fetches everything the signed-in user may see. State is only set after the
   // awaits, so it is safe to call from an effect. ARU-157: after every await, an answer is dropped if a newer load
@@ -1027,6 +1104,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setAssignmentSentCounts({});
         setPhotoDeletionStart(null);
         setAccessRequests([]);
+        setContentReports([]);
         setUnread({});
         setGeneralUnread(0);
         setCourseBilling([]);
@@ -1085,18 +1163,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       // Requests for the teacher's Manage roles screen. Not live: they refresh with every load.
       if (me.role === 'teacher') {
-        const req = await supabase.rpc('access_requests');
+        const [req, reports] = await Promise.all([supabase.rpc('access_requests'), fetchReports()]);
         if (!current()) return;
         setAccessRequests(req.error ? [] : ((req.data as AccessRequestRow[] | null) ?? []).map(toAccessRequest));
+        // ARU-158: the Reports row's count. Before 0064 runs there is no table: no reports.
+        if (reports) setContentReports(reports);
+        else setContentReports([]);
       } else {
         setAccessRequests([]);
+        setContentReports([]);
       }
       await Promise.all([loadUnread().catch(() => {}), loadGeneralUnread().catch(() => {})]);
     } finally {
       // A dropped answer leaves "loaded" to the load that replaced it (or to the next user's first load).
       if (current()) setLoadedFor(userId);
     }
-  }, [userId, loadUnread, loadGeneralUnread, verifyUser]);
+  }, [userId, loadUnread, loadGeneralUnread, verifyUser, fetchReports]);
 
   /** User-triggered reload (pull to refresh, retry) with a spinner. */
   const refresh = useCallback(async () => {
@@ -1165,6 +1247,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         unreadTimer = setTimeout(() => {
           unreadTimer = null;
           loadUnread().catch(() => {});
+        }, UNREAD_DEBOUNCE_MS);
+      })
+      // ARU-158: a deleted message may have been unread. DELETE events carry only the id (and reach every client),
+      // so refetch the counts, batched the same way.
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'course_messages' }, () => {
+        if (unreadTimer) return;
+        unreadTimer = setTimeout(() => {
+          unreadTimer = null;
+          loadUnread().catch(() => {});
+        }, UNREAD_DEBOUNCE_MS);
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'general_messages' }, () => {
+        if (generalUnreadTimer) return;
+        generalUnreadTimer = setTimeout(() => {
+          generalUnreadTimer = null;
+          loadGeneralUnread().catch(() => {});
         }, UNREAD_DEBOUNCE_MS);
       })
       // A general chat message refetches only the general count, batched the same way (ARU-72).
@@ -1281,6 +1379,50 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     [loadGeneralUnread],
   );
+
+  // The PDF first (removing a file that is already gone is not an error), then the row. The number of rows deleted
+  // (0: RLS refused it, or it was already gone).
+  const removePdf = async (id: string, storagePath: string) => {
+    check(await supabase.storage.from('materials').remove([storagePath]));
+    return rows<{ id: string }>(await supabase.from('material_files').delete().eq('id', id).select('id')).length;
+  };
+
+  // ARU-158: a chat message, Blog post or review through delete_content() (0064), which checks who may delete it.
+  // Content that is already gone is not an error.
+  const deleteThroughFunction = async (kind: 'course_message' | 'general_message' | 'blog_post' | 'review', id: string) => {
+    check(await supabase.rpc('delete_content', { kind, content: id }));
+  };
+
+  // ARU-158 AC 7: delete a reported piece of content through its usual path. Already gone counts as deleted.
+  const deleteContent = async (kind: ContentKind, id: string) => {
+    if (kind === 'meeting_note') {
+      const res = await supabase.rpc('delete_meeting_listener_notes', { note: id });
+      // "Not found": deleted already. Any other refusal (e.g. a note made private since) leaves the report open.
+      if (res.error?.code !== NOT_FOUND) check(res);
+      return;
+    }
+    if (kind === 'pdf') {
+      let path = materialFiles.find((f) => f.id === id)?.storagePath;
+      if (!path) {
+        const res = await supabase.from('material_files').select('storage_path').eq('id', id);
+        check(res);
+        path = (res.data as { storage_path: string }[] | null)?.[0]?.storage_path;
+      }
+      if (!path) return;
+      if (!(await removePdf(id, path))) {
+        const still = await supabase.from('material_files').select('id').eq('id', id);
+        check(still);
+        if (still.data?.length) throw new Error(CANT_DELETE_CONTENT);
+      }
+      return;
+    }
+    await deleteThroughFunction(kind, id);
+  };
+
+  const loadReports = useCallback(async () => {
+    const reports = await fetchReports();
+    if (reports) setContentReports(reports);
+  }, [fetchReports]);
 
   const requireRole = (...roles: User['role'][]) => {
     if (!currentUser || !roles.includes(currentUser.role)) throw new Error(`Only a ${roles.join(' or ')} can do this.`);
@@ -1721,11 +1863,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       requireRole('teacher', 'mentor');
       const item = materialFiles.find((f) => f.id === id);
       if (!item) throw new Error('Material not found');
-      // PDF first (removing a file that is already gone is not an error), then the row.
-      check(await supabase.storage.from('materials').remove([item.storagePath]));
-      const deleted = rows<{ id: string }>(await supabase.from('material_files').delete().eq('id', id).select('id'));
+      const deleted = await removePdf(id, item.storagePath);
       await load();
-      if (!deleted.length) throw new Error('You can no longer delete this file.');
+      if (!deleted) throw new Error('You can no longer delete this file.');
     },
     getMaterialFileUrl: async (storagePath) => {
       const { data, error } = await supabase.storage.from('materials').createSignedUrl(storagePath, 60);
@@ -1864,7 +2004,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         await supabase.from('course_messages').insert({ id, course_id: courseId, author_id: currentUser.id, body: body.trim() }),
       );
     },
-    subscribeToMessages: (courseId, onMessage) => {
+    subscribeToMessages: (courseId, onMessage, onDelete) => {
       const channel = supabase
         .channel(`chat-${courseId}-${Math.random().toString(36).slice(2)}`)
         .on(
@@ -1872,6 +2012,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           { event: 'INSERT', schema: 'public', table: 'course_messages', filter: `course_id=eq.${courseId}` },
           (payload) => onMessage(toMessage(payload.new as MessageRow)),
         )
+        // ARU-158 AC 11: Realtime applies no RLS or filter to DELETE events and sends only the id, so listen without a
+        // filter; the chat removes the id if it shows it and ignores the rest.
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'course_messages' }, (payload) => {
+          const id = (payload.old as { id?: string } | null)?.id;
+          if (id) onDelete?.(id);
+        })
         .subscribe();
       return () => {
         supabase.removeChannel(channel);
@@ -1897,12 +2043,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (!currentUser) throw new Error('Please sign in again.');
       checkInsert(await supabase.from('general_messages').insert({ id, author_id: currentUser.id, body: body.trim() }));
     },
-    subscribeToGeneralMessages: (onMessage) => {
+    subscribeToGeneralMessages: (onMessage, onDelete) => {
       const channel = supabase
         .channel(`general-chat-${Math.random().toString(36).slice(2)}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'general_messages' }, (payload) =>
           onMessage(toGeneralMessage(payload.new as GeneralMessageRow)),
         )
+        // ARU-158 AC 11: deleted messages (the id only, see subscribeToMessages).
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'general_messages' }, (payload) => {
+          const id = (payload.old as { id?: string } | null)?.id;
+          if (id) onDelete?.(id);
+        })
         .subscribe();
       return () => {
         supabase.removeChannel(channel);
@@ -2100,6 +2251,40 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       requireRole('teacher');
       check(await supabase.rpc('set_access_status', { target, new_status: status }));
       await load();
+    },
+    contentReports,
+    loadReports,
+    reportContent: async ({ kind, contentId, reason, comment }) => {
+      if (!currentUser) throw new Error('Please sign in again.');
+      const text = comment.trim();
+      check(
+        await supabase.rpc('report_content', {
+          kind,
+          content: contentId,
+          report_reason: reason,
+          report_comment: text || null,
+        }),
+      );
+    },
+    dismissReport: async (reportId) => {
+      requireRole('teacher');
+      check(await supabase.rpc('resolve_report', { report: reportId, new_status: 'dismissed' }));
+      await loadReports();
+    },
+    deleteReportedContent: async (report) => {
+      requireRole('teacher');
+      try {
+        await deleteContent(report.kind, report.contentId);
+      } catch (e) {
+        // Refused or offline: the report stays open (analysis note 3).
+        await loadReports().catch(() => {});
+        throw e;
+      }
+      check(await supabase.rpc('resolve_report', { report: report.id, new_status: 'removed' }));
+      await load();
+    },
+    deleteChatMessage: async (kind, id) => {
+      await deleteThroughFunction(kind, id);
     },
     unreadCount: (courseId) => (courseId === activeChat ? 0 : (unread[courseId] ?? 0)),
     markChatRead,

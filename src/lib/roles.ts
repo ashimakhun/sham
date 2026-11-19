@@ -142,3 +142,16 @@ export function canDeleteListenerNote(
 export function seesOnlyCourseSummary(user: User | null | undefined, course: Course, members: CourseMember[]) {
   return user?.role === 'student' && !isCourseListener(user, course, members);
 }
+
+/** ARU-158 AC 1: Report shows on content whose author is someone else (not a deleted account: no author). The
+ *  database also refuses content the user can't see (report_content(), 0064). */
+export function canReport(user: User | null | undefined, authorId: string | null | undefined) {
+  return !!user && user.accessStatus !== 'pending' && user.accessStatus !== 'rejected' && !!authorId && authorId !== user.id;
+}
+
+/** ARU-158 AC 11: mirrors 0064's delete policies on chat messages: the teacher in every chat, a course's current
+ *  owner in that course's chat (`course` is undefined for the general chat). */
+export function canDeleteChatMessage(user: User | null | undefined, course?: Pick<Course, 'createdById'>) {
+  if (!user) return false;
+  return user.role === 'teacher' || (!!course && course.createdById === user.id);
+}

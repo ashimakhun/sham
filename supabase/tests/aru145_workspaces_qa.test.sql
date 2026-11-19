@@ -84,6 +84,9 @@ insert into material_files (id, author_id, name, storage_path, size_bytes)
   values (t.x('XF'), t.x('XT'), 'X pdf', t.x('XT') || '/' || t.x('XF') || '.pdf', 100);
 insert into telegram_links (user_id, chat_id) values (t.x('XS'), 7001), (t.x('XT'), 7002), (t.id('S1'), 7003), (t.id('T'), 7004), (t.id('M'), 7005);
 insert into photo_deletion_warnings (homework_id, mark, user_id, deletion_date) values (t.x('XH'), 30, t.x('XS'), current_date + 20);
+-- ARU-158 (0064): a W2 report (the guard takes the workspace from the reporter).
+insert into content_reports (reporter_id, content_kind, content_id, author_id, content_text, course_id, reason)
+  values (t.x('XM'), 'course_message', t.x('XCM'), t.x('XS'), 'X chat', t.x('XC'), 'spam');
 insert into storage.objects (bucket_id, name, owner) values
   ('homework', t.x('XS') || '/xh.jpg', t.x('XS')),
   ('materials', t.x('XT') || '/' || t.x('XF') || '.pdf', t.x('XT')),
@@ -93,8 +96,8 @@ insert into material_files (id, author_id, name, storage_path, size_bytes, cours
   values (t.x('AF'), t.id('M'), 'A pdf', t.id('M') || '/' || t.x('AF') || '.pdf', 100, t.id('A'), true);
 
 -- Every W2 row was set to W2 by the guard (no row defaults to the oldest workspace).
-select t.eq((select count(*) from information_schema.columns c where c.table_schema = 'public' and c.column_name = 'workspace_id'), 23::bigint,
-  'data: 23 workspace-scoped tables (22 + profiles)');
+select t.eq((select count(*) from information_schema.columns c where c.table_schema = 'public' and c.column_name = 'workspace_id'), 24::bigint,
+  'data: 24 workspace-scoped tables (23 + profiles; content_reports since ARU-158)');
 do $$
 declare r record; n bigint; missing text := '';
 begin
@@ -117,7 +120,7 @@ begin
       if n > 0 then leaks := leaks || r.table_name || '=' || n || ' '; end if;
     end loop;
     reset role;
-    perform t.eq(leaks, '', format('AC5 %s reads no W2 row in any of the 23 tables', who));
+    perform t.eq(leaks, '', format('AC5 %s reads no W2 row in any of the 24 tables', who));
   end loop;
 end $$;
 select t.login('T');

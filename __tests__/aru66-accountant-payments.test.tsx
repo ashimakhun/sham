@@ -210,83 +210,20 @@ describe('AC1 / AC6: the payments screen', () => {
   });
 });
 
-describe('AC7 / AC8 / AC9: the listener\'s deadline on the Courses tab', () => {
-  const card = () => screen.getByText('Algebra');
-
-  it('an unpaid listener in the period sees a red border and "Payment due by" on that card only', async () => {
+// ARU-161: listeners no longer see payment deadlines (ARU-66 AC 7-9's card line and red border are gone).
+describe('ARU-161: no payment deadline on the listener\'s Courses tab', () => {
+  it('an unpaid listener in the period sees no border and no "Payment due" line; nothing is loaded', async () => {
     const loadPaymentDues = jest.fn(async () => [{ courseId: 'A', deadline: '2026-11-05' }]);
     setStore(forUser('S1', { loadPaymentDues }));
     await render(<CoursesScreen />);
-    await waitFor(() => expect(screen.getByTestId('payment-due-A')).toBeTruthy());
-    expect(loadPaymentDues).toHaveBeenCalledWith('2026-11-03');
-    expect(screen.getByText(`Payment due by ${formatDate(new Date(2026, 10, 5).toISOString())}`)).toBeTruthy();
-    expect(screen.queryByTestId('payment-due-B')).toBeNull();
-    expect(card()).toBeTruthy();
-    // No "Paid" or "Exempt" labels for listeners.
-    expect(screen.queryByText(/^(Paid|Exempt|Unpaid)/)).toBeNull();
-  });
-
-  it('nothing shows when nothing is due, or the due function fails', async () => {
-    setStore(forUser('S1', { loadPaymentDues: jest.fn(async () => { throw new Error('offline'); }) }));
-    await render(<CoursesScreen />);
     await act(async () => {});
-    expect(screen.queryByText(/Payment due/)).toBeNull();
-    expect(screen.queryByText('offline')).toBeNull();
-  });
-
-  it('marked Paid elsewhere: the highlight goes on the next focus, not before', async () => {
-    let due = [{ courseId: 'A', deadline: '2026-11-05' }];
-    const loadPaymentDues = jest.fn(async () => due);
-    setStore(forUser('S1', { loadPaymentDues }));
-    await render(<CoursesScreen />);
-    await waitFor(() => expect(screen.getByTestId('payment-due-A')).toBeTruthy());
-    due = [];
-    await act(async () => {});
-    expect(screen.getByTestId('payment-due-A')).toBeTruthy();
-    await refocus();
-    await waitFor(() => expect(screen.queryByTestId('payment-due-A')).toBeNull());
-  });
-
-  it('returning to the foreground reloads', async () => {
-    let onChange: ((s: string) => void) | undefined;
-    jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, cb) => {
-      onChange = cb as (s: string) => void;
-      return { remove: () => {} } as ReturnType<typeof AppState.addEventListener>;
-    });
-    let due: { courseId: string; deadline: string }[] = [];
-    const loadPaymentDues = jest.fn(async () => due);
-    setStore(forUser('S1', { loadPaymentDues }));
-    await render(<CoursesScreen />);
-    await act(async () => {});
+    expect(screen.getByText('Algebra')).toBeTruthy();
     expect(screen.queryByTestId('payment-due-A')).toBeNull();
-    due = [{ courseId: 'A', deadline: '2026-11-05' }];
-    await act(async () => onChange?.('active'));
-    await waitFor(() => expect(screen.getByTestId('payment-due-A')).toBeTruthy());
-  });
-
-  it('the period starting while the tab is open shows the highlight within a minute', async () => {
-    jest.restoreAllMocks(); // fake timers drive Date.now here
-    jest.useFakeTimers({
-      now: new Date(2026, 10, 30, 23, 59, 50),
-      doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'],
-    });
-    try {
-      const loadPaymentDues = jest.fn(async (today: string) =>
-        today === '2026-12-01' ? [{ courseId: 'A', deadline: '2026-12-05' }] : [],
-      );
-      setStore(forUser('S1', { loadPaymentDues }));
-      await render(<CoursesScreen />);
-      await act(async () => {});
-      expect(screen.queryByTestId('payment-due-A')).toBeNull();
-      // 30 s later the device clock reads 1 Dec, the first day of the period.
-      await act(async () => {
-        jest.advanceTimersByTime(30_000);
-      });
-      await act(async () => {});
-      expect(loadPaymentDues).toHaveBeenLastCalledWith('2026-12-01');
-      expect(screen.getByText(`Payment due by ${formatDate(new Date(2026, 11, 5).toISOString())}`)).toBeTruthy();
-    } finally {
-      jest.useRealTimers();
-    }
+    expect(screen.queryByText(/Payment due|Payment overdue/)).toBeNull();
+    expect(screen.queryByText(/^(Paid|Exempt|Unpaid)/)).toBeNull();
+    // AC 7: no request on focus or when the app comes back.
+    await refocus();
+    await act(async () => AppState.currentState);
+    expect(loadPaymentDues).not.toHaveBeenCalled();
   });
 });

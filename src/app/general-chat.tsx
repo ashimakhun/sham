@@ -5,7 +5,7 @@ import { AppState } from 'react-native';
 import { ChatView } from '@/components/ChatView';
 import { EmptyState } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
-import { canUseGeneralChat } from '@/lib/roles';
+import { canDeleteChatMessage, canUseGeneralChat } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { useGeneralChat } from '@/lib/useCourseChat';
 
@@ -41,7 +41,17 @@ function GeneralChat() {
   const { t } = useI18n();
   const chat = useGeneralChat(true);
   useMarkGeneralChatRead(chat.messages[0]?.id);
-  return <ChatView chat={chat} emptyText={t('chat.generalEmpty')} unknownAuthor={t('chat.unknownUser')} />;
+  const { currentUser } = useStore();
+  return (
+    <ChatView
+      chat={chat}
+      emptyText={t('chat.generalEmpty')}
+      unknownAuthor={t('chat.unknownUser')}
+      kind="general_message"
+      // ARU-158 AC 11: only the teacher deletes general chat messages.
+      canDelete={canDeleteChatMessage(currentUser)}
+    />
+  );
 }
 
 /** ARU-61: one chat for every approved user (any role), opened from the Profile tab. Waiting and declined accounts

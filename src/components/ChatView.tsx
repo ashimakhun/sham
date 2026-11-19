@@ -13,10 +13,13 @@ import {
 
 import { Text, TextInput } from '@/components/AppText';
 
+import { ActionMenu, type MenuAction, openReport } from '@/components/ContentMenu';
 import { EmptyState, ErrorText, RoleBadge, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
+import { confirmDestructive } from '@/lib/confirm';
 import { newId } from '@/lib/id';
 import { personName } from '@/lib/deleteAccount';
+import { canReport } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors, formatDateTime } from '@/lib/theme';
 import type { ChatMessage } from '@/lib/types';
@@ -31,6 +34,8 @@ type ChatState<M extends ChatMessage> = {
   error: string | null;
   loadOlder: () => void;
   send: (id: string, body: string) => Promise<void>;
+  /** ARU-158: takes a deleted message off the list at once (realtime also delivers the deletion). */
+  remove: (id: string) => void;
 };
 
 /**
@@ -40,20 +45,53 @@ type ChatState<M extends ChatMessage> = {
  * - `unknownAuthor`: the name shown when the author's profile can't be read. An author who deleted their account
  *   (no author any more, ARU-75) shows as "Deleted account", without a role badge.
  * - `badges`: extra badges after the role badge (the course chat's "Owner").
+ * - `kind`: what a report on a message is about (ARU-158); `canDelete`: the user may delete any message here (the
+ *   teacher; a course's owner in its chat). Long-press a message for Report (someone else's) and Delete.
  */
 export function ChatView<M extends ChatMessage>({
   chat,
   emptyText,
   unknownAuthor,
   badges,
+  kind,
+  canDelete = false,
 }: {
   chat: ChatState<M>;
   emptyText: string;
   unknownAuthor: string;
   badges?: (message: M) => ReactNode;
+  kind: 'course_message' | 'general_message';
+  canDelete?: boolean;
 }) {
-  const { currentUser } = useStore();
+  const { currentUser, deleteChatMessage } = useStore();
   const { t } = useI18n();
+  // ARU-158: the message whose menu is open, and the result of deleting one.
+  const [menuFor, setMenuFor] = useState<M | null>(null);
+  const deletion = useAction();
+
+  function actionsFor(message: M): MenuAction[] {
+    const actions: MenuAction[] = [];
+    if (canReport(currentUser, message.authorId)) {
+      actions.push({ key: 'report', label: t('report.menuReport'), onPress: () => openReport(kind, message.id) });
+    }
+    if (canDelete) {
+      actions.push({
+        key: 'delete',
+        label: t('report.menuDelete'),
+        destructive: true,
+        onPress: () => {
+          confirmDestructive(t('chat.deleteTitle'), t('chat.deleteMessage'), t('chat.deleteConfirm')).then((ok) => {
+            if (!ok) return;
+            deletion.run(async () => {
+              await deleteChatMessage(kind, message.id);
+              chat.remove(message.id);
+            });
+          });
+        },
+      });
+    }
+    return actions;
+  }
   const headerHeight = useHeaderHeight();
   const [text, setText] = useState('');
   // One id per message, kept across retries so a retry never posts twice; renewed after a send.
@@ -89,6 +127,8 @@ export function ChatView<M extends ChatMessage>({
             mine={item.authorId != null && item.authorId === currentUser?.id}
             unknownAuthor={unknownAuthor}
             badges={badges?.(item)}
+            actions={actionsFor(item)}
+            onOpenMenu={() => setMenuFor(item)}
           />
         )}
         onEndReached={() => chat.loadOlder()}
@@ -105,8 +145,9 @@ export function ChatView<M extends ChatMessage>({
           )
         }
       />
+      <ActionMenu visible={!!menuFor} actions={menuFor ? actionsFor(menuFor) : []} onClose={() => setMenuFor(null)} />
       <View style={chatStyles.composer}>
-        <ErrorText error={error ?? chat.error} />
+        <ErrorText error={error ?? deletion.error ?? chat.error} />
         <View style={chatStyles.row}>
           <TextInput
             accessibilityLabel={t('chat.messageLabel')}
@@ -166,16 +207,30 @@ function Bubble({
   mine,
   unknownAuthor,
   badges,
+  actions,
+  onOpenMenu,
 }: {
   message: ChatMessage;
   mine: boolean;
   unknownAuthor: string;
   badges?: ReactNode;
+  actions: MenuAction[];
+  onOpenMenu: () => void;
 }) {
   const { getUser } = useStore();
+  const { t } = useI18n();
   const author = message.authorId == null ? undefined : getUser(message.authorId);
+  const hasActions = actions.length > 0;
   return (
-    <View style={[chatStyles.bubble, mine ? chatStyles.mine : chatStyles.theirs]}>
+    // ARU-158 AC 1 / 11: long-press (a long click on web) opens the message's menu. Screen readers get the same
+    // actions as accessibility actions, since a long-press is hard to find there.
+    <Pressable
+      testID={`chat-message-${message.id}`}
+      onLongPress={hasActions ? onOpenMenu : undefined}
+      accessibilityHint={hasActions ? t('report.messageActionsHint') : undefined}
+      accessibilityActions={hasActions ? actions.map((a) => ({ name: a.key, label: a.label })) : undefined}
+      onAccessibilityAction={(e) => actions.find((a) => a.key === e.nativeEvent.actionName)?.onPress()}
+      style={[chatStyles.bubble, mine ? chatStyles.mine : chatStyles.theirs]}>
       <View style={chatStyles.meta}>
         <Text style={[styles.label, { flexShrink: 1 }]} numberOfLines={1}>
           {personName(message.authorId, author, unknownAuthor)}
@@ -185,7 +240,7 @@ function Bubble({
       </View>
       <Text style={styles.body}>{message.body}</Text>
       <Text style={styles.muted}>{formatDateTime(message.createdAt)}</Text>
-    </View>
+    </Pressable>
   );
 }
 
