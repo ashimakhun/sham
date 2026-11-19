@@ -129,6 +129,38 @@ describe('AC 10: Russian', () => {
       expect(screen.getByText(translate('ru', key as never))).toBeTruthy();
     },
   );
+
+  // ARU-177 fix: Save errors are shown as they are, Sign out errors still go through tm() (Auth's English never shows
+  // on a Russian screen), and a Save after a failed Sign out shows its own Russian text again.
+  it('a Sign out failure shows the Russian generic error, then a Save refusal shows its Russian text', async () => {
+    const thrown = dbErrorMessage(
+      { message: translate('en', 'db.username_invalid'), code: '22023', hint: 'sham:username_invalid' } as never,
+      'ru',
+    );
+    setStore(
+      fakeStore(null, {
+        currentUser: ruUser(),
+        needsUsername: true,
+        myUsername: null,
+        signOut: jest.fn(async () => {
+          throw new Error('AuthRetryableFetchError: Failed to fetch');
+        }),
+        chooseUsername: jest.fn(async () => {
+          throw new Error(thrown);
+        }),
+      }),
+    );
+    await app();
+    await flush();
+    await fireEvent.press(screen.getByText(translate('ru', 'common.signOut')));
+    await flush();
+    expect(screen.getByText(translate('ru', 'common.genericError'))).toBeTruthy();
+    expect(screen.queryByText(/Failed to fetch/)).toBeNull();
+    await fill('dana', 'Dana');
+    await fireEvent.press(screen.getByText(translate('ru', 'common.save')));
+    await flush();
+    expect(screen.getByText(translate('ru', 'db.username_invalid'))).toBeTruthy();
+  });
 });
 
 describe('AC 3: after Save', () => {

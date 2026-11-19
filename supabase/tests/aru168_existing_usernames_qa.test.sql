@@ -104,12 +104,20 @@ select t.eq(pg_temp.choose('S1', 'sam', repeat('ж', 80)), 'ok', '80 Cyrillic ch
 
 -- The job: the teacher with an email-like name is left alone; generated usernames stay taken for people choosing later.
 update profiles set full_name = 't@x.test' where id = t.id('T');
+-- ARU-176 fix, job path (AC 8): a mentor's sign-up name in its audit entries goes too.
+insert into auth.audit_log_entries (payload) values
+  (json_build_object('action', 'token_refreshed', 'actor_id', t.id('M'), 'actor_username', 'm@x.test', 'actor_name', 'Mentor Real'));
 update app_settings set username_deadline = now() - interval '1 day';
 select t.ok(move_unclaimed_accounts() >= 1, 'the job moves the remaining students and mentors');
 select t.ok(pg_temp.uname('T') is null and pg_temp.addr('T') = 't@x.test'
   and (select full_name from profiles where id = t.id('T')) = 't@x.test', 'the job leaves the teacher (and its name) alone');
 select t.eq(pg_temp.choose('T', pg_temp.uname('S3'), 'Tess'), '23505 | sham:username_taken', 'a generated username is taken for others');
 select t.ok(pg_temp.addr('T') = 't@x.test', 'the teacher is unchanged after the refusal');
+select t.ok(pg_temp.uname('M') is not null
+  and not exists (select 1 from auth.audit_log_entries where payload::text like '%Mentor Real%'),
+  'AC6 via the job: the moved mentor''s sign-up name (actor_name) is erased too');
+select t.ok(exists (select 1 from auth.audit_log_entries where payload ->> 'actor_name' = 'Teacher Tess'),
+  'criterion change: the job leaves the unmoved teacher''s audit entries as they were');
 select t.ok((select bool_and(a.email = u.username || '@users.sham.invalid') from usernames u join auth.users a on a.id = u.user_id),
   'every usernames row matches its account''s Auth address');
 
