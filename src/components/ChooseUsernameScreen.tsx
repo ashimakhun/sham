@@ -30,6 +30,10 @@ export function ChooseUsernameScreen() {
   const { currentUser, chooseUsername, signOut } = useStore();
   const { t, tm } = useI18n();
   const { busy, error, run } = useAction();
+  // ARU-177: Save's errors are app messages or database errors the store already gave in the user's language
+  // (dbErrorMessage), so ErrorText shows them as they are; Sign out's errors are Supabase Auth's English text, which
+  // tm() turns into the generic text in Russian.
+  const [failed, setFailed] = useState<'save' | 'signOut'>('save');
   const [username, setUsername] = useState('');
   const [name, setName] = useState(() => prefillDisplayName(currentUser?.name));
 
@@ -82,13 +86,19 @@ export function ChooseUsernameScreen() {
           />
           <Text style={styles.muted}>{t('signIn.displayNameHint')}</Text>
         </View>
-        <ErrorText error={tm(error)} />
+        <ErrorText error={failed === 'save' ? error : tm(error)} />
         <Button
           title={busy ? t('common.saving') : t('common.save')}
-          onPress={() => run(() => chooseUsername(username, name))}
+          onPress={() => {
+            setFailed('save');
+            return run(() => chooseUsername(username, name));
+          }}
           disabled={!canSave || busy}
         />
-        <Button title={t('common.signOut')} variant="secondary" onPress={() => run(signOut)} disabled={busy} />
+        <Button title={t('common.signOut')} variant="secondary" onPress={() => {
+            setFailed('signOut');
+            return run(signOut);
+          }} disabled={busy} />
       </KeyboardForm>
     </SafeAreaView>
   );

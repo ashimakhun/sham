@@ -69,11 +69,13 @@ create function move_to_username(account uuid, uname text) returns void
                          else i.provider_id end
     where i.user_id = account;
 
-    -- auth.audit_log_entries: this user's entries name the internal address (actor_username, traits.user_email), and
-    -- the old email is replaced wherever else it appears (any letter case).
+    -- auth.audit_log_entries: this user's entries name the internal address (actor_username, traits.user_email),
+    -- lose the sign-up name (actor_name: Supabase Auth copies the metadata full_name into it), and the old email is
+    -- replaced wherever else it appears (any letter case).
     update auth.audit_log_entries a set payload = (
-        case when a.payload::jsonb ? 'actor_username' and a.payload::jsonb ->> 'actor_id' = account::text
+        case when a.payload::jsonb ? 'actor_username'
              then jsonb_set(a.payload::jsonb, '{actor_username}', to_jsonb(new_email)) else a.payload::jsonb end
+        - 'actor_name'
       )::json
     where a.payload::jsonb ->> 'actor_id' = account::text;
     update auth.audit_log_entries a set payload = jsonb_set(a.payload::jsonb, '{traits,user_email}', to_jsonb(new_email))::json
