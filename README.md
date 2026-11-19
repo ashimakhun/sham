@@ -272,12 +272,15 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `<username>@users.sham.invalid` and a display name of 1–80 characters, and no longer uses the email as the name
    (SQL Editor inserts stay exempt); `access_requests()` returns `username` instead of `email`; turn off Confirm email
    first, see step 3; deletes no data),
+   `0068_no_session_ip.sql` (ARU-167: a `before insert or update` trigger on Supabase Auth's `auth.sessions` sets `ip`
+   and `user_agent` to null, and existing sessions are cleared (nobody is signed out); no public table, RLS or app
+   changes),
    `0070_existing_usernames.sql` (ARU-168: older accounts without a username. Adds `app_settings.username_deadline`
    (now + 60 days), `choose_username(username, display_name)` (own account only, signed in) and the daily pg_cron job
    `username-deadline` (`move_unclaimed_accounts()`, postgres only), which after the deadline gives every remaining
    older account except teachers a `user-xxxxxx` username. Both erase the real email and sign-up name from Auth, see
    [Usernames for older accounts](#usernames-for-older-accounts-aru-168); pg_cron must be on; changes no rows itself
-   except the new setting). 0068 and 0069 belong to ARU-167 and ARU-166.
+   except the new setting). 0069 belongs to ARU-166.
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. Turn off **Authentication → Email → Confirm email**, in development and production, **before** applying
    `0067_username_sign_in.sql` (ARU-164). Username accounts sign up with an internal address that can't receive mail,
@@ -876,6 +879,11 @@ supabase/manage-roles.sql admin queries: list users, make the first teacher
 ```
 
 ## Roles and access
+
+**Sham never stores IP addresses or user agents (ARU-167).** Supabase Auth's `auth.sessions` gets them cleared at
+write time by the `clear_session_ip()` trigger (migration `0068_no_session_ip.sql`), and a CI check
+(`__tests__/aru167-no-ip-guard.test.ts`, part of `npm test`) fails on any `public` column named `ip`, `ip_address` or
+`user_agent` or of type `inet` / `cidr`, and on any reading of `x-forwarded-for`, `x-real-ip` or `cf-connecting-ip`.
 
 Every rule below applies within the account's own workspace (ARU-145): "all" means all of that workspace, "the
 teacher" is that workspace's teacher, and nobody can see or change anything in another workspace.

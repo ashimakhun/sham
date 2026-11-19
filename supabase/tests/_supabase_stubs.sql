@@ -46,10 +46,17 @@ create table auth.one_time_tokens (
   relates_to text not null,
   created_at timestamp default now()
 );
--- Supabase Auth's sessions: the move must leave them alone (AC 6).
+
+-- Supabase Auth's sessions (ARU-167): just the columns the IP-clearing trigger touches, plus the cascade from auth.users.
+-- ARU-168's move must leave them alone (AC 6).
 create table auth.sessions (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users (id) on delete cascade
+  user_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  refreshed_at timestamp,
+  ip inet,
+  user_agent text
 );
 
 -- Same resolution order as Supabase's auth.uid().
