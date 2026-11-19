@@ -42,8 +42,12 @@ An educational mobile app where teachers, mentors and students work together:
   **Deleted account**. A mentor who owns courses must hand them over first; the teacher can't delete their account.
 - **Change password** (ARU-76): any approved user changes their own password from the Profile tab, with the current
   password checked first.
-- **Forgot password?** (ARU-77): on the sign-in screen, anyone resets their password with a code sent by email (needs
-  the [Password reset email](#password-reset-email) setup).
+- **Username sign-in** (ARU-164): new accounts sign up with a **display name** (doesn't have to be a real name), a
+  **username** and a password; no email. Usernames are unique, case-insensitive, 3–30 characters of `a–z 0–9 _ . -`.
+  Supabase Auth gets an internal address `<username>@users.sham.invalid` that can never receive mail. Accounts made
+  before ARU-164 still sign in with their email (until ARU-168).
+- **Forgot password?** (ARU-77): hidden on the sign-in screen since ARU-164 (the email reset doesn't work for username
+  accounts; ARU-165 brings recovery back without email). `/reset-password` still works by link for older accounts.
 - **Homework photos** (ARU-105, ARU-107, ARU-112): compressed when picked and deleted 6 months after the homework is
   checked; senders get a warning banner (and Telegram warnings) and can download their photos as a ZIP.
 - **Telegram notifications** from the Sham bot (ARU-48 and later): meeting started, new homework, homework reviewed,
@@ -262,9 +266,16 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    removes their own blocks; approved accounts, never oneself, only people of their workspace; removed with either
    account), leaves blocked authors out of the blocker's new-message counts (`chat_unread_counts()`,
    `general_chat_unread_count()`) and Telegram recipients (`chat_message_recipients()`, `general_message_recipients()`,
-   `new_material_recipients()`, `meeting_notes_recipients()`); changes no data; not in the realtime publication).
+   `new_material_recipients()`, `meeting_notes_recipients()`); changes no data; not in the realtime publication),
+   `0067_username_sign_in.sql` (ARU-164: new table `usernames` (own row readable, no app writes; freed when the
+   account is deleted); `handle_new_user()` requires a valid username, a matching internal address
+   `<username>@users.sham.invalid` and a display name of 1–80 characters, and no longer uses the email as the name
+   (SQL Editor inserts stay exempt); `access_requests()` returns `username` instead of `email`; turn off Confirm email
+   first, see step 3; deletes no data).
    Each migration has its own number; `npm run test:db` fails if two files share one.
-3. For development, turn off **Authentication → Email → Confirm email**.
+3. Turn off **Authentication → Email → Confirm email**, in development and production, **before** applying
+   `0067_username_sign_in.sql` (ARU-164). Username accounts sign up with an internal address that can't receive mail,
+   so with it on, new accounts could never be confirmed.
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
    [Password reset email](#password-reset-email). On the default email sender only the project's team members get
    the email; real users need custom SMTP.
@@ -915,7 +926,10 @@ teacher" is that workspace's teacher, and nobody can see or change anything in a
 | Delete payment proofs (only by deleting a course or discipline, ARU-99) | | | ✓ |
 | Choose the app language (Profile → Language, saved in `profiles.language`, ARU-108) | own | own | own |
 | Change own password (Supabase Auth, current password required, ARU-76) | own | own | own |
-| Reset a forgotten password with an emailed code (signed out, any approval state, ARU-77) | own | own | own |
+| Reset a forgotten password with an emailed code (signed out, any approval state, ARU-77; older email accounts only, link hidden since ARU-164) | own | own | own |
+| Sign up with a username and display name (signed out, ARU-164) | ✓ | ✓ | ✓ |
+| See own username (`usernames`, own row only; also waiting / declined accounts, ARU-164) | own | own | own |
+| See others' usernames (access requests of own workspace, `access_requests()`, ARU-164) |  |  | ✓ |
 | Become / stop being teacher (other than by creating a workspace at sign-up) |          |                    | (nobody) |
 | Delete own account (ARU-75; password again; also waiting / declined accounts) | ✓ | ✓ (not while owning a course) | (never) |
 | Delete someone else's account |         |                    | (nobody) |

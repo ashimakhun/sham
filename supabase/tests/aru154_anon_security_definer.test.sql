@@ -39,7 +39,8 @@ reset role;
 -- EXECUTE grants.
 set session authorization supabase_auth_admin;
 insert into auth.users (id, email, raw_user_meta_data)
-  values ('00000000-0000-0000-0000-00000000f154', 'new154@x.test', '{"full_name": "New 154", "workspace_name": "WS 154"}');
+  values ('00000000-0000-0000-0000-00000000f154', 'new154@users.sham.invalid',
+    '{"username": "new154", "full_name": "New 154", "workspace_name": "WS 154"}'); -- ARU-164: username + internal address
 reset session authorization;
 select t.ok(exists (select 1 from profiles where id = '00000000-0000-0000-0000-00000000f154'),
   'sign-up still creates the profile (handle_new_user trigger)');

@@ -1,4 +1,4 @@
-import { Redirect, router } from 'expo-router';
+import { Redirect } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 
@@ -8,9 +8,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, ErrorText, Field, Segmented, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import { PASSWORD_MIN, WORKSPACE_NAME_MAX } from '@/lib/password';
+import { NAME_MAX } from '@/lib/profileName';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import { useAction } from '@/lib/useAction';
+import { isValidUsername, USERNAME_MAX } from '@/lib/username';
 
 type Mode = 'signIn' | 'signUp';
 /** ARU-146: nothing is chosen until the user picks one. */
@@ -20,7 +22,8 @@ export default function SignInScreen() {
   const { ready, session, currentUser, dataLoaded, refresh, signIn, signUp, signOut, accountNotice } = useStore();
   const [mode, setMode] = useState<Mode>('signIn');
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  // ARU-164: the username (or, when signing in, an older account's email: AC 8).
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [choice, setChoice] = useState<Choice>('');
   const [workspaceName, setWorkspaceName] = useState('');
@@ -53,13 +56,17 @@ export default function SignInScreen() {
   // ARU-146 AC 1: Create account also needs a workspace choice whose field has something other than spaces.
   const choiceReady =
     (choice === 'create' && workspaceName.trim() !== '') || (choice === 'join' && inviteCode.trim() !== '');
-  const canSubmit = email.trim() && password.length >= PASSWORD_MIN && (mode === 'signIn' || (name.trim() && choiceReady));
+  // ARU-164 AC 2: the sign-up rules apply to Create account only; signing in takes any non-empty text (note 5).
+  const usernameBroken = mode === 'signUp' && username.trim() !== '' && !isValidUsername(username);
+  const usernameReady = mode === 'signIn' ? username.trim() !== '' : isValidUsername(username);
+  const canSubmit =
+    usernameReady && password.length >= PASSWORD_MIN && (mode === 'signIn' || (name.trim() && name.trim().length <= NAME_MAX && choiceReady));
 
   function submit() {
-    if (mode === 'signIn') return signIn(email, password);
+    if (mode === 'signIn') return signIn(username, password);
     return signUp(
       name,
-      email,
+      username,
       password,
       choice === 'create' ? { kind: 'create', name: workspaceName } : { kind: 'join', code: inviteCode },
     );
@@ -99,23 +106,46 @@ export default function SignInScreen() {
           />
 
           {mode === 'signUp' && (
-            <Field
-              label={t('signIn.fullName')}
-              placeholder={t('signIn.fullNamePlaceholder')}
-              value={name}
-              onChangeText={setName}
-              autoComplete="name"
-            />
+            // ARU-164 AC 1: a display name, not a real name.
+            <View style={{ gap: 4 }}>
+              <Field
+                label={t('signIn.displayName')}
+                placeholder={t('signIn.displayNamePlaceholder')}
+                value={name}
+                onChangeText={setName}
+                autoComplete="nickname"
+                maxLength={NAME_MAX}
+                accessibilityHint={t('signIn.displayNameHint')}
+              />
+              <Text style={styles.muted}>{t('signIn.displayNameHint')}</Text>
+            </View>
           )}
-          <Field
-            label={t('signIn.email')}
-            placeholder={t('signIn.emailPlaceholder')}
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            autoComplete="email"
-            keyboardType="email-address"
-          />
+          {/* ARU-164 AC 6: the username, with no autocapitalisation or autocorrect, autofilled as a username. */}
+          <View style={{ gap: 4 }}>
+            <Field
+              label={t('signIn.username')}
+              placeholder={t('signIn.usernamePlaceholder')}
+              value={username}
+              onChangeText={setUsername}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="username"
+              textContentType="username"
+              maxLength={mode === 'signUp' ? USERNAME_MAX : undefined}
+              testID="username-field"
+            />
+            {usernameBroken ? (
+              <Text style={{ color: colors.danger, fontSize: 14 }} testID="username-rule" accessibilityLiveRegion="polite">
+                {t('signIn.usernameRule')}
+              </Text>
+            ) : null}
+            {mode === 'signIn' ? (
+              // ARU-164 AC 8: older accounts still sign in with their email until ARU-168.
+              <Text style={styles.muted} testID="legacy-email-hint">
+                {t('signIn.legacyEmailHint')}
+              </Text>
+            ) : null}
+          </View>
           <Field
             label={t('signIn.password')}
             placeholder={t('password.placeholder', { min: PASSWORD_MIN })}
@@ -158,15 +188,8 @@ export default function SignInScreen() {
               )}
             </View>
           )}
-          {mode === 'signIn' && (
-            // ARU-77: reset a forgotten password with a code sent by email.
-            <Text
-              accessibilityRole="link"
-              style={[styles.caps, { color: colors.primary, fontSize: 14, alignSelf: 'flex-start', paddingVertical: 4 }]}
-              onPress={() => router.push({ pathname: '/reset-password', params: { email: email.trim() } })}>
-              {t('signIn.forgotPassword')}
-            </Text>
-          )}
+          {/* ARU-164 AC 9: no "Forgot password?" here: the email reset doesn't work for username accounts. ARU-165 brings
+              recovery back without email; /reset-password stays reachable by link until then. */}
 
           <ErrorText error={tm(error)} />
           <Button

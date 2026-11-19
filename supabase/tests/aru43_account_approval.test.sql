@@ -47,8 +47,9 @@ select t.login('M');
 select t.throws($$select set_access_status(t.u('P'), 'approved')$$, '42501', 'AC7 a mentor cannot accept');
 select t.throws($$select * from access_requests()$$, '42501', 'AC7 a mentor cannot list requests');
 select t.login('T');
-select t.eq((select string_agg(full_name || ' <' || email || '> ' || access_status, ', ') from access_requests()),
-  'Pending Pat <p@x.test> pending, Rejected Rae <r@x.test> pending', 'AC5 the teacher lists requests oldest first with email');
+-- ARU-164 AC 11: the second line is the username (none for these accounts, made without one), never the email.
+select t.eq((select string_agg(full_name || ' <' || coalesce(username, '') || '> ' || access_status, ', ') from access_requests()),
+  'Pending Pat <> pending, Rejected Rae <> pending', 'AC5 the teacher lists requests oldest first (ARU-164: username, no email)');
 select t.ok(exists (select 1 from profiles where id = t.u('P')), 'the teacher sees pending profiles');
 select t.throws($$select set_access_status(t.id('T'), 'rejected')$$, '42501', 'AC7 the teacher''s own status cannot change');
 select t.throws($$select set_access_status(t.u('P'), 'pending')$$, '22023', 'only accept or decline');

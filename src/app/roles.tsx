@@ -190,9 +190,12 @@ export default function RolesScreen() {
                 <Text style={styles.body} numberOfLines={2}>
                   {r.name}
                 </Text>
-                <Text style={styles.muted} numberOfLines={1}>
-                  {r.email}
-                </Text>
+                {/* ARU-164 AC 11: the username, never an email; no line for an older account without one. */}
+                {r.username ? (
+                  <Text style={styles.muted} numberOfLines={1}>
+                    {`@${r.username}`}
+                  </Text>
+                ) : null}
                 <Text style={styles.muted}>{t('roles.signedUp', { date: formatDate(r.createdAt) })}</Text>
                 {r.status === 'rejected' && (
                   <View style={[styles.badge, { backgroundColor: DANGER_SOFT, alignSelf: 'flex-start' }]}>

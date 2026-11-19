@@ -16,9 +16,10 @@ jest.mock('expo-router', () => ({
 jest.mock('@/lib/store', () => require('./helpers/mocks').store);
 
 const button = (name: string) => screen.getByRole('button', { name });
+// ARU-164: the second field is the username (it was the email).
 const fill = async (name: string, email: string, password: string) => {
-  await fireEvent.changeText(screen.getByPlaceholderText('Dana Serikova'), name);
-  await fireEvent.changeText(screen.getByPlaceholderText('you@example.com'), email);
+  await fireEvent.changeText(screen.getByPlaceholderText('Dana S.'), name);
+  await fireEvent.changeText(screen.getByPlaceholderText('dana_s'), email);
   await fireEvent.changeText(screen.getByPlaceholderText('At least 6 characters'), password);
 };
 /** ARU-146: Create account also needs a workspace choice; this picks "Create a workspace" with a name. */
@@ -41,15 +42,15 @@ describe('Create account mode', () => {
     await render(<SignInScreen />);
     await fireEvent.press(screen.getByText('Create account'));
     await chooseWorkspace();
-    await fill('', 'dana@example.com', 'secret1');
+    await fill('', 'dana_s', 'secret1');
     expect(button('Create account')).toBeDisabled();
-    await fill('   ', 'dana@example.com', 'secret1');
+    await fill('   ', 'dana_s', 'secret1');
     expect(button('Create account')).toBeDisabled();
     await fill('Dana', '', 'secret1');
     expect(button('Create account')).toBeDisabled();
-    await fill('Dana', 'dana@example.com', '12345');
+    await fill('Dana', 'dana_s', '12345');
     expect(button('Create account')).toBeDisabled();
-    await fill('Dana', 'dana@example.com', '123456');
+    await fill('Dana', 'dana_s', '123456');
     expect(button('Create account')).toBeEnabled();
   });
 
@@ -59,7 +60,7 @@ describe('Create account mode', () => {
     setStore(fakeStore(null, { signUp }));
     await render(<SignInScreen />);
     await fireEvent.press(screen.getByText('Create account'));
-    await fill('Dana', 'dana@example.com', 'secret1');
+    await fill('Dana', 'dana_s', 'secret1');
     await chooseWorkspace();
     // Not awaited: the sign-up promise stays pending until finish() is called.
     void fireEvent.press(button('Create account'));
@@ -73,7 +74,7 @@ describe('Create account mode', () => {
     setStore(fakeStore(null, { signUp }));
     const { container } = await render(<SignInScreen />);
     await fireEvent.press(screen.getByText('Create account'));
-    await fill('Dana', 'used@example.com', 'secret1');
+    await fill('Dana', 'used_name', 'secret1');
     await chooseWorkspace();
     await fireEvent.press(button('Create account'));
     expect(await screen.findByText('User already registered')).toBeTruthy();
@@ -103,8 +104,10 @@ describe('Create account mode', () => {
       'Homework, checks and lessons in one place.',
       'Sign in',
       'Create account',
-      'Full name',
-      'Email',
+      // ARU-164: Display name (with its hint) and Username replace Full name and Email.
+      'Display name',
+      "Doesn't have to be your real name",
+      'Username',
       'Password',
       // ARU-146: the workspace choice, nothing chosen yet.
       'Create a workspace',
@@ -119,9 +122,9 @@ describe('Sign in mode (AC 3, regression)', () => {
     const signIn = jest.fn(async () => {});
     setStore(fakeStore(null, { signIn }));
     const { container } = await render(<SignInScreen />);
-    expect(screen.queryByText('Full name')).toBeNull();
+    expect(screen.queryByText('Display name')).toBeNull();
     expect(lastFormChild(container)).toBe(screen.getByRole('button', { name: 'Sign in' }));
-    await fireEvent.changeText(screen.getByPlaceholderText('you@example.com'), 'dana@example.com');
+    await fireEvent.changeText(screen.getByPlaceholderText('dana_s'), 'dana@example.com');
     await fireEvent.changeText(screen.getByPlaceholderText('At least 6 characters'), 'secret1');
     await fireEvent.press(button('Sign in'));
     await waitFor(() => expect(signIn).toHaveBeenCalledWith('dana@example.com', 'secret1'));

@@ -40,18 +40,16 @@ async function fillCode(code: string, password: string, confirm = password) {
   await fireEvent.changeText(screen.getByTestId('confirm-password'), confirm);
 }
 
-describe('AC1: Forgot password? on the sign-in screen', () => {
-  it('shows in Sign in mode only and opens Reset password with the typed email', async () => {
+// ARU-164 AC 9: the link is no longer on the sign-in screen (the email reset doesn't work for username accounts);
+// the Reset password screen below stays reachable by link until ARU-165.
+describe('AC1: Forgot password? on the sign-in screen (hidden since ARU-164)', () => {
+  it('is not shown in either mode', async () => {
     setStore(fakeStore(null));
     await render(<SignInScreen />);
-    await fireEvent.changeText(screen.getByPlaceholderText('you@example.com'), ' dana@example.com ');
-    const link = screen.getByRole('link', { name: 'Forgot password?' });
-    await fireEvent.press(link);
-    expect(router.push).toHaveBeenCalledWith({ pathname: '/reset-password', params: { email: 'dana@example.com' } });
+    expect(screen.queryByText('Forgot password?')).toBeNull();
     await fireEvent.press(screen.getByRole('tab', { name: 'Create account' }));
     expect(screen.queryByText('Forgot password?')).toBeNull();
-    await fireEvent.press(screen.getByRole('tab', { name: 'Sign in' }));
-    expect(screen.getByText('Forgot password?')).toBeTruthy();
+    expect(router.push).not.toHaveBeenCalled();
   });
 });
 

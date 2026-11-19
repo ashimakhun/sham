@@ -75,7 +75,8 @@ export type PaymentDue = {
 export type AccessRequest = {
   id: string;
   name: string;
-  email: string;
+  /** ARU-164: the account's username, or '' for an older account without one. Never an email. */
+  username: string;
   createdAt: string;
   status: Exclude<AccessStatus, 'approved'>;
 };
