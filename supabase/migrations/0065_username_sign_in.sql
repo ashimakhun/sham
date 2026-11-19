@@ -11,11 +11,16 @@
 --        * a username that breaks the rules: sham:username_invalid;
 --        * an Auth address other than <username>@users.sham.invalid: sham:signup_email_mismatch (analysis note 1),
 --          so a direct API call can't store a real email or a username that doesn't match its address;
---        * a display name blank or over 80 characters: sham:display_name_invalid;
+--        * a display name blank (Unicode spaces included, ARU-174) or over 80 characters: sham:display_name_invalid;
 --        * a username already taken: sham:username_taken (Auth's unique address normally answers first).
 --      The display name no longer falls back to the email. Only an admin (SQL Editor: session user postgres or
 --      supabase_admin) may still add an auth user without a username, as in 0060.
 --   3. access_requests() returns `username` instead of `email` (same rules as 0059), so no function returns an email.
+--   4. ARU-175 (AC 14): the Auth address can't change after sign-up except to the account's own internal address
+--      (<username>@users.sham.invalid, any letter case). With Confirm email off, auth.updateUser({ email }) applies at
+--      once, so without this a username account could store a real email or take another username's address, and an
+--      older account (no usernames row) could squat a free username. Only an admin (session user postgres or
+--      supabase_admin) may change any address. ARU-168 must insert the usernames row before it sets the address.
 -- The internal domain is also in src/lib/username.ts (USERNAME_DOMAIN): keep both in step.
 -- Supabase: Authentication → Email → Confirm email must be OFF (README → Setup) before this is applied.
 -- Deletes no data. Existing accounts get no usernames row.
@@ -49,7 +54,9 @@ create or replace function handle_new_user() returns trigger
     ws_name text := meta ->> 'workspace_name';
     invite text := meta ->> 'invite_code';
     uname text := lower(regexp_replace(coalesce(meta ->> 'username', ''), '^\s+|\s+$', '', 'g'));
-    display text := regexp_replace(coalesce(meta ->> 'full_name', ''), '^\s+|\s+$', '', 'g');
+    -- ARU-174: trim_spaces() (0031, as Edit name since ARU-56) also strips no-break and other Unicode spaces, which
+    -- \s doesn't match under the database's character class, so a name of only those spaces counts as blank.
+    display text := trim_spaces(coalesce(meta ->> 'full_name', ''));
     is_admin boolean := session_user in ('postgres', 'supabase_admin');
     ws uuid;
     creates boolean := false;
@@ -132,3 +139,26 @@ create function access_requests()
   end $$;
 revoke execute on function access_requests() from public, anon;
 grant execute on function access_requests() to authenticated;
+
+-- 4. ARU-175 / AC 14: the address stays tied to the username. Checks the result, not the caller, so it holds for
+-- the Auth API, an Edge Function or SQL alike. Updates that don't change the address (password, sign-in times,
+-- metadata) never reach it.
+create function auth_email_change_guard() returns trigger
+  language plpgsql security definer set search_path = public
+  as $$
+  declare
+    uname text;
+  begin
+    if session_user in ('postgres', 'supabase_admin') then
+      return new;
+    end if;
+    select u.username into uname from usernames u where u.user_id = new.id;
+    if uname is null or lower(coalesce(new.email, '')) <> uname || '@users.sham.invalid' then
+      raise exception 'This account''s sign-in address can''t be changed.'
+        using errcode = '42501', hint = 'sham:address_change_refused';
+    end if;
+    return new;
+  end $$;
+revoke execute on function auth_email_change_guard() from public, anon, authenticated;
+create trigger auth_email_change_guard before update of email on auth.users
+  for each row when (old.email is distinct from new.email) execute function auth_email_change_guard();

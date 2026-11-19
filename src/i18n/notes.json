@@ -868,5 +868,6 @@
   "db.username_invalid": "Database error · a sign-up with a username that breaks the rules, from outside the app (ARU-164)",
   "db.signup_email_mismatch": "Database error · a sign-up whose Auth address isn't the username's internal address (ARU-164)",
   "db.display_name_invalid": "Database error · a sign-up with a blank or too long display name, from outside the app (ARU-164)",
-  "db.username_taken": "Database error · a sign-up with a username already used (ARU-164)"
+  "db.username_taken": "Database error · a sign-up with a username already used (ARU-164)",
+  "db.address_change_refused": "Database error · a change of the account's Auth address from outside the app (ARU-175)"
 }
