@@ -155,6 +155,11 @@ export function fakeStore(who: keyof typeof users | null, over: Partial<Store> =
     dismissReport: jest.fn(async () => {}),
     deleteReportedContent: jest.fn(async () => {}),
     deleteChatMessage: jest.fn(async () => {}),
+    // ARU-162: nobody blocked by default.
+    blockedUserIds: over.blockedUserIds ?? [],
+    isBlocked: (id) => !!id && (over.blockedUserIds ?? []).includes(id),
+    blockUser: jest.fn(async () => {}),
+    unblockUser: jest.fn(async () => {}),
     ...over,
   };
 }

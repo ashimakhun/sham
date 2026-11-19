@@ -67,6 +67,9 @@ export default function ProfileScreen() {
         )}
         {/* ARU-76: own password only; waiting / declined accounts never get here (AccessGate). */}
         <Button title={t('profile.changePassword')} variant="secondary" onPress={() => router.push('/change-password')} />
+        {/* ARU-162 AC 5: everyone's own Blocked people list (after Change password, which
+            stays first in this group, ARU-100). */}
+        <Button title={t('block.profileRow')} variant="secondary" onPress={() => router.push('/blocked')} />
         <ErrorText error={tm(error)} />
         {/* The root screen redirects to sign-in once the session is gone. */}
         <Button title={t('common.signOut')} variant="secondary" disabled={busy} onPress={() => run(signOut)} />

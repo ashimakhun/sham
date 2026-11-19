@@ -13,7 +13,7 @@ import {
 
 import { Text, TextInput } from '@/components/AppText';
 
-import { ActionMenu, type MenuAction, openReport } from '@/components/ContentMenu';
+import { ActionMenu, type MenuAction, openReport, useBlockAction } from '@/components/ContentMenu';
 import { EmptyState, ErrorText, RoleBadge, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import { confirmDestructive } from '@/lib/confirm';
@@ -68,12 +68,16 @@ export function ChatView<M extends ChatMessage>({
   // ARU-158: the message whose menu is open, and the result of deleting one.
   const [menuFor, setMenuFor] = useState<M | null>(null);
   const deletion = useAction();
+  const blockAction = useBlockAction();
 
   function actionsFor(message: M): MenuAction[] {
     const actions: MenuAction[] = [];
     if (canReport(currentUser, message.authorId)) {
       actions.push({ key: 'report', label: t('report.menuReport'), onPress: () => openReport(kind, message.id) });
     }
+    // ARU-162 AC 1: Block <name>, after Report; the chat then hides their messages at once (useChat).
+    const block = blockAction(message.authorId);
+    if (block) actions.push(block);
     if (canDelete) {
       actions.push({
         key: 'delete',

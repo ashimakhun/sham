@@ -252,7 +252,12 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    it; written only through `report_content()` and `resolve_report()`), and `delete_content()`, through which the
    teacher deletes any course or general chat message, Blog post or review and a course's owner any message in its
    chat (no new delete policies: direct deletes keep their earlier rules); changes no data; see
-   [Handling reports](#handling-reports-aru-158)).
+   [Handling reports](#handling-reports-aru-158)),
+   `0065_user_blocks.sql` (ARU-162: blocking a person. Adds `user_blocks` (own rows only: each user reads, adds and
+   removes their own blocks; approved accounts, never oneself, only people of their workspace; removed with either
+   account), leaves blocked authors out of the blocker's new-message counts (`chat_unread_counts()`,
+   `general_chat_unread_count()`) and Telegram recipients (`chat_message_recipients()`, `general_message_recipients()`,
+   `new_material_recipients()`, `meeting_notes_recipients()`); changes no data; not in the realtime publication).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
@@ -847,6 +852,7 @@ teacher" is that workspace's teacher, and nobody can see or change anything in a
 | Delete any general chat message (ARU-158) | | | ✓ |
 | Report a chat message, notes, a Blog post, a PDF or a review they can see, not their own (ARU-158) | ✓ | ✓ | ✓ |
 | See reports (Profile → Reports), delete reported content, dismiss reports (ARU-158; not about their own content: operator only) | | | ✓ |
+| Block / unblock a person, see own Blocked people (ARU-162; hides their chat messages, notes, Blog posts and reviews from me; private: nobody else sees blocks) | ✓ | ✓ | ✓ |
 | Delete any Blog post or course review (ARU-158) | | | ✓ |
 | General chat new message count (`general_chat_reads`, own row only) | ✓ | ✓ | ✓ |
 | See course meetings        | courses they're in | ✓ (all courses)  | ✓       |

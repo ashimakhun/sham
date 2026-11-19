@@ -81,8 +81,10 @@ describe('AC 1 / 11: chat message menu (long-press)', () => {
 
   it('screen readers get the actions as accessibility actions', async () => {
     await openChat('T');
+    // ARU-162 adds Block <name> after Report.
     expect(screen.getByTestId('chat-message-m2').props.accessibilityActions).toEqual([
       { name: 'report', label: 'Report' },
+      { name: 'block', label: 'Block Student Sue' },
       { name: 'delete', label: 'Delete' },
     ]);
     // A deleted account's message: Delete only.
@@ -156,10 +158,11 @@ describe('AC 1 / 11: chat message menu (long-press)', () => {
     expect(screen.getByText('Sam here')).toBeTruthy();
   });
 
+  // ARU-162 adds Block after Report.
   it.each([
-    ['T', ['report', 'delete']],
-    ['M', ['report']],
-    ['S2', ['report']],
+    ['T', ['report', 'block', 'delete']],
+    ['M', ['report', 'block']],
+    ['S2', ['report', 'block']],
   ] as const)('general chat: %s gets %j (only the teacher deletes)', async (who, actions) => {
     const general = [msg('g1', 'S1', 'General Sam', 1)];
     setStore(fakeStore(who, { loadGeneralMessages: jest.fn(async () => ({ messages: general, hasMore: false })) }));
