@@ -160,5 +160,14 @@ export function useChat<M extends ChatMessage>(source: ChatSource<M>, enabled: b
     [source, loadLatest],
   );
 
-  return { messages, hasMore, loaded, loadingOlder, error, loadOlder, send, remove };
+  // ARU-162 AC 2: messages of people I've blocked are never shown, including ones arriving live; a block hides the
+  // ones on screen at once. The full list stays underneath, so paging and catching up work as before.
+  const isBlocked = store.isBlocked;
+  const visible = useMemo(() => messages.filter((m) => !isBlocked(m.authorId)), [messages, isBlocked]);
+  // When everything loaded so far is hidden, the list can't be scrolled to load more: load the next older page.
+  useEffect(() => {
+    if (loaded && messages.length > 0 && visible.length === 0 && hasMore && !loadingOlder) loadOlder();
+  }, [loaded, messages.length, visible.length, hasMore, loadingOlder, loadOlder]);
+
+  return { messages: visible, hasMore, loaded, loadingOlder, error, loadOlder, send, remove };
 }

@@ -58,13 +58,14 @@ describe('AC 11: general chat Delete', () => {
   it('the teacher gets Delete on every general message (and Report on others)', async () => {
     await open('T');
     const actions = (id: string) => screen.getByTestId(`chat-message-${id}`).props.accessibilityActions.map((a: { name: string }) => a.name);
-    expect(actions('g2')).toEqual(['report', 'delete']);
-    expect(actions('g1')).toEqual(['report', 'delete']);
+    // ARU-162 adds Block after Report.
+    expect(actions('g2')).toEqual(['report', 'block', 'delete']);
+    expect(actions('g1')).toEqual(['report', 'block', 'delete']);
   });
 
   it('a course owner (mentor M owns Algebra) gets no Delete in the general chat, only Report on others', async () => {
     await open('M');
-    expect(screen.getByTestId('chat-message-g2').props.accessibilityActions.map((a: { name: string }) => a.name)).toEqual(['report']);
+    expect(screen.getByTestId('chat-message-g2').props.accessibilityActions.map((a: { name: string }) => a.name)).toEqual(['report', 'block']);
     expect(screen.getByTestId('chat-message-g1').props.accessibilityActions).toBeUndefined();
   });
 
@@ -124,7 +125,7 @@ describe('AC 12: Russian', () => {
     await render(ru(<GeneralChatScreen />));
     await screen.findByText('Sue in general');
     const labels = screen.getByTestId('chat-message-g2').props.accessibilityActions.map((a: { label: string }) => a.label);
-    expect(labels).toEqual(['Пожаловаться', 'Удалить']);
+    expect(labels).toEqual(['Пожаловаться', 'Заблокировать: Student Sue', 'Удалить']);
     await fireEvent(screen.getByTestId('chat-message-g2'), 'longPress');
     expect(within(screen.getByTestId('action-menu')).getByRole('button', { name: 'Пожаловаться' })).toBeTruthy();
   });

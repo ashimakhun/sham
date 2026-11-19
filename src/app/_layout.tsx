@@ -86,6 +86,8 @@ function AppStack() {
           {/* ARU-158: report a piece of content (modal), and the teacher's Reports list. */}
           <Stack.Screen name="report" options={{ title: t('report.title'), presentation: 'modal' }} />
           <Stack.Screen name="reports" options={{ title: t('reports.title') }} />
+          {/* ARU-162: the people I've blocked. */}
+          <Stack.Screen name="blocked" options={{ title: t('block.profileRow') }} />
           <Stack.Screen name="delete-account" options={{ title: t('common.deleteAccount') }} />
           <Stack.Screen name="accountant/courses" options={{ title: t('accountant.selectTitle') }} />
           <Stack.Screen name="accountant/[id]" options={{ title: t('accountant.paymentsTitle') }} />

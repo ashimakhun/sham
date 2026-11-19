@@ -853,5 +853,13 @@
   "db.report_dismiss_own": "Only the operator can dismiss a report about your own content.",
   "db.report_content_exists": "Delete the content first.",
   "db.content_cant_delete": "You can't delete this content.",
-  "db.text_not_allowed": "This text contains words that aren't allowed. Please change it."
+  "db.text_not_allowed": "This text contains words that aren't allowed. Please change it.",
+  "block.menuBlock": "Block {name}",
+  "block.confirmTitle": "Block {name}?",
+  "block.confirmMessage": "{name} won't be told. You won't see their messages, notes, Blog posts or reviews. You can unblock them in Profile.",
+  "block.confirmButton": "Block",
+  "block.errorTitle": "Couldn't block",
+  "block.profileRow": "Blocked people",
+  "block.none": "You haven't blocked anyone.",
+  "block.unblock": "Unblock"
 }

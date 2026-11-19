@@ -21,11 +21,13 @@ import { useAction } from '@/lib/useAction';
  * Reads the store's courseFeedback, which RLS limits to courses the user can see and which reloads live.
  */
 export function FeedbackSection({ course }: { course: Course }) {
-  const { courseFeedback, meetings, currentUser, courseMembers, getUser, deleteFeedback } = useStore();
+  const { courseFeedback, meetings, currentUser, courseMembers, getUser, deleteFeedback, isBlocked } = useStore();
   const { busy, error, run } = useAction();
   const { t, lang } = useI18n();
 
   const items = feedbackFor(courseFeedback, course.id);
+  // ARU-162 AC 2: review cards of people I've blocked are hidden; the average and the count still use every review.
+  const cards = items.filter((f) => !isBlocked(f.userId));
   // Only current listeners write (owners and the teacher are never listeners; a removed listener's feedback stays
   // but is locked, AC 9).
   const listener = isCourseListener(currentUser, course, courseMembers);
@@ -59,8 +61,8 @@ export function FeedbackSection({ course }: { course: Course }) {
           <ErrorText error={error} />
         </View>
       ) : null}
-      {items.length === 0 && !(listener && !started) ? <Text style={styles.muted}>{t('feedback.none')}</Text> : null}
-      {items.map((f, i) => (
+      {cards.length === 0 && !(listener && !started) ? <Text style={styles.muted}>{t('feedback.none')}</Text> : null}
+      {cards.map((f, i) => (
         <View
           key={f.id}
           testID={`feedback-${f.id}`}

@@ -20,7 +20,7 @@ import { useAction } from '@/lib/useAction';
  */
 export default function DisciplineScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getDiscipline, courses, courseFeedback, getUser, getCourse, currentUser, loading, refresh, setDisciplineHidden } =
+  const { getDiscipline, courses, courseFeedback, getUser, getCourse, currentUser, loading, refresh, setDisciplineHidden, isBlocked } =
     useStore();
   const { busy, error, run } = useAction();
   const { t, lang } = useI18n();
@@ -29,6 +29,8 @@ export default function DisciplineScreen() {
 
   const teacher = canManageDisciplines(currentUser);
   const reviews = disciplineFeedback(discipline.id, courses, courseFeedback);
+  // ARU-162 AC 2: review cards of people I've blocked are hidden; the rating still uses every review.
+  const cards = reviews.filter((f) => !isBlocked(f.userId));
   const assigned = coursesInDiscipline(discipline.id, courses);
 
   return (
@@ -64,8 +66,8 @@ export default function DisciplineScreen() {
 
       <Card style={{ gap: 8 }}>
         <Text style={styles.label}>{t('disciplines.reviews')}</Text>
-        {reviews.length === 0 ? <Text style={styles.muted}>{t('disciplines.noReviews')}</Text> : null}
-        {reviews.map((f, i) => (
+        {cards.length === 0 ? <Text style={styles.muted}>{t('disciplines.noReviews')}</Text> : null}
+        {cards.map((f, i) => (
           <View
             key={f.id}
             testID={`review-${f.id}`}

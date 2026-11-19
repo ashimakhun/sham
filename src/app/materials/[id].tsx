@@ -32,7 +32,12 @@ export default function MaterialDetailScreen() {
       contentInsetAdjustmentBehavior="automatic">
       {/* ARU-158 AC 1: the ⋯ menu (Report) at the header's right, on someone else's post. */}
       <Stack.Screen
-        options={{ headerRight: () => <ReportMenu kind="blog_post" id={item.id} authorId={item.teacherId} /> }}
+        options={{
+          // ARU-162: after blocking the author the post is hidden, so go back to the list.
+          headerRight: () => (
+            <ReportMenu kind="blog_post" id={item.id} authorId={item.teacherId} onBlocked={() => router.back()} />
+          ),
+        }}
       />
       <Card>
         <Text style={styles.h1}>{item.title}</Text>
