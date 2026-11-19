@@ -15,7 +15,7 @@ export type MeetingNotesRecipient = { user_id: string; author_name: string; cour
 export type MeetingNotesDeps = {
   /** Calls meeting_notes_recipients(note) with the service role. Throws on a database error. */
   recipients: (id: string) => Promise<MeetingNotesRecipient[]>;
-  /** sendTelegramMessages() with the service-role client, the bot token and fetch. */
+  /** sendPushMessages() (push.ts, ARU-166) with the service-role client and fetch. */
   send: (messages: TelegramMessage[]) => Promise<SendResult>;
   log?: (line: string) => void;
 };
@@ -24,8 +24,9 @@ export type MeetingNotesDeps = {
 export type MeetingNotesReport = { recipients: number } & SendResult;
 
 /** The English text, exactly as the story sets it (plain text: names and titles as typed; never the notes). */
-export function meetingNotesText(authorName: string, courseTitle: string) {
-  return telegramText('en', 'meetingNotesPublished', { name: authorName, course: courseTitle });
+export function meetingNotesText(_authorName: string, courseTitle: string) {
+  // ARU-166: no person's name; the author's name is not used (the parameter stays for the existing callers).
+  return telegramText('en', 'meetingNotesPublished', { course: courseTitle });
 }
 
 /** One message per recipient row, in every language (each recipient gets theirs, ARU-110). */
@@ -34,7 +35,7 @@ export function meetingNotesMessages(rows: MeetingNotesRecipient[]): TelegramMes
     localizedMessage(
       r.user_id,
       'meeting_notes',
-      telegramTexts('meetingNotesPublished', { name: r.author_name, course: r.course_title }),
+      telegramTexts('meetingNotesPublished', { course: r.course_title }),
     ),
   );
 }

@@ -46,8 +46,8 @@ const rows: MeetingNotesRecipient[] = [
   { user_id: 'M', author_name: 'Aigerim', course_title: 'Algebra' },
   { user_id: 'M2', author_name: 'Aigerim', course_title: 'Algebra' },
 ];
-const EN = 'New notes from Aigerim on a Algebra meeting';
-const RU = 'Новые заметки от Aigerim к встрече курса Algebra';
+const EN = 'New notes on a Algebra meeting';
+const RU = 'Новые заметки к встрече курса Algebra';
 
 describe('AC 10: the secret', () => {
   it.each([
@@ -76,14 +76,14 @@ describe('AC 10: the secret', () => {
 
 describe('AC 1: the message', () => {
   it('the catalog has the story\'s English and Russian texts, with a note', () => {
-    expect(TELEGRAM_TEXTS.meetingNotesPublished.en).toBe('New notes from {name} on a {course} meeting');
-    expect(TELEGRAM_TEXTS.meetingNotesPublished.ru).toBe('Новые заметки от {name} к встрече курса {course}');
+    expect(TELEGRAM_TEXTS.meetingNotesPublished.en).toBe('New notes on a {course} meeting');
+    expect(TELEGRAM_TEXTS.meetingNotesPublished.ru).toBe('Новые заметки к встрече курса {course}');
     expect(TELEGRAM_TEXTS.meetingNotesPublished.note).toMatch(/^Meeting notes · /);
   });
 
   it('names and titles as typed (plain text)', () => {
     expect(meetingNotesText('Aigerim', 'Algebra')).toBe(EN);
-    expect(meetingNotesText('Дана *_', '<b>T</b> & 😀')).toBe('New notes from Дана *_ on a <b>T</b> & 😀 meeting');
+    expect(meetingNotesText('Дана *_', '<b>T</b> & 😀')).toBe('New notes on a <b>T</b> & 😀 meeting');
   });
 
   it('one meeting_notes message per recipient, in one send call', async () => {

@@ -185,12 +185,13 @@ select t.ok(not (select announced from meeting_listener_notes where id = t.note(
 select t.eq(t.calls(), 4::bigint, 'AC3 and queues nothing');
 delete from meeting_listener_notes where id = t.note('S1', 'c2');
 
--- AC 7: the switch off → left out (the lookup is at processing time).
+-- AC 7, changed by ARU-166 (0069): the Telegram switch and link no longer filter recipients; the push sender checks
+-- notification_settings instead (supabase/tests/aru166_push_notifications.test.sql).
 update telegram_links set notify_meeting_notes = false where user_id = t.id('M');
-select t.eq(t.recipients(t.note('S1', 'c1')), 'Student Sam|Algebra: M2,T', 'AC7 switch off: left out');
+select t.eq(t.recipients(t.note('S1', 'c1')), 'Student Sam|Algebra: M,M2,T', 'ARU-166 a Telegram switch off no longer filters');
 update telegram_links set notify_meeting_notes = true where user_id = t.id('M');
 delete from telegram_links where user_id = t.id('M2');
-select t.eq(t.recipients(t.note('S1', 'c1')), 'Student Sam|Algebra: M,T', 'AC7 not linked: left out');
+select t.eq(t.recipients(t.note('S1', 'c1')), 'Student Sam|Algebra: M,M2,T', 'ARU-166 not linked: still a recipient');
 insert into telegram_links (user_id, chat_id) values (t.id('M2'), 5004);
 
 -- Edge: a hidden course is never hidden from its listeners, owner or teacher.

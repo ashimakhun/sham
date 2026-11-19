@@ -1,4 +1,6 @@
-// ARU-110: the Telegram notification texts in English and Russian, with a note per text (which notification, when
+// ARU-110: the notification texts in English and Russian (sent as push since ARU-166; the file keeps its name until
+// ARU-171 removes Telegram). Since ARU-166 no text names a person (AC 10): it says what happened and where.
+// Originally the Telegram notification texts in English and Russian, with a note per text (which notification, when
 // it's sent) for the product owner's spreadsheet. Kept apart from the app catalog (src/i18n), which Edge Functions
 // can't import. telegram-texts.test.ts checks every text has both languages and a note, and the same {placeholders}.
 // A later notification kind adds its texts here (ARU-112's photo-deletion warning did).
@@ -37,30 +39,30 @@ export const TELEGRAM_TEXTS = {
     note: 'New homework · to the listeners when homework is assigned to a completed meeting',
   },
   homeworkSubmitted: {
-    en: 'New homework to check from {name} in {course}: {assignment}',
-    ru: 'Новое домашнее задание на проверку от {name} по курсу {course}: {assignment}',
-    note: 'Homework submitted · to the course owner when a listener sends homework',
+    en: 'New homework to check in {course}: {assignment}',
+    ru: 'Новое домашнее задание на проверку по курсу {course}: {assignment}',
+    note: 'Homework submitted · to the course owner when a listener sends homework (push; names no person, ARU-166)',
   },
   newAccount: {
-    en: 'New account waiting for your approval: {name}. Open Sham → Manage roles to accept or decline.',
-    ru: 'Новый аккаунт ждёт вашего подтверждения: {name}. Откройте Sham → Управление ролями, чтобы принять или отклонить.',
-    note: 'New accounts · to the teacher when someone signs up',
+    en: 'New account waiting for your approval. Open Sham → Manage roles to accept or decline.',
+    ru: 'Новый аккаунт ждёт вашего подтверждения. Откройте Sham → Управление ролями, чтобы принять или отклонить.',
+    note: 'New accounts · to the teacher when someone signs up (push; names no person, ARU-166)',
   },
   newBlogPost: {
-    en: 'New blog post from {name}: {title}',
-    ru: 'Новая запись в блоге от {name}: {title}',
-    note: 'New materials · to everyone who may read it when a blog post is published',
+    en: 'New blog post: {title}',
+    ru: 'Новая запись в блоге: {title}',
+    note: 'New materials · to everyone who may read it when a blog post is published (push; names no person, ARU-166)',
   },
   newKnowledgeFile: {
-    en: 'New file in the knowledge base from {name}: {title}',
-    ru: 'Новый файл в базе знаний от {name}: {title}',
-    note: 'New materials · to everyone who may read it when a PDF is added to the knowledge base',
+    en: 'New file in the knowledge base: {title}',
+    ru: 'Новый файл в базе знаний: {title}',
+    note: 'New materials · to everyone who may read it when a PDF is added to the knowledge base (push; names no person, ARU-166)',
   },
   // ARU-151: when someone publishes notes on a course meeting (once per note).
   meetingNotesPublished: {
-    en: 'New notes from {name} on a {course} meeting',
-    ru: 'Новые заметки от {name} к встрече курса {course}',
-    note: 'Meeting notes · to the course (listeners, owner, teacher; not the author) when someone publishes notes on a meeting',
+    en: 'New notes on a {course} meeting',
+    ru: 'Новые заметки к встрече курса {course}',
+    note: 'Meeting notes · to the course (listeners, owner, teacher; not the author) when someone publishes notes on a meeting (push; names no person, ARU-166)',
   },
   // ARU-112 / ARU-133: the photo-deletion warning, in three plural forms (Russian one / few / many; English uses
   // "photo" for 1 and "photos" otherwise). photo-deletion.ts picks the form and fills {count} and {date}.

@@ -45,8 +45,8 @@ const rows = (title: string): NewMaterialRecipient[] => [
   { user_id: 'S1', author_name: 'Aigerim', item_title: title },
   { user_id: 'M2', author_name: 'Aigerim', item_title: title },
 ];
-const BLOG = 'New blog post from Aigerim: Exam tips';
-const FILE = 'New file in the knowledge base from Aigerim: Formulas.pdf';
+const BLOG = 'New blog post: Exam tips';
+const FILE = 'New file in the knowledge base: Formulas.pdf';
 
 describe('AC9: the secret', () => {
   it.each([
@@ -77,7 +77,7 @@ describe('AC1 / AC2: the messages', () => {
   it('texts are exactly as the story sets them, names and titles as typed', () => {
     expect(newMaterialText('blog', 'Aigerim', 'Exam tips')).toBe(BLOG);
     expect(newMaterialText('file', 'Aigerim', 'Formulas.pdf')).toBe(FILE);
-    expect(newMaterialText('blog', 'Дана *_', '<b>T</b> & 😀')).toBe('New blog post from Дана *_: <b>T</b> & 😀');
+    expect(newMaterialText('blog', 'Дана *_', '<b>T</b> & 😀')).toBe('New blog post: <b>T</b> & 😀');
   });
 
   it('a Blog post: one new_material message per recipient, in one send call', async () => {

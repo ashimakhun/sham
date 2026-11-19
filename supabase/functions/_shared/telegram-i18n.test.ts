@@ -65,26 +65,26 @@ describe('AC 3: every kind, English as today and Russian', () => {
     [
       'homework submitted',
       homeworkSubmittedMessages([{ user_id: 'M', sender_name: 'Sam', course_title: 'Algebra', assignment_title: 'Fractions' }] as never),
-      'New homework to check from Sam in Algebra: Fractions',
-      'Новое домашнее задание на проверку от Sam по курсу Algebra: Fractions',
+      'New homework to check in Algebra: Fractions',
+      'Новое домашнее задание на проверку по курсу Algebra: Fractions',
     ],
     [
       'new account',
       newAccountMessages([{ user_id: 'T', account_name: 'Анна' }] as never),
-      'New account waiting for your approval: Анна. Open Sham → Manage roles to accept or decline.',
-      'Новый аккаунт ждёт вашего подтверждения: Анна. Откройте Sham → Управление ролями, чтобы принять или отклонить.',
+      'New account waiting for your approval. Open Sham → Manage roles to accept or decline.',
+      'Новый аккаунт ждёт вашего подтверждения. Откройте Sham → Управление ролями, чтобы принять или отклонить.',
     ],
     [
       'new blog post',
       newMaterialMessages('blog', [{ user_id: 'S1', author_name: 'Tess', item_title: 'Tips' }] as never),
-      'New blog post from Tess: Tips',
-      'Новая запись в блоге от Tess: Tips',
+      'New blog post: Tips',
+      'Новая запись в блоге: Tips',
     ],
     [
       'new knowledge base file',
       newMaterialMessages('file', [{ user_id: 'S1', author_name: 'Tess', item_title: 'Guide' }] as never),
-      'New file in the knowledge base from Tess: Guide',
-      'Новый файл в базе знаний от Tess: Guide',
+      'New file in the knowledge base: Guide',
+      'Новый файл в базе знаний: Guide',
     ],
   ])('%s', (_kind, messages, english, russian) => {
     expect(messages.map((m) => m.text)).toEqual([english]);

@@ -29,7 +29,7 @@ export type PhotoDeletionDeps = {
   markRemoved: (photos: DuePhoto[]) => Promise<number>;
   /** claim_photo_deletion_warnings(). */
   claimWarnings: () => Promise<PhotoWarning[]>;
-  /** sendTelegramMessages() with the service-role client, the bot token and fetch. */
+  /** sendPushMessages() (push.ts, ARU-166) with the service-role client and fetch. */
   send: (messages: TelegramMessage[]) => Promise<SendResult>;
   log?: (line: string) => void;
 };

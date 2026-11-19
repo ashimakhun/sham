@@ -91,7 +91,9 @@ select t.eq(t.who('file', t.mid('f1')), 'M2,N,S1,T', 'AC3 the course''s current 
 -- Switches: other switches off still get it; New materials off doesn't.
 update telegram_links set notify_chat_message = false, notify_general_chat = false where user_id = t.id('S2');
 update telegram_links set notify_new_material = false where user_id = t.id('N');
-select t.eq(t.who('blog', t.mid('p1')), 'M2,S1,S2,T', 'AC5 only New materials matters: S2 in, N (switched off) out');
+-- ARU-166 (0069): Telegram links and switches no longer filter recipients (the push sender checks
+-- notification_settings), so N (Telegram switch off) and the unlinked S3 are in.
+select t.eq(t.who('blog', t.mid('p1')), 'M2,N,S1,S2,S3,T', 'ARU-166 recipients no longer depend on Telegram links or switches');
 
 -- set_telegram_notification for a user without a link: no error, nothing created.
 select t.login('S3');

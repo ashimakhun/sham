@@ -48,7 +48,8 @@ it.each(roles)('AC 1 / AC 5: %s sees the chat button right after the name card, 
   const all = screen.getAllByRole('button');
   // The name card's only button is "Edit name"; the chat button comes straight after it.
   expect(all.indexOf(chat())).toBe(all.indexOf(screen.getByRole('button', { name: 'Edit name' })) + 1);
-  const markers = ['Open general chat', 'Telegram notifications', ...(billing ? ['ACCOUNTANT'] : []), 'Change password'];
+  // ARU-166 AC 7: "Notifications" took the Telegram button's place.
+  const markers = ['Open general chat', 'Notifications', ...(billing ? ['ACCOUNTANT'] : []), 'Change password'];
   const pos = positions(view, markers);
   expect(pos.every((p) => p >= 0)).toBe(true);
   expect(pos).toEqual([...pos].sort((a, b) => a - b));
@@ -92,14 +93,15 @@ it('AC 4: tapping it opens the general chat', async () => {
   expect(router.push).toHaveBeenCalledWith('/general-chat');
 });
 
-it('edge: Telegram not configured — the chat button sits directly above the bottom group (student)', async () => {
+it('edge: Telegram not configured — only Notifications sits between the chat button and the bottom group (student)', async () => {
   delete process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME;
   setStore(fakeStore('S1'));
   await renderProfile();
-  // ARU-101: Telegram is a button now.
+  // ARU-166 AC 7: no Telegram button; "Notifications" is shown with or without a bot.
   expect(screen.queryByRole('button', { name: 'Telegram notifications' })).toBeNull();
   const all = screen.getAllByRole('button');
-  expect(all.indexOf(screen.getByRole('button', { name: 'Change password' }))).toBe(all.indexOf(chat()) + 1);
+  expect(all.indexOf(screen.getByRole('button', { name: 'Notifications' }))).toBe(all.indexOf(chat()) + 1);
+  expect(all.indexOf(screen.getByRole('button', { name: 'Change password' }))).toBe(all.indexOf(chat()) + 2);
 });
 
 it('AC 6: the button is a direct section of the scroll content (no extra wrapper margin)', async () => {

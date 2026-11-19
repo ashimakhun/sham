@@ -107,11 +107,13 @@ select t.ok(exists (select 1 from materials where id = t.mid('b1')), 'AC8 the po
 select t.eq(t.calls(), 0::bigint, 'AC8 no secrets: no call');
 
 -- AC 1 / AC 4 / AC 10: a Blog post goes to every Approved, linked account but the author.
-select t.eq(t.recipients('blog', t.mid('b1')), 'Mentor Max|Exam tips: M2,N,S1,S2,T',
-  'AC1/AC4 blog post: everyone Approved and linked but the author; not P, R or unlinked S3');
+-- ARU-166 (0069): a Telegram link is no longer needed, so the unlinked S3 is a recipient too.
+select t.eq(t.recipients('blog', t.mid('b1')), 'Mentor Max|Exam tips: M2,N,S1,S2,S3,T',
+  'AC1/AC4 blog post: everyone Approved but the author, linked or not (ARU-166); not P or R');
 -- AC 5: a switch off -> left out; back on -> back in.
 update telegram_links set notify_new_material = false where user_id = t.id('S2');
-select t.eq(t.recipients('blog', t.mid('b1')), 'Mentor Max|Exam tips: M2,N,S1,T', 'AC5 switch off: left out');
+-- ARU-166: the Telegram switch no longer filters here; the push sender checks notification_settings.
+select t.eq(t.recipients('blog', t.mid('b1')), 'Mentor Max|Exam tips: M2,N,S1,S2,S3,T', 'ARU-166 a Telegram switch no longer filters');
 update telegram_links set notify_new_material = true where user_id = t.id('S2');
 select t.eq(t.recipients('blog', t.mid('nope')), '', 'AC10 unknown id: nothing');
 select t.eq(t.recipients('file', t.mid('b1')), '', 'AC10 a blog id asked as a file: nothing');
@@ -124,7 +126,7 @@ select t.login('T');
 select t.lives(t.blog('T', 'b2', 'Week plan'), 'T shares a post with only the URL');
 reset role;
 select t.eq(t.calls(), 0::bigint, 'a missing secret: no call');
-select t.eq(t.recipients('blog', t.mid('b2')), 'Teacher Tess|Week plan: M,M2,N,S1,S2', 'AC4 the teacher as author is left out');
+select t.eq(t.recipients('blog', t.mid('b2')), 'Teacher Tess|Week plan: M,M2,N,S1,S2,S3', 'AC4 the teacher as author is left out');
 
 -- AC 9: one call per insert, with the body, the header and a timeout.
 insert into vault.decrypted_secrets values ('new_material_notify_secret', 's3cret');
@@ -148,8 +150,8 @@ reset role;
 select t.eq(t.calls(), 3::bigint, 'AC9 one call per PDF');
 select t.eq((select body from net.requests order by id desc limit 1),
   jsonb_build_object('type', 'file', 'id', t.mid('f2')), 'body is {"type": "file", "id": "<id>"}');
-select t.eq(t.recipients('file', t.mid('f1')), 'Mentor Max|Formulas.pdf: M2,N,S1,S2,T', 'AC2 no-course PDF: everyone');
-select t.eq(t.recipients('file', t.mid('f2')), 'Mentor Max|Syllabus.pdf: M2,N,S1,S2,T', 'AC2 Everyone PDF on A: everyone');
+select t.eq(t.recipients('file', t.mid('f1')), 'Mentor Max|Formulas.pdf: M2,N,S1,S2,S3,T', 'AC2 no-course PDF: everyone');
+select t.eq(t.recipients('file', t.mid('f2')), 'Mentor Max|Syllabus.pdf: M2,N,S1,S2,S3,T', 'AC2 Everyone PDF on A: everyone');
 select t.eq(t.recipients('blog', t.mid('f1')), '', 'a file id asked as a blog post: nothing');
 
 -- AC 3: a course-only PDF on A by N (not in A) -> teacher, A's owner M and listeners S1, M2; not S2 or the author.
@@ -171,7 +173,7 @@ update courses set created_by = t.id('M') where id = t.id('A');
 -- The course is deleted -> "on delete set null" leaves course_only on with no course: visible to everyone, and so are
 -- its messages. (Course A has homework, which can't be deleted here, so set the column as the delete would.)
 update material_files set course_id = null where id = t.mid('f3');
-select t.eq(t.recipients('file', t.mid('f3')), 'Mentor Nina|Answers.pdf: M,M2,S1,S2,T',
+select t.eq(t.recipients('file', t.mid('f3')), 'Mentor Nina|Answers.pdf: M,M2,S1,S2,S3,T',
   'AC3 course-only PDF whose course is gone: everyone but the author');
 
 -- AC 6: edits (name, description, course, course-only) and deletes -> no call.
@@ -202,7 +204,7 @@ select t.eq(t.recipients('file', t.mid('f2')), '', 'AC7 deleted PDF: nothing');
 
 -- Edge: the author renamed before processing -> the current name; titles are returned as typed.
 update profiles set full_name = 'Max *Bold* <b>' where id = t.id('M');
-select t.eq(t.recipients('blog', t.mid('b1')), 'Max *Bold* <b>|Exam tips: M2,N,S1,S2,T', 'current author name, as typed');
+select t.eq(t.recipients('blog', t.mid('b1')), 'Max *Bold* <b>|Exam tips: M2,N,S1,S2,S3,T', 'current author name, as typed');
 
 -- AC 8: net.http_post raising -> the insert still succeeds.
 create or replace function net.http_post(

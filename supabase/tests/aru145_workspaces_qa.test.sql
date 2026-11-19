@@ -87,6 +87,9 @@ insert into photo_deletion_warnings (homework_id, mark, user_id, deletion_date) 
 -- ARU-158 (0064): a W2 report (the guard takes the workspace from the reporter).
 insert into content_reports (reporter_id, content_kind, content_id, author_id, content_text, course_id, reason)
   values (t.x('XM'), 'course_message', t.x('XCM'), t.x('XS'), 'X chat', t.x('XC'), 'spam');
+-- ARU-166 (0069): a W2 phone and W2 switches (the guard takes the workspace from the user).
+insert into push_devices (user_id, device_id, token, platform) values (t.x('XS'), 'x-dev', 'ExponentPushToken[x166]', 'ios');
+insert into notification_settings (user_id, notify_chat_message) values (t.x('XS'), false);
 insert into storage.objects (bucket_id, name, owner) values
   ('homework', t.x('XS') || '/xh.jpg', t.x('XS')),
   ('materials', t.x('XT') || '/' || t.x('XF') || '.pdf', t.x('XT')),
@@ -96,8 +99,8 @@ insert into material_files (id, author_id, name, storage_path, size_bytes, cours
   values (t.x('AF'), t.id('M'), 'A pdf', t.id('M') || '/' || t.x('AF') || '.pdf', 100, t.id('A'), true);
 
 -- Every W2 row was set to W2 by the guard (no row defaults to the oldest workspace).
-select t.eq((select count(*) from information_schema.columns c where c.table_schema = 'public' and c.column_name = 'workspace_id'), 24::bigint,
-  'data: 24 workspace-scoped tables (23 + profiles; content_reports since ARU-158)');
+select t.eq((select count(*) from information_schema.columns c where c.table_schema = 'public' and c.column_name = 'workspace_id'), 26::bigint,
+  'data: 26 workspace-scoped tables (23 + profiles; content_reports since ARU-158; push_devices and notification_settings since ARU-166)');
 do $$
 declare r record; n bigint; missing text := '';
 begin
