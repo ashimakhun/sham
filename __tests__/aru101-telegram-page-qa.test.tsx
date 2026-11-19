@@ -31,12 +31,13 @@ afterEach(() => {
   delete process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME;
 });
 
-it('AC 1 / edge: the Profile button reads "Telegram notifications, button" with a hint; the chevron is hidden; 44 pt', async () => {
+// ARU-166 AC 7: the Profile button is "Notifications" now (same place and rules).
+it('AC 1 / edge: the Profile button reads "Notifications, button" with a hint; the chevron is hidden; 44 pt', async () => {
   setStore(fakeStore('S1', { telegram: linked }));
   await render(<ProfileScreen />);
   await act(async () => {});
-  const btn = screen.getByRole('button', { name: 'Telegram notifications' });
-  expect(btn.props.accessibilityHint).toBe('Opens the Telegram notifications page');
+  const btn = screen.getByRole('button', { name: 'Notifications' });
+  expect(btn.props.accessibilityHint).toBe('Opens the Notifications page');
   const chevron = screen.getByTestId('icon-chevron-forward', hidden);
   expect(chevron.props.accessibilityElementsHidden).toBe(true);
   expect(chevron.props.importantForAccessibility).toBe('no');

@@ -15,7 +15,7 @@ export type HomeworkRecipient = { course_title: string; user_id: string };
 export type HomeworkReviewedDeps = {
   /** Calls homework_reviewed_recipient(homework_id) with the service role. Throws on a database error. */
   recipient: (homeworkId: string) => Promise<HomeworkRecipient[]>;
-  /** sendTelegramMessages() with the service-role client, the bot token and fetch. */
+  /** sendPushMessages() (push.ts, ARU-166) with the service-role client and fetch. */
   send: (messages: TelegramMessage[]) => Promise<SendResult>;
   log?: (line: string) => void;
 };

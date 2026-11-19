@@ -13,7 +13,7 @@ export type NewHomeworkRecipient = { course_title: string; user_id: string };
 export type NewHomeworkDeps = {
   /** Calls new_homework_recipients(assignment) with the service role. Throws on a database error. */
   recipients: (assignmentId: string) => Promise<NewHomeworkRecipient[]>;
-  /** sendTelegramMessages() with the service-role client, the bot token and fetch. */
+  /** sendPushMessages() (push.ts, ARU-166) with the service-role client and fetch. */
   send: (messages: TelegramMessage[]) => Promise<SendResult>;
   log?: (line: string) => void;
 };

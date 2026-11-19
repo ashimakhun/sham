@@ -13,7 +13,7 @@ export type ClaimedMeeting = { meeting_id: string; course_title: string; listene
 export type MeetingStartDeps = {
   /** Calls claim_started_meetings() with the service role. Throws on a database error. */
   claim: () => Promise<ClaimedMeeting[]>;
-  /** sendTelegramMessages() with the service-role client, the bot token and fetch. */
+  /** sendPushMessages() (push.ts, ARU-166) with the service-role client and fetch. */
   send: (messages: TelegramMessage[]) => Promise<SendResult>;
   log?: (line: string) => void;
 };

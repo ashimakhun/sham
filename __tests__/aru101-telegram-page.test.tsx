@@ -22,7 +22,9 @@ const linked: TelegramLink = {
   linkedAt: '2026-11-01T10:00:00.000Z',
   switches: { meeting_started: true, new_homework: true, homework_reviewed: true, chat_message: true },
 };
-const tgButton = () => screen.getByRole('button', { name: 'Telegram notifications' });
+// ARU-166 AC 7: Profile's button is "Notifications >" now, in the same place, shown with or without a bot; it opens
+// the Notifications page. The checks below keep ARU-101's button rules for it. The Telegram page stays until ARU-171.
+const tgButton = () => screen.getByRole('button', { name: 'Notifications' });
 
 beforeEach(async () => {
   jest.clearAllMocks();
@@ -40,11 +42,12 @@ async function renderProfile() {
 }
 
 describe('Profile button (AC 1, 2, 9)', () => {
-  it.each(['S1', 'M', 'T'] as const)('%s sees one "Telegram notifications" button with a chevron and no Telegram settings', async (who) => {
+  it.each(['S1', 'M', 'T'] as const)('%s sees one "Notifications" button (ARU-166) with a chevron and no Telegram settings', async (who) => {
     setStore(fakeStore(who, { telegram: linked }));
     await renderProfile();
-    expect(screen.getAllByRole('button', { name: 'Telegram notifications' })).toHaveLength(1);
-    expect(screen.getByText('Telegram notifications')).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: 'Notifications' })).toHaveLength(1);
+    expect(screen.getByText('Notifications')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Telegram notifications' })).toBeNull();
     expect(screen.getByTestId('icon-chevron-forward', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.queryByTestId('icon-chevron-down', { includeHiddenElements: true })).toBeNull();
     expect(screen.queryByText('TELEGRAM NOTIFICATIONS')).toBeNull();
@@ -59,7 +62,7 @@ describe('Profile button (AC 1, 2, 9)', () => {
     setStore({ ...fakeStore('M', { telegram: null }), currentUser: accountant });
     const view = await renderProfile();
     const json = JSON.stringify(view.toJSON());
-    const pos = [users.M.name, 'Telegram notifications', 'ACCOUNTANT', 'Change password'].map((m) => json.indexOf(m));
+    const pos = [users.M.name, 'Notifications', 'ACCOUNTANT', 'Change password'].map((m) => json.indexOf(m));
     expect(pos.every((p) => p >= 0)).toBe(true);
     expect(pos).toEqual([...pos].sort((a, b) => a - b));
   });
@@ -68,7 +71,7 @@ describe('Profile button (AC 1, 2, 9)', () => {
     setStore(fakeStore('S1', { telegram: null }));
     await renderProfile();
     await fireEvent.press(tgButton());
-    expect(router.push).toHaveBeenCalledWith('/telegram');
+    expect(router.push).toHaveBeenCalledWith('/notifications');
     expect(screen.queryByRole('button', { name: 'Connect Telegram' })).toBeNull();
     expect(screen.queryByText('Get Sham notifications in Telegram.')).toBeNull();
   });
@@ -92,11 +95,12 @@ describe('Profile button (AC 1, 2, 9)', () => {
     expect(screen.getByTestId('icon-chevron-forward', { includeHiddenElements: true })).toBeTruthy();
   });
 
-  it('AC 9: no bot configured: no button, the rest of Profile unchanged', async () => {
+  it('ARU-166 AC 7: no bot configured: the Notifications button is still there, no Telegram button', async () => {
     delete process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME;
     setStore(fakeStore('S1', { telegram: null }));
     await renderProfile();
     expect(screen.queryByRole('button', { name: 'Telegram notifications' })).toBeNull();
+    expect(tgButton()).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy();
   });
 });

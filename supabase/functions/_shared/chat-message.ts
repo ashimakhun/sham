@@ -23,7 +23,7 @@ export type ChatMessageDeps = {
   recipients: (messageId: string) => Promise<ChatMessageRecipients | null>;
   /** Calls general_message_recipients(message) with the service role (ARU-87). Throws on a database error. */
   generalRecipients?: (messageId: string) => Promise<GeneralMessageRecipients | null>;
-  /** sendTelegramMessages() with the service-role client, the bot token and fetch. */
+  /** sendPushMessages() (push.ts, ARU-166) with the service-role client and fetch. */
   send: (messages: TelegramMessage[]) => Promise<SendResult>;
   log?: (line: string) => void;
 };

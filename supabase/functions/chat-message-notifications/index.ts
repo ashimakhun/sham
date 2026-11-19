@@ -5,7 +5,8 @@
 // only wires it to Supabase and Telegram.
 //
 // Secrets (Supabase dashboard → Edge Functions → Secrets, or `npx supabase secrets set ...`):
-//   TELEGRAM_BOT_TOKEN  the bot's token (already set for ARU-48)
+//   EXPO_ACCESS_TOKEN optional (ARU-166): only if push security is turned on in Expo. Since ARU-166 this
+//                     function sends push notifications, not Telegram: TELEGRAM_BOT_TOKEN is no longer read.
 //   CHAT_NOTIFY_SECRET  a random string; the same value goes into Vault as 'chat_notify_secret'
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase.
 //
@@ -19,9 +20,9 @@ import {
   type GeneralMessageRecipients,
   handleChatMessageRequest,
 } from '../_shared/chat-message.ts';
-import { sendTelegramMessages, type ServiceClient } from '../_shared/telegram.ts';
+import { type PushServiceClient, sendPushMessages } from '../_shared/push.ts';
 
-const token = Deno.env.get('TELEGRAM_BOT_TOKEN') ?? '';
+const accessToken = Deno.env.get('EXPO_ACCESS_TOKEN') || undefined;
 const secret = Deno.env.get('CHAT_NOTIFY_SECRET') ?? '';
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
   auth: { persistSession: false },
@@ -39,7 +40,7 @@ Deno.serve((request) =>
       if (error) throw new Error(error.message);
       return ((data ?? []) as GeneralMessageRecipients[])[0] ?? null;
     },
-    send: (messages) => sendTelegramMessages(supabase as unknown as ServiceClient, token, fetch, messages),
+    send: (messages) => sendPushMessages(supabase as unknown as PushServiceClient, fetch, messages, { accessToken }),
     log: (line) => console.log(line),
   }),
 );

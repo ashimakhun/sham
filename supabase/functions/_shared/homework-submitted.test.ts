@@ -46,7 +46,7 @@ const row: HomeworkSubmittedRecipient = {
   sender_name: 'Student Sam',
   user_id: 'M',
 };
-const TEXT = 'New homework to check from Student Sam in Algebra: Chapter 3';
+const TEXT = 'New homework to check in Algebra: Chapter 3';
 
 describe('AC8: the secret', () => {
   it.each([
@@ -77,7 +77,7 @@ describe('AC1: the message', () => {
   it('text is exactly as the story sets it, names and titles as typed', () => {
     expect(homeworkSubmittedText('Student Sam', 'Algebra', 'Chapter 3')).toBe(TEXT);
     expect(homeworkSubmittedText('Дана *_', '<b>C</b> & 😀', 'x: y')).toBe(
-      'New homework to check from Дана *_ in <b>C</b> & 😀: x: y',
+      'New homework to check in <b>C</b> & 😀: x: y',
     );
   });
 

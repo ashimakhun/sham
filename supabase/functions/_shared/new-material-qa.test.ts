@@ -72,8 +72,8 @@ it('extra fields in the body are ignored; the lookup uses only type and id', asy
 });
 
 it('AC 1 / edge: names and titles with *, _, <, emoji and Cyrillic are sent exactly as typed', () => {
-  expect(newMaterialText('blog', 'Айгерім *A*', 'Tips_<b>1</b> 🎓')).toBe('New blog post from Айгерім *A*: Tips_<b>1</b> 🎓');
-  expect(newMaterialText('file', 'T_1', 'a*b.pdf')).toBe('New file in the knowledge base from T_1: a*b.pdf');
+  expect(newMaterialText('blog', 'Айгерім *A*', 'Tips_<b>1</b> 🎓')).toBe('New blog post: Tips_<b>1</b> 🎓');
+  expect(newMaterialText('file', 'T_1', 'a*b.pdf')).toBe('New file in the knowledge base: a*b.pdf');
 });
 
 it('a GET with the right secret is refused and looks nothing up', async () => {
