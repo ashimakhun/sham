@@ -852,5 +852,6 @@
   "db.report_not_found": "Report not found.",
   "db.report_dismiss_own": "Only the operator can dismiss a report about your own content.",
   "db.report_content_exists": "Delete the content first.",
-  "db.content_cant_delete": "You can't delete this content."
+  "db.content_cant_delete": "You can't delete this content.",
+  "db.text_not_allowed": "This text contains words that aren't allowed. Please change it."
 }

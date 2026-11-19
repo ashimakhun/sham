@@ -852,5 +852,6 @@
   "db.report_not_found": "Database error · Reports screen · the report doesn't exist in my workspace",
   "db.report_dismiss_own": "Database error · Reports screen · the teacher dismisses a report about their own content",
   "db.report_content_exists": "Database error · Reports screen · marking Removed while the content still exists",
-  "db.content_cant_delete": "Database error · Reports screen and chats · the user may not delete this content"
+  "db.content_cant_delete": "Database error · Reports screen and chats · the user may not delete this content",
+  "db.text_not_allowed": "Chats, meeting notes, Blog · the text contains a word from the offensive word list (ARU-163)"
 }
