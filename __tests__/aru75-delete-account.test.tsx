@@ -35,7 +35,7 @@ jest.mock('react-native-safe-area-context', () => require('react-native-safe-are
 
 const EXPLANATION =
   'Your profile, homework and photos, course memberships, attendance marks, feedback, likes, materials and PDFs you ' +
-  'shared, and your Telegram link are deleted. Your chat messages and the work you did for others (checked homework, ' +
+  'shared, and your notification settings are deleted. Your chat messages and the work you did for others (checked homework, ' +
   "meetings, notes) stay, shown as Deleted account. This can't be undone.";
 
 const button = (name: string | RegExp) => screen.getByRole('button', { name });

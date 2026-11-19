@@ -37,22 +37,22 @@ select t.eq(t.calls(), 0::bigint, 'fixture sign-ups queued nothing (no secrets)'
 
 -- AC 3: the column and the switch.
 select t.ok((select bool_and(attnotnull) from pg_attribute
-  where attrelid = 'telegram_links'::regclass and attname = 'notify_new_account'), 'notify_new_account is not null');
-insert into telegram_links (user_id, chat_id) values (t.id('T'), 1001), (t.id('M'), 1002);
-select t.ok((select notify_new_account from telegram_links where user_id = t.id('T')), 'AC3 on by default');
+  where attrelid = 'notification_settings'::regclass and attname = 'notify_new_account'), 'notify_new_account is not null');
+insert into notification_settings (user_id) values (t.id('T')), (t.id('M'));
+select t.ok((select notify_new_account from notification_settings where user_id = t.id('T')), 'AC3 on by default');
 select t.login('T');
-select t.lives('select set_telegram_notification(''new_account'', false)', 'AC3 the teacher turns New accounts off');
+select t.lives('select set_notification(''new_account'', false)', 'AC3 the teacher turns New accounts off');
 reset role;
-select t.ok(not (select notify_new_account from telegram_links where user_id = t.id('T')), 'AC3 saved off');
-select t.ok((select notify_chat_message and notify_meeting_started from telegram_links where user_id = t.id('T')),
+select t.ok(not (select notify_new_account from notification_settings where user_id = t.id('T')), 'AC3 saved off');
+select t.ok((select notify_chat_message and notify_meeting_started from notification_settings where user_id = t.id('T')),
   'AC3 other switches untouched');
-select t.ok((select notify_new_account from telegram_links where user_id = t.id('M')), 'AC3 only the caller''s row');
+select t.ok((select notify_new_account from notification_settings where user_id = t.id('M')), 'AC3 only the caller''s row');
 select t.login('T');
-select t.lives('select set_telegram_notification(''new_account'', true)', 'AC3 back on');
-select t.lives('select set_telegram_notification(''chat_message'', true)', 'earlier kinds still work');
-select t.throws('select set_telegram_notification(''nope'', true)', '22023', 'unknown kind is still an error');
+select t.lives('select set_notification(''new_account'', true)', 'AC3 back on');
+select t.lives('select set_notification(''chat_message'', true)', 'earlier kinds still work');
+select t.throws('select set_notification(''nope'', true)', '22023', 'unknown kind is still an error');
 reset role;
-select t.ok((select notify_new_account from telegram_links where user_id = t.id('T')), 'AC3 saved on');
+select t.ok((select notify_new_account from notification_settings where user_id = t.id('T')), 'AC3 saved on');
 
 -- AC 7: grants.
 select t.ok(not has_function_privilege('anon', 'new_account_notification(uuid)', 'execute'), 'AC7 anon can''t run it');

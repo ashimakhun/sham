@@ -1,7 +1,7 @@
 /**
  * @jest-environment node
  */
-// QA ARU-112: gaps in photo-deletion.test.ts: the Telegram text is exactly the story's (AC 4); the secret in a Bearer
+// QA ARU-112: gaps in photo-deletion.test.ts: the push text is exactly the story's (AC 4); the secret in a Bearer
 // header, in another case or with extra text, or a GET, is refused and nothing runs, so only the cron job's
 // x-cron-secret works (AC 9); with the right secret every step runs in order, file first and then the row (AC 2/3).
 import {

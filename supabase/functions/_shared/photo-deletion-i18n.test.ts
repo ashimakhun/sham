@@ -1,10 +1,11 @@
 /**
  * @jest-environment node
  */
-// ARU-133: the photo-deletion warning in each sender's language (ARU-110's Telegram catalog), with Russian plurals and
+// ARU-133: the photo-deletion warning in each sender's language (ARU-110's notification catalog), with Russian plurals and
 // dates; English is unchanged.
 import { formatUtcDay, photoDeletionMessages, photoDeletionText } from './photo-deletion';
-import { sendTelegramMessages, type ServiceClient } from './telegram';
+import { sendPushMessages } from './push';
+import { pushClient, pushFetch } from './push-test-helpers';
 
 describe('texts', () => {
   it.each([
@@ -34,27 +35,17 @@ it('each sender gets the warning in their own language (Russian, then English by
     { user_id: 'RU', photo_count: 2, earliest: '2026-12-08' },
     { user_id: 'EN', photo_count: 1, earliest: '2026-12-08' },
   ]);
-  const client = {
-    from: (table: string) => ({
-      select: () => ({
-        in: async () =>
-          table === 'profiles'
-            ? { data: [{ id: 'RU', language: 'ru' }, { id: 'EN', language: null, device_language: null }], error: null }
-            : {
-                data: [
-                  { user_id: 'RU', chat_id: 1, notify_photo_deletion: true },
-                  { user_id: 'EN', chat_id: 2, notify_photo_deletion: true },
-                ],
-                error: null,
-              },
-      }),
-      delete: () => ({ eq: () => ({ eq: async () => ({ data: null, error: null }) }) }),
-    }),
-  } as unknown as ServiceClient;
-  const fetchFn = jest.fn(async () => new Response('{"ok":true}', { status: 200 })) as unknown as typeof fetch;
-  const result = await sendTelegramMessages(client, 'tok', fetchFn, messages, { sleep: async () => {} });
+  const { client } = pushClient(
+    [
+      { user_id: 'RU', chat_id: 1, notify_photo_deletion: true },
+      { user_id: 'EN', chat_id: 2, notify_photo_deletion: true },
+    ],
+    [{ id: 'RU', language: 'ru' }, { id: 'EN', language: null, device_language: null }],
+  );
+  const push = pushFetch();
+  const result = await sendPushMessages(client, push.fetch, messages, { sleep: async () => {} });
   expect(result.sent).toBe(2);
-  const bodies = (fetchFn as jest.Mock).mock.calls.map((c) => JSON.parse((c as [string, RequestInit])[1].body as string));
-  expect(bodies.find((b) => b.chat_id === 1).text).toMatch(/^2 фотографии домашних заданий будут удалены 8 декабря 2026/);
-  expect(bodies.find((b) => b.chat_id === 2).text).toMatch(/^1 homework photo will be deleted on 8 Dec 2026/);
+  const bodies = Object.fromEntries(push.sent());
+  expect(bodies[1]).toMatch(/^2 фотографии домашних заданий будут удалены 8 декабря 2026/);
+  expect(bodies[2]).toMatch(/^1 homework photo will be deleted on 8 Dec 2026/);
 });

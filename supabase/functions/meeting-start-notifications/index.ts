@@ -1,10 +1,9 @@
-// ARU-41: a Telegram message to a course's listeners when one of its meetings starts. Called every minute by the
+// ARU-41: a push notification to a course's listeners when one of its meetings starts. Called every minute by the
 // pg_cron job from migration 0035 (through pg_net, with the secret in x-cron-secret). The logic is in
-// ../_shared/meeting-start.ts (tested with Jest); this file only wires it to Supabase and Telegram.
+// ../_shared/meeting-start.ts (tested with Jest); this file only wires it to Supabase and push.
 //
 // Secrets (Supabase dashboard → Edge Functions → Secrets, or `npx supabase secrets set ...`):
-//   EXPO_ACCESS_TOKEN    optional (ARU-166): only if push security is turned on in Expo. Since ARU-166 this
-//                        function sends push notifications, not Telegram: TELEGRAM_BOT_TOKEN is no longer read.
+//   EXPO_ACCESS_TOKEN    optional (ARU-166): only if push security is turned on in Expo. The function sends push (ARU-166).
 //   MEETING_NOTIFY_SECRET  a random string; the same value goes into Vault as 'meeting_notify_secret'
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase.
 //

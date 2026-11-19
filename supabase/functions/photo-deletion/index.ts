@@ -1,11 +1,10 @@
-// ARU-112: deletes homework photos 6 months after checking, warns their senders on Telegram 30 and 7 days before, and
+// ARU-112: deletes homework photos 6 months after checking, warns their senders with a push 30 and 7 days before, and
 // removes leftover photos from failed sends. Called once a day by the pg_cron job from migration 0053 (through
 // pg_net, with the secret in x-cron-secret). The logic is in ../_shared/photo-deletion.ts (tested with Jest); this
-// file only wires it to Supabase, Storage and Telegram.
+// file only wires it to Supabase, Storage and push.
 //
 // Secrets (Supabase dashboard → Edge Functions → Secrets, or `npx supabase secrets set ...`):
-//   EXPO_ACCESS_TOKEN    optional (ARU-166): only if push security is turned on in Expo. Since ARU-166 this
-//                        function sends push notifications, not Telegram: TELEGRAM_BOT_TOKEN is no longer read.
+//   EXPO_ACCESS_TOKEN    optional (ARU-166): only if push security is turned on in Expo. The function sends push (ARU-166).
 //   PHOTO_DELETION_SECRET  a random string; the same value goes into Vault as 'photo_deletion_secret'
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase.
 //

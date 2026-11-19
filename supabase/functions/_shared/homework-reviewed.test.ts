@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 // ARU-49: the homework-reviewed-notifications function's logic, with the recipient lookup and the sending helper
-// mocked (AC 1, 6, 7), and once end to end with the real ARU-48 helper and a mocked Telegram (AC 3, plain text).
+// mocked (AC 1, 6, 7), and once end to end with the real push sender and a mocked Expo push service (AC 3, plain text).
 import {
   handleHomeworkReviewedRequest,
   type HomeworkRecipient,
@@ -10,7 +10,9 @@ import {
   homeworkReviewedMessages,
   homeworkReviewedText,
 } from './homework-reviewed';
-import { sendTelegramMessages, type SendResult, type ServiceClient, type TelegramMessage } from './telegram';
+import { type SendResult, type NotificationMessage } from './notification';
+import { sendPushMessages } from './push';
+import { pushClient, pushFetch } from './push-test-helpers';
 
 const SECRET = 'hw-secret-123';
 const HW = '0b9a2c3e-1d4f-4a5b-8c6d-7e8f9a0b1c2d';
@@ -27,11 +29,11 @@ const post = (
 const ok: SendResult = { sent: 0, skipped: 0, failed: [], removed: 0 };
 
 function deps(rows: HomeworkRecipient[], result: Partial<SendResult> = {}) {
-  const sent: TelegramMessage[][] = [];
+  const sent: NotificationMessage[][] = [];
   const logs: string[] = [];
   const d: HomeworkReviewedDeps = {
     recipient: jest.fn(async () => rows),
-    send: jest.fn(async (messages: TelegramMessage[]) => {
+    send: jest.fn(async (messages: NotificationMessage[]) => {
       sent.push(messages);
       return { ...ok, sent: messages.length, ...result };
     }),
@@ -142,31 +144,23 @@ describe('AC6: failures are logged and dropped', () => {
   it('the helper throwing: logged as failed, still 200', async () => {
     const { d, logs } = deps([sam]);
     d.send = jest.fn(async () => {
-      throw new Error('telegram_links unreachable');
+      throw new Error('push service unreachable');
     });
     const res = await handleHomeworkReviewedRequest(post(), SECRET, d);
     expect(res.status).toBe(200);
-    expect((await res.json()).failed).toEqual([{ userId: 'S1', error: 'telegram_links unreachable' }]);
-    expect(logs.join('\n')).toContain('failed 1 (S1: telegram_links unreachable)');
+    expect((await res.json()).failed).toEqual([{ userId: 'S1', error: 'push service unreachable' }]);
+    expect(logs.join('\n')).toContain('failed 1 (S1: push service unreachable)');
   });
 });
 
-describe('end to end with the ARU-48 helper', () => {
+describe('end to end with the push sender', () => {
   const run = async (links: Record<string, unknown>[]) => {
-    const client = {
-      from: () => ({
-        select: () => ({
-          in: (_c: string, ids: string[]) =>
-            Promise.resolve({ data: links.filter((l) => ids.includes(l.user_id as string)), error: null }),
-        }),
-        delete: () => ({ eq: () => ({ eq: () => Promise.resolve({ data: null, error: null }) }) }),
-      }),
-    } as unknown as ServiceClient;
-    const fetchFn = jest.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    const { client } = pushClient(links as never);
+    const fetchFn = pushFetch();
     const res = await handleHomeworkReviewedRequest(post(), SECRET, {
       recipient: async () => [{ course_title: 'Algebra *1*', user_id: 'S1' }],
       send: (messages) =>
-        sendTelegramMessages(client, 'TOKEN', fetchFn as unknown as typeof fetch, messages, { sleep: async () => {} }),
+        sendPushMessages(client, fetchFn.fetch, messages, { sleep: async () => {} }),
     });
     return { body: await res.json(), fetchFn };
   };
@@ -174,23 +168,19 @@ describe('end to end with the ARU-48 helper', () => {
   it('AC1: linked with Homework reviewed on: one plain-text message to the linked chat', async () => {
     const { body, fetchFn } = await run([{ user_id: 'S1', chat_id: 11, notify_homework_reviewed: true }]);
     expect(body).toMatchObject({ recipients: 1, sent: 1, skipped: 0, failed: [] });
-    expect(fetchFn).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe('https://api.telegram.org/botTOKEN/sendMessage');
-    const sent = JSON.parse(init.body as string);
-    expect(sent).toMatchObject({ chat_id: 11, text: 'Your homework for Algebra *1* was reviewed' });
-    expect(sent.parse_mode).toBeUndefined();
+    expect(fetchFn.mock).toHaveBeenCalledTimes(1);
+    expect(fetchFn.sent()).toEqual([[11, 'Your homework for Algebra *1* was reviewed']]);
   });
 
   it('AC3: Homework reviewed off: skipped, nothing sent', async () => {
     const { body, fetchFn } = await run([{ user_id: 'S1', chat_id: 11, notify_homework_reviewed: false }]);
     expect(body).toMatchObject({ recipients: 1, sent: 0, skipped: 1 });
-    expect(fetchFn).not.toHaveBeenCalled();
+    expect(fetchFn.mock).not.toHaveBeenCalled();
   });
 
   it('AC3: not linked: skipped, nothing sent', async () => {
     const { body, fetchFn } = await run([]);
     expect(body).toMatchObject({ recipients: 1, sent: 0, skipped: 1 });
-    expect(fetchFn).not.toHaveBeenCalled();
+    expect(fetchFn.mock).not.toHaveBeenCalled();
   });
 });

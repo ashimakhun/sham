@@ -9,16 +9,16 @@ import { Button, Card, ErrorText, styles, ThemedSwitch } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import { askPushPermission, pushPermission, type PushPermission, pushSupported } from '@/lib/push';
 import { useStore } from '@/lib/store';
-import { telegramSwitchesFor } from '@/lib/telegram';
+import { notificationSwitchesFor } from '@/lib/notifications';
 import { colors } from '@/lib/theme';
-import type { TelegramKind } from '@/lib/types';
+import type { NotificationKind } from '@/lib/types';
 
 // The fallback is passed in already translated; e.message is shown through ErrorText, which translates app messages.
 const errorText = (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback);
 
 /**
  * ARU-166 AC 7: on the Profile tab, "Notifications >" opens the Notifications page (src/app/notifications.tsx). It sits
- * where "Telegram notifications >" was and is shown for every role, whether or not a Telegram bot is configured.
+ * where ARU-101's Telegram button was and is shown for every role.
  */
 export function NotificationsButton() {
   const { t } = useI18n();
@@ -66,7 +66,7 @@ export function NotificationSettings() {
   const [error, setError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   // Switches flip at once and go back if saving fails (AC 8).
-  const [pending, setPending] = useState<Partial<Record<TelegramKind, boolean>>>({});
+  const [pending, setPending] = useState<Partial<Record<NotificationKind, boolean>>>({});
 
   const refresh = useCallback(
     (ask: boolean) => {
@@ -95,7 +95,7 @@ export function NotificationSettings() {
 
   if (!currentUser) return null;
 
-  function toggle(kind: TelegramKind, value: boolean) {
+  function toggle(kind: NotificationKind, value: boolean) {
     setPending((p) => ({ ...p, [kind]: value }));
     setError(null);
     // AC 1: turning a switch on asks when Sham has never asked on this phone.
@@ -138,7 +138,7 @@ export function NotificationSettings() {
           />
         </View>
       )}
-      {telegramSwitchesFor(currentUser.role, lang).map(({ kind, label }) => (
+      {notificationSwitchesFor(currentUser.role, lang).map(({ kind, label }) => (
         <View key={kind} style={[styles.row, { minHeight: 44 }]}>
           <Text style={[styles.body, { flex: 1 }]}>{label}</Text>
           <ThemedSwitch

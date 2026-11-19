@@ -48,7 +48,7 @@ select t.ok(not exists (
 
 -- AC 11: these stay global.
 select t.eq((select count(*) from information_schema.columns where table_schema = 'public' and column_name = 'workspace_id'
-  and table_name in ('app_settings', 'telegram_link_codes', 'photo_zip_links')), 0::bigint, 'AC11 global tables have no workspace');
+  and table_name in ('app_settings', 'photo_zip_links')), 0::bigint, 'AC11 global tables have no workspace');
 
 -- Workspace W2 (made as the admin: the SQL Editor / service role).
 insert into workspaces (id, name, created_at) values (t.x('W2'), 'Other school', now());
@@ -87,7 +87,7 @@ insert into course_messages (id, course_id, author_id, body) values (t.x('XCM'),
 insert into general_messages (id, author_id, body) values (t.x('XGM'), t.x('XS'), 'X general');
 insert into materials (id, teacher_id, title, body) values (t.x('XMAT'), t.x('XT'), 'X post', 'x');
 insert into material_likes (material_id, user_id) values (t.x('XMAT'), t.x('XS'));
-insert into telegram_links (user_id, chat_id) values (t.x('XS'), 9001), (t.x('XM'), 9002), (t.id('S1'), 9003), (t.id('T'), 9004);
+insert into notification_settings (user_id) values (t.x('XS')), (t.x('XM')), (t.id('S1')), (t.id('T'));
 -- A message in the first workspace's course A, for the recipients check.
 insert into course_messages (id, course_id, author_id, body) values (t.x('ACM'), t.id('A'), t.id('S1'), 'A chat');
 insert into general_messages (id, author_id, body) values (t.x('AGM'), t.id('S1'), 'A general');

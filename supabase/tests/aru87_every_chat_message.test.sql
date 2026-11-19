@@ -48,19 +48,19 @@ select t.ok((select prosecdef and 'search_path=public' = any(proconfig) from pg_
   where oid = 'notify_general_message()'::regprocedure), 'notify_general_message: security definer, search_path=public');
 
 -- AC 6: the switch.
-insert into telegram_links (user_id, chat_id) values (t.id('S1'), 3001), (t.id('T'), 3002);
-select t.ok((select bool_and(notify_general_chat) from telegram_links), 'AC6 on by default');
+insert into notification_settings (user_id) values (t.id('S1')), (t.id('T'));
+select t.ok((select bool_and(notify_general_chat) from notification_settings), 'AC6 on by default');
 select t.login('S1');
-select t.lives('select set_telegram_notification(''general_chat'', false)', 'AC6 S1 turns General chat off');
+select t.lives('select set_notification(''general_chat'', false)', 'AC6 S1 turns General chat off');
 reset role;
-select t.ok(not (select notify_general_chat from telegram_links where user_id = t.id('S1')), 'AC6 saved off');
-select t.ok((select notify_chat_message from telegram_links where user_id = t.id('S1')), 'AC6 Chat messages untouched');
-select t.ok((select notify_general_chat from telegram_links where user_id = t.id('T')), 'AC6 only the caller''s row');
+select t.ok(not (select notify_general_chat from notification_settings where user_id = t.id('S1')), 'AC6 saved off');
+select t.ok((select notify_chat_message from notification_settings where user_id = t.id('S1')), 'AC6 Chat messages untouched');
+select t.ok((select notify_general_chat from notification_settings where user_id = t.id('T')), 'AC6 only the caller''s row');
 select t.login('T');
-select t.lives('select set_telegram_notification(''new_account'', false)', 'ARU-84 kind kept');
-select t.lives('select set_telegram_notification(''homework_submitted'', false)', 'ARU-89 kind kept');
-select t.lives('select set_telegram_notification(''chat_message'', true)', 'earlier kinds kept');
-select t.throws('select set_telegram_notification(''nope'', true)', '22023', 'unknown kind still an error');
+select t.lives('select set_notification(''new_account'', false)', 'ARU-84 kind kept');
+select t.lives('select set_notification(''homework_submitted'', false)', 'ARU-89 kind kept');
+select t.lives('select set_notification(''chat_message'', true)', 'earlier kinds kept');
+select t.throws('select set_notification(''nope'', true)', '22023', 'unknown kind still an error');
 reset role;
 
 -- AC 1 / AC 2: course chat, every message, read positions ignored. S1 hasn't opened A for a day and has 3 unread

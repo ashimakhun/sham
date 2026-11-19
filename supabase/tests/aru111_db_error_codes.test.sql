@@ -58,4 +58,4 @@ select t.eq(pg_temp.err(format('select set_user_role(%L, %L)', t.id('S3'), 'ment
 
 -- Signed out: unchanged refusals.
 select t.login(null);
-select t.ok(pg_temp.err('select disconnect_telegram()') like '42501 |%', 'signed out is still refused');
+select t.ok(pg_temp.err($$select set_notification('chat_message', true)$$) like '42501 |%', 'signed out is still refused');

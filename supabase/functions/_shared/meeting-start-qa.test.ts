@@ -5,7 +5,7 @@
 // string, a GET with the right secret (nothing claimed), a listener in two meetings at once, a claimed meeting whose
 // listener list comes back null, and the report a run returns.
 import { type ClaimedMeeting, handleMeetingStartRequest, meetingStartMessages, type MeetingStartDeps } from './meeting-start';
-import type { SendResult, TelegramMessage } from './telegram';
+import type { SendResult, NotificationMessage } from './notification';
 
 const SECRET = 'cron-secret-123';
 const url = 'https://x.supabase.co/functions/v1/meeting-start-notifications';
@@ -13,7 +13,7 @@ const url = 'https://x.supabase.co/functions/v1/meeting-start-notifications';
 function deps(meetings: ClaimedMeeting[]) {
   const d: MeetingStartDeps = {
     claim: jest.fn(async () => meetings),
-    send: jest.fn(async (messages: TelegramMessage[]): Promise<SendResult> => ({
+    send: jest.fn(async (messages: NotificationMessage[]): Promise<SendResult> => ({
       sent: messages.length - 1,
       skipped: 1,
       failed: [],

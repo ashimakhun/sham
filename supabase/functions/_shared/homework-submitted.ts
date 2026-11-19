@@ -5,9 +5,9 @@
 // through the ARU-48 helper, which skips an unlinked owner or one with Homework submitted off. Nothing is retried.
 // No Deno-only imports, so Jest can test it.
 
-import { localizedMessage, type SendResult, type TelegramMessage } from './telegram.ts';
-import { telegramText, telegramTexts } from './telegram-texts.ts';
-import { timingSafeEqual } from './telegram-bot.ts';
+import { localizedMessage, type SendResult, type NotificationMessage } from './notification.ts';
+import { notificationText, notificationTexts } from './notification-texts.ts';
+import { timingSafeEqual } from './timing-safe-equal.ts';
 
 /** One row of homework_submitted_recipient(). */
 export type HomeworkSubmittedRecipient = {
@@ -21,26 +21,26 @@ export type HomeworkSubmittedDeps = {
   /** Calls homework_submitted_recipient(homework_id) with the service role. Throws on a database error. */
   recipient: (homeworkId: string) => Promise<HomeworkSubmittedRecipient[]>;
   /** sendPushMessages() (push.ts, ARU-166) with the service-role client and fetch. */
-  send: (messages: TelegramMessage[]) => Promise<SendResult>;
+  send: (messages: NotificationMessage[]) => Promise<SendResult>;
   log?: (line: string) => void;
 };
 
-/** What a call returns (and logs), so a call can be checked from net._http_response without Telegram. */
+/** What a call returns (and logs), so a call can be checked from net._http_response without a phone. */
 export type HomeworkSubmittedReport = { recipients: number } & SendResult;
 
 /** The English text (plain text: titles are shown as typed). Since ARU-166 it names no person, so the sender's name
  *  is not used; the parameter stays for the existing callers. */
 export function homeworkSubmittedText(_senderName: string, courseTitle: string, assignmentTitle: string) {
-  return telegramText('en', 'homeworkSubmitted', { course: courseTitle, assignment: assignmentTitle });
+  return notificationText('en', 'homeworkSubmitted', { course: courseTitle, assignment: assignmentTitle });
 }
 
 /** One message per recipient row (in practice zero or one: the owner). */
-export function homeworkSubmittedMessages(rows: HomeworkSubmittedRecipient[]): TelegramMessage[] {
+export function homeworkSubmittedMessages(rows: HomeworkSubmittedRecipient[]): NotificationMessage[] {
   return rows.map((r) =>
     localizedMessage(
       r.user_id,
       'homework_submitted',
-      telegramTexts('homeworkSubmitted', { course: r.course_title, assignment: r.assignment_title }),
+      notificationTexts('homeworkSubmitted', { course: r.course_title, assignment: r.assignment_title }),
     ),
   );
 }

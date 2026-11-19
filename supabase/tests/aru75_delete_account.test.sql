@@ -43,7 +43,7 @@ select t.eq(t.fk_action(tbl, col), 'c'::"char", tbl || '.' || col || ' still cas
 from (values ('homework', 'student_id'), ('course_members', 'user_id'), ('meeting_attendance', 'user_id'),
   ('course_feedback', 'user_id'), ('material_likes', 'user_id'), ('materials', 'teacher_id'),
   ('material_files', 'author_id'), ('course_chat_reads', 'user_id'), ('general_chat_reads', 'user_id'),
-  ('telegram_links', 'user_id'), ('telegram_link_codes', 'user_id')) as v (tbl, col);
+  ('notification_settings', 'user_id')) as v (tbl, col);
 select t.eq(t.fk_action('courses', 'created_by'), 'a'::"char", 'AC6 courses.created_by still blocks the deletion');
 
 -- Fixture -----------------------------------------------------------------------------------------------------------
@@ -88,8 +88,7 @@ insert into material_files (id, author_id, name, course_id, storage_path, size_b
   (t.x('pdf'), t.id('M2'), 'Book', t.id('A'), t.id('M2') || '/' || t.x('pdf') || '.pdf', 1000);
 insert into course_chat_reads (course_id, user_id, last_read_at) values (t.id('B'), t.id('M2'), now());
 insert into general_chat_reads (user_id, last_read_at) values (t.id('M2'), now());
-insert into telegram_links (user_id, chat_id) values (t.id('M2'), 4242);
-insert into telegram_link_codes (code, user_id) values ('aru75code', t.id('M2'));
+insert into notification_settings (user_id) values (t.id('M2'));
 insert into storage.objects (bucket_id, name, owner) values
   ('homework', t.id('M2') || '/' || t.x('hw') || '.jpg', t.id('M2')),
   ('materials', t.id('M2') || '/' || t.x('pdf') || '.pdf', t.id('M2')),
@@ -154,8 +153,7 @@ select t.ok(not exists (select 1 from material_likes where material_id = t.x('po
 select t.ok(not exists (select 1 from material_files where author_id = t.id('M2')), 'AC7 Knowledge base PDFs gone');
 select t.ok(not exists (select 1 from course_chat_reads where user_id = t.id('M2')), 'AC7 course chat read positions gone');
 select t.ok(not exists (select 1 from general_chat_reads where user_id = t.id('M2')), 'AC7 general chat read position gone');
-select t.ok(not exists (select 1 from telegram_links where user_id = t.id('M2')), 'AC7 Telegram link gone');
-select t.ok(not exists (select 1 from telegram_link_codes where user_id = t.id('M2')), 'AC7 Telegram link codes gone');
+select t.ok(not exists (select 1 from notification_settings where user_id = t.id('M2')), 'AC7 notification settings gone');
 
 -- AC 8: shared content stays, pointing to no one.
 select t.ok((select author_id is null and body = 'from M2' from course_messages where id = t.x('cm_old')),
@@ -214,7 +212,7 @@ insert into auth.users (id, email, raw_user_meta_data) values (t.x('again'), 'm2
 select t.ok((select role = 'student' and access_status = 'pending' and mentor_id is null and not is_accountant
   from profiles where id = t.x('again')), 'AC5 a new account with the same email waits as a student');
 select t.ok(not exists (select 1 from course_members where user_id = t.x('again'))
-  and not exists (select 1 from telegram_links where user_id = t.x('again')), 'AC5 with none of the old data');
+  and not exists (select 1 from notification_settings where user_id = t.x('again')), 'AC5 with none of the old data');
 
 -- AC 10: a waiting account can be deleted, and leaves the teacher's Requests list.
 select t.lives(format('delete from auth.users where id = %L', t.x('again')), 'AC10 a waiting account is deleted');
@@ -224,13 +222,13 @@ reset role;
 
 -- AC 12 c is all-or-nothing: a failure inside the deletion leaves every row as it was.
 create function pg_temp.boom() returns trigger language plpgsql as $$ begin raise exception 'boom'; end $$;
-create trigger boom before delete on telegram_links for each row execute function pg_temp.boom();
-insert into telegram_links (user_id, chat_id) values (t.id('S1'), 777);
+create trigger boom before delete on notification_settings for each row execute function pg_temp.boom();
+insert into notification_settings (user_id) values (t.id('S1'));
 select t.eq(t.err(format('delete from auth.users where id = %L', t.id('S1'))), 'boom', 'AC12c a failing step fails the deletion');
 select t.ok(exists (select 1 from profiles where id = t.id('S1'))
   and (select count(*) from homework where student_id = t.id('S1')) = 3
   and exists (select 1 from course_members where user_id = t.id('S1')), 'AC12c ... and nothing was deleted');
-drop trigger boom on telegram_links;
+drop trigger boom on notification_settings;
 select t.lives(format('delete from auth.users where id = %L', t.id('S1')), 'AC12c retry deletes S1');
 select t.ok(not exists (select 1 from homework where student_id = t.id('S1')), 'AC7 S1''s homework gone');
 select t.eq((select count(*) from course_members where course_id = t.id('A')), 1::bigint,

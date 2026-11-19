@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 // ARU-87: chat-message-notifications also handles {"general_message_id"} (the general chat): the text and kind, the
-// secret, the body rules (exactly one id), an unknown message, and once end to end with the real ARU-48 helper (the
+// secret, the body rules (exactly one id), an unknown message, and once end to end with the real push sender (the
 // General chat switch is separate from Chat messages). Course chat behaviour is in chat-message.test.ts.
 import {
   type ChatMessageDeps,
@@ -11,7 +11,9 @@ import {
   generalMessageMessages,
   handleChatMessageRequest,
 } from './chat-message';
-import { sendTelegramMessages, type SendResult, type ServiceClient, type TelegramMessage } from './telegram';
+import { type SendResult, type NotificationMessage } from './notification';
+import { sendPushMessages } from './push';
+import { pushClient, pushFetch } from './push-test-helpers';
 
 const SECRET = 'chat-secret-123';
 const MSG = '0b6f1c1e-2a3b-4c5d-8e9f-001122334455';
@@ -24,12 +26,12 @@ const post = (body: unknown, headers: Record<string, string> = { authorization: 
 const ok: SendResult = { sent: 0, skipped: 0, failed: [], removed: 0 };
 
 function deps(found: GeneralMessageRecipients | null) {
-  const sent: TelegramMessage[][] = [];
+  const sent: NotificationMessage[][] = [];
   const logs: string[] = [];
   const d: ChatMessageDeps = {
     recipients: jest.fn(async () => ({ course_title: 'Algebra', recipient_ids: ['X'] })),
     generalRecipients: jest.fn(async () => found),
-    send: jest.fn(async (messages: TelegramMessage[]) => {
+    send: jest.fn(async (messages: NotificationMessage[]) => {
       sent.push(messages);
       return { ...ok, sent: messages.length };
     }),
@@ -107,28 +109,19 @@ describe('the secret and the body', () => {
   });
 });
 
-describe('AC 6: with the real helper, General chat and Chat messages are separate switches', () => {
-  function client(links: Record<string, unknown>[]): ServiceClient {
-    return {
-      from: () => ({
-        select: () => ({ in: async () => ({ data: links, error: null }) }),
-        delete: () => ({ eq: () => ({ eq: async () => ({ data: null, error: null }) }) }),
-      }),
-    };
-  }
+describe('AC 6: with the real push sender, General chat and Chat messages are separate switches', () => {
 
   it('general chat follows notify_general_chat only', async () => {
     const links = [
       { user_id: 'on', chat_id: 1, notify_general_chat: true, notify_chat_message: false },
       { user_id: 'off', chat_id: 2, notify_general_chat: false, notify_chat_message: true },
     ];
-    const fetchFn = jest.fn(async () => new Response('{"ok":true}', { status: 200 }));
+    const push = pushFetch();
     const { d } = deps({ recipient_ids: ['on', 'off'] });
-    d.send = (messages) => sendTelegramMessages(client(links), 'TOKEN', fetchFn as unknown as typeof fetch, messages);
+    d.send = (messages) => sendPushMessages(pushClient(links).client, push.fetch, messages);
     const body = await (await handleChatMessageRequest(post({ general_message_id: MSG }), SECRET, d)).json();
     expect(body).toMatchObject({ recipients: 2, sent: 1, skipped: 1 });
-    const sentBody = JSON.parse((fetchFn.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
-    expect(sentBody).toEqual({ chat_id: 1, text: GENERAL_CHAT_TEXT, disable_web_page_preview: true });
+    expect(push.sent()).toEqual([[1, GENERAL_CHAT_TEXT]]);
   });
 
   it('course chats still follow notify_chat_message only', async () => {
@@ -136,10 +129,10 @@ describe('AC 6: with the real helper, General chat and Chat messages are separat
       { user_id: 'on', chat_id: 1, notify_general_chat: false, notify_chat_message: true },
       { user_id: 'off', chat_id: 2, notify_general_chat: true, notify_chat_message: false },
     ];
-    const fetchFn = jest.fn(async () => new Response('{"ok":true}', { status: 200 }));
+    const push = pushFetch();
     const { d } = deps(null);
     d.recipients = jest.fn(async () => ({ course_title: 'Algebra', recipient_ids: ['on', 'off'] }));
-    d.send = (messages) => sendTelegramMessages(client(links), 'TOKEN', fetchFn as unknown as typeof fetch, messages);
+    d.send = (messages) => sendPushMessages(pushClient(links).client, push.fetch, messages);
     const body = await (await handleChatMessageRequest(post({ message_id: MSG }), SECRET, d)).json();
     expect(body).toMatchObject({ message_id: MSG, recipients: 2, sent: 1, skipped: 1 });
   });

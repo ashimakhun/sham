@@ -14,10 +14,6 @@ jest.mock('@/lib/store', () => require('./helpers/mocks').store);
 
 beforeEach(() => {
   jest.clearAllMocks();
-  process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME = 'ShamSchoolBot';
-});
-afterEach(() => {
-  delete process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME;
 });
 
 async function renderProfile() {
@@ -93,11 +89,10 @@ it('AC 4: tapping it opens the general chat', async () => {
   expect(router.push).toHaveBeenCalledWith('/general-chat');
 });
 
-it('edge: Telegram not configured — only Notifications sits between the chat button and the bottom group (student)', async () => {
-  delete process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME;
+it('edge: only Notifications sits between the chat button and the bottom group (student)', async () => {
   setStore(fakeStore('S1'));
   await renderProfile();
-  // ARU-166 AC 7: no Telegram button; "Notifications" is shown with or without a bot.
+  // ARU-166 AC 7: no Telegram button; "Notifications" is shown instead.
   expect(screen.queryByRole('button', { name: 'Telegram notifications' })).toBeNull();
   const all = screen.getAllByRole('button');
   expect(all.indexOf(screen.getByRole('button', { name: 'Notifications' }))).toBe(all.indexOf(chat()) + 1);

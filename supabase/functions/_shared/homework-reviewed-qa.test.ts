@@ -5,7 +5,7 @@
 // secret, the secret of another function), bodies that are JSON but not an object with a uuid, extra body fields
 // ignored, the secret never logged, and the message never carrying the mentor's comment or anything but the title.
 import { handleHomeworkReviewedRequest, type HomeworkRecipient, type HomeworkReviewedDeps } from './homework-reviewed';
-import type { SendResult, TelegramMessage } from './telegram';
+import type { SendResult, NotificationMessage } from './notification';
 
 const SECRET = 'hw-secret-123';
 const HW = '0b9a2c3e-1d4f-4a5b-8c6d-7e8f9a0b1c2d';
@@ -18,11 +18,11 @@ const post = (body: unknown, authorization: string | null = `Bearer ${SECRET}`) 
   });
 
 function deps(rows: HomeworkRecipient[] = [{ course_title: 'Algebra', user_id: 'S1' }]) {
-  const sent: TelegramMessage[][] = [];
+  const sent: NotificationMessage[][] = [];
   const logs: string[] = [];
   const d: HomeworkReviewedDeps = {
     recipient: jest.fn(async () => rows),
-    send: jest.fn(async (messages: TelegramMessage[]) => {
+    send: jest.fn(async (messages: NotificationMessage[]) => {
       sent.push(messages);
       return { ...ok, sent: messages.length };
     }),

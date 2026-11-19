@@ -3,9 +3,9 @@
 // which marks them first, so a meeting is announced at most once) and only then sends "<course title> meeting has
 // started" to each Approved listener through the ARU-48 helper. No Deno-only imports, so Jest can test it.
 
-import { localizedMessage, type SendResult, type TelegramMessage } from './telegram.ts';
-import { telegramText, telegramTexts } from './telegram-texts.ts';
-import { timingSafeEqual } from './telegram-bot.ts';
+import { localizedMessage, type SendResult, type NotificationMessage } from './notification.ts';
+import { notificationText, notificationTexts } from './notification-texts.ts';
+import { timingSafeEqual } from './timing-safe-equal.ts';
 
 /** One meeting claimed by claim_started_meetings(). */
 export type ClaimedMeeting = { meeting_id: string; course_title: string; listener_ids: string[] | null };
@@ -14,24 +14,24 @@ export type MeetingStartDeps = {
   /** Calls claim_started_meetings() with the service role. Throws on a database error. */
   claim: () => Promise<ClaimedMeeting[]>;
   /** sendPushMessages() (push.ts, ARU-166) with the service-role client and fetch. */
-  send: (messages: TelegramMessage[]) => Promise<SendResult>;
+  send: (messages: NotificationMessage[]) => Promise<SendResult>;
   log?: (line: string) => void;
 };
 
-/** The counts a run returns (and logs), so a run can be checked from net._http_response without Telegram. */
+/** The counts a run returns (and logs), so a run can be checked from net._http_response without a phone. */
 export type MeetingStartReport = { meetings: number } & SendResult;
 
 /** The message text, exactly as the product owner set it (plain text: the title is shown as typed). */
 export function meetingStartedText(courseTitle: string) {
-  return telegramText('en', 'meetingStarted', { course: courseTitle });
+  return notificationText('en', 'meetingStarted', { course: courseTitle });
 }
 
 /** One message per listener per claimed meeting (AC 1, AC 8). */
-export function meetingStartMessages(meetings: ClaimedMeeting[]): TelegramMessage[] {
+export function meetingStartMessages(meetings: ClaimedMeeting[]): NotificationMessage[] {
   return meetings.flatMap((m) =>
     // ARU-110: each listener gets it in their own language.
     (m.listener_ids ?? []).map((userId) =>
-      localizedMessage(userId, 'meeting_started', telegramTexts('meetingStarted', { course: m.course_title })),
+      localizedMessage(userId, 'meeting_started', notificationTexts('meetingStarted', { course: m.course_title })),
     ),
   );
 }

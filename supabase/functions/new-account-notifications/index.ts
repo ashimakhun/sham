@@ -1,10 +1,9 @@
-// ARU-84: a Telegram message to the teacher when a new account waits for approval. Called by the trigger from
+// ARU-84: a push notification to the teacher when a new account waits for approval. Called by the trigger from
 // migration 0044 (through pg_net, with "Authorization: Bearer <secret>" and {"user_id": "<id>"}). The logic is in
-// ../_shared/new-account.ts (tested with Jest); this file only wires it to Supabase and Telegram.
+// ../_shared/new-account.ts (tested with Jest); this file only wires it to Supabase and push.
 //
 // Secrets (Supabase dashboard → Edge Functions → Secrets, or `npx supabase secrets set ...`):
-//   EXPO_ACCESS_TOKEN        optional (ARU-166): only if push security is turned on in Expo. Since ARU-166 this
-//                            function sends push notifications, not Telegram: TELEGRAM_BOT_TOKEN is no longer read.
+//   EXPO_ACCESS_TOKEN        optional (ARU-166): only if push security is turned on in Expo. The function sends push (ARU-166).
 //   NEW_ACCOUNT_NOTIFY_SECRET  a random string; the same value goes into Vault as 'new_account_notify_secret'
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase.
 //

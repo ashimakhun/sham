@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 // ARU-102: the new-material-notifications function's logic, with the recipient lookup and the sending helper mocked
-// (AC 1, 2, 8, 9), and once end to end with the real ARU-48 helper and a mocked Telegram (AC 5 switch).
+// (AC 1, 2, 8, 9), and once end to end with the real push sender and a mocked Expo push service (AC 5 switch).
 import {
   handleNewMaterialRequest,
   type NewMaterialDeps,
@@ -10,7 +10,9 @@ import {
   type NewMaterialRecipient,
   newMaterialText,
 } from './new-material';
-import { sendTelegramMessages, type SendResult, type ServiceClient, type TelegramMessage } from './telegram';
+import { type SendResult, type NotificationMessage } from './notification';
+import { sendPushMessages } from './push';
+import { pushClient, pushFetch } from './push-test-helpers';
 
 const SECRET = 'mat-secret-123';
 const ID = '3c1d2e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f';
@@ -27,11 +29,11 @@ const post = (
 const ok: SendResult = { sent: 0, skipped: 0, failed: [], removed: 0 };
 
 function deps(rows: NewMaterialRecipient[], result: Partial<SendResult> = {}) {
-  const sent: TelegramMessage[][] = [];
+  const sent: NotificationMessage[][] = [];
   const logs: string[] = [];
   const d: NewMaterialDeps = {
     recipients: jest.fn(async () => rows),
-    send: jest.fn(async (messages: TelegramMessage[]) => {
+    send: jest.fn(async (messages: NotificationMessage[]) => {
       sent.push(messages);
       return { ...ok, sent: messages.length, ...result };
     }),
@@ -149,34 +151,29 @@ describe('AC8: failures are logged and dropped', () => {
 
   it('the helper throwing: 200 with every message reported failed', async () => {
     const { d } = deps(rows('x'));
-    (d.send as jest.Mock).mockRejectedValueOnce(new Error('telegram down'));
+    (d.send as jest.Mock).mockRejectedValueOnce(new Error('push down'));
     const res = await handleNewMaterialRequest(post(), SECRET, d);
     expect(res.status).toBe(200);
     expect((await res.json()).failed).toEqual([
-      { userId: 'T', error: 'telegram down' },
-      { userId: 'S1', error: 'telegram down' },
-      { userId: 'M2', error: 'telegram down' },
+      { userId: 'T', error: 'push down' },
+      { userId: 'S1', error: 'push down' },
+      { userId: 'M2', error: 'push down' },
     ]);
   });
 });
 
-describe('AC5: with the real helper, the New materials switch decides', () => {
-  function client(on: boolean): ServiceClient {
+describe('AC5: with the real push sender, the New materials switch decides', () => {
+  function client(on: boolean) {
     const links = [
       { user_id: 'T', chat_id: 11, notify_general_chat: true, notify_new_material: true },
       { user_id: 'S1', chat_id: 12, notify_general_chat: true, notify_new_material: on },
     ];
-    return {
-      from: () => ({
-        select: () => ({ in: async () => ({ data: links, error: null }) }),
-        delete: () => ({ eq: () => ({ eq: async () => ({ data: null, error: null }) }) }),
-      }),
-    };
+    return pushClient(links).client;
   }
   const run = async (on: boolean) => {
-    const fetchFn = jest.fn(async () => new Response('{"ok":true}', { status: 200 }));
+    const fetchFn = pushFetch();
     const { d } = deps(rows('Exam tips').slice(0, 2));
-    d.send = (messages) => sendTelegramMessages(client(on), 'TOKEN', fetchFn as unknown as typeof fetch, messages);
+    d.send = (messages) => sendPushMessages(client(on), fetchFn.fetch, messages);
     const res = await handleNewMaterialRequest(post(), SECRET, d);
     return { body: await res.json(), fetchFn };
   };
@@ -184,13 +181,15 @@ describe('AC5: with the real helper, the New materials switch decides', () => {
   it('on: both get it as plain text', async () => {
     const { body, fetchFn } = await run(true);
     expect(body).toMatchObject({ sent: 2, skipped: 0 });
-    const sentBody = JSON.parse((fetchFn.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
-    expect(sentBody).toEqual({ chat_id: 11, text: BLOG, disable_web_page_preview: true });
+    expect(fetchFn.sent()).toEqual([
+      [11, BLOG],
+      [12, BLOG],
+    ]);
   });
 
   it('off for S1: S1 skipped, the teacher still gets it', async () => {
     const { body, fetchFn } = await run(false);
     expect(body).toMatchObject({ sent: 1, skipped: 1 });
-    expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect(fetchFn.mock).toHaveBeenCalledTimes(1);
   });
 });

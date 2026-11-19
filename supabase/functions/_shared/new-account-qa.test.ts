@@ -5,7 +5,7 @@
 // an upper-case uuid, the report a call returns, the secret and the name never logged, and the wiring between the Edge
 // Function, the migration and the README.
 import { handleNewAccountRequest, type NewAccountDeps, type NewAccountRecipient } from './new-account';
-import type { SendResult, TelegramMessage } from './telegram';
+import type { SendResult, NotificationMessage } from './notification';
 
 const fs = jest.requireActual<{ readFileSync: (p: string, e: string) => string }>('fs');
 const read = (p: string) => fs.readFileSync(p, 'utf8');
@@ -20,7 +20,7 @@ function deps(rows: NewAccountRecipient[]) {
   const logs: string[] = [];
   const d: NewAccountDeps = {
     recipient: jest.fn(async () => rows),
-    send: jest.fn(async (m: TelegramMessage[]): Promise<SendResult> => ({ sent: m.length, skipped: 0, failed: [], removed: 0 })),
+    send: jest.fn(async (m: NotificationMessage[]): Promise<SendResult> => ({ sent: m.length, skipped: 0, failed: [], removed: 0 })),
     log: (line) => logs.push(line),
   };
   return { d, logs };

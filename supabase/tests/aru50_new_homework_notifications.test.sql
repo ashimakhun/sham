@@ -196,7 +196,7 @@ select t.bot();
 select t.eq(t.recipients('HW4'), 'Algebra:M2,S2', 'AC5 removed listener left out, newly added one included');
 reset role;
 
--- AC 3: the trigger never looks at telegram_links; the switch only matters in the Edge Function (Jest). Approving S3
+-- AC 3: the trigger never looks at notification_settings; the switch only matters in the Edge Function (Jest). Approving S3
 -- later makes them a recipient of a call made now, never of one already sent (pg_net doesn't resend).
 update profiles set access_status = 'approved' where id = t.id('S3');
 select t.bot();
