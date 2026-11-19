@@ -257,14 +257,24 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    teacher deletes any course or general chat message, Blog post or review and a course's owner any message in its
    chat (no new delete policies: direct deletes keep their earlier rules); changes no data; see
    [Handling reports](#handling-reports-aru-158)),
-   `0065_username_sign_in.sql` (ARU-164: new table `usernames` (own row readable, no app writes; freed when the
+   `0065_offensive_word_filter.sql` (ARU-163: new table `blocked_words` with a starting English and Russian list (RLS
+   on, no policies: no app role can read or change it), and before insert / update triggers that refuse course and
+   general chat messages, meeting notes and Blog post titles / texts containing a listed word with the new code
+   `sham:text_not_allowed`; updates that don't change the text aren't checked; existing rows aren't changed; see
+   [Offensive word filter](#offensive-word-filter-aru-163)),
+   `0066_user_blocks.sql` (ARU-162: blocking a person. Adds `user_blocks` (own rows only: each user reads, adds and
+   removes their own blocks; approved accounts, never oneself, only people of their workspace; removed with either
+   account), leaves blocked authors out of the blocker's new-message counts (`chat_unread_counts()`,
+   `general_chat_unread_count()`) and Telegram recipients (`chat_message_recipients()`, `general_message_recipients()`,
+   `new_material_recipients()`, `meeting_notes_recipients()`); changes no data; not in the realtime publication),
+   `0067_username_sign_in.sql` (ARU-164: new table `usernames` (own row readable, no app writes; freed when the
    account is deleted); `handle_new_user()` requires a valid username, a matching internal address
    `<username>@users.sham.invalid` and a display name of 1–80 characters, and no longer uses the email as the name
    (SQL Editor inserts stay exempt); `access_requests()` returns `username` instead of `email`; turn off Confirm email
    first, see step 3; deletes no data).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. Turn off **Authentication → Email → Confirm email**, in development and production, **before** applying
-   `0065_username_sign_in.sql` (ARU-164). Username accounts sign up with an internal address that can't receive mail,
+   `0067_username_sign_in.sql` (ARU-164). Username accounts sign up with an internal address that can't receive mail,
    so with it on, new accounts could never be confirmed.
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
    [Password reset email](#password-reset-email). On the default email sender only the project's team members get
@@ -739,6 +749,15 @@ exactly one teacher per workspace, and after that the database rejects any chang
 new owner. A user sees their new role after pull-to-refresh or reopening the app. There is no per-student
 mentor: adding someone to a course as a listener makes the course owner their mentor for that course.
 
+### Offensive word filter (ARU-163)
+
+Course and general chat messages, meeting notes and Blog posts (title and text) that contain a word from the
+offensive word list are refused: "This text contains words that aren't allowed. Please change it." The check runs in
+the database (migration `0065_offensive_word_filter.sql`), so it applies to every app version and API call. Words
+match as whole words, ignoring case (Latin and Cyrillic). There is one global list, in the table `blocked_words`; no
+app screen shows it. Add, remove or list words in the SQL Editor with
+[`supabase/manage-words.sql`](supabase/manage-words.sql); a change applies to the next send or save.
+
 ## Checks
 
 ```bash
@@ -858,6 +877,7 @@ teacher" is that workspace's teacher, and nobody can see or change anything in a
 | Delete any general chat message (ARU-158) | | | ✓ |
 | Report a chat message, notes, a Blog post, a PDF or a review they can see, not their own (ARU-158) | ✓ | ✓ | ✓ |
 | See reports (Profile → Reports), delete reported content, dismiss reports (ARU-158; not about their own content: operator only) | | | ✓ |
+| Block / unblock a person, see own Blocked people (ARU-162; hides their chat messages, notes, Blog posts and reviews from me; private: nobody else sees blocks) | ✓ | ✓ | ✓ |
 | Delete any Blog post or course review (ARU-158) | | | ✓ |
 | General chat new message count (`general_chat_reads`, own row only) | ✓ | ✓ | ✓ |
 | See course meetings        | courses they're in | ✓ (all courses)  | ✓       |

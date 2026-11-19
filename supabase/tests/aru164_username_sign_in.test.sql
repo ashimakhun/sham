@@ -1,5 +1,5 @@
 -- ARU-164: sign-up and sign-in with a username and a display name. Rules under test:
--- supabase/migrations/0065_username_sign_in.sql.
+-- supabase/migrations/0067_username_sign_in.sql.
 select t.seed();
 
 -- A sign-up as Supabase Auth makes it: an insert into auth.users as supabase_auth_admin. errcode | hint, or 'ok'.

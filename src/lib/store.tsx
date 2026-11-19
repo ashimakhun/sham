@@ -319,6 +319,16 @@ export type Store = {
   deleteReportedContent: (report: ContentReport) => Promise<void>;
   /** ARU-158 AC 11: the teacher (any chat) or a course's owner (its chat) deletes a chat message. */
   deleteChatMessage: (kind: 'course_message' | 'general_message', id: string) => Promise<void>;
+  /** ARU-162: the people I've blocked (my own blocks only; nobody else can read them). Their chat messages, meeting
+   *  notes, Blog posts and reviews are hidden from me: `materials` and `meetingListenerNotes` already leave them out,
+   *  chats leave out their messages, and the review cards are filtered on screen (the rating stays unchanged). */
+  blockedUserIds: string[];
+  /** ARU-162: whether content by this author is hidden from me (never for a deleted account: no author). */
+  isBlocked: (authorId: string | null | undefined) => boolean;
+  /** ARU-162 AC 2 / 6: blocks a person. Their content disappears at once; blocking again does nothing. */
+  blockUser: (userId: string) => Promise<void>;
+  /** ARU-162 AC 5: unblocks a person; their content shows again (reloaded). */
+  unblockUser: (userId: string) => Promise<void>;
 };
 
 /** Live count refetches are batched: one request at most this often while messages arrive (ARU-31). */
@@ -880,6 +890,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [profiles, setProfiles] = useState<User[]>([]);
   const [accessRequests, setAccessRequests] = useState<AccessRequest[]>([]);
   const [contentReports, setContentReports] = useState<ContentReport[]>([]);
+  // ARU-162: the people I've blocked (ids).
+  const [blockedIds, setBlockedIds] = useState<string[]>([]);
   const [telegram, setTelegram] = useState<TelegramLink | null | undefined>(undefined);
   const [homework, setHomework] = useState<Homework[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -968,6 +980,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setProfiles([]);
         setAccessRequests([]);
         setContentReports([]);
+        setBlockedIds([]);
         setTelegram(undefined);
         setHomework([]);
         setMaterials([]);
@@ -1105,6 +1118,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setPhotoDeletionStart(null);
         setAccessRequests([]);
         setContentReports([]);
+        setBlockedIds([]);
         setUnread({});
         setGeneralUnread(0);
         setCourseBilling([]);
@@ -1173,6 +1187,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setAccessRequests([]);
         setContentReports([]);
       }
+      // ARU-162: my blocks (RLS: own rows only). On an error (offline, or before 0066 runs) the last known blocks stay,
+      // so a blocked person's content doesn't come back because of one failed request.
+      const blocks = await Promise.resolve(supabase.from('user_blocks').select('blocked_id')).catch(() => null);
+      if (!current()) return;
+      if (blocks && !blocks.error) {
+        setBlockedIds(((blocks.data as { blocked_id: string }[] | null) ?? []).map((b) => b.blocked_id));
+      }
       await Promise.all([loadUnread().catch(() => {}), loadGeneralUnread().catch(() => {})]);
     } finally {
       // A dropped answer leaves "loaded" to the load that replaced it (or to the next user's first load).
@@ -1209,6 +1230,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => sub.remove();
   }, [userId, verifyUser]);
 
+  // ARU-162 AC 4: the live handlers below read my blocks through a ref, so a block doesn't restart the channel.
+  const blockedRef = useRef<string[]>([]);
+  useEffect(() => {
+    blockedRef.current = blockedIds;
+  }, [blockedIds]);
+
   // Live updates start once the first load has said whether the account is approved.
   const firstLoadDone = !!userId && loadedFor === userId;
   useEffect(() => {
@@ -1242,7 +1269,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // A chat message refetches only the counts (one request, batched), never the full load() (ARU-31).
       // Realtime applies RLS, so only messages of chats the user is in arrive; their own never count.
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'course_messages' }, (payload) => {
-        if ((payload.new as MessageRow).author_id === userId) return;
+        const author = (payload.new as MessageRow).author_id;
+        // ARU-162 AC 4: a blocked author's message never counts (the database leaves it out too).
+        if (author === userId || (author != null && blockedRef.current.includes(author))) return;
         if (unreadTimer) return;
         unreadTimer = setTimeout(() => {
           unreadTimer = null;
@@ -1267,7 +1296,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       })
       // A general chat message refetches only the general count, batched the same way (ARU-72).
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'general_messages' }, (payload) => {
-        if ((payload.new as { author_id?: string }).author_id === userId) return;
+        const author = (payload.new as { author_id?: string | null }).author_id;
+        if (author === userId || (author != null && blockedRef.current.includes(author))) return;
         if (generalUnreadTimer) return;
         generalUnreadTimer = setTimeout(() => {
           generalUnreadTimer = null;
@@ -1314,6 +1344,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const currentUser = profiles.find((u) => u.id === userId) ?? null;
   // Only approved accounts are users of the app: pickers and lists never offer people still waiting (ARU-43).
   const users = useMemo(() => profiles.filter((u) => u.accessStatus === 'approved'), [profiles]);
+  // ARU-162 AC 2: Blog posts and meeting notes of people I've blocked are left out everywhere (lists, details, the
+  // meetings' Notes link). A deleted author (null) is never blocked.
+  const blockedSet = useMemo(() => new Set(blockedIds), [blockedIds]);
+  const isBlocked = useCallback((authorId: string | null | undefined) => !!authorId && blockedSet.has(authorId), [blockedSet]);
+  const visibleMaterials = useMemo(() => materials.filter((m) => !isBlocked(m.teacherId)), [materials, isBlocked]);
+  const visibleListenerNotes = useMemo(
+    () => meetingListenerNotes.filter((n) => !isBlocked(n.authorId)),
+    [meetingListenerNotes, isBlocked],
+  );
   const getUser = useCallback((id: string | undefined) => users.find((u) => u.id === id), [users]);
   const sortedCourses = useMemo(
     () => [...courses].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
@@ -1434,7 +1473,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     session,
     currentUser,
     users,
-    materials,
+    materials: visibleMaterials,
     materialFiles: sortedMaterialFiles,
     courses: sortedCourses,
     courseMembers,
@@ -1442,7 +1481,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     meetings,
     assignments,
     attendance,
-    meetingListenerNotes,
+    meetingListenerNotes: visibleListenerNotes,
     assignmentSentCounts,
     materialLikes,
     courseFeedback,
@@ -2285,6 +2324,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     deleteChatMessage: async (kind, id) => {
       await deleteThroughFunction(kind, id);
+    },
+    blockedUserIds: blockedIds,
+    isBlocked,
+    blockUser: async (blockedId) => {
+      if (!currentUser) throw new Error('Please sign in again.');
+      // AC 6: blocking someone already blocked does nothing (no error).
+      check(
+        await supabase
+          .from('user_blocks')
+          .upsert({ blocker_id: currentUser.id, blocked_id: blockedId }, { onConflict: 'blocker_id,blocked_id', ignoreDuplicates: true }),
+      );
+      // AC 2: hidden at once, everywhere; the counts drop their messages (AC 4).
+      setBlockedIds((ids) => (ids.includes(blockedId) ? ids : [...ids, blockedId]));
+      loadUnread().catch(() => {});
+      loadGeneralUnread().catch(() => {});
+    },
+    unblockUser: async (blockedId) => {
+      if (!currentUser) throw new Error('Please sign in again.');
+      check(await supabase.from('user_blocks').delete().eq('blocker_id', currentUser.id).eq('blocked_id', blockedId));
+      setBlockedIds((ids) => ids.filter((id) => id !== blockedId));
+      // AC 5: their content, counts included, comes back with the next load.
+      await load().catch(() => {});
     },
     unreadCount: (courseId) => (courseId === activeChat ? 0 : (unread[courseId] ?? 0)),
     markChatRead,

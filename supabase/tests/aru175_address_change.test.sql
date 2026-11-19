@@ -1,5 +1,5 @@
 -- ARU-175 (ARU-164 AC 14): the Auth address can't change after sign-up except to the account's own internal address.
--- Rules under test: supabase/migrations/0065_username_sign_in.sql, part 4. Case numbers follow the analysis comment.
+-- Rules under test: supabase/migrations/0067_username_sign_in.sql, part 4. Case numbers follow the analysis comment.
 select t.seed();
 
 create function pg_temp.u(who text) returns uuid language sql immutable as $$ select md5('aru175' || who)::uuid $$;
