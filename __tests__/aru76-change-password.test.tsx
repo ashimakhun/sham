@@ -38,8 +38,10 @@ describe('AC1: Change password on Profile', () => {
     const buttons = screen.getAllByRole('button');
     const at = (name: string | RegExp) => buttons.indexOf(screen.getByRole('button', { name }));
     expect(at('Change password')).toBeGreaterThan(at('Open general chat'));
-    // ARU-162: Blocked people sits between Change password and Sign out.
-    expect(at('Change password')).toBe(at('Blocked people') - 1);
+    // ARU-162: Blocked people sits between Change password and Sign out; ARU-165 AC 5: Recovery code right under
+    // Change password.
+    expect(at('Change password')).toBe(at('Recovery code') - 1);
+    expect(at('Recovery code')).toBe(at('Blocked people') - 1);
     expect(at('Blocked people')).toBe(at('Sign out') - 1);
     if (who === 'T') expect(at('Change password')).toBeGreaterThan(at(/^Manage roles/));
     await fireEvent.press(button('Change password'));

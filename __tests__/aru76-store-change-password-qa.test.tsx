@@ -88,7 +88,8 @@ it('AC5: the older code-less reply "Invalid login credentials" (400) is a wrong 
 // ARU-108 AC 7a: "Email not confirmed" now comes through as the catalog text, still never as a wrong password.
 it.each([
   ['a server error', { message: 'Database error querying schema', code: 'unexpected_failure', status: 500 }, 'Database error querying schema'],
-  ['email not confirmed', { message: 'Email not confirmed', code: 'email_not_confirmed', status: 400 }, 'Confirm your email first: open the link we sent you.'],
+  // ARU-165 AC 13 removed auth.emailNotConfirmed: Auth's own text is shown (still not "wrong password").
+  ['email not confirmed', { message: 'Email not confirmed', code: 'email_not_confirmed', status: 400 }, 'Email not confirmed'],
 ])('%s on the check is not shown as a wrong password; nothing updated', async (_k, error, shown) => {
   mockAuth.signInWithPassword.mockResolvedValue({ data: {}, error });
   await mount();

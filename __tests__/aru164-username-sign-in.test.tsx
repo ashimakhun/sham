@@ -93,7 +93,7 @@ describe('sign-in screen', () => {
     await waitFor(() => expect(signUp).toHaveBeenCalledWith('Dana', 'Dana_S', 'secret1', { kind: 'join', code: 'ABCD2345' }));
   });
 
-  it('AC 6, AC 8, AC 9: Sign in takes a username or an email, with the hint and no Forgot password?', async () => {
+  it('AC 6, AC 8: Sign in takes a username or an email, with the hint (ARU-165 AC 8 brings Forgot password? back)', async () => {
     const signIn = jest.fn(async () => {});
     setStore(fakeStore(null, { signIn }));
     await render(<SignInScreen />);
@@ -103,7 +103,7 @@ describe('sign-in screen', () => {
     expect(field.props.autoComplete).toBe('username');
     expect(field.props.textContentType).toBe('username');
     expect(screen.getByText('Created your account with an email? Sign in with it.')).toBeTruthy();
-    expect(screen.queryByText('Forgot password?')).toBeNull();
+    expect(screen.getByText('Forgot password?')).toBeTruthy();
     await fireEvent.changeText(field, 'ab'); // no sign-up rules when signing in
     await fireEvent.changeText(screen.getByPlaceholderText('At least 6 characters'), 'secret1');
     expect(screen.queryByText(RULE)).toBeNull();

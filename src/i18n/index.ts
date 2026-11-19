@@ -87,13 +87,11 @@ const MESSAGE_IDS: [TextId, Params?][] = [
   // ARU-164: username sign-in and sign-up.
   ['auth.invalidUsernameCredentials'],
   ['auth.usernameTaken'],
-  ['auth.emailNotConfirmed'],
   ...Array.from({ length: 30 }, (_, i): [TextId, Params] => ['auth.weakPassword', { min: i + 1 }]),
   ['auth.rateLimited'],
   ['auth.network'],
   ['auth.samePassword'],
   ['auth.wrongCurrentPassword'],
-  ['auth.codeInvalid'],
   ['auth.signedOut'],
   ['auth.signInAgain'],
   ['profile.nameTooLong', { max: 80 }],
@@ -105,6 +103,11 @@ const MESSAGE_IDS: [TextId, Params?][] = [
   ['profile.waitingApproval'],
   ['profile.languageSaveFailed'],
   ['signIn.accountDeleted'],
+  // ARU-165: Forgot password with a recovery code, and the Save your recovery code screen.
+  ['signIn.passwordChangedSignedOut'],
+  ['forgot.wrong'],
+  ['forgot.locked'],
+  ['recovery.replaced'],
   // ARU-146: the sign-up refusal the app words itself when joining (Supabase Auth hides the database's hint).
   ['db.invite_code_unknown'],
 ];
