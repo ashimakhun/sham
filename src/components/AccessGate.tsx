@@ -4,6 +4,7 @@ import { RefreshControl, ScrollView, View } from 'react-native';
 import { Text } from '@/components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ChooseUsernameScreen } from '@/components/ChooseUsernameScreen';
 import { DeleteAccountForm } from '@/components/DeleteAccountForm';
 import { Button, ErrorText, styles } from '@/components/ui';
 import { translate } from '@/i18n';
@@ -19,10 +20,14 @@ export const DECLINED_TEXT = translate('en', 'gate.declinedText');
 
 /**
  * ARU-43: an account that isn't approved sees only this screen, whatever route it opens (deep links included).
- * Approved accounts, and signed-out visitors (the sign-in screen), get the app as usual.
+ * Approved accounts, and signed-out visitors (the sign-in screen), get the app as usual. ARU-168: Choose a username
+ * comes before all of it.
  */
 export function AccessGate({ children }: { children: ReactNode }) {
-  const { currentUser } = useStore();
+  const { currentUser, needsUsername } = useStore();
+  // ARU-168 AC 1: an older account (no username) chooses one first, before the waiting / declined screen and the tabs.
+  // Later gates (ARU-165's Save your recovery code) come after this one.
+  if (needsUsername) return <ChooseUsernameScreen />;
   const status = currentUser?.accessStatus;
   if (!currentUser || !status || status === 'approved') return <>{children}</>;
   return <AccessScreen declined={status === 'rejected'} />;

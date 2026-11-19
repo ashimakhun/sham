@@ -878,5 +878,10 @@
   "db.signup_email_mismatch": "Create your account in the app with a username.",
   "db.display_name_invalid": "Display name must be 1 to 80 characters.",
   "db.username_taken": "This username is taken. Try another one.",
-  "db.address_change_refused": "This account's sign-in address can't be changed."
+  "db.address_change_refused": "This account's sign-in address can't be changed.",
+  "chooseUsername.title": "Choose a username",
+  "chooseUsername.text": "Sham no longer keeps email addresses. Choose a username to sign in with from now on. Your email will then be deleted.",
+  "chooseUsername.usernameA11y": "Username to sign in with",
+  "chooseUsername.displayNameA11y": "Display name, shown to others",
+  "db.username_already_set": "This account already has a username."
 }

@@ -271,7 +271,13 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    account is deleted); `handle_new_user()` requires a valid username, a matching internal address
    `<username>@users.sham.invalid` and a display name of 1–80 characters, and no longer uses the email as the name
    (SQL Editor inserts stay exempt); `access_requests()` returns `username` instead of `email`; turn off Confirm email
-   first, see step 3; deletes no data).
+   first, see step 3; deletes no data),
+   `0070_existing_usernames.sql` (ARU-168: older accounts without a username. Adds `app_settings.username_deadline`
+   (now + 60 days), `choose_username(username, display_name)` (own account only, signed in) and the daily pg_cron job
+   `username-deadline` (`move_unclaimed_accounts()`, postgres only), which after the deadline gives every remaining
+   older account except teachers a `user-xxxxxx` username. Both erase the real email and sign-up name from Auth, see
+   [Usernames for older accounts](#usernames-for-older-accounts-aru-168); pg_cron must be on; changes no rows itself
+   except the new setting). 0068 and 0069 belong to ARU-167 and ARU-166.
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. Turn off **Authentication → Email → Confirm email**, in development and production, **before** applying
    `0067_username_sign_in.sql` (ARU-164). Username accounts sign up with an internal address that can't receive mail,
@@ -279,6 +285,35 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
    [Password reset email](#password-reset-email). On the default email sender only the project's team members get
    the email; real users need custom SMTP.
+
+### Usernames for older accounts (ARU-168)
+
+Accounts made before ARU-164 (or added in the SQL Editor) have no `usernames` row. On their next start the app shows
+**Choose a username** before anything else; Save runs `choose_username()`, which saves the username and display name
+and **moves the account over**: its Auth address becomes `<username>@users.sham.invalid`, and the real email and the
+sign-up name are erased from `auth.users` (address, pending email change, email tokens, user metadata),
+`auth.identities.identity_data`, `auth.audit_log_entries.payload` and `auth.one_time_tokens`. Sessions stay valid.
+
+The deadline is `app_settings.username_deadline` (set to 60 days after `0070` ran). From then on the daily job
+`username-deadline` (02:43 UTC) moves every remaining older account **except teachers** with a generated `user-xxxxxx`
+username (an email-like display name becomes that username). A teacher keeps signing in with the email until they
+choose a username themselves, so the workspace is never left without a way in. Running the job again changes nothing.
+
+To check one account's move (SQL Editor; put the account's id in `:id` and its old email in `:old`):
+
+```sql
+select u.email, u.email_change, u.email_change_token_new, u.email_change_token_current, u.confirmation_token,
+       u.recovery_token, u.raw_user_meta_data,
+       (select username from public.usernames where user_id = u.id) as username,
+       (select json_agg(identity_data) from auth.identities where user_id = u.id) as identities,
+       (select count(*) from auth.audit_log_entries where payload::text ilike '%' || :'old' || '%') as audit_rows_with_old_email,
+       (select count(*) from auth.one_time_tokens where user_id = u.id) as one_time_tokens
+from auth.users u where u.id = :'id';
+```
+
+Expected: the internal address, empty email-change and token columns, metadata without `email` / `full_name` / `name`,
+identities with only `sub`, the internal `email` and the verified flags, and 0 for the two counts. To run the job by
+hand: `select public.move_unclaimed_accounts();` (returns how many accounts it moved; does nothing before the deadline).
 
 ### Password reset email
 
@@ -930,6 +965,9 @@ teacher" is that workspace's teacher, and nobody can see or change anything in a
 | Sign up with a username and display name (signed out, ARU-164) | ✓ | ✓ | ✓ |
 | See own username (`usernames`, own row only; also waiting / declined accounts, ARU-164) | own | own | own |
 | See others' usernames (access requests of own workspace, `access_requests()`, ARU-164) |  |  | ✓ |
+| Choose own username and display name, once, as an older account (`choose_username()`, any approval state, ARU-168) | own | own | own |
+| Moved to a generated `user-xxxxxx` username by the 60-day job (older accounts only, ARU-168) | ✓ | ✓ | (never) |
+| Choose or change someone else's username |  |  | (nobody) |
 | Become / stop being teacher (other than by creating a workspace at sign-up) |          |                    | (nobody) |
 | Delete own account (ARU-75; password again; also waiting / declined accounts) | ✓ | ✓ (not while owning a course) | (never) |
 | Delete someone else's account |         |                    | (nobody) |

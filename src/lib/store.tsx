@@ -122,6 +122,14 @@ export type Store = {
   refresh: () => Promise<void>;
   getUser: (id: string | undefined) => User | undefined;
   getCourse: (id: string | undefined) => Course | undefined;
+  /** ARU-168: the signed-in account's own username (usernames row), null for an older account without one, undefined
+   *  while unknown (not loaded yet, or the request failed with nothing known before). */
+  myUsername: string | null | undefined;
+  /** ARU-168 AC 1: an older account (no usernames row) must choose a username before anything else. */
+  needsUsername: boolean;
+  /** ARU-168 AC 3: saves the username and display name and moves the account over (choose_username()), then refreshes
+   *  the session (so its address is the internal one) and reloads. "Already set" (another device) just reloads. */
+  chooseUsername: (username: string, displayName: string) => Promise<void>;
   /** ARU-164: a username (or an older account's email, AC 8) and the password. */
   signIn: (username: string, password: string) => Promise<void>;
   /** ARU-146: creates the account and, in the same step, the workspace (its teacher) or the request to join one (by
@@ -918,6 +926,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [generalUnread, setGeneralUnread] = useState(0);
   const [generalChatOpen, setGeneralChatOpen] = useState(false);
   const [accountNotice, setAccountNotice] = useState<string | null>(null);
+  // ARU-168: the own usernames row (see Store.myUsername).
+  const [myUsername, setMyUsername] = useState<string | null | undefined>(undefined);
 
   const userId = session?.user.id;
   // ARU-157: the signed-in user as the auth handler last set it (synchronously, unlike `session`), so a load that
@@ -982,6 +992,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setContentReports([]);
         setBlockedIds([]);
         setTelegram(undefined);
+        setMyUsername(undefined);
         setHomework([]);
         setMaterials([]);
         setMaterialFiles([]);
@@ -1052,7 +1063,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     try {
       // RLS returns nothing but the own profile to an account that isn't approved (ARU-43), so these all succeed
       // (empty) for it and the app shows the waiting screen.
-      const [profileRows, hw, mats, crs, members, mtgs, asgs, att, files, likes, fb, discs, listenerNotes] = await Promise.all([
+      const [profileRows, hw, mats, crs, members, mtgs, asgs, att, files, likes, fb, discs, listenerNotes, own] = await Promise.all([
         // '*' so the app keeps working if the access_status column (0021) isn't there yet.
         supabase.from('profiles').select('*').order('full_name'),
         supabase.from('homework').select('*').order('created_at', { ascending: false }),
@@ -1074,6 +1085,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         supabase.from('disciplines').select('*').order('name'),
         // ARU-125: oldest first, as the Notes page lists them.
         supabase.from('meeting_listener_notes').select('*').order('created_at').order('id'),
+        // ARU-168: the own username (RLS: own row only). Loaded with the profile so the Choose a username screen shows
+        // before anything else. A failure (offline, or before 0067) gives null here and keeps what was known.
+        Promise.resolve(supabase.from('usernames').select('username')).catch(() => null),
       ]);
       if (!current()) return;
       const signedHomework = await withSignedPhotoUrls(rows<HomeworkRow>(hw).map(toHomework));
@@ -1097,6 +1111,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         verifyUser().catch(() => {});
       }
       setProfiles(all);
+      if (own && !own.error) {
+        setMyUsername(((own.data as { username: string }[] | null) ?? [])[0]?.username ?? null);
+      }
       setHomework(signedHomework);
       setMaterials(rows<MaterialRow>(mats).map(toMaterial));
       setCourses(rows<CourseRow>(crs).map(toCourse));
@@ -1492,6 +1509,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     refresh,
     getUser,
     getCourse,
+    myUsername,
+    needsUsername: !!currentUser && myUsername === null,
+    chooseUsername: async (username, displayName) => {
+      const res = await Promise.resolve(
+        supabase.rpc('choose_username', { username: normalizeUsername(username), display_name: displayName.trim() }),
+      ).catch(() => null);
+      if (!res) throw new Error(NETWORK_ERROR);
+      if (res.error) {
+        // Edge case (two devices): saved on the other one already; reload and continue.
+        if (res.error.hint === 'sham:username_already_set') {
+          await load().catch(() => {});
+          return;
+        }
+        if (res.error.hint === 'sham:username_taken') throw new Error(USERNAME_TAKEN);
+        // No database code: the request didn't get through (offline, server down). Nothing was saved.
+        if (!res.error.hint && !res.error.code) throw new Error(NETWORK_ERROR);
+        throw new Error(dbErrorMessage(res.error));
+      }
+      setMyUsername(normalizeUsername(username));
+      // AC 3: the session now carries the internal address (Change password signs in with it). Offline: the app
+      // continues; changePassword reads the Auth user again anyway.
+      await Promise.resolve(supabase.auth.refreshSession()).catch(() => {});
+      await load().catch(() => {});
+    },
     signIn: async (username, password) => {
       setAccountNotice(null);
       // ARU-108 AC 7a: Auth errors in the app's wording (translated on the screen). ARU-164: a username becomes its
@@ -1554,7 +1595,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (newPassword === currentPassword) throw new Error(SAME_PASSWORD);
       // A stolen unlocked phone isn't enough: the current password must be right. Signing in again also gives a
       // fresh session, so the update passes with "Secure password change" turned on.
-      const verified = await supabase.auth.signInWithPassword({ email: me.email, password: currentPassword });
+      // ARU-168 AC 5: the latest address from Auth (the account may have been moved over since this session started),
+      // never a cached old email; the session's own when Auth can't be asked.
+      let email = me.email;
+      try {
+        const latest = await supabase.auth.getUser();
+        if (latest.data?.user?.id === me.id && latest.data.user.email) email = latest.data.user.email;
+      } catch {
+        // Keep the session's address.
+      }
+      const verified = await supabase.auth.signInWithPassword({ email, password: currentPassword });
       if (verified.error) {
         throw new Error(isInvalidCredentials(verified.error) ? WRONG_CURRENT_PASSWORD : authErrorMessage(verified.error));
       }

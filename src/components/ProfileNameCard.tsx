@@ -18,9 +18,11 @@ export const EDIT_NAME_ICON = 'create-outline' as const;
 /** The Profile tab's name card (display name, username, role) with an "Edit name" pencil for the signed-in user (ARU-55, ARU-71). Only approved
  *  users reach the Profile tab: pending and rejected accounts see only the waiting screen (ARU-43). */
 export function ProfileNameCard() {
-  const { currentUser, session, updateMyName } = useStore();
+  const { currentUser, session, myUsername, updateMyName } = useStore();
   // ARU-164: a username account's Auth address is <username>@<internal domain>; an older account's email shows nothing.
-  const username = usernameFromAddress(session?.user.email);
+  // ARU-168 AC 9: the own usernames row first, so an account the job moved shows its new username before the session
+  // carries the new address.
+  const username = myUsername ?? usernameFromAddress(session?.user.email);
   const { busy, error, run } = useAction();
   const { t, tm } = useI18n();
   const [editing, setEditing] = useState(false);

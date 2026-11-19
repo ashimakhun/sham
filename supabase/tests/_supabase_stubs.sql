@@ -12,7 +12,44 @@ create schema auth;
 create table auth.users (
   id uuid primary key default gen_random_uuid(),
   email text,
-  raw_user_meta_data jsonb default '{}'::jsonb
+  raw_user_meta_data jsonb default '{}'::jsonb,
+  -- ARU-168: the pending-email and token columns Supabase Auth keeps (varchar(255) there).
+  email_change text default '',
+  email_change_token_new text default '',
+  email_change_token_current text default '',
+  email_change_confirm_status smallint default 0,
+  confirmation_token text default '',
+  recovery_token text default '',
+  reauthentication_token text default ''
+);
+-- ARU-168: the other Auth tables that hold an email, as Supabase defines the columns used here.
+create table auth.identities (
+  id uuid primary key default gen_random_uuid(),
+  provider_id text not null,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  identity_data jsonb not null,
+  provider text not null,
+  email text generated always as (lower(identity_data ->> 'email')) stored,
+  unique (provider_id, provider)
+);
+create table auth.audit_log_entries (
+  id uuid primary key default gen_random_uuid(),
+  payload json,
+  created_at timestamptz default now(),
+  ip_address varchar(64) not null default ''
+);
+create table auth.one_time_tokens (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  token_type text not null,
+  token_hash text not null,
+  relates_to text not null,
+  created_at timestamp default now()
+);
+-- Supabase Auth's sessions: the move must leave them alone (AC 6).
+create table auth.sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade
 );
 
 -- Same resolution order as Supabase's auth.uid().
@@ -55,7 +92,8 @@ create publication supabase_realtime;
 grant usage on schema public, auth, storage to anon, authenticated, service_role;
 grant execute on function auth.uid() to anon, authenticated;
 grant usage on schema auth to supabase_auth_admin;
-grant select, insert, update, delete on auth.users to supabase_auth_admin;
+grant select, insert, update, delete on auth.users, auth.identities, auth.audit_log_entries, auth.one_time_tokens,
+  auth.sessions to supabase_auth_admin;
 grant all on storage.objects, storage.buckets to anon, authenticated, service_role;
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
