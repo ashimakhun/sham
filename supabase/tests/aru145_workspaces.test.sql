@@ -192,8 +192,9 @@ select t.ok((select not (t.x('XT') = any(recipient_ids)) and t.id('T') = any(rec
 select t.ok((select bool_and(p.workspace_id = t.x('W2')) from general_message_recipients(t.x('XGM')) r, unnest(r.recipient_ids) u
   join profiles p on p.id = u), 'AC10 general chat: only W2 accounts');
 select t.ok((select not (t.x('XS') = any(recipient_ids)) from general_message_recipients(t.x('AGM'))), 'AC10 general chat: no W2 account for the first workspace');
-select t.ok((select array_agg(user_id order by user_id) from new_material_recipients('blog', t.x('XMAT')))
-  = (select array_agg(id order by id) from profiles where id in (t.x('XS'), t.x('XM'))), 'AC10 new material: only W2 accounts with Telegram');
+select t.eq((select array_agg(user_id order by user_id) from new_material_recipients('blog', t.x('XMAT'))),
+  (select array_agg(id order by id) from profiles where id in (t.x('XS'), t.x('XM'), t.x('XP'))),
+  'AC10 new material: only W2 accounts (since ARU-166 also XP, accepted in AC9, who has no Telegram link)');
 reset role;
 insert into auth.users (id, email, raw_user_meta_data) values (t.x('XP2'), 'xp2@x.test', '{"full_name":"Xu New"}');
 update profiles set workspace_id = t.x('W2') where id = t.x('XP2');

@@ -41,7 +41,7 @@ function deps(rows: NewAccountRecipient[], result: Partial<SendResult> = {}) {
 }
 
 const dana: NewAccountRecipient = { account_name: 'Dana Serikova', user_id: 'T' };
-const TEXT = 'New account waiting for your approval: Dana Serikova. Open Sham → Manage roles to accept or decline.';
+const TEXT = 'New account waiting for your approval. Open Sham → Manage roles to accept or decline.';
 
 describe('AC7: the secret', () => {
   it.each([
@@ -74,7 +74,7 @@ describe('AC1: the message', () => {
   it('text is exactly as the story sets it, names as typed', () => {
     expect(newAccountText('Dana Serikova')).toBe(TEXT);
     expect(newAccountText('Дана "*_<b>" 😀')).toBe(
-      'New account waiting for your approval: Дана "*_<b>" 😀. Open Sham → Manage roles to accept or decline.',
+      'New account waiting for your approval. Open Sham → Manage roles to accept or decline.',
     );
   });
 

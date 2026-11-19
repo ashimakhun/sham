@@ -262,7 +262,14 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    removes their own blocks; approved accounts, never oneself, only people of their workspace; removed with either
    account), leaves blocked authors out of the blocker's new-message counts (`chat_unread_counts()`,
    `general_chat_unread_count()`) and Telegram recipients (`chat_message_recipients()`, `general_message_recipients()`,
-   `new_material_recipients()`, `meeting_notes_recipients()`); changes no data; not in the realtime publication).
+   `new_material_recipients()`, `meeting_notes_recipients()`); changes no data; not in the realtime publication),
+   `0069_push_notifications.sql` (ARU-166: push notifications. Adds `push_devices` (one row per phone: a random
+   install id, the Expo push token, the platform and the time; nothing else) and `notification_settings` (one switch
+   per notification kind; no row means every switch on); both are read by their owner only and written only through
+   the new `register_push_device()`, `unregister_push_device()` and `set_notification()`, and both follow the
+   workspace rules. Copies every Telegram link's switch values into `notification_settings`, and
+   `new_material_recipients()` / `meeting_notes_recipients()` no longer need a Telegram link; deletes no data; see
+   [Push notifications](#push-notifications-aru-166)).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. For development, turn off **Authentication → Email → Confirm email**.
 4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
@@ -310,7 +317,54 @@ There can be only one teacher. If your database already has two or more, `0009_r
 `update profiles set role = 'mentor' where id = (select id from auth.users where email = '…');` for each extra
 teacher in the SQL Editor, then run the migration again.
 
+### Push notifications (ARU-166)
+
+Since ARU-166 every notification arrives on the phone as a push, sent by the notification Edge Functions through
+Expo's push service (in front of Apple's APNs and Google's FCM, `supabase/functions/_shared/push.ts`). Each person
+picks what they get on **Profile → Notifications** (the switches are saved on the account, the same on every phone).
+Push texts never name a person: they say what happened and where (for example "New message in the Algebra chat").
+
+* **A development build is needed** (`expo-notifications` is a native module). Push doesn't work in Expo Go or on the
+  web: the Notifications page says "Notifications work in the installed Sham app." there, and nothing is registered.
+* The phone asks for permission the first time the person opens **Profile → Notifications** (or turns a switch on
+  there), never at app start or sign-in. On Android the app first creates its **General** channel.
+* What's stored per phone (`push_devices`): a random install id, the Expo push token, `ios` / `android` and the time.
+  No name, email, phone number or device model. The app registers again on every open and return to the foreground;
+  Sign out removes the phone's registration first. **Offline sign-out:** the registration stays until someone signs
+  in on that phone (it moves to them) or Expo reports the token invalid (it's then deleted on the next send).
+
+**Setup (a person, once):**
+
+1. Run `0069_push_notifications.sql` (see [Setup](#setup)).
+2. Android: create a Firebase project for `com.ashimakhun.sham`, make an **FCM V1 service account key** (Firebase
+   console → Project settings → Service accounts → Generate new private key) and upload it:
+   `npx eas-cli@latest credentials` → Android → `development` (and `production`) → **Google Service Account** →
+   **Manage your Google Service Account Key for Push Notifications (FCM V1)** → upload the JSON file.
+3. iOS: `npx eas-cli@latest credentials` → iOS → **Push Notifications: Manage your Apple Push Notifications Key** →
+   let EAS create an APNs key (needs the paid Apple Developer account).
+4. Build and install a development build on a phone: `npx eas-cli@latest build --profile development --platform ios`
+   (and `--platform android`).
+5. Deploy the notification functions again (they now send push): `npx supabase functions deploy
+   chat-message-notifications homework-reviewed-notifications homework-submitted-notifications
+   meeting-notes-notifications meeting-start-notifications new-account-notifications new-homework-notifications
+   new-material-notifications photo-deletion --no-verify-jwt`.
+6. Optional: only if **push security** (enhanced security for push notifications) is turned on for the project in
+   Expo, create an access token on expo.dev and set it: `npx supabase secrets set EXPO_ACCESS_TOKEN=<token>`.
+   Without it nothing changes. The functions no longer read `TELEGRAM_BOT_TOKEN`.
+
+**Checking one push:** sign in on the development build with an approved account, open **Profile → Notifications**
+and allow notifications. The phone's row appears in `push_devices` (Table editor). Then either trigger an event (for
+example post in a course chat from another account) or send a test with Expo's push tool
+(https://expo.dev/notifications) to the token in that row. A push shows as a banner even while Sham is open; tapping
+it opens Sham. Each function's response (in `net._http_response`) reports `recipients`, `sent`, `skipped`, `failed`
+and `removed`.
+
 ### Telegram notifications
+
+> **Since ARU-166 Telegram no longer sends notifications**: the functions below send push notifications instead (see
+> [Push notifications](#push-notifications-aru-166)), and Profile shows **Notifications** instead of **Telegram
+> notifications**. The bot still answers `/start` and `/stop`. ARU-171 removes the Telegram sections, the bot and its
+> tables. The steps below are kept until then.
 
 Notifications go through the Sham Telegram bot (ARU-48). Each user connects on **Profile → Telegram notifications**
 and chooses which types they get. Until the steps below are done the card stays hidden and nothing else changes.
@@ -896,7 +950,11 @@ teacher" is that workspace's teacher, and nobody can see or change anything in a
 | See / copy the workspace's invite code (Manage roles, ARU-146) | | | ✓ |
 | Switch student ↔ mentor    |           |                    | ✓       |
 | Accept or reject new accounts |        |                    | ✓       |
-| Connect Telegram and choose own notifications | ✓ (own) | ✓ (own) | ✓ (own) |
+| Connect Telegram and choose own notifications (no longer reachable from Profile since ARU-166) | ✓ (own) | ✓ (own) | ✓ (own) |
+| Register / unregister own phone for push (`push_devices`, ARU-166; waiting / declined accounts: unregister only) | ✓ (own) | ✓ (own) | ✓ (own) |
+| See and change own notification switches (Profile → Notifications, `notification_settings`, ARU-166) | ✓ (own) | ✓ (own) | ✓ (own) |
+| See anyone else's phones or switches | | | (nobody) |
+| Get push notifications (ARU-166): the same people as the Telegram rows below, linked or not, with that switch on, on every registered phone | as below | as below | as below |
 | Get a Telegram message for every new course chat message (ARU-44, ARU-87; linked, **Chat messages** on) | courses they're in | own courses + courses they're in | all courses |
 | Get a Telegram message for every new general chat message (ARU-87; linked, **General chat** on) | ✓ | ✓ | ✓ |
 | Get "Your homework … was reviewed" in Telegram (ARU-49) | own homework, when checked | own homework (sent as a listener), when checked | (never sends homework) |

@@ -4,7 +4,7 @@ import { ScrollView, View } from 'react-native';
 import { AccountantSection } from '@/components/Accountant';
 import { LanguageSwitch } from '@/components/LanguageSwitch';
 import { ProfileNameCard } from '@/components/ProfileNameCard';
-import { TelegramButton } from '@/components/Telegram';
+import { NotificationsButton } from '@/components/Notifications';
 import { Button, ErrorText, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import { canManageRoles, canUseGeneralChat } from '@/lib/roles';
@@ -41,8 +41,8 @@ export default function ProfileScreen() {
       )}
 
       {/* ARU-98: no course cards here; courses are listed on the Courses tab. */}
-      {/* ARU-101: a button that opens the Telegram notifications page. */}
-      <TelegramButton />
+      {/* ARU-166 AC 7: "Notifications >" where ARU-101's "Telegram notifications >" was, for every role. */}
+      <NotificationsButton />
       {/* ARU-65: accountants and the teacher. */}
       <AccountantSection />
       {/* ARU-108: English / Русский, saved on the account. */}

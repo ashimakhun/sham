@@ -11,6 +11,7 @@ import { dbErrorMessage, phoneLanguage, translate } from '@/i18n';
 
 import { PHOTO_TOO_LARGE } from './compressPhoto';
 import { newId } from './id';
+import { syncPushRegistration, unregisterThisPhone, type PushRpc } from './push';
 import { PHOTOS_ZIP_ERROR } from './photoRetention';
 import { isAllowedProof, PROOF_MAX_BYTES, PROOF_RULE, proofFormat } from './paymentProof';
 import { NOTES_MAX } from './markdown';
@@ -249,6 +250,15 @@ export type Store = {
   setTelegramNotification: (kind: TelegramKind, enabled: boolean) => Promise<void>;
   /** Removes the Telegram link and its switches. */
   disconnectTelegram: () => Promise<void>;
+  /** ARU-166: the signed-in user's notification switches (saved on the account): undefined until loaded. An account
+   *  that never set one has no row, which reads as every switch on (AC 8). */
+  notificationSettings: Record<TelegramKind, boolean> | undefined;
+  /** ARU-166: refetches the switches (the Notifications page calls it on focus). An error keeps what was loaded. */
+  loadNotificationSettings: () => Promise<void>;
+  /** ARU-166: turns one notification kind on or off for the account (set_notification). Throws when saving fails. */
+  setNotification: (kind: TelegramKind, enabled: boolean) => Promise<void>;
+  /** ARU-166: registers this phone for push (or removes its registration when notifications are off). Never throws. */
+  syncPushDevice: () => Promise<void>;
   /** ARU-107 AC 2: the app-wide deletion start date (YYYY-MM-DD, UTC), or null until ARU-112's daily job first runs.
    *  While null, no homework photo has a deletion date. */
   photoDeletionStart: string | null;
@@ -493,6 +503,24 @@ type TelegramLinkRow = {
   /** ARU-151 (0062); undefined before that migration runs. */
   notify_meeting_notes?: boolean;
 };
+// ARU-166: notification_settings columns, in the app's kinds. A missing row or column reads as on (AC 8).
+const NOTIFICATION_KINDS: TelegramKind[] = [
+  'meeting_started',
+  'new_homework',
+  'homework_reviewed',
+  'photo_deletion',
+  'homework_submitted',
+  'chat_message',
+  'general_chat',
+  'new_material',
+  'meeting_notes',
+  'new_account',
+];
+const toNotificationSettings = (row: Record<string, unknown> | undefined) =>
+  Object.fromEntries(NOTIFICATION_KINDS.map((k) => [k, row?.[`notify_${k}`] !== false])) as Record<TelegramKind, boolean>;
+// ARU-166: the two database calls src/lib/push.ts makes.
+const pushRpc: PushRpc = (fn, args) => supabase.rpc(fn, args);
+
 const toTelegramLink = (r: TelegramLinkRow): TelegramLink => ({
   linkedAt: r.linked_at,
   switches: {
@@ -890,6 +918,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // ARU-162: the people I've blocked (ids).
   const [blockedIds, setBlockedIds] = useState<string[]>([]);
   const [telegram, setTelegram] = useState<TelegramLink | null | undefined>(undefined);
+  const [notificationSettings, setNotificationSettings] = useState<Record<TelegramKind, boolean> | undefined>(undefined);
   const [homework, setHomework] = useState<Homework[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [materialFiles, setMaterialFiles] = useState<MaterialFile[]>([]);
@@ -979,6 +1008,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setContentReports([]);
         setBlockedIds([]);
         setTelegram(undefined);
+        setNotificationSettings(undefined);
         setHomework([]);
         setMaterials([]);
         setMaterialFiles([]);
@@ -1393,6 +1423,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setTelegram(row ? toTelegramLink(row) : null);
   }, [userId]);
 
+  // ARU-166: the own row only (RLS); none means every switch on. Not in load(): the Notifications page refetches it.
+  const loadNotificationSettings = useCallback(async () => {
+    if (!userId) return;
+    const res = await supabase.from('notification_settings').select('*').eq('user_id', userId);
+    check(res);
+    setNotificationSettings(toNotificationSettings(((res.data as Record<string, unknown>[] | null) ?? [])[0]));
+  }, [userId]);
+
+  // ARU-166 AC 2 / AC 3 / AC 5: register this phone (or remove its registration) on app open and every return to the
+  // foreground, once the first load has said whether the account is approved. Waiting and declined accounts only
+  // unregister. Never asks for permission (AC 1) and never shows an error.
+  const syncPushDevice = useCallback(async () => {
+    if (!userId) return;
+    await syncPushRegistration(pushRpc, !waiting);
+  }, [userId, waiting]);
+  useEffect(() => {
+    if (!userId || !firstLoadDone) return;
+    syncPushDevice().catch(() => {});
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') syncPushDevice().catch(() => {});
+    });
+    return () => sub.remove();
+  }, [userId, firstLoadDone, syncPushDevice]);
+
   const markChatRead = useCallback<Store['markChatRead']>(
     async (courseId, upToMessageId) => {
       // Clear at once (and drop any count request in flight), then save; the refetch after the save is the truth.
@@ -1512,6 +1566,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
     },
     signOut: async () => {
+      // ARU-166 AC 4: this phone's registration goes first; offline (or slow), sign-out still happens.
+      await unregisterThisPhone(pushRpc).catch(() => {});
       check(await supabase.auth.signOut());
     },
     getWorkspaceInvite: async () => {
@@ -2275,6 +2331,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       check(await supabase.rpc('set_telegram_notification', { kind, enabled }));
       await loadTelegram();
     },
+    notificationSettings,
+    loadNotificationSettings,
+    setNotification: async (kind, enabled) => {
+      check(await supabase.rpc('set_notification', { kind, enabled }));
+      setNotificationSettings((current) => ({ ...(current ?? toNotificationSettings(undefined)), [kind]: enabled }));
+    },
+    syncPushDevice,
     disconnectTelegram: async () => {
       check(await supabase.rpc('disconnect_telegram'));
       setTelegram(null);

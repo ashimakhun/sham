@@ -193,8 +193,8 @@ const kinds: [
           })),
         send,
       }),
-    "Новое домашнее задание на проверку от Сэм по курсу Algebra: Дроби",
-    "New homework to check from Сэм in Algebra: Дроби",
+    "Новое домашнее задание на проверку по курсу Algebra: Дроби",
+    "New homework to check in Algebra: Дроби",
   ],
   [
     "new account",
@@ -207,8 +207,8 @@ const kinds: [
           })),
         send,
       }),
-    "Новый аккаунт ждёт вашего подтверждения: Anna *_<b>. Откройте Sham → Управление ролями, чтобы принять или отклонить.",
-    "New account waiting for your approval: Anna *_<b>. Open Sham → Manage roles to accept or decline.",
+    "Новый аккаунт ждёт вашего подтверждения. Откройте Sham → Управление ролями, чтобы принять или отклонить.",
+    "New account waiting for your approval. Open Sham → Manage roles to accept or decline.",
   ],
   [
     "new blog post",
@@ -222,8 +222,8 @@ const kinds: [
           })),
         send,
       }),
-    "Новая запись в блоге от Tess: Tips",
-    "New blog post from Tess: Tips",
+    "Новая запись в блоге: Tips",
+    "New blog post: Tips",
   ],
   [
     "new knowledge base file",
@@ -237,8 +237,8 @@ const kinds: [
           })),
         send,
       }),
-    "Новый файл в базе знаний от Tess: Guide.pdf",
-    "New file in the knowledge base from Tess: Guide.pdf",
+    "Новый файл в базе знаний: Guide.pdf",
+    "New file in the knowledge base: Guide.pdf",
   ],
 ];
 
@@ -414,10 +414,10 @@ describe("AC 3: names and titles exactly as typed", () => {
       },
     ]);
     expect(m.text).toBe(
-      "New homework to check from {course} in {name}: {assignment}",
+      "New homework to check in {name}: {assignment}",
     );
     expect(m.texts?.ru).toBe(
-      "Новое домашнее задание на проверку от {course} по курсу {name}: {assignment}",
+      "Новое домашнее задание на проверку по курсу {name}: {assignment}",
     );
   });
 });

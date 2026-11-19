@@ -7,11 +7,14 @@ import { useEffect } from 'react';
 import { AccessGate } from '@/components/AccessGate';
 import { LanguageProvider, useI18n } from '@/i18n/LanguageProvider';
 import { font, INTER_FONTS } from '@/lib/fonts';
+import { showPushesInForeground } from '@/lib/push';
 import { StoreProvider } from '@/lib/store';
 import { colors } from '@/lib/theme';
 
 // ARU-119 AC 5: keep the splash screen up until the fonts are ready, so text never flashes in the system font.
 SplashScreen.preventAutoHideAsync().catch(() => {});
+// ARU-166 AC 12: a push that arrives while Sham is open still shows as a banner (installed builds only).
+showPushesInForeground();
 
 export default function RootLayout() {
   // The Inter faces ship with the app (no download); they load from the bundle at start.
@@ -94,6 +97,7 @@ function AppStack() {
           <Stack.Screen name="general-chat" options={{ title: t('chat.generalTitle') }} />
           {/* ARU-101: a pushed page (not a modal), so iOS swipe-back and Android back return to Profile. */}
           <Stack.Screen name="telegram" options={{ title: t('telegram.title') }} />
+          <Stack.Screen name="notifications" options={{ title: t('notifications.title') }} />
           <Stack.Screen name="change-password" options={{ title: t('changePassword.title'), presentation: 'modal' }} />
           <Stack.Screen name="reset-password" options={{ title: t('reset.title') }} />
           <Stack.Screen name="disciplines/new" options={{ title: t('disciplines.newTitle'), presentation: 'modal' }} />

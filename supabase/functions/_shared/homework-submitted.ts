@@ -20,7 +20,7 @@ export type HomeworkSubmittedRecipient = {
 export type HomeworkSubmittedDeps = {
   /** Calls homework_submitted_recipient(homework_id) with the service role. Throws on a database error. */
   recipient: (homeworkId: string) => Promise<HomeworkSubmittedRecipient[]>;
-  /** sendTelegramMessages() with the service-role client, the bot token and fetch. */
+  /** sendPushMessages() (push.ts, ARU-166) with the service-role client and fetch. */
   send: (messages: TelegramMessage[]) => Promise<SendResult>;
   log?: (line: string) => void;
 };
@@ -28,9 +28,10 @@ export type HomeworkSubmittedDeps = {
 /** What a call returns (and logs), so a call can be checked from net._http_response without Telegram. */
 export type HomeworkSubmittedReport = { recipients: number } & SendResult;
 
-/** The message text, exactly as the story sets it (plain text: names and titles are shown as typed). */
-export function homeworkSubmittedText(senderName: string, courseTitle: string, assignmentTitle: string) {
-  return telegramText('en', 'homeworkSubmitted', { name: senderName, course: courseTitle, assignment: assignmentTitle });
+/** The English text (plain text: titles are shown as typed). Since ARU-166 it names no person, so the sender's name
+ *  is not used; the parameter stays for the existing callers. */
+export function homeworkSubmittedText(_senderName: string, courseTitle: string, assignmentTitle: string) {
+  return telegramText('en', 'homeworkSubmitted', { course: courseTitle, assignment: assignmentTitle });
 }
 
 /** One message per recipient row (in practice zero or one: the owner). */
@@ -39,7 +40,7 @@ export function homeworkSubmittedMessages(rows: HomeworkSubmittedRecipient[]): T
     localizedMessage(
       r.user_id,
       'homework_submitted',
-      telegramTexts('homeworkSubmitted', { name: r.sender_name, course: r.course_title, assignment: r.assignment_title }),
+      telegramTexts('homeworkSubmitted', { course: r.course_title, assignment: r.assignment_title }),
     ),
   );
 }

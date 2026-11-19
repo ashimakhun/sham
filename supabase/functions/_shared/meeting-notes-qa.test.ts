@@ -80,7 +80,7 @@ it('extra body fields are ignored: the lookup gets only the id and the text neve
   const sent = (d.send as jest.Mock).mock.calls[0][0] as TelegramMessage[];
   expect(sent).toHaveLength(1);
   expect(sent[0].userId).toBe('U1');
-  expect(sent[0].text).toBe('New notes from Aigerim on a Algebra meeting');
+  expect(sent[0].text).toBe('New notes on a Algebra meeting');
   for (const t of [sent[0].text, ...Object.values(sent[0].texts ?? {})]) {
     expect(t).not.toContain('Secret note text');
     expect(t).not.toContain('Fake');
@@ -88,16 +88,17 @@ it('extra body fields are ignored: the lookup gets only the id and the text neve
 });
 
 it('AC 1 / edge: a name containing "{course}" and titles with *, _, <, emoji stay as typed', () => {
-  expect(meetingNotesText('Sam {course}', 'Alg_<b> 😀')).toBe('New notes from Sam {course} on a Alg_<b> 😀 meeting');
+  expect(meetingNotesText('Sam {course}', 'Alg_<b> 😀')).toBe('New notes on a Alg_<b> 😀 meeting');
   const [m] = meetingNotesMessages([{ user_id: 'U', author_name: 'Айгерім {name}', course_title: '*Курс*' }]);
-  expect(m.texts?.ru).toBe('Новые заметки от Айгерім {name} к встрече курса *Курс*');
+  expect(m.texts?.ru).toBe('Новые заметки к встрече курса *Курс*');
   expect(m.kind).toBe('meeting_notes');
 });
 
 it('the catalog entry has both languages, the same placeholders and a note', () => {
   const e = TELEGRAM_TEXTS.meetingNotesPublished;
   const ph = (s: string) => (s.match(/\{\w+\}/g) ?? []).sort();
-  expect(ph(e.en)).toEqual(['{course}', '{name}']);
+  // ARU-166 AC 10: the push text names no person, so {name} is gone.
+  expect(ph(e.en)).toEqual(['{course}']);
   expect(ph(e.ru)).toEqual(ph(e.en));
   expect(e.note.length).toBeGreaterThan(10);
 });
@@ -143,10 +144,10 @@ describe('with the real helper: each recipient in their language', () => {
     const res = await handleMeetingNotesRequest(req(JSON.stringify({ id: ID })), SECRET, d);
     expect(res.status).toBe(200);
     const byChat = Object.fromEntries(sent.map((s) => [s.chat_id, s.text]));
-    expect(byChat[100]).toBe('Новые заметки от Sam к встрече курса Algebra');
-    expect(byChat[101]).toBe('New notes from Sam on a Algebra meeting');
-    expect(byChat[102]).toBe('Новые заметки от Sam к встрече курса Algebra');
-    expect(byChat[103]).toBe('New notes from Sam on a Algebra meeting');
+    expect(byChat[100]).toBe('Новые заметки к встрече курса Algebra');
+    expect(byChat[101]).toBe('New notes on a Algebra meeting');
+    expect(byChat[102]).toBe('Новые заметки к встрече курса Algebra');
+    expect(byChat[103]).toBe('New notes on a Algebra meeting');
     expect(sent).toHaveLength(4);
   });
 });

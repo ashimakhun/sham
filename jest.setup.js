@@ -70,3 +70,33 @@ jest.mock('expo-splash-screen', () => ({
   hide: jest.fn(),
   setOptions: jest.fn(),
 }));
+
+// ARU-166: expo-notifications has no native module under Jest. Permission, channel, token and handler calls are
+// jest.fn()s; a test sets the permission with require('expo-notifications').__setPermission({ status, ios }) and what
+// asking answers with __setAnswer(...), and reads the calls from the mocks.
+jest.mock('expo-notifications', () => {
+  const state = { permission: { status: 'undetermined', granted: false, canAskAgain: true }, answer: null };
+  const IosAuthorizationStatus = { NOT_DETERMINED: 0, DENIED: 1, AUTHORIZED: 2, PROVISIONAL: 3, EPHEMERAL: 4 };
+  return {
+    IosAuthorizationStatus,
+    AndroidImportance: { UNKNOWN: 0, UNSPECIFIED: 1, NONE: 2, MIN: 3, LOW: 4, DEFAULT: 5, HIGH: 6, MAX: 7 },
+    getPermissionsAsync: jest.fn(async () => state.permission),
+    requestPermissionsAsync: jest.fn(async () => {
+      state.permission = state.answer ?? { status: 'granted', granted: true, canAskAgain: true };
+      return state.permission;
+    }),
+    setNotificationChannelAsync: jest.fn(async (id, channel) => ({ id, ...channel })),
+    getExpoPushTokenAsync: jest.fn(async () => ({ type: 'expo', data: 'ExponentPushToken[test-token]' })),
+    setNotificationHandler: jest.fn(),
+    __setPermission: (p) => {
+      state.permission = { granted: p.status === 'granted', canAskAgain: true, ...p };
+    },
+    __setAnswer: (p) => {
+      state.answer = p ? { granted: p.status === 'granted', canAskAgain: true, ...p } : null;
+    },
+    __reset: () => {
+      state.permission = { status: 'undetermined', granted: false, canAskAgain: true };
+      state.answer = null;
+    },
+  };
+});

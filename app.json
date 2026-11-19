@@ -43,6 +43,12 @@
       ],
       "@react-native-community/datetimepicker",
       [
+        "expo-notifications",
+        {
+          "defaultChannel": "default"
+        }
+      ],
+      [
         "expo-localization",
         {
           "supportedLocales": {

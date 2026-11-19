@@ -15,7 +15,7 @@ export type NewAccountRecipient = { account_name: string; user_id: string };
 export type NewAccountDeps = {
   /** Calls new_account_notification(user_id) with the service role. Throws on a database error. */
   recipient: (userId: string) => Promise<NewAccountRecipient[]>;
-  /** sendTelegramMessages() with the service-role client, the bot token and fetch. */
+  /** sendPushMessages() (push.ts, ARU-166) with the service-role client and fetch. */
   send: (messages: TelegramMessage[]) => Promise<SendResult>;
   log?: (line: string) => void;
 };
@@ -23,14 +23,14 @@ export type NewAccountDeps = {
 /** What a call returns (and logs), so a call can be checked from net._http_response without Telegram. */
 export type NewAccountReport = { recipients: number } & SendResult;
 
-/** The message text, exactly as the story sets it (plain text: the name is shown as typed). */
-export function newAccountText(name: string) {
-  return telegramText('en', 'newAccount', { name });
+/** The English text. Since ARU-166 it names no person, so the name is not used (kept for the existing callers). */
+export function newAccountText(_name?: string) {
+  return telegramText('en', 'newAccount');
 }
 
 /** One message per recipient row (in practice zero or one: the teacher). */
 export function newAccountMessages(rows: NewAccountRecipient[]): TelegramMessage[] {
-  return rows.map((r) => localizedMessage(r.user_id, 'new_account', telegramTexts('newAccount', { name: r.account_name })));
+  return rows.map((r) => localizedMessage(r.user_id, 'new_account', telegramTexts('newAccount')));
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
