@@ -101,7 +101,7 @@ it('saves the trimmed name on the own row and shows it everywhere on this device
 it('refuses blank and too long names without a request', async () => {
   await mount();
   await expect(store.updateMyName('   ')).rejects.toThrow();
-  await expect(store.updateMyName('a'.repeat(81))).rejects.toThrow('Name must be 80 characters or fewer');
+  await expect(store.updateMyName('a'.repeat(81))).rejects.toThrow('Display name must be 80 characters or fewer');
   expect(mockState.updates).toEqual([]);
 });
 

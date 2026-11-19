@@ -69,7 +69,7 @@ it('AC 8: the ARU-55 checks work as before through the pencil (blank, too long, 
   await fireEvent.changeText(field(), '   ');
   expect(save()).toBeDisabled();
   await fireEvent.changeText(field(), 'x'.repeat(81));
-  expect(screen.getByText('Name must be 80 characters or fewer')).toBeTruthy();
+  expect(screen.getByText('Display name must be 80 characters or fewer')).toBeTruthy();
   expect(save()).toBeDisabled();
   await fireEvent.changeText(field(), '  Sam S  ');
   await fireEvent.press(save());

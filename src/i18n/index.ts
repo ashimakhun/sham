@@ -84,6 +84,9 @@ const MESSAGE_IDS: [TextId, Params?][] = [
   ['common.genericError'],
   ['auth.invalidCredentials'],
   ['auth.userExists'],
+  // ARU-164: username sign-in and sign-up.
+  ['auth.invalidUsernameCredentials'],
+  ['auth.usernameTaken'],
   ['auth.emailNotConfirmed'],
   ...Array.from({ length: 30 }, (_, i): [TextId, Params] => ['auth.weakPassword', { min: i + 1 }]),
   ['auth.rateLimited'],
@@ -95,6 +98,9 @@ const MESSAGE_IDS: [TextId, Params?][] = [
   ['auth.signInAgain'],
   ['profile.nameTooLong', { max: 80 }],
   ['profile.nameEmpty'],
+  // ARU-164 AC 10: "Display name" in Edit name's errors.
+  ['profile.displayNameTooLong', { max: 80 }],
+  ['profile.displayNameEmpty'],
   ['profile.nameNotSaved'],
   ['profile.waitingApproval'],
   ['profile.languageSaveFailed'],

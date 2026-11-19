@@ -52,7 +52,7 @@ it('AC 5: non-breaking and other Unicode spaces only count as blank', async () =
 it('AC 6: 80 characters with spaces around them are allowed (trimmed)', async () => {
   const store = await openForm();
   await fireEvent.changeText(field(), `   ${'a'.repeat(80)}   `);
-  expect(screen.queryByText('Name must be 80 characters or fewer')).toBeNull();
+  expect(screen.queryByText('Display name must be 80 characters or fewer')).toBeNull();
   expect(disabled()).toBe(false);
   await fireEvent.press(save());
   expect(store.updateMyName).toHaveBeenCalledWith('a'.repeat(80));
@@ -61,10 +61,10 @@ it('AC 6: 80 characters with spaces around them are allowed (trimmed)', async ()
 it('edge: emoji count by JavaScript string length (41 two-unit emoji are over 80)', async () => {
   await openForm();
   await fireEvent.changeText(field(), '🙂'.repeat(41));
-  expect(screen.getByText('Name must be 80 characters or fewer')).toBeTruthy();
+  expect(screen.getByText('Display name must be 80 characters or fewer')).toBeTruthy();
   expect(disabled()).toBe(true);
   await fireEvent.changeText(field(), '🙂'.repeat(40));
-  expect(screen.queryByText('Name must be 80 characters or fewer')).toBeNull();
+  expect(screen.queryByText('Display name must be 80 characters or fewer')).toBeNull();
   expect(disabled()).toBe(false);
 });
 

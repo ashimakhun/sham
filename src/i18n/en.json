@@ -792,5 +792,21 @@
   "roles.copied": "Copied",
   "db.invite_code_unknown": "No workspace has this invite code.",
   "db.signup_update_app": "Update the app to create an account.",
-  "db.workspace_name_length": "Workspace name must be 1 to 80 characters."
+  "db.workspace_name_length": "Workspace name must be 1 to 80 characters.",
+  "signIn.displayName": "Display name",
+  "signIn.displayNameHint": "Doesn't have to be your real name",
+  "signIn.displayNamePlaceholder": "Dana S.",
+  "signIn.username": "Username",
+  "signIn.usernamePlaceholder": "dana_s",
+  "signIn.usernameRule": "3–30 characters: letters a–z, digits, _ . -; starts and ends with a letter or digit",
+  "signIn.legacyEmailHint": "Created your account with an email? Sign in with it.",
+  "auth.invalidUsernameCredentials": "Incorrect username or password.",
+  "auth.usernameTaken": "This username is taken. Try another one.",
+  "profile.displayNameLabel": "Display name",
+  "profile.displayNameEmpty": "Enter your display name.",
+  "profile.displayNameTooLong": "Display name must be {max} characters or fewer",
+  "db.username_invalid": "Username must be 3 to 30 characters: letters a-z, digits, _ . -; starting and ending with a letter or digit.",
+  "db.signup_email_mismatch": "Create your account in the app with a username.",
+  "db.display_name_invalid": "Display name must be 1 to 80 characters.",
+  "db.username_taken": "This username is taken. Try another one."
 }

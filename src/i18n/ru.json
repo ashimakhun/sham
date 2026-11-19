@@ -792,5 +792,21 @@
   "roles.copied": "Скопировано",
   "db.invite_code_unknown": "Нет рабочего пространства с этим кодом приглашения.",
   "db.signup_update_app": "Обновите приложение, чтобы создать аккаунт.",
-  "db.workspace_name_length": "Название рабочего пространства — от 1 до 80 символов."
+  "db.workspace_name_length": "Название рабочего пространства — от 1 до 80 символов.",
+  "signIn.displayName": "Отображаемое имя",
+  "signIn.displayNameHint": "Не обязательно настоящее имя",
+  "signIn.displayNamePlaceholder": "Дана С.",
+  "signIn.username": "Имя пользователя",
+  "signIn.usernamePlaceholder": "например, dana_s",
+  "signIn.usernameRule": "3–30 символов: латинские буквы a–z, цифры, _ . -; начинается и заканчивается буквой или цифрой",
+  "signIn.legacyEmailHint": "Создали аккаунт с почтой? Войдите с ней.",
+  "auth.invalidUsernameCredentials": "Неверное имя пользователя или пароль.",
+  "auth.usernameTaken": "Это имя пользователя занято. Выберите другое.",
+  "profile.displayNameLabel": "Отображаемое имя",
+  "profile.displayNameEmpty": "Введите отображаемое имя.",
+  "profile.displayNameTooLong": "Отображаемое имя — не более {max} символов",
+  "db.username_invalid": "Имя пользователя — 3–30 символов: латинские буквы a–z, цифры, _ . -; начинается и заканчивается буквой или цифрой.",
+  "db.signup_email_mismatch": "Создайте аккаунт в приложении с именем пользователя.",
+  "db.display_name_invalid": "Отображаемое имя — от 1 до 80 символов.",
+  "db.username_taken": "Это имя пользователя занято. Выберите другое."
 }

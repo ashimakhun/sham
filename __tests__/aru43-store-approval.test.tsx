@@ -39,7 +39,7 @@ jest.mock('@/lib/supabase', () => {
       rpc: (name: string, args: unknown) => {
         mockState.rpcs.push({ name, args });
         if (name === 'access_requests') {
-          return ok([{ id: 'P', full_name: 'Pending Pat', email: 'p@x.test', created_at: '2026-10-30T10:00:00Z', access_status: 'pending' }]);
+          return ok([{ id: 'P', full_name: 'Pending Pat', username: 'pat_p', created_at: '2026-10-30T10:00:00Z', access_status: 'pending' }]);
         }
         return ok([]);
       },
@@ -90,7 +90,7 @@ it('the teacher: pending accounts are not users, requests are loaded, Accept cal
   expect(store.users.map((u) => u.id)).toEqual(['T', 'S']);
   expect(store.getUser('P')).toBeUndefined();
   expect(store.accessRequests).toEqual([
-    { id: 'P', name: 'Pending Pat', email: 'p@x.test', createdAt: '2026-10-30T10:00:00Z', status: 'pending' },
+    { id: 'P', name: 'Pending Pat', username: 'pat_p', createdAt: '2026-10-30T10:00:00Z', status: 'pending' },
   ]);
   expect(mockState.channels).toBe(1);
   await act(() => store.setAccessStatus('P', 'approved'));

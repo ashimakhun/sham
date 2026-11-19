@@ -18,6 +18,9 @@ export const RATE_LIMITED = en('auth.rateLimited');
 export const INVALID_CREDENTIALS = en('auth.invalidCredentials');
 export const USER_EXISTS = en('auth.userExists');
 export const EMAIL_NOT_CONFIRMED = en('auth.emailNotConfirmed');
+// ARU-164: the sign-in screen asks for a username (AC 7), and sign-up answers a used one as taken (AC 4).
+export const USERNAME_INVALID_CREDENTIALS = en('auth.invalidUsernameCredentials');
+export const USERNAME_TAKEN = en('auth.usernameTaken');
 /** The server's minimum length when it states one ("Password should be at least 8 characters."), else ours. The
  *  analysis note on ARU-108: a stricter project setting must not be contradicted by "at least 6". */
 export const weakPasswordMessage = (serverText?: string) =>
@@ -89,6 +92,13 @@ export function authErrorMessage(error: AuthErrorLike): string {
   return error.message || GENERIC_ERROR;
 }
 
+/** ARU-164 AC 7: a sign-in error. Wrong username or password reads the same whether or not the username exists (and
+ *  for an older account's email, AC 8); network, rate-limit and other errors keep their own texts. */
+export function signInErrorMessage(error: AuthErrorLike): string {
+  if (isInvalidCredentials(error)) return USERNAME_INVALID_CREDENTIALS;
+  return authErrorMessage(error);
+}
+
 /** ARU-146: the account-creation trigger refused the sign-up. Supabase Auth hides its message and hint behind
  *  "Database error saving new user" (500, unexpected_failure), so the app can't tell which rule failed. */
 export function isSignUpRefused(error: AuthErrorLike) {
@@ -103,5 +113,7 @@ export function isSignUpRefused(error: AuthErrorLike) {
  *  (AC 4); when creating, the name is checked in the app already, so it's the generic text. */
 export function signUpErrorMessage(error: AuthErrorLike, kind: 'create' | 'join'): string {
   if (isSignUpRefused(error)) return kind === 'join' ? INVITE_CODE_UNKNOWN : GENERIC_ERROR;
+  // ARU-164 AC 4: Auth's unique address is the username's, so a used address means the username is taken.
+  if (error?.code === 'user_already_exists' || error?.code === 'email_exists') return USERNAME_TAKEN;
   return authErrorMessage(error);
 }

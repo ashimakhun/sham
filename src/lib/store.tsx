@@ -21,12 +21,14 @@ import {
   isInvalidCredentials,
   NETWORK_ERROR,
   SAME_PASSWORD,
+  signInErrorMessage,
   signUpErrorMessage,
-  USER_EXISTS,
+  USERNAME_TAKEN,
   WRONG_CURRENT_PASSWORD,
 } from './password';
 import { LANGUAGE_SAVE_FAILED, nameProblem } from './profileName';
 import { supabase } from './supabase';
+import { normalizeUsername, signInAddress, usernameAddress } from './username';
 import type {
   AccessRequest,
   AssignmentSentCount,
@@ -117,10 +119,11 @@ export type Store = {
   refresh: () => Promise<void>;
   getUser: (id: string | undefined) => User | undefined;
   getCourse: (id: string | undefined) => Course | undefined;
-  signIn: (email: string, password: string) => Promise<void>;
+  /** ARU-164: a username (or an older account's email, AC 8) and the password. */
+  signIn: (username: string, password: string) => Promise<void>;
   /** ARU-146: creates the account and, in the same step, the workspace (its teacher) or the request to join one (by
    *  invite code). Both travel in the sign-up's user data, so they also work with email confirmation on. */
-  signUp: (name: string, email: string, password: string, workspace: WorkspaceChoice) => Promise<void>;
+  signUp: (displayName: string, username: string, password: string, workspace: WorkspaceChoice) => Promise<void>;
   /** ARU-146: the teacher's workspace name and invite code; null for anyone else (the database returns no row). */
   getWorkspaceInvite: () => Promise<WorkspaceInvite | null>;
   signOut: () => Promise<void>;
@@ -328,7 +331,7 @@ type PaymentRequestRow = {
   proof_type: 'image' | 'pdf';
   sent_at: string;
 };
-type AccessRequestRow = { id: string; full_name: string; email: string | null; created_at: string; access_status: AccessRequest['status'] };
+type AccessRequestRow = { id: string; full_name: string; username: string | null; created_at: string; access_status: AccessRequest['status'] };
 type HomeworkRow = {
   id: string;
   student_id: string;
@@ -514,7 +517,7 @@ const seesBilling = (u: User | undefined) =>
 const toAccessRequest = (r: AccessRequestRow): AccessRequest => ({
   id: r.id,
   name: r.full_name,
-  email: r.email ?? '',
+  username: r.username ?? '',
   createdAt: r.created_at,
   status: r.access_status,
 });
@@ -1308,26 +1311,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     refresh,
     getUser,
     getCourse,
-    signIn: async (email, password) => {
+    signIn: async (username, password) => {
       setAccountNotice(null);
-      // ARU-108 AC 7a: Auth errors in the app's wording (translated on the screen).
-      const res = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-      if (res.error) throw new Error(authErrorMessage(res.error));
+      // ARU-108 AC 7a: Auth errors in the app's wording (translated on the screen). ARU-164: a username becomes its
+      // internal address; text with "@" is an older account's email (AC 8).
+      const res = await supabase.auth.signInWithPassword({ email: signInAddress(username), password });
+      if (res.error) throw new Error(signInErrorMessage(res.error));
     },
-    signUp: async (name, email, password, workspace) => {
+    signUp: async (name, username, password, workspace) => {
       setAccountNotice(null);
       const choice =
         workspace.kind === 'create' ? { workspace_name: workspace.name.trim() } : { invite_code: workspace.code.trim().toUpperCase() };
+      // ARU-164: no email. Auth gets the username's internal address (never mailed: Confirm email is off), and the
+      // database checks the username, the display name and that the address matches.
       const res = await supabase.auth.signUp({
-        email: email.trim(),
+        email: usernameAddress(username),
         password,
-        options: { data: { full_name: name.trim(), ...choice } },
+        options: { data: { username: normalizeUsername(username), full_name: name.trim(), ...choice } },
       });
       if (res.error) throw new Error(signUpErrorMessage(res.error, workspace.kind));
-      // With email confirmation on, Supabase answers an existing email with a user that has no identities instead of
-      // an error (ARU-108 analysis note): the same message.
+      // With email confirmation on, Supabase answers an existing address with a user that has no identities instead
+      // of an error (ARU-108 analysis note); kept harmlessly with it off (ARU-164 note 6): the username is taken.
       if (res.data.user && Array.isArray(res.data.user.identities) && res.data.user.identities.length === 0) {
-        throw new Error(USER_EXISTS);
+        throw new Error(USERNAME_TAKEN);
       }
     },
     signOut: async () => {
