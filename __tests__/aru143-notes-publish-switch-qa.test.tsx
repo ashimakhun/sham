@@ -33,16 +33,20 @@ const C: Meeting = {
   createdAt: at(-100),
 };
 const members = [member('A', 'S1'), member('A', 'M2')];
-const note = (authorId: string, isPublic: boolean, body = `${authorId}'s notes`): MeetingListenerNote => ({
-  id: `n-${authorId}`,
-  meetingId: 'C',
-  courseId: 'A',
-  authorId,
-  body,
-  createdAt: at(-10),
-  updatedAt: at(-10),
-  isPublic,
-});
+const note = (authorId: string, isPublic: boolean, body = `${authorId}'s notes`): MeetingListenerNote => {
+  // One clock read for both timestamps, so updatedAt always equals createdAt (ARU-179).
+  const written = at(-10);
+  return {
+    id: `n-${authorId}`,
+    meetingId: 'C',
+    courseId: 'A',
+    authorId,
+    body,
+    createdAt: written,
+    updatedAt: written,
+    isPublic,
+  };
+};
 const ru = (ui: React.ReactElement) => <I18nContext.Provider value={make('ru')}>{ui}</I18nContext.Provider>;
 const publish = () => screen.getByTestId('notes-publish');
 const saveBtn = () => screen.getAllByRole('button', { name: /^Save/ }).at(-1)!;
