@@ -10,7 +10,7 @@ create function pg_temp.signup(who text, uname text) returns void language plpgs
 begin
   execute 'set session authorization supabase_auth_admin';
   insert into auth.users (id, email, raw_user_meta_data) values (pg_temp.u(who), uname || '@users.sham.invalid',
-    jsonb_build_object('username', uname, 'full_name', 'User ' || who, 'invite_code', current_setting('t.code')));
+    jsonb_build_object('username', uname, 'full_name', 'User ' || who, 'invite_code', current_setting('t.code'), 'terms_version', 1));
   execute 'reset session authorization';
 end $$;
 create function pg_temp.change(id uuid, email text) returns text language plpgsql as $$

@@ -62,7 +62,7 @@ select set_config('t.code', (select c.code from workspace_invite_codes c join pr
   where p.id = t.id('T')), false);
 set session authorization supabase_auth_admin;
 insert into auth.users (id, email, raw_user_meta_data) values (md5('new')::uuid, 'taken1@users.sham.invalid',
-  jsonb_build_object('username', 'taken1', 'full_name', 'New One', 'invite_code', current_setting('t.code')));
+  jsonb_build_object('username', 'taken1', 'full_name', 'New One', 'invite_code', current_setting('t.code'), 'terms_version', 1));
 reset session authorization;
 insert into auth.users (id, email) values (md5('ghost')::uuid, 'ghost@users.sham.invalid');
 

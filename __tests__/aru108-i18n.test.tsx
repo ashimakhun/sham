@@ -27,6 +27,7 @@ import type { User } from '@/lib/types';
 
 import { fakeStore, users } from './helpers/fakeStore';
 import { setStore } from './helpers/mocks';
+import { tickAgree } from './helpers/agree';
 
 jest.mock('expo-router', () => {
   const base = require('./helpers/mocks').expoRouter;
@@ -309,6 +310,7 @@ describe('AC 7 / AC 12: the part-1 screens in Russian and English', () => {
     await fireEvent.changeText(screen.getByPlaceholderText('Не менее 6 символов'), 'secret1');
     await fireEvent.press(screen.getByRole('tab', { name: 'Создать пространство' }));
     await fireEvent.changeText(screen.getByPlaceholderText('Моя школа'), 'Школа');
+    await tickAgree(); // ARU-159: the agreement box
     await fireEvent.press(screen.getByRole('button', { name: 'Создать аккаунт' }));
     expect(await screen.findByText('Что-то пошло не так. Попробуйте снова.')).toBeTruthy();
     await view.unmount();
@@ -320,6 +322,7 @@ describe('AC 7 / AC 12: the part-1 screens in Russian and English', () => {
     await fireEvent.changeText(screen.getByPlaceholderText('At least 6 characters'), 'secret1');
     await fireEvent.press(screen.getByRole('tab', { name: 'Create a workspace' }));
     await fireEvent.changeText(screen.getByPlaceholderText('My school'), 'School');
+    await tickAgree(); // ARU-159: the agreement box
     await fireEvent.press(screen.getAllByRole('button', { name: 'Create account' }).at(-1)!);
     expect(await screen.findByText('Signups not allowed for this instance')).toBeTruthy();
     expect(CYRILLIC.test(allText())).toBe(false);

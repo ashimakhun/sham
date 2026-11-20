@@ -6,6 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ChooseUsernameScreen } from '@/components/ChooseUsernameScreen';
 import { DeleteAccountForm } from '@/components/DeleteAccountForm';
+import { LegalLinks } from '@/components/LegalLinks';
+import { LegalUpdateScreen } from '@/components/LegalUpdateScreen';
 import { SaveRecoveryCodeScreen } from '@/components/RecoveryCode';
 import { Button, ErrorText, styles } from '@/components/ui';
 import { translate } from '@/i18n';
@@ -22,10 +24,13 @@ export const DECLINED_TEXT = translate('en', 'gate.declinedText');
 /**
  * ARU-43: an account that isn't approved sees only this screen, whatever route it opens (deep links included).
  * Approved accounts, and signed-out visitors (the sign-in screen), get the app as usual. ARU-168: Choose a username
- * comes before all of it, then ARU-165's Save your recovery code.
+ * comes before all of it, then ARU-165's Save your recovery code. ARU-159's "We've updated our Terms" comes first.
  */
 export function AccessGate({ children }: { children: ReactNode }) {
-  const { currentUser, needsUsername, needsRecoveryCode } = useStore();
+  const { currentUser, needsUsername, needsRecoveryCode, needsLegalAgreement } = useStore();
+  // ARU-159 AC 8: a new version of the Privacy Policy / Terms of Use (or none agreed yet) comes before everything else.
+  // It replaces the routes without redirecting, so after I agree the route underneath (a deep link) renders.
+  if (needsLegalAgreement) return <LegalUpdateScreen />;
   // ARU-168 AC 1: an older account (no username) chooses one first, before the waiting / declined screen and the tabs.
   if (needsUsername) return <ChooseUsernameScreen />;
   // ARU-165 AC 1: then, with a username but no saved recovery code, Save your recovery code (before the waiting /
@@ -71,6 +76,8 @@ function AccessScreen({ declined }: { declined: boolean }) {
         )}
         <Button title={t('common.signOut')} variant="secondary" onPress={() => run(signOut)} disabled={busy} />
         <Button title={t('common.deleteAccount')} variant="danger" onPress={() => setDeleting(true)} disabled={busy} />
+        {/* ARU-159 AC 7: the documents and Contact us, for waiting and declined accounts too. */}
+        <LegalLinks center />
       </ScrollView>
     </SafeAreaView>
   );

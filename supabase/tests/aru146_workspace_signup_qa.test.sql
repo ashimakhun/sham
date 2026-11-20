@@ -22,7 +22,7 @@ begin
   execute 'set session authorization supabase_auth_admin';
   begin
     insert into auth.users (id, email, raw_user_meta_data) values (pg_temp.u(who),
-      'u' || left(md5(who), 20) || '@users.sham.invalid', jsonb_build_object('username', 'u' || left(md5(who), 20), 'full_name', 'User ' || who) || meta);
+      'u' || left(md5(who), 20) || '@users.sham.invalid', '{"terms_version": 1}'::jsonb || jsonb_build_object('username', 'u' || left(md5(who), 20), 'full_name', 'User ' || who) || meta);
     -- ARU-164: every sign-up carries a username, its internal address and a display name.
   exception when others then
     get stacked diagnostics code = returned_sqlstate, hint = pg_exception_hint;

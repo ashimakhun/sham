@@ -30,6 +30,7 @@ import {
 
 import { fakeStore } from "./helpers/fakeStore";
 import { setStore } from "./helpers/mocks";
+import { tickAgree } from './helpers/agree';
 
 // Paths are relative to the repo root (Jest's working directory), as in aru74-migration-numbers-qa.test.ts.
 const fs = jest.requireActual<{
@@ -182,6 +183,7 @@ async function openSignUp() {
     screen.getByPlaceholderText("At least 6 characters"),
     "secret1",
   );
+  await tickAgree(); // ARU-159: the agreement box
 }
 
 describe("AC 1: sign-up screen", () => {
@@ -290,6 +292,7 @@ describe("AC 1: sign-up screen", () => {
       screen.getByPlaceholderText(ru["signIn.workspaceNamePlaceholder"]),
       "Школа",
     );
+    await tickAgree(); // ARU-159: the agreement box
     await fireEvent.press(
       screen.getByRole("button", { name: "Создать аккаунт" }),
     );

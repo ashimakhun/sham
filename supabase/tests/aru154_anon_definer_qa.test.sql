@@ -61,7 +61,7 @@ select t.ok(not exists (select 1 from homework_assignments where id = md5('qa154
 set session authorization supabase_auth_admin;
 insert into auth.users (id, email, raw_user_meta_data)
   values (md5('qa154-create')::uuid, 'c154@users.sham.invalid',
-    '{"username": "c154", "full_name": "Create 154", "workspace_name": "QA 154 school"}'); -- ARU-164: username + internal address
+    '{"username": "c154", "full_name": "Create 154", "workspace_name": "QA 154 school", "terms_version": 1}'); -- ARU-164: username + internal address
 reset session authorization;
 select t.eq((select role::text || '/' || access_status::text from profiles where id = md5('qa154-create')::uuid),
   'teacher/approved', 'sign-up by workspace name: approved teacher of the new workspace');
@@ -71,7 +71,7 @@ select set_config('t.code', (select c.code from workspace_invite_codes c join pr
 set session authorization supabase_auth_admin;
 insert into auth.users (id, email, raw_user_meta_data)
   values (md5('qa154-join')::uuid, 'j154@users.sham.invalid', -- ARU-164: username + internal address
-    json_build_object('username', 'j154', 'full_name', 'Join 154', 'invite_code', lower(current_setting('t.code')))::jsonb);
+    json_build_object('username', 'j154', 'full_name', 'Join 154', 'invite_code', lower(current_setting('t.code')), 'terms_version', 1)::jsonb);
 reset session authorization;
 select t.eq((select role::text || '/' || access_status::text from profiles where id = md5('qa154-join')::uuid),
   'student/pending', 'sign-up by invite code: waiting student');

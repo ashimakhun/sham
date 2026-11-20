@@ -33,6 +33,7 @@ import { PASSWORD_CHANGED_SIGNED_OUT, RECOVERY_LOCKED, RecoveryCodeReplaced, REC
 import { LANGUAGE_SAVE_FAILED, nameProblem } from './profileName';
 import { supabase } from './supabase';
 import { normalizeUsername, signInAddress, usernameAddress } from './username';
+import { LEGAL_VERSION, needsLegalAgreement } from './legal';
 import type {
   AccessRequest,
   ResetCode,
@@ -154,6 +155,12 @@ export type Store = {
   /** ARU-165 AC 1: an account with a username but no saved recovery code sees Save your recovery code before anything
    *  else (after Choose a username). False while unknown (not loaded, or the request failed). */
   needsRecoveryCode: boolean;
+  /** ARU-159 AC 8 / AC 10: the own latest agreement to the Privacy Policy and Terms of Use is older than LEGAL_VERSION,
+   *  or missing. False while unknown (not loaded, or the request failed: offline never blocks). */
+  needsLegalAgreement: boolean;
+  /** ARU-159 AC 9: saves the own agreement to LEGAL_VERSION (agree_to_terms(), server time). Offline: NETWORK_ERROR,
+   *  nothing changes. */
+  agreeToTerms: () => Promise<void>;
   /** ARU-165 AC 1 / AC 4: the code to show on Save your recovery code: the one already made in this app session
    *  (kept in memory only), else a new one from the server (make_recovery_code: any unsaved code stops working). */
   getRecoveryCode: () => Promise<string>;
@@ -935,6 +942,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // session for the Save screen (memory only: a new app start makes a new one, AC 4).
   const [recoveryCodeSaved, setRecoveryCodeSaved] = useState<boolean | undefined>(undefined);
   const [pendingRecoveryCode, setPendingRecoveryCode] = useState<string | null>(null);
+  // ARU-159: the own latest agreed version (null: none; undefined while unknown).
+  const [legalVersion, setLegalVersion] = useState<number | null | undefined>(undefined);
 
   const userId = session?.user.id;
   // ARU-157: the signed-in user as the auth handler last set it (synchronously, unlike `session`), so a load that
@@ -992,6 +1001,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setBlockedIds([]);
         setMyUsername(undefined);
         setRecoveryCodeSaved(undefined);
+        setLegalVersion(undefined);
         setPendingRecoveryCode(null);
         setNotificationSettings(undefined);
         setHomework([]);
@@ -1064,7 +1074,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     try {
       // RLS returns nothing but the own profile to an account that isn't approved (ARU-43), so these all succeed
       // (empty) for it and the app shows the waiting screen.
-      const [profileRows, hw, mats, crs, members, mtgs, asgs, att, files, likes, fb, discs, listenerNotes, own] = await Promise.all([
+      const [profileRows, hw, mats, crs, members, mtgs, asgs, att, files, likes, fb, discs, listenerNotes, own, agreements] = await Promise.all([
         // '*' so the app keeps working if the access_status column (0021) isn't there yet.
         supabase.from('profiles').select('*').order('full_name'),
         supabase.from('homework').select('*').order('created_at', { ascending: false }),
@@ -1089,6 +1099,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // ARU-168: the own username (RLS: own row only). Loaded with the profile so the Choose a username screen shows
         // before anything else. A failure (offline, or before 0067) gives null here and keeps what was known.
         Promise.resolve(supabase.from('usernames').select('username')).catch(() => null),
+        // ARU-159 AC 8: the own latest agreement (RLS: own rows only), loaded with the profile so the update screen
+        // shows before anything else. A failure (offline, or before 0075) gives null here and keeps what was known.
+        Promise.resolve(supabase.from('legal_agreements').select('version').order('version', { ascending: false }).limit(1)).catch(
+          () => null,
+        ),
       ]);
       if (!current()) return;
       // ARU-165: only an account with a username has a recovery code: ask whether it is saved, before the data is
@@ -1124,6 +1139,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setMyUsername(((own.data as { username: string }[] | null) ?? [])[0]?.username ?? null);
       }
       if (savedCode && !savedCode.error) setRecoveryCodeSaved(savedCode.data === true);
+      if (agreements && !agreements.error) {
+        setLegalVersion(((agreements.data as { version: number }[] | null) ?? [])[0]?.version ?? null);
+      }
       setHomework(signedHomework);
       setMaterials(rows<MaterialRow>(mats).map(toMaterial));
       setCourses(rows<CourseRow>(crs).map(toCourse));
@@ -1599,6 +1617,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     myUsername,
     needsUsername: !!currentUser && myUsername === null,
     needsRecoveryCode: !!currentUser && !!myUsername && recoveryCodeSaved === false,
+    needsLegalAgreement: !!currentUser && needsLegalAgreement(legalVersion),
+    agreeToTerms: async () => {
+      const res = await Promise.resolve(supabase.rpc('agree_to_terms', { version: LEGAL_VERSION })).catch(() => null);
+      if (!res) throw new Error(NETWORK_ERROR);
+      if (res.error) {
+        if (!res.error.hint && !res.error.code) throw new Error(NETWORK_ERROR);
+        throw new Error(dbErrorMessage(res.error));
+      }
+      setLegalVersion((v) => Math.max(v ?? 0, LEGAL_VERSION));
+    },
     getRecoveryCode: async () => {
       if (pendingRecoveryCode) return pendingRecoveryCode;
       const res = await Promise.resolve(supabase.rpc('make_recovery_code')).catch(() => null);
@@ -1721,7 +1749,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const res = await supabase.auth.signUp({
         email: usernameAddress(username),
         password,
-        options: { data: { username: normalizeUsername(username), full_name: name.trim(), ...choice } },
+        // ARU-159 AC 5: the version of the documents agreed to with the checkbox, saved with the account.
+        options: { data: { username: normalizeUsername(username), full_name: name.trim(), ...choice, terms_version: LEGAL_VERSION } },
       });
       if (res.error) throw new Error(signUpErrorMessage(res.error, workspace.kind));
       // With email confirmation on, Supabase answers an existing address with a user that has no identities instead

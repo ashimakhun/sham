@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sham — Privacy Policy</title>
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 17px; line-height: 1.55; color: #1f2937; background: #fff; -webkit-text-size-adjust: 100%; }
+    main { max-width: 760px; margin: 0 auto; padding: 20px 16px 48px; overflow-wrap: break-word; }
+    .top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+    .brand { font-weight: 700; font-size: 18px; }
+    .lang { font-size: 15px; }
+    .meta { color: #6b7280; font-size: 15px; margin: 0; }
+    h1 { font-size: 28px; line-height: 1.25; margin: 16px 0 4px; }
+    h2 { font-size: 20px; line-height: 1.3; margin: 28px 0 8px; }
+    p, li { margin: 8px 0; }
+    ul { padding-left: 22px; }
+    a { color: #4f46e5; }
+    table { width: 100%; border-collapse: collapse; font-size: 15px; margin: 8px 0; }
+    th, td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; vertical-align: top; }
+    th { background: #f9fafb; }
+    @media (max-width: 600px) {
+      table, thead, tbody, tr, th, td { display: block; width: 100%; }
+      thead { display: none; }
+      tr { border: 1px solid #e5e7eb; border-radius: 8px; margin: 12px 0; padding: 4px 0; }
+      td { border: 0; padding: 4px 12px; }
+      td::before { content: attr(data-label); display: block; font-weight: 600; color: #6b7280; font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="top">
+      <span class="brand">Sham</span>
+      <a class="lang" href="privacy-ru.html" hreflang="ru">Русский</a>
+    </div>
+    <h1>Privacy Policy</h1>
+    <p class="meta">Version 1</p>
+    <p>Effective date: 20 November 2026</p>
+    <p>Sham is an app for running courses: meetings, homework, materials, chats and payment records for a teacher, mentors and students. It is operated by Aruzhan Ashimakhun, Kazakhstan ("we"). Contact: <a href="mailto:ashimakhun.a@gmail.com">ashimakhun.a@gmail.com</a>.</p>
+    <h2>What we collect and why</h2>
+    <table>
+      <thead><tr><th>Data</th><th>Why we use it</th><th>Who can see it</th></tr></thead>
+      <tbody>
+        <tr><td data-label="Data">Username, display name (it doesn't have to be your real name) and password (stored encrypted by our provider). We don't ask for an email or phone number</td><td data-label="Why we use it">To create your account and sign you in</td><td data-label="Who can see it">Display name: other approved people in your workspace. Username: only you and the teacher</td></tr>
+        <tr><td data-label="Data">Role, accountant flag, approval status, workspace</td><td data-label="Why we use it">To show you the right screens and keep each workspace separate</td><td data-label="Who can see it">The teacher; your role is shown next to your name</td></tr>
+        <tr><td data-label="Data">App language and phone language</td><td data-label="Why we use it">To show the app and notifications in your language</td><td data-label="Who can see it">Only the app</td></tr>
+        <tr><td data-label="Data">Courses, meetings, attendance marks</td><td data-label="Why we use it">To run the courses you take part in</td><td data-label="Who can see it">People of that course, mentors and the teacher</td></tr>
+        <tr><td data-label="Data">Homework: title, text and photo</td><td data-label="Why we use it">So mentors and the teacher can check it</td><td data-label="Who can see it">You, mentors and the teacher</td></tr>
+        <tr><td data-label="Data">Chat messages (course chats and general chat), meeting notes, feedback and ratings, likes</td><td data-label="Why we use it">To let people talk and share in the app</td><td data-label="Who can see it">The people of that chat, course or workspace, as the app shows</td></tr>
+        <tr><td data-label="Data">Blog posts and PDF files that mentors and the teacher share</td><td data-label="Why we use it">To share learning materials</td><td data-label="Who can see it">Approved people of the workspace, or only a course's people</td></tr>
+        <tr><td data-label="Data">Payment records: paid marks, exemptions, payment requests and proof photos or PDFs</td><td data-label="Why we use it">So the accountant and the teacher can see who paid</td><td data-label="Who can see it">You, accountants and the teacher</td></tr>
+        <tr><td data-label="Data">Push notification address of your phone: a random install ID, the push token from Expo, and iOS or Android. No phone number or device model. Your on/off switch for each kind of notification</td><td data-label="Why we use it">To send you the notifications you turned on</td><td data-label="Who can see it">Only the app</td></tr>
+        <tr><td data-label="Data">Recovery code and the teacher's reset code (only a one-way hash; a reset code expires after 24 hours), and failed recovery attempts per username</td><td data-label="Why we use it">To let you set a new password without an email, and to block guessing (5 wrong tries lock it for 15 minutes)</td><td data-label="Who can see it">Nobody in the app. The code itself is shown once, only to you (a reset code only to the teacher who made it)</td></tr>
+      </tbody>
+    </table>
+    <p>Reminders (a meeting starting, homework due soon, photos about to be deleted) are worked out and scheduled on your phone from data the app already shows you; nothing extra is sent to us for them. Push notifications never contain the name of the person who wrote or did something.</p>
+    <p>We do not use your data for advertising, we do not sell it, and we do not track you across other apps or websites.</p>
+    <h2>Who processes it for us</h2>
+    <ul>
+      <li><strong>Supabase</strong> stores the database and files and handles sign-in. Servers: Singapore.</li>
+      <li><strong>Expo</strong> (Expo's push service) passes push notifications to Apple (iOS) or Google (Android), which deliver them to your phone. They receive your phone's push token and the notification text, which never includes a person's name.</li>
+      <li><strong>Zoom</strong> (or another meeting service) is where meetings take place. Sham only stores the meeting link; that service's own policy applies.</li>
+    </ul>
+    <h2>Technical connection data</h2>
+    <p>Sham does not store IP addresses in its own data. Our cloud infrastructure may process technical connection metadata, including your IP address, for a short time and only to keep the service secure and to deliver your requests. We do not use it to identify you or link it to your account.</p>
+    <h2>How long we keep it</h2>
+    <ul>
+      <li><strong>Homework photos</strong> are deleted 6 months after the homework is checked. You get warnings 30 and 7 days before, and you can download your photos as a ZIP until then.</li>
+      <li><strong>Your account</strong> stays until you delete it.</li>
+      <li><strong>When you delete your account</strong> (Profile → Delete account), we delete your profile, username, password, recovery code, phone push registrations, notification settings, your homework and photos, payment records, feedback, likes, Blog posts and PDF files you shared, and uploaded files. Your chat messages and meeting notes stay so that conversations still make sense, but show "Deleted account" instead of your name.</li>
+    </ul>
+    <h2>Your rights</h2>
+    <p>You can see and change your display name, language and notification settings in the app, and delete your account at any time. You can also email us, giving your username, to ask what data we hold about you, to correct or block it, to delete it, or to withdraw your consent. We answer within 30 days.</p>
+    <h2>Children</h2>
+    <p>Sham is for people aged 13 and older. Don't create an account if you are under 13, and teachers must not accept one. If we learn that an account belongs to a child under 13, we delete it. Every account joins a workspace only after its teacher accepts it. A teacher who accepts the account of someone under 18 is responsible for having their parent's or guardian's consent where the law requires it. A parent or guardian can ask the teacher or us to delete a child's account at any time.</p>
+    <h2>Security</h2>
+    <p>Data is sent over encrypted connections. Access rules in the database make sure each person sees only what their role allows, and workspaces never see each other's data.</p>
+    <h2>Changes</h2>
+    <p>If we change this policy, we will update the date above and tell you in the app.</p>
+  </main>
+</body>
+</html>

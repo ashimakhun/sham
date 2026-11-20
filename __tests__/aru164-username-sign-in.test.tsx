@@ -9,6 +9,7 @@ import { isValidUsername, signInAddress, usernameAddress, usernameFromAddress, U
 
 import { fakeStore } from './helpers/fakeStore';
 import { setStore } from './helpers/mocks';
+import { tickAgree } from './helpers/agree';
 
 jest.mock('expo-router', () => require('./helpers/mocks').expoRouter);
 jest.mock('@/lib/store', () => require('./helpers/mocks').store);
@@ -81,6 +82,7 @@ describe('sign-in screen', () => {
     await fireEvent.changeText(screen.getByPlaceholderText('At least 6 characters'), 'secret1');
     await fireEvent.press(screen.getByRole('tab', { name: 'Join a workspace' }));
     await fireEvent.changeText(screen.getByPlaceholderText('8 letters and digits'), 'ABCD2345');
+    await tickAgree(); // ARU-159: the agreement box
     for (const bad of ['ab', 'da..na', '_dana', 'dana@x']) {
       await fireEvent.changeText(screen.getByTestId('username-field'), bad);
       expect(screen.getByText(RULE)).toBeTruthy();

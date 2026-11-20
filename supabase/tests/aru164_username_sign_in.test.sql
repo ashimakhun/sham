@@ -9,7 +9,7 @@ declare code text; hint text; result text := 'ok';
 begin
   execute 'set session authorization supabase_auth_admin';
   begin
-    insert into auth.users (id, email, raw_user_meta_data) values (pg_temp.u(who), email, meta);
+    insert into auth.users (id, email, raw_user_meta_data) values (pg_temp.u(who), email, '{"terms_version": 1}'::jsonb || meta); -- ARU-159: every sign-up from the app agrees to a version of the legal documents (terms_version).
   exception when others then
     get stacked diagnostics code = returned_sqlstate, hint = pg_exception_hint;
     result := concat_ws(' | ', code, hint);

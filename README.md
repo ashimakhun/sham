@@ -315,7 +315,15 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    self, only with a username; returns the plain code once with its expiry) and `workspace_usernames()` (usernames of
    the accepted accounts in the teacher's workspace, for Manage roles). Replaces `recovery_check()` (also accepts a
    valid, unexpired reset code; same lock) and `recovery_finish()` (also deletes the reset code). The Edge Functions
-   are unchanged and need no redeploy; changes no existing rows).
+   are unchanged and need no redeploy; changes no existing rows),
+   `0075_legal_agreements.sql` (ARU-159: agreement to the Privacy Policy and Terms of Use. Adds `legal_agreements`
+   (user, version, server time; unique per user and version; deleted with the account); RLS: each account reads its
+   own rows only, nobody writes directly. Replaces `handle_new_user()` (every 0067 rule kept): a sign-up must send
+   `terms_version`, a whole number of at least 1, saved as the account's first agreement, else it is refused
+   (`sham:signup_update_app`; SQL Editor admins are still exempt). Adds `agree_to_terms(version)` for signed-in
+   users (not anon). Deletes no data; existing accounts have no agreement, so the app asks each of them once. Ship it
+   together with the app update: an older app's sign-ups are refused once it runs; see
+   [Legal pages](#legal-pages-aru-159)).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. Turn off **Authentication → Email → Confirm email**, in development and production, **before** applying
    `0067_username_sign_in.sql` (ARU-164). Username accounts sign up with an internal address that can't receive mail,
@@ -821,6 +829,27 @@ reports yet. The app never shows one workspace's reports to another.
 1. Run `supabase/migrations/0064_content_reports.sql` (after 0063). Deleted chat messages disappear live from open
    chats: `course_messages` and `general_messages` are already in the realtime publication.
 
+### Legal pages (ARU-159)
+
+The Privacy Policy and Terms of Use are static pages in [`legal/`](legal), in English and Russian, published with
+GitHub Pages from this public repo. Anyone can open them without signing in. The app links to them (sign-up checkbox,
+Profile, the waiting / declined screen and the "We've updated our Terms" screen) in the app's language; the
+addresses, the version and the contact email are in `src/lib/legal.ts`.
+
+1. On GitHub: **Settings → Pages → Build and deployment → Source: Deploy from a branch**, branch `main`, folder
+   `/ (root)`, then **Save**. After a minute the pages are live.
+2. Enter these addresses in App Store Connect (**App Privacy → Privacy Policy URL**, and the Terms of Use / EULA link
+   in the app description if wanted):
+   - Privacy Policy (English): https://ashimakhun.github.io/sham/legal/privacy.html
+   - Privacy Policy (Russian): https://ashimakhun.github.io/sham/legal/privacy-ru.html
+   - Terms of Use (English): https://ashimakhun.github.io/sham/legal/terms.html
+   - Terms of Use (Russian): https://ashimakhun.github.io/sham/legal/terms-ru.html
+3. **Changing the documents:** copy the new final texts into all four pages, update the version and date at the top
+   of each, and raise `LEGAL_VERSION` (and `LEGAL_EFFECTIVE_DATE`) in `src/lib/legal.ts` in the same release. Every
+   account then sees "We've updated our Terms" once and taps **I agree** (`agree_to_terms()`), on any device.
+4. Who agreed to what: `select user_id, version, agreed_at from legal_agreements order by agreed_at desc;` in the SQL
+   Editor (the app shows nobody else's agreements).
+
 ### Download my photos (ARU-107)
 
 Homework photos are kept for 6 months after the homework is checked (the deletion itself is ARU-112's daily job;
@@ -1108,6 +1137,9 @@ teacher" is that workspace's teacher, and nobody can see or change anything in a
 | Change own password (Supabase Auth, current password required, ARU-76) | own | own | own |
 | See and save own first recovery code (ARU-165; also waiting / declined accounts) | own | own | own |
 | Make a new recovery code (current password checked on the server, ARU-165) | own | own | own |
+| Open the Privacy Policy and Terms of Use pages (public, also signed out; ARU-159) | ✓ | ✓ | ✓ |
+| Agree to the documents (at sign-up, and to a new version: `agree_to_terms()`, also waiting / declined accounts; ARU-159) | own | own | own |
+| Read agreements (`legal_agreements`, ARU-159) | own only | own only | own only (not others') |
 | Forgot password with own username + recovery code (signed out, any account, ARU-165) | own | own | own |
 | Read, make or replace another person's recovery code | (nobody) | (nobody) | (nobody) |
 | Sign up with a username and display name (signed out, ARU-164) | ✓ | ✓ | ✓ |

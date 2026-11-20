@@ -8,6 +8,7 @@ import SignInScreen from '@/app/index';
 
 import { fakeStore, users } from './helpers/fakeStore';
 import { setStore } from './helpers/mocks';
+import { tickAgree } from './helpers/agree';
 
 jest.mock('expo-router', () => ({
   ...require('./helpers/mocks').expoRouter,
@@ -26,6 +27,7 @@ const fill = async (name: string, email: string, password: string) => {
 const chooseWorkspace = async () => {
   await fireEvent.press(screen.getByRole('tab', { name: 'Create a workspace' }));
   await fireEvent.changeText(screen.getByPlaceholderText('My school'), 'School');
+  await tickAgree(); // ARU-159: the agreement box
 };
 /** The last element in the form's scroll content must be the submit button: nothing (not even an empty Text) after it. */
 const lastFormChild = (container: Awaited<ReturnType<typeof render>>['container']) => {
@@ -96,8 +98,15 @@ describe('Create account mode', () => {
     const { container } = await render(<SignInScreen />);
     await fireEvent.press(screen.getByText('Create account'));
     const texts = container
-      .queryAll((n) => n.type === 'Text')
-      .map((n) => [n.props.children].flat().join(''))
+      // ARU-159: the checkbox icon is a glyph hidden from screen readers, not a text.
+      .queryAll((n) => n.type === 'Text' && !n.props.accessibilityElementsHidden)
+      // ARU-159: the checkbox text holds its two links as nested texts; read their words too.
+      .map((n) =>
+        [n.props.children]
+          .flat()
+          .map((c) => (typeof c === 'string' ? c : typeof c?.props?.children === 'string' ? c.props.children : ''))
+          .join(''),
+      )
       .filter((t) => t.trim());
     expect(texts).toEqual([
       'Sham',
@@ -112,6 +121,10 @@ describe('Create account mode', () => {
       // ARU-146: the workspace choice, nothing chosen yet.
       'Create a workspace',
       'Join a workspace',
+      // ARU-159: the agreement box (its two links are also texts of their own).
+      "I'm 13 or older, and if I'm under 18 my parent or guardian agrees. I agree to the Terms of Use and Privacy Policy.",
+      'Terms of Use',
+      'Privacy Policy',
       'Create account',
     ]);
   });
