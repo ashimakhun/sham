@@ -914,5 +914,19 @@
   "roles.resetDone": "Done",
   "db.only_teacher_reset_code": "Only the teacher can make reset codes.",
   "db.reset_code_students_mentors": "Reset codes can be made only for students and mentors.",
-  "db.reset_code_no_username": "{name} has no username yet. They need to sign in and choose one first."
+  "db.reset_code_no_username": "{name} has no username yet. They need to sign in and choose one first.",
+  "legal.privacyPolicy": "Privacy Policy",
+  "legal.termsOfUse": "Terms of Use",
+  "legal.contactUs": "Contact us",
+  "legal.agreeCheckbox": "I'm 13 or older, and if I'm under 18 my parent or guardian agrees. I agree to the {terms} and {privacy}.",
+  "legal.agreeTermsLink": "Terms of Use",
+  "legal.agreePrivacyLink": "Privacy Policy",
+  "legal.agreeA11y": "I'm 13 or older, and if I'm under 18 my parent or guardian agrees. I agree to the Terms of Use and Privacy Policy.",
+  "legal.linkFailed": "Couldn't open the page. Check your connection and try again.",
+  "legal.noMailApp": "No mail app found. Write to us at {email}.",
+  "legal.updateTitle": "We've updated our Terms",
+  "legal.updateText": "Please read the Terms of Use and Privacy Policy, then tap I agree to continue.",
+  "legal.agree": "I agree",
+  "legal.agreeing": "Saving…",
+  "db.terms_version_invalid": "Update the app to agree to the terms."
 }

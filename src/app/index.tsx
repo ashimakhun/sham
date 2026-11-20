@@ -5,6 +5,7 @@ import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView, V
 import { Text } from '@/components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AgreeCheckbox } from '@/components/LegalLinks';
 import { Button, ErrorText, Field, Segmented, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import { PASSWORD_MIN, WORKSPACE_NAME_MAX } from '@/lib/password';
@@ -28,6 +29,8 @@ export default function SignInScreen() {
   const [choice, setChoice] = useState<Choice>('');
   const [workspaceName, setWorkspaceName] = useState('');
   const [inviteCode, setInviteCode] = useState('');
+  // ARU-159 AC 3 / AC 4: unticked at first; kept when switching modes.
+  const [agreed, setAgreed] = useState(false);
   const { busy, error, run } = useAction();
   const { t, tm } = useI18n();
 
@@ -60,7 +63,7 @@ export default function SignInScreen() {
   const usernameBroken = mode === 'signUp' && username.trim() !== '' && !isValidUsername(username);
   const usernameReady = mode === 'signIn' ? username.trim() !== '' : isValidUsername(username);
   const canSubmit =
-    usernameReady && password.length >= PASSWORD_MIN && (mode === 'signIn' || (name.trim() && name.trim().length <= NAME_MAX && choiceReady));
+    usernameReady && password.length >= PASSWORD_MIN && (mode === 'signIn' || (name.trim() && name.trim().length <= NAME_MAX && choiceReady && agreed));
 
   function submit() {
     if (mode === 'signIn') return signIn(username, password);
@@ -188,6 +191,8 @@ export default function SignInScreen() {
               )}
             </View>
           )}
+          {/* ARU-159 AC 3: age and agreement in one box, below the workspace choice; Create account only. */}
+          {mode === 'signUp' && <AgreeCheckbox checked={agreed} onChange={setAgreed} />}
           {/* ARU-165 AC 8: Forgot password? is back, with a recovery code instead of email (ARU-164 had hidden it). The
               username typed here is filled in. */}
           {mode === 'signIn' && (

@@ -914,5 +914,19 @@
   "roles.resetDone": "Reset code sheet · closes it; the code can't be shown again",
   "db.only_teacher_reset_code": "Database error · someone other than the teacher tried to make a reset code",
   "db.reset_code_students_mentors": "Database error · a reset code for the teacher's own account or not a student/mentor",
-  "db.reset_code_no_username": "Database error / Manage roles · Reset password for an account without a username, {name} as typed"
+  "db.reset_code_no_username": "Database error / Manage roles · Reset password for an account without a username, {name} as typed",
+  "legal.privacyPolicy": "Profile, waiting / declined screen, update screen · link that opens the Privacy Policy page (ARU-159)",
+  "legal.termsOfUse": "Profile, waiting / declined screen, update screen · link that opens the Terms of Use page (ARU-159)",
+  "legal.contactUs": "Profile and the waiting / declined screen · link that opens a new email to the operator (ARU-159)",
+  "legal.agreeCheckbox": "Sign-in · Create account · checkbox below the workspace choice; {terms} and {privacy} are the links legal.agreeTermsLink and legal.agreePrivacyLink (ARU-159)",
+  "legal.agreeTermsLink": "Sign-in · Create account · the Terms of Use link inside the checkbox text (Russian: accusative case) (ARU-159)",
+  "legal.agreePrivacyLink": "Sign-in · Create account · the Privacy Policy link inside the checkbox text (Russian: accusative case) (ARU-159)",
+  "legal.agreeA11y": "Sign-in · Create account · what screen readers read for the checkbox (ARU-159)",
+  "legal.linkFailed": "Profile, sign-up, waiting / declined and update screens · message when a Privacy Policy / Terms of Use link can't open (ARU-159)",
+  "legal.noMailApp": "Profile and the waiting / declined screen · message after Contact us when no mail app can open the email; {email} is the operator's address (ARU-159)",
+  "legal.updateTitle": "Full screen before the app when the documents have a new version · title (ARU-159)",
+  "legal.updateText": "Update screen · text under the title (ARU-159)",
+  "legal.agree": "Update screen · button that saves the agreement (ARU-159)",
+  "legal.agreeing": "Update screen · the I agree button while saving (ARU-159)",
+  "db.terms_version_invalid": "Database error · agreeing to a version below 1, from an old app or the API (ARU-159; not shown by this app)"
 }

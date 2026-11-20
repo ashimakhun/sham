@@ -9,6 +9,7 @@ import { I18nContext, make } from '@/i18n/context';
 
 import { fakeStore } from './helpers/fakeStore';
 import { setStore } from './helpers/mocks';
+import { tickAgree } from './helpers/agree';
 
 jest.mock('expo-router', () => require('./helpers/mocks').expoRouter);
 jest.mock('@/lib/store', () => require('./helpers/mocks').store);
@@ -23,6 +24,7 @@ async function openSignUp() {
   await fireEvent.changeText(screen.getByPlaceholderText('Dana S.'), 'Dana');
   await fireEvent.changeText(screen.getByPlaceholderText('dana_s'), 'dana_s'); // ARU-164: a username
   await fireEvent.changeText(screen.getByPlaceholderText('At least 6 characters'), 'secret1');
+  await tickAgree(); // ARU-159: the agreement box
 }
 
 beforeEach(() => jest.clearAllMocks());
@@ -94,6 +96,7 @@ describe('AC 1: the choice', () => {
     await fireEvent.press(screen.getByRole('tab', { name: 'Присоединиться' }));
     expect(screen.getByText('Код приглашения')).toBeTruthy();
     await fireEvent.changeText(screen.getByPlaceholderText('8 букв и цифр'), 'ZZZZZZZZ');
+    await tickAgree(); // ARU-159: the agreement box
     await fireEvent.press(screen.getByRole('button', { name: 'Создать аккаунт' }));
     expect(await screen.findByText('Нет рабочего пространства с этим кодом приглашения.')).toBeTruthy();
   });

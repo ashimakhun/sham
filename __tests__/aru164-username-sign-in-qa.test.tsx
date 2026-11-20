@@ -23,6 +23,7 @@ import { signInAddress, usernameFromAddress } from "@/lib/username";
 
 import { fakeStore } from "./helpers/fakeStore";
 import { setStore } from "./helpers/mocks";
+import { tickAgree } from './helpers/agree';
 
 jest.mock("expo-router", () => require("./helpers/mocks").expoRouter);
 jest.mock("@/lib/store", () => require("./helpers/mocks").store);
@@ -50,6 +51,7 @@ async function fillSignUp(name: string, username = "dana_s") {
     screen.getByPlaceholderText("8 letters and digits"),
     "ABCD2345",
   );
+  await tickAgree(); // ARU-159: the agreement box
 }
 
 it("AC 1 / AC 5: a display name of only no-break spaces keeps Create account disabled", async () => {

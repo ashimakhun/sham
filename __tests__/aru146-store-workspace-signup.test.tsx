@@ -72,7 +72,7 @@ it('AC 2: creating sends the trimmed workspace name with the full name', async (
     {
       email: 'dana_s@users.sham.invalid',
       password: 'secret1',
-      options: { data: { username: 'dana_s', full_name: 'Dana', workspace_name: 'My school' } },
+      options: { data: { username: 'dana_s', full_name: 'Dana', workspace_name: 'My school', terms_version: 1 } }, // ARU-159
     },
   ]);
 });
@@ -84,7 +84,7 @@ it('AC 3 / AC 4: joining sends the code trimmed, in upper case', async () => {
     {
       email: 'dana_s@users.sham.invalid',
       password: 'secret1',
-      options: { data: { username: 'dana_s', full_name: 'Dana', invite_code: 'ABCD2345' } },
+      options: { data: { username: 'dana_s', full_name: 'Dana', invite_code: 'ABCD2345', terms_version: 1 } }, // ARU-159
     },
   ]);
 });

@@ -78,6 +78,9 @@ export function fakeStore(who: keyof typeof users | null, over: Partial<Store> =
     accountNotice: null,
     changePassword: jest.fn(async () => {}),
     needsRecoveryCode: false,
+    // ARU-159: no update screen unless a test asks for it.
+    needsLegalAgreement: false,
+    agreeToTerms: jest.fn(async () => {}),
     getRecoveryCode: jest.fn(async () => 'ABCD-EFGH-JKMN-PQRS'),
     saveRecoveryCode: jest.fn(async () => {}),
     makeNewRecoveryCode: jest.fn(async () => 'WXYZ-2345-6789-ABCD'),

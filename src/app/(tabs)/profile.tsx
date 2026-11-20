@@ -3,6 +3,7 @@ import { ScrollView, View } from 'react-native';
 
 import { AccountantSection } from '@/components/Accountant';
 import { LanguageSwitch } from '@/components/LanguageSwitch';
+import { LegalLinks } from '@/components/LegalLinks';
 import { ProfileNameCard } from '@/components/ProfileNameCard';
 import { NotificationsButton } from '@/components/Notifications';
 import { Button, ErrorText, styles } from '@/components/ui';
@@ -65,6 +66,8 @@ export default function ProfileScreen() {
             onPress={() => router.push('/reports')}
           />
         )}
+        {/* ARU-159 AC 6: Privacy Policy, Terms of Use and Contact us, above Change password, for every role. */}
+        <LegalLinks />
         {/* ARU-76: own password only; waiting / declined accounts never get here (AccessGate). */}
         <Button title={t('profile.changePassword')} variant="secondary" onPress={() => router.push('/change-password')} />
         {/* ARU-165 AC 5: a new recovery code (current password checked on the server), under Change password. */}
