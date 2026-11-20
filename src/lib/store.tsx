@@ -35,6 +35,7 @@ import { supabase } from './supabase';
 import { normalizeUsername, signInAddress, usernameAddress } from './username';
 import type {
   AccessRequest,
+  ResetCode,
   AssignmentSentCount,
   ContentKind,
   ContentReport,
@@ -260,6 +261,12 @@ export type Store = {
   subscribeToGeneralMessages: (onMessage: (m: GeneralMessage) => void, onDelete?: (id: string) => void) => () => void;
   /** Teacher only (ARU-43): accounts waiting for approval and declined ones, oldest first. Empty for others. */
   accessRequests: AccessRequest[];
+  /** Teacher only (ARU-169 AC 1): user id → username of the accepted accounts in the workspace (workspace_usernames).
+   *  An account without a username has no entry. Empty for others. */
+  memberUsernames: Record<string, string>;
+  /** Teacher only (ARU-169 AC 3–5): a new one-time reset code for an accepted student or mentor (make_reset_code).
+   *  Any earlier code for them stops working. The plain code is returned once; `expiresAt` is server time (ISO). */
+  makeResetCode: (userId: string) => Promise<ResetCode>;
   /** Teacher only (ARU-43): accept (approved) or decline (rejected) an account, then refetch. A retry is a no-op. */
   setAccessStatus: (userId: string, status: 'approved' | 'rejected') => Promise<void>;
   /** Teacher only (ARU-13): switches a user between student and mentor via set_user_role(), then refetches. */
@@ -892,6 +899,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // Every profile the database returns: approved accounts, plus all accounts for the teacher and the own row (ARU-43).
   const [profiles, setProfiles] = useState<User[]>([]);
   const [accessRequests, setAccessRequests] = useState<AccessRequest[]>([]);
+  const [memberUsernames, setMemberUsernames] = useState<Record<string, string>>({});
   const [contentReports, setContentReports] = useState<ContentReport[]>([]);
   // ARU-162: the people I've blocked (ids).
   const [blockedIds, setBlockedIds] = useState<string[]>([]);
@@ -1196,14 +1204,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       // Requests for the teacher's Manage roles screen. Not live: they refresh with every load.
       if (me.role === 'teacher') {
-        const [req, reports] = await Promise.all([supabase.rpc('access_requests'), fetchReports()]);
+        // ARU-169 AC 1: the members' usernames load and refresh together with the requests (analysis note 6).
+        const [req, reports, names] = await Promise.all([
+          supabase.rpc('access_requests'),
+          fetchReports(),
+          Promise.resolve(supabase.rpc('workspace_usernames')).catch(() => null),
+        ]);
         if (!current()) return;
         setAccessRequests(req.error ? [] : ((req.data as AccessRequestRow[] | null) ?? []).map(toAccessRequest));
+        // On an error (offline, or before 0074 runs) the last known usernames stay.
+        if (names && !names.error) {
+          setMemberUsernames(
+            Object.fromEntries(
+              ((names.data as { user_id: string; username: string }[] | null) ?? []).map((r) => [r.user_id, r.username]),
+            ),
+          );
+        }
         // ARU-158: the Reports row's count. Before 0064 runs there is no table: no reports.
         if (reports) setContentReports(reports);
         else setContentReports([]);
       } else {
         setAccessRequests([]);
+        setMemberUsernames({});
         setContentReports([]);
       }
       // ARU-162: my blocks (RLS: own rows only). On an error (offline, or before 0066 runs) the last known blocks stay,
@@ -2447,6 +2469,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     syncPushDevice,
     accessRequests,
+    memberUsernames,
+    makeResetCode: async (target) => {
+      requireRole('teacher');
+      const res = await supabase.rpc('make_reset_code', { target });
+      check(res);
+      const row = ((res.data as { code: string; expires_at: string }[] | null) ?? [])[0];
+      if (!row?.code) throw new Error(translate('en', 'common.genericError'));
+      return { code: row.code, expiresAt: row.expires_at };
+    },
     setAccessStatus: async (target, status) => {
       requireRole('teacher');
       check(await supabase.rpc('set_access_status', { target, new_status: status }));

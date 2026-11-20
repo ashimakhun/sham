@@ -42,6 +42,9 @@ export function Card({ children, onPress, style, accessible, testID }: CardProps
 
 type ButtonProps = {
   title: string;
+  /** ARU-169: a screen reader label that says more than the title ("Reset password for Sam"). */
+  accessibilityLabel?: string;
+  testID?: string;
   onPress: () => void;
   variant?: 'primary' | 'secondary' | 'danger';
   disabled?: boolean;
@@ -56,14 +59,27 @@ type ButtonProps = {
   badgeOnIcon?: boolean;
 };
 
-export function Button({ title, onPress, variant = 'primary', disabled, unread = 0, icon, badgeOnIcon }: ButtonProps) {
+export function Button({
+  title,
+  onPress,
+  variant = 'primary',
+  disabled,
+  unread = 0,
+  icon,
+  badgeOnIcon,
+  accessibilityLabel,
+  testID,
+}: ButtonProps) {
   const { lang } = useI18n();
   const textColor = variant === 'primary' ? '#fff' : variant === 'danger' ? colors.danger : colors.primary;
   return (
     <Pressable
       accessibilityRole="button"
       // With an icon there is no visible text, so the label is always set; the unread count joins it (ARU-31).
-      accessibilityLabel={unread > 0 ? withUnreadLabel(title, unread, lang) : icon ? title : undefined}
+      accessibilityLabel={
+        unread > 0 ? withUnreadLabel(title, unread, lang) : icon ? title : (accessibilityLabel ?? undefined)
+      }
+      testID={testID}
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [

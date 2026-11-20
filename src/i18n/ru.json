@@ -902,5 +902,17 @@
   "db.username_already_set": "У этого аккаунта уже есть имя пользователя.",
   "db.recovery_needs_username": "Сначала выберите имя пользователя.",
   "db.recovery_code_saved": "Код восстановления уже сохранён. Новый можно создать в профиле.",
-  "db.recovery_code_replaced": "Этот код восстановления заменён. Сохраните новый."
+  "db.recovery_code_replaced": "Этот код восстановления заменён. Сохраните новый.",
+  "roles.resetPassword": "Сбросить пароль",
+  "roles.resetPasswordLabel": "Сбросить пароль для {name}",
+  "roles.resetTitle": "Сброс пароля",
+  "roles.resetMessage": "Создать код сброса для {name}? С ним можно задать новый пароль в течение 24 часов. Прежний код сброса для этого человека перестанет действовать.",
+  "roles.resetConfirm": "Создать код",
+  "roles.resetCodeTitle": "Код сброса",
+  "roles.resetCodeText": "Передайте этот код {name} лично или в сообщении. Он действует один раз, до {until}. Больше вы его не увидите.",
+  "roles.resetCopyLabel": "Скопировать код сброса",
+  "roles.resetDone": "Готово",
+  "db.only_teacher_reset_code": "Только преподаватель может создавать коды сброса.",
+  "db.reset_code_students_mentors": "Коды сброса можно создавать только для студентов и менторов.",
+  "db.reset_code_no_username": "У {name} пока нет имени пользователя. Сначала нужно войти и выбрать его."
 }

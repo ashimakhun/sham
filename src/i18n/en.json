@@ -902,5 +902,17 @@
   "db.username_already_set": "This account already has a username.",
   "db.recovery_needs_username": "Choose a username first.",
   "db.recovery_code_saved": "Your recovery code is already saved. Make a new one in Profile.",
-  "db.recovery_code_replaced": "This recovery code was replaced. Save the new one."
+  "db.recovery_code_replaced": "This recovery code was replaced. Save the new one.",
+  "roles.resetPassword": "Reset password",
+  "roles.resetPasswordLabel": "Reset password for {name}",
+  "roles.resetTitle": "Reset password",
+  "roles.resetMessage": "Make a reset code for {name}? It lets them set a new password within 24 hours. Any earlier reset code for them stops working.",
+  "roles.resetConfirm": "Make code",
+  "roles.resetCodeTitle": "Reset code",
+  "roles.resetCodeText": "Give this code to {name} in person or by message. It works once, until {until}. You won't see it again.",
+  "roles.resetCopyLabel": "Copy reset code",
+  "roles.resetDone": "Done",
+  "db.only_teacher_reset_code": "Only the teacher can make reset codes.",
+  "db.reset_code_students_mentors": "Reset codes can be made only for students and mentors.",
+  "db.reset_code_no_username": "{name} has no username yet. They need to sign in and choose one first."
 }

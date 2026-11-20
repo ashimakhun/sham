@@ -902,5 +902,17 @@
   "db.username_already_set": "Database error · choosing a username for an account that already has one, e.g. on a second device (ARU-168)",
   "db.recovery_needs_username": "Save your recovery code · database refusal: the account has no username yet (ARU-165)",
   "db.recovery_code_saved": "Save your recovery code · database refusal: a saved code exists (ARU-165)",
-  "db.recovery_code_replaced": "Save your recovery code · database refusal: the code shown isn't the current one (ARU-165)"
+  "db.recovery_code_replaced": "Save your recovery code · database refusal: the code shown isn't the current one (ARU-165)",
+  "roles.resetPassword": "Manage roles · button on a Mentors or Students row (ARU-169)",
+  "roles.resetPasswordLabel": "Manage roles · screen reader label of Reset password, {name} = display name",
+  "roles.resetTitle": "Manage roles · title of the Reset password confirmation",
+  "roles.resetMessage": "Manage roles · Reset password confirmation text, {name} = display name",
+  "roles.resetConfirm": "Manage roles · confirm button of the Reset password confirmation",
+  "roles.resetCodeTitle": "Manage roles · title of the Reset code sheet (the one-time code)",
+  "roles.resetCodeText": "Reset code sheet · {name} = display name, {until} = expiry date and time in local time",
+  "roles.resetCopyLabel": "Reset code sheet · screen reader label of Copy",
+  "roles.resetDone": "Reset code sheet · closes it; the code can't be shown again",
+  "db.only_teacher_reset_code": "Database error · someone other than the teacher tried to make a reset code",
+  "db.reset_code_students_mentors": "Database error · a reset code for the teacher's own account or not a student/mentor",
+  "db.reset_code_no_username": "Database error / Manage roles · Reset password for an account without a username, {name} as typed"
 }
