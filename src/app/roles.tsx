@@ -91,6 +91,8 @@ export default function RolesScreen() {
   }
 
   const q = query.trim().toLowerCase();
+  // ARU-178: the row shows "@username", so one leading "@" is ignored when matching the username (not the name).
+  const uq = q.startsWith('@') ? q.slice(1) : q;
   // Requests and Declined come oldest first from access_requests(); the search filters them by name too.
   const requests = (status: AccessRequest['status']) =>
     accessRequests
@@ -105,7 +107,7 @@ export default function RolesScreen() {
         .filter(
           (u) =>
             u.role === s.role &&
-            (u.name.toLowerCase().includes(q) || (!!q && !!memberUsernames[u.id]?.toLowerCase().includes(q))),
+            (u.name.toLowerCase().includes(q) || (!!uq && !!memberUsernames[u.id]?.toLowerCase().includes(uq))),
         )
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((user): Row => ({ kind: 'user', user })),
