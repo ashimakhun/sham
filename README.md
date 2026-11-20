@@ -46,8 +46,11 @@ An educational mobile app where teachers, mentors and students work together:
   **username** and a password; no email. Usernames are unique, case-insensitive, 3–30 characters of `a–z 0–9 _ . -`.
   Supabase Auth gets an internal address `<username>@users.sham.invalid` that can never receive mail. Accounts made
   before ARU-164 still sign in with their email (until ARU-168).
-- **Forgot password?** (ARU-77): hidden on the sign-in screen since ARU-164 (the email reset doesn't work for username
-  accounts; ARU-165 brings recovery back without email). `/reset-password` still works by link for older accounts.
+- **Recovery code and Forgot password?** (ARU-165): every account with a username gets a personal recovery code
+  (shown once, only its hash is stored). **Forgot password?** on the sign-in screen takes the username, the recovery
+  code and a new password; 5 wrong codes lock recovery for that username for 15 minutes. Profile → **Recovery code**
+  makes a new code after the current password is checked. The email reset (ARU-77) is gone; the old
+  `/reset-password` link opens the sign-in screen. See [Password recovery](#password-recovery-aru-165).
 - **Homework photos** (ARU-105, ARU-107, ARU-112): compressed when picked and deleted 6 months after the homework is
   checked; senders get a warning banner (and push warnings) and can download their photos as a ZIP.
 - **Push notifications** (ARU-166; through the Sham Telegram bot until ARU-171 removed it): meeting started, new
@@ -298,14 +301,21 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    itself. Adds `notification_settings.notify_homework_due` (on by default) and the `homework_due` kind to
    `set_notification()`; unschedules the `meeting-start-notifications` cron job and drops `claim_started_meetings()`.
    `photo_deletion_warnings`, `claim_photo_deletion_warnings()` and `course_meetings.start_notified_at` stay, unused;
-   no RLS change, deletes no data; see [Reminders](#reminders-aru-170)).
+   no RLS change, deletes no data; see [Reminders](#reminders-aru-170)),
+   `0073_recovery_codes.sql` (ARU-165: recovery codes. Adds `recovery_codes` (one row per account: the code's SHA-256
+   hash, `saved_at`; deleted with the account) and `recovery_attempts` (wrong attempts and the 15-minute lock per
+   username); RLS on with no policies, so the app reads neither. Signed-in functions `my_recovery_code_saved()`,
+   `make_recovery_code()` (refused once a code is saved) and `save_recovery_code(code)`; Edge-Function-only (service
+   role) `replace_recovery_code()`, `recovery_check()` and `recovery_finish()`, which also ends every session of the
+   account by deleting its `auth.sessions` rows. Needs no extension; changes no existing rows; deploy the two Edge
+   Functions, see [Password recovery](#password-recovery-aru-165)).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. Turn off **Authentication → Email → Confirm email**, in development and production, **before** applying
    `0067_username_sign_in.sql` (ARU-164). Username accounts sign up with an internal address that can't receive mail,
    so with it on, new accounts could never be confirmed.
-4. For **Forgot password?** (ARU-77), put `{{ .Token }}` in the **Reset Password** email template, see
-   [Password reset email](#password-reset-email). On the default email sender only the project's team members get
-   the email; real users need custom SMTP.
+4. For **Forgot password?** and Profile → **Recovery code** (ARU-165), deploy the `recover-password` and
+   `new-recovery-code` Edge Functions, see [Password recovery](#password-recovery-aru-165). No email settings are
+   needed.
 
 ### Usernames for older accounts (ARU-168)
 
@@ -336,32 +346,46 @@ Expected: the internal address, empty email-change and token columns, metadata w
 identities with only `sub`, the internal `email` and the verified flags, and 0 for the two counts. To run the job by
 hand: `select public.move_unclaimed_accounts();` (returns how many accounts it moved; does nothing before the deadline).
 
-### Password reset email
+### Password recovery (ARU-165)
 
-**Forgot password?** on the sign-in screen (ARU-77) emails the user a one-time **code** (no link, so no deep links
-are needed and it works the same in Expo Go, dev builds, iOS and Android). The user types it into the app with a new
-password. Nothing is in the database; it's all Supabase Auth settings in the dashboard:
+Sham keeps no email, so a forgotten password is reset with the person's own **recovery code**: 16 characters of
+`ABCDEFGHJKMNPQRSTUVWXYZ23456789` (`XXXX-XXXX-XXXX-XXXX`), made by the database. Only its SHA-256 hash is stored
+(`recovery_codes`, migration `0073_recovery_codes.sql`).
 
-1. **Custom SMTP (required before real users can reset).** Supabase's default sender only delivers to the project's
-   team members and is heavily rate-limited. Set up a provider (for example Resend, Postmark or SendGrid) under
-   **Authentication → Emails → SMTP Settings** (enable custom SMTP, fill host, port, user, password and the sender
-   address/name). Development can be tested with a team member's address on the default sender.
-2. **Reset Password template.** Under **Authentication → Emails → Templates → Reset Password**, replace the body so
-   it shows the code (`{{ .Token }}`) instead of the link. Sample:
+- **Getting a code.** An account with a username and no saved code sees **Save your recovery code** before anything
+  else (after Choose a username, before the waiting / declined screen and the tabs). Leaving it without Continue
+  makes a new code next time; the unsaved one stops working.
+- **New code.** Profile → **Recovery code** checks the current password in the `new-recovery-code` Edge Function,
+  then replaces the code (the old one stops working at once).
+- **Forgot password?** (sign-in screen): username + recovery code + new password, through the `recover-password`
+  Edge Function. It sets the password with the Auth admin API, ends every session of the account (their refresh
+  tokens stop working; other devices sign out with "You were signed out because your password was changed." when the
+  app opens or comes back to the foreground, or at the latest when their access token expires), deletes the used
+  code and signs this device in; the Save screen then shows a new code. 5 wrong codes for a username (also unknown
+  ones) lock recovery for it for 15 minutes; normal sign-in isn't affected.
 
-   Subject: `Your Sham password reset code`
+Setup:
 
-   ```html
-   <h2>Reset your Sham password</h2>
-   <p>Enter this code in the Sham app to choose a new password:</p>
-   <p style="font-size:24px;font-weight:bold;letter-spacing:4px">{{ .Token }}</p>
-   <p>The code works once and expires in 1 hour. If you didn't ask to reset your password, ignore this email.</p>
+1. Run `0073_recovery_codes.sql` (see [Setup](#setup)).
+2. Deploy both functions. They need no secrets of their own (`SUPABASE_URL`, `SUPABASE_ANON_KEY` and
+   `SUPABASE_SERVICE_ROLE_KEY` are provided by Supabase):
+   ```bash
+   npx supabase functions deploy new-recovery-code                   # JWT verification on: signed-in users only
+   npx supabase functions deploy recover-password --no-verify-jwt    # callers are signed out
    ```
-3. **Optional.** **Authentication → Providers → Email**: *Email OTP Length* (6 by default; the app accepts 6–10 digits)
-   and *Email OTP Expiration* (3600 s by default). **Authentication → Rate Limits** sets how many emails can be sent
-   per hour. The app also waits 60 seconds between "Send a new code" taps.
+3. Check: sign up a test account, save its code, sign out, use **Forgot password?** with the code; then
+   `select count(*) from auth.sessions where user_id = '<id>'` shows only the new session.
 
-No redirect URL is needed (`resetPasswordForEmail` is called without `redirectTo`).
+**Someone lost both the password and the recovery code** (or an older account that hasn't chosen a username yet, so
+has no code): an admin sets a new password in the SQL Editor and passes it on in person; the person then changes it
+in Profile → Change password and makes a new recovery code. (ARU-169 will add a one-time reset code the teacher makes
+for students and mentors.)
+
+```sql
+update auth.users set encrypted_password = extensions.crypt('<new password>', extensions.gen_salt('bf'))
+where id = '<account id>';
+delete from auth.sessions where user_id = '<account id>';  -- sign the account out everywhere
+```
 
 ### Upgrading an existing project to 0005 (ARU-14)
 
@@ -908,7 +932,7 @@ All texts live in one catalog: `src/i18n/en.json` and `src/i18n/ru.json` (the sa
 `useI18n().t('<id>', { …params })`; counts use plural forms (`<id>_one` / `_few` / `_many` / `_other`); dates use
 `formatDate` / `formatWeekdayDate` / `formatDateTime` from the same hook, in the chosen language. `npm test` fails when
 an ID is missing from one file, a Russian text or a note is empty, or the `{placeholders}` differ.
-Moved to the catalog so far (part 1): sign-in and create account, Reset and Change password, the waiting / declined
+Moved to the catalog so far (part 1): sign-in and create account, Forgot password (ARU-165) and Change password, the waiting / declined
 screens, the tab bar and the Profile tab; (part 2, ARU-109) the Homework and Courses tabs, homework, course, listener,
 feedback, meeting and discipline screens; (part 3, ARU-113) Materials, the chats, Pay, the accountant screens, Manage
 roles, the notification switches (the Telegram page until ARU-171) and Delete account. Every screen is now in both
@@ -947,7 +971,9 @@ src/app/                  screens (Expo Router — every file is a route)
   courses/[id]/chat.tsx   course chat (owner, listeners and the teacher)
   general-chat.tsx        general chat for every accepted account (from Profile)
   change-password.tsx     the signed-in user changes their own password (from Profile)
-  reset-password.tsx      Forgot password?: email a code, then set a new password with it (signed out)
+  forgot-password.tsx     Forgot password?: username + recovery code + new password (signed out, ARU-165)
+  recovery-code.tsx       Profile → Recovery code: a new recovery code after the current password (ARU-165)
+  reset-password.tsx      the old email-reset link: redirects to the root (ARU-165)
   courses/[id]/edit.tsx   Edit course (pencil in the course name card): discipline and owner, teacher or mentor (ARU-103)
   courses/[id]/owner.tsx  teacher or mentor changes the course owner (opened from Edit course)
   courses/[id]/meetings/  schedule / edit a meeting; [meetingId]/notes.tsx notes; [meetingId]/assign-homework.tsx;
@@ -1061,7 +1087,10 @@ teacher" is that workspace's teacher, and nobody can see or change anything in a
 | Delete payment proofs (only by deleting a course or discipline, ARU-99) | | | ✓ |
 | Choose the app language (Profile → Language, saved in `profiles.language`, ARU-108) | own | own | own |
 | Change own password (Supabase Auth, current password required, ARU-76) | own | own | own |
-| Reset a forgotten password with an emailed code (signed out, any approval state, ARU-77; older email accounts only, link hidden since ARU-164) | own | own | own |
+| See and save own first recovery code (ARU-165; also waiting / declined accounts) | own | own | own |
+| Make a new recovery code (current password checked on the server, ARU-165) | own | own | own |
+| Forgot password with own username + recovery code (signed out, any account, ARU-165) | own | own | own |
+| Read, make or replace another person's recovery code | (nobody) | (nobody) | (nobody) |
 | Sign up with a username and display name (signed out, ARU-164) | ✓ | ✓ | ✓ |
 | See own username (`usernames`, own row only; also waiting / declined accounts, ARU-164) | own | own | own |
 | See others' usernames (access requests of own workspace, `access_requests()`, ARU-164) |  |  | ✓ |

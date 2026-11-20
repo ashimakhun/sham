@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
@@ -19,16 +18,18 @@ import { isAllowedProof, PROOF_MAX_BYTES, PROOF_RULE, proofFormat } from './paym
 import { NOTES_MAX } from './markdown';
 import {
   authErrorMessage,
-  cleanCode,
-  codeErrorMessage,
+  GENERIC_ERROR,
   isInvalidCredentials,
   NETWORK_ERROR,
+  RATE_LIMITED,
   SAME_PASSWORD,
   signInErrorMessage,
   signUpErrorMessage,
   USERNAME_TAKEN,
+  weakPasswordMessage,
   WRONG_CURRENT_PASSWORD,
 } from './password';
+import { PASSWORD_CHANGED_SIGNED_OUT, RECOVERY_LOCKED, RecoveryCodeReplaced, RECOVERY_WRONG } from './recovery';
 import { LANGUAGE_SAVE_FAILED, nameProblem } from './profileName';
 import { supabase } from './supabase';
 import { normalizeUsername, signInAddress, usernameAddress } from './username';
@@ -149,11 +150,22 @@ export type Store = {
   /** ARU-76: the signed-in user changes their own password. The current password is checked first by signing in
    *  again (same user, so no reload); a wrong one throws WRONG_CURRENT_PASSWORD and nothing changes. */
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
-  /** ARU-77: asks Supabase to email a reset code (the email is trimmed). Same result whether or not it has an account. */
-  requestPasswordReset: (email: string) => Promise<void>;
-  /** ARU-77: checks the emailed code, then saves the new password, as one action. The app is signed in only once the
-   *  password is saved; if saving fails the user is signed out again and the old password still works. */
-  resetPasswordWithCode: (email: string, code: string, newPassword: string) => Promise<void>;
+  /** ARU-165 AC 1: an account with a username but no saved recovery code sees Save your recovery code before anything
+   *  else (after Choose a username). False while unknown (not loaded, or the request failed). */
+  needsRecoveryCode: boolean;
+  /** ARU-165 AC 1 / AC 4: the code to show on Save your recovery code: the one already made in this app session
+   *  (kept in memory only), else a new one from the server (make_recovery_code: any unsaved code stops working). */
+  getRecoveryCode: () => Promise<string>;
+  /** ARU-165 AC 3 / AC 7: marks the code shown saved. Offline: NETWORK_ERROR, nothing changes. When it isn't the
+   *  current code any more (another device), a fresh code is made and RecoveryCodeReplaced is thrown with it. */
+  saveRecoveryCode: (code: string) => Promise<void>;
+  /** ARU-165 AC 5–7: checks the password on the server (new-recovery-code Edge Function) and returns the new code
+   *  (unsaved until saveRecoveryCode). A wrong password throws WRONG_CURRENT_PASSWORD and changes nothing. */
+  makeNewRecoveryCode: (password: string) => Promise<string>;
+  /** ARU-165 AC 8–12: Forgot password (signed out) through the recover-password Edge Function, then signs in with the
+   *  username and the new password. Throws RECOVERY_WRONG, RECOVERY_LOCKED, the weak-password, network or generic
+   *  message; then nothing has changed. */
+  recoverPassword: (username: string, code: string, newPassword: string) => Promise<void>;
   /** Approved users change their own name (ARU-55): trimmed, not blank, at most NAME_MAX characters. The database
    *  allows only the own row and refuses blank names; the store's profiles are updated right after the save. */
   updateMyName: (name: string) => Promise<void>;
@@ -739,6 +751,22 @@ type ListenerHomeworkRow = { id: string; photo_path: string | null };
 
 /** ARU-75: the readable message for a failed delete-account call. The function answers {"error": "<message>"}; no
  *  answer at all (offline) or an unreadable one gets a generic message. */
+/** ARU-165: an Edge Function's error answer ({ code, error }), 'offline' when it never arrived, or null. */
+async function functionAnswer(error: unknown): Promise<{ code?: string; error?: string } | 'offline' | null> {
+  const e = error as { name?: string; context?: { json?: () => Promise<unknown> } };
+  if (e?.name === 'FunctionsFetchError') return 'offline';
+  if (typeof e?.context?.json !== 'function') return null;
+  try {
+    const body = (await e.context.json()) as { code?: unknown; error?: unknown } | null;
+    return {
+      code: typeof body?.code === 'string' ? body.code : undefined,
+      error: typeof body?.error === 'string' ? body.error : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function deleteErrorMessage(error: unknown): Promise<string> {
   const e = error as { name?: string; context?: { json?: () => Promise<unknown>; status?: number } };
   if (e?.name === 'FunctionsFetchError') return DELETE_OFFLINE;
@@ -855,29 +883,6 @@ async function withSignedPhotoUrls(items: Homework[]) {
   return items.map((h) => (h.photoPath ? { ...h, photoUrl: urls.get(h.photoPath) ?? undefined } : h));
 }
 
-// ARU-77: set while a forgotten-password reset runs. If the app is killed after the code was accepted but before the
-// new password was saved, the next start signs out instead of opening the app with the old password still in place.
-const RESET_PENDING_KEY = 'sham.passwordResetPending';
-
-async function setResetPending(pending: boolean) {
-  try {
-    if (pending) await AsyncStorage.setItem(RESET_PENDING_KEY, '1');
-    else await AsyncStorage.removeItem(RESET_PENDING_KEY);
-  } catch {
-    // Storage unavailable: the reset still works, only the kill-mid-reset clean-up is lost.
-  }
-}
-
-async function finishInterruptedReset() {
-  try {
-    if ((await AsyncStorage.getItem(RESET_PENDING_KEY)) !== '1') return;
-    await supabase.auth.signOut({ scope: 'local' });
-    await AsyncStorage.removeItem(RESET_PENDING_KEY);
-  } catch {
-    // Never block start-up.
-  }
-}
-
 /** ARU-170: how long the store waits for a burst of loads to settle before rescheduling reminders. */
 export const REMINDER_DEBOUNCE_MS = 1500;
 
@@ -918,6 +923,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [accountNotice, setAccountNotice] = useState<string | null>(null);
   // ARU-168: the own usernames row (see Store.myUsername).
   const [myUsername, setMyUsername] = useState<string | null | undefined>(undefined);
+  // ARU-165: whether the own account has a saved recovery code (undefined while unknown), and the code made in this app
+  // session for the Save screen (memory only: a new app start makes a new one, AC 4).
+  const [recoveryCodeSaved, setRecoveryCodeSaved] = useState<boolean | undefined>(undefined);
+  const [pendingRecoveryCode, setPendingRecoveryCode] = useState<string | null>(null);
 
   const userId = session?.user.id;
   // ARU-157: the signed-in user as the auth handler last set it (synchronously, unlike `session`), so a load that
@@ -943,9 +952,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const e = error as { status?: number; code?: string; message?: string };
       const gone =
         e.code === 'user_not_found' || /user from sub claim in jwt does not exist|user not found/i.test(e.message ?? '');
-      if (!gone) return false;
-      setAccountNotice(ACCOUNT_DELETED);
-      // ARU-170 AC 3: the deleted account's reminders go before the session does.
+      // ARU-165 AC 9: the session was ended on the server (a recovery on another device changed the password).
+      const ended =
+        e.code === 'session_not_found' || /session from session_id claim in jwt does not exist/i.test(e.message ?? '');
+      if (!gone && !ended) return false;
+      setAccountNotice(gone ? ACCOUNT_DELETED : PASSWORD_CHANGED_SIGNED_OUT);
+      // ARU-170 AC 3: the deleted (or signed-out) account's reminders go before the session does.
       await cancelAllReminders();
       await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
       return true;
@@ -954,27 +966,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return false;
     }
   }, []);
-  // ARU-77: while a forgotten-password reset runs (and while start-up checks for an unfinished one), a new session is
-  // parked here instead of being shown: verifyOtp signs the user in before the new password is saved, and the app
-  // must not open (or the approval gate take over) until it is. Signing out (null) always goes through.
-  const holdingSession = useRef(true);
-  const parkedSession = useRef<Session | null>(null);
-
   useEffect(() => {
-    finishInterruptedReset()
-      .then(() => supabase.auth.getSession())
-      .then(({ data }) => {
-        holdingSession.current = false;
-        parkedSession.current = null;
-        applySession(data.session);
-        setReady(true);
-      });
+    supabase.auth.getSession().then(({ data }) => {
+      applySession(data.session);
+      setReady(true);
+    });
     const { data } = supabase.auth.onAuthStateChange((_event, s) => {
-      if (s && holdingSession.current) {
-        parkedSession.current = s;
-        return;
-      }
-      if (!s) parkedSession.current = null;
       applySession(s);
       if (!s) {
         // ARU-170 AC 3: however the session ended, no reminder of the previous account stays (sign-out cancels first).
@@ -986,6 +983,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setContentReports([]);
         setBlockedIds([]);
         setMyUsername(undefined);
+        setRecoveryCodeSaved(undefined);
+        setPendingRecoveryCode(null);
         setNotificationSettings(undefined);
         setHomework([]);
         setMaterials([]);
@@ -1084,6 +1083,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         Promise.resolve(supabase.from('usernames').select('username')).catch(() => null),
       ]);
       if (!current()) return;
+      // ARU-165: only an account with a username has a recovery code: ask whether it is saved, before the data is
+      // shown, so Save your recovery code comes before anything else. A failure (offline, or before 0073) keeps what
+      // was known.
+      const hasUsername = !!own && !own.error && ((own.data as unknown[] | null) ?? []).length > 0;
+      const savedCode = hasUsername
+        ? await Promise.resolve(supabase.rpc('my_recovery_code_saved')).catch(() => null)
+        : null;
+      if (!current()) return;
       const signedHomework = await withSignedPhotoUrls(rows<HomeworkRow>(hw).map(toHomework));
       if (!current()) return;
       const all = rows<ProfileRow>(profileRows).map(toUser);
@@ -1108,6 +1115,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (own && !own.error) {
         setMyUsername(((own.data as { username: string }[] | null) ?? [])[0]?.username ?? null);
       }
+      if (savedCode && !savedCode.error) setRecoveryCodeSaved(savedCode.data === true);
       setHomework(signedHomework);
       setMaterials(rows<MaterialRow>(mats).map(toMaterial));
       setCourses(rows<CourseRow>(crs).map(toCourse));
@@ -1568,6 +1576,91 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     getCourse,
     myUsername,
     needsUsername: !!currentUser && myUsername === null,
+    needsRecoveryCode: !!currentUser && !!myUsername && recoveryCodeSaved === false,
+    getRecoveryCode: async () => {
+      if (pendingRecoveryCode) return pendingRecoveryCode;
+      const res = await Promise.resolve(supabase.rpc('make_recovery_code')).catch(() => null);
+      if (!res) throw new Error(NETWORK_ERROR);
+      if (res.error) {
+        // Saved on another device meanwhile: nothing to show, the app continues.
+        if (res.error.hint === 'sham:recovery_code_saved') {
+          setRecoveryCodeSaved(true);
+          return '';
+        }
+        if (!res.error.hint && !res.error.code) throw new Error(NETWORK_ERROR);
+        throw new Error(dbErrorMessage(res.error));
+      }
+      const code = String(res.data ?? '');
+      setPendingRecoveryCode(code);
+      return code;
+    },
+    saveRecoveryCode: async (code) => {
+      const res = await Promise.resolve(supabase.rpc('save_recovery_code', { code })).catch(() => null);
+      if (!res) throw new Error(NETWORK_ERROR);
+      if (res.error) {
+        if (res.error.hint === 'sham:recovery_code_replaced') {
+          // Edge case (two devices): a newer code exists. Show a fresh one instead of marking this one saved.
+          setPendingRecoveryCode(null);
+          const fresh = await Promise.resolve(supabase.rpc('make_recovery_code')).catch(() => null);
+          if (fresh?.error?.hint === 'sham:recovery_code_saved') {
+            // The newer code was saved on the other device meanwhile: nothing left to save here.
+            setRecoveryCodeSaved(true);
+            return;
+          }
+          const next = fresh && !fresh.error ? String(fresh.data ?? '') : '';
+          if (next) setPendingRecoveryCode(next);
+          throw new RecoveryCodeReplaced(next);
+        }
+        if (!res.error.hint && !res.error.code) throw new Error(NETWORK_ERROR);
+        throw new Error(dbErrorMessage(res.error));
+      }
+      setPendingRecoveryCode(null);
+      setRecoveryCodeSaved(true);
+    },
+    makeNewRecoveryCode: async (password) => {
+      if (!userId) throw new Error(translate('en', 'auth.signedOut'));
+      let res: { data: unknown; error: unknown };
+      try {
+        res = await supabase.functions.invoke('new-recovery-code', { body: { password } });
+      } catch {
+        throw new Error(NETWORK_ERROR);
+      }
+      if (res.error) {
+        const answer = await functionAnswer(res.error);
+        if (answer === 'offline') throw new Error(NETWORK_ERROR);
+        if (answer?.code === 'wrong_password') throw new Error(WRONG_CURRENT_PASSWORD);
+        if (answer?.code === 'rate_limited') throw new Error(RATE_LIMITED);
+        throw new Error(GENERIC_ERROR);
+      }
+      const code = (res.data as { code?: unknown } | null)?.code;
+      if (typeof code !== 'string' || !code) throw new Error(GENERIC_ERROR);
+      // AC 7: the old code is gone on the server. Until Done the new one is unsaved: if the Save screen takes over
+      // (a reload), it shows this same code.
+      setPendingRecoveryCode(code);
+      return code;
+    },
+    recoverPassword: async (username, code, newPassword) => {
+      setAccountNotice(null);
+      let res: { error: unknown };
+      try {
+        res = await supabase.functions.invoke('recover-password', {
+          body: { username: normalizeUsername(username), code, password: newPassword },
+        });
+      } catch {
+        throw new Error(NETWORK_ERROR);
+      }
+      if (res.error) {
+        const answer = await functionAnswer(res.error);
+        if (answer === 'offline') throw new Error(NETWORK_ERROR);
+        if (answer?.code === 'wrong_code') throw new Error(RECOVERY_WRONG);
+        if (answer?.code === 'locked') throw new Error(RECOVERY_LOCKED);
+        if (answer?.code === 'weak_password') throw new Error(weakPasswordMessage(answer.error));
+        throw new Error(GENERIC_ERROR);
+      }
+      // AC 9: signed in on this device with the new password; the Save screen then shows a new code.
+      const signedIn = await supabase.auth.signInWithPassword({ email: usernameAddress(username), password: newPassword });
+      if (signedIn.error) throw new Error(signInErrorMessage(signedIn.error));
+    },
     chooseUsername: async (username, displayName) => {
       const res = await Promise.resolve(
         supabase.rpc('choose_username', { username: normalizeUsername(username), display_name: displayName.trim() }),
@@ -1674,42 +1767,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (verified.data.user?.id !== me.id) throw new Error(translate('en', 'auth.signInAgain'));
       const updated = await supabase.auth.updateUser({ password: newPassword });
       if (updated.error) throw new Error(authErrorMessage(updated.error));
-    },
-    requestPasswordReset: async (email) => {
-      // Supabase answers the same for unknown emails, so the app can't tell (and never says) whether one exists.
-      const res = await supabase.auth.resetPasswordForEmail(email.trim());
-      if (res.error) throw new Error(authErrorMessage(res.error));
-    },
-    resetPasswordWithCode: async (email, code, newPassword) => {
-      holdingSession.current = true;
-      parkedSession.current = null;
-      await setResetPending(true);
-      let verified = false;
-      let saved = false;
-      try {
-        const res = await supabase.auth.verifyOtp({ email: email.trim(), token: cleanCode(code), type: 'recovery' });
-        if (res.error) throw new Error(codeErrorMessage(res.error));
-        verified = true;
-        const updated = await supabase.auth.updateUser({ password: newPassword });
-        if (updated.error) throw new Error(authErrorMessage(updated.error));
-        saved = true;
-        const next = parkedSession.current ?? res.data.session ?? (await supabase.auth.getSession()).data.session;
-        holdingSession.current = false;
-        parkedSession.current = null;
-        // Now the app opens as after a normal sign-in: Homework, or the waiting / declined screen (ARU-43).
-        applySession(next);
-      } catch (e) {
-        if (e instanceof Error && e.message) throw e;
-        throw new Error(NETWORK_ERROR);
-      } finally {
-        if (verified && !saved) {
-          // No half-finished reset (AC 8): back to signed out; local scope works offline too. The old password stays.
-          await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
-        }
-        holdingSession.current = false;
-        parkedSession.current = null;
-        await setResetPending(false);
-      }
     },
     updateMyName: async (name) => {
       if (!currentUser || (currentUser.accessStatus && currentUser.accessStatus !== 'approved')) {

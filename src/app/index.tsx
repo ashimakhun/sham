@@ -1,4 +1,4 @@
-import { Redirect } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 
@@ -188,8 +188,19 @@ export default function SignInScreen() {
               )}
             </View>
           )}
-          {/* ARU-164 AC 9: no "Forgot password?" here: the email reset doesn't work for username accounts. ARU-165 brings
-              recovery back without email; /reset-password stays reachable by link until then. */}
+          {/* ARU-165 AC 8: Forgot password? is back, with a recovery code instead of email (ARU-164 had hidden it). The
+              username typed here is filled in. */}
+          {mode === 'signIn' && (
+            <Text
+              accessibilityRole="link"
+              testID="forgot-password-link"
+              style={[styles.caps, { color: colors.primary, fontSize: 14, alignSelf: 'flex-start', paddingVertical: 4 }]}
+              onPress={() =>
+                router.push({ pathname: '/forgot-password', params: username.includes('@') ? {} : { username: username.trim() } })
+              }>
+              {t('signIn.forgotPassword')}
+            </Text>
+          )}
 
           <ErrorText error={tm(error)} />
           <Button

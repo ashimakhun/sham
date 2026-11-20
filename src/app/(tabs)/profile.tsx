@@ -67,6 +67,8 @@ export default function ProfileScreen() {
         )}
         {/* ARU-76: own password only; waiting / declined accounts never get here (AccessGate). */}
         <Button title={t('profile.changePassword')} variant="secondary" onPress={() => router.push('/change-password')} />
+        {/* ARU-165 AC 5: a new recovery code (current password checked on the server), under Change password. */}
+        <Button title={t('recovery.codeLabel')} variant="secondary" onPress={() => router.push('/recovery-code')} />
         {/* ARU-162 AC 5: everyone's own Blocked people list (after Change password, which
             stays first in this group, ARU-100). */}
         <Button title={t('block.profileRow')} variant="secondary" onPress={() => router.push('/blocked')} />

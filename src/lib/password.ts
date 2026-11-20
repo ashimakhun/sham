@@ -1,5 +1,5 @@
-// Shared rules and messages for the password screens: change password on Profile (ARU-76) and the forgotten-password
-// reset on the sign-in screen (ARU-77), so both behave and read the same. ARU-108: the texts are the English catalog's
+// Shared rules and messages for the password screens: change password on Profile (ARU-76) and Forgot password with a
+// recovery code on the sign-in screen (ARU-165), so both behave and read the same. ARU-108: the texts are the English catalog's
 // (src/i18n/en.json); the screens show them in the chosen language with translateMessage().
 import { translate } from '@/i18n';
 
@@ -17,7 +17,6 @@ export const RATE_LIMITED = en('auth.rateLimited');
 // ARU-108 AC 7a: Auth errors the app words itself.
 export const INVALID_CREDENTIALS = en('auth.invalidCredentials');
 export const USER_EXISTS = en('auth.userExists');
-export const EMAIL_NOT_CONFIRMED = en('auth.emailNotConfirmed');
 // ARU-164: the sign-in screen asks for a username (AC 7), and sign-up answers a used one as taken (AC 4).
 export const USERNAME_INVALID_CREDENTIALS = en('auth.invalidUsernameCredentials');
 export const USERNAME_TAKEN = en('auth.usernameTaken');
@@ -30,17 +29,6 @@ export const GENERIC_ERROR = en('common.genericError');
 export const INVITE_CODE_UNKNOWN = en('db.invite_code_unknown');
 /** Workspace names: trimmed, 1–80 characters (the database checks it too). */
 export const WORKSPACE_NAME_MAX = 80;
-
-// ARU-77: the forgotten-password reset with a code from the email.
-export const CODE_INVALID = en('auth.codeInvalid');
-/** Seconds before "Send a new code" can be tapped again. */
-export const RESEND_COOLDOWN_S = 60;
-/** The same answer whether or not an account exists for the email (AC 3). */
-export const codeSentMessage = (email: string) => en('reset.codeSent', { email });
-/** Digits only: letters are dropped and a pasted "123 456" becomes "123456". */
-export const cleanCode = (text: string) => text.replace(/\D/g, '').slice(0, 10);
-/** A complete code: 6–10 digits (the project's OTP length, 6 by default). */
-export const codeReady = (code: string) => /^\d{6,10}$/.test(code);
 
 /** Both new-password fields are filled and differ (shows "Passwords don't match"). */
 export function passwordsMismatch(password: string, confirm: string) {
@@ -62,7 +50,7 @@ export function isInvalidCredentials(error: AuthErrorLike) {
   return error.status === 400 && /invalid login credentials/i.test(error.message ?? '');
 }
 
-/** Too many requests (Supabase's rate limits, ARU-77 AC 9). */
+/** Too many requests (Supabase's rate limits). */
 export function isRateLimited(error: AuthErrorLike) {
   return !!error && (error.status === 429 || /^over_.*rate_limit$/.test(error.code ?? ''));
 }
@@ -72,12 +60,6 @@ export function isNetworkError(error: AuthErrorLike) {
   return !!error && (error.name === 'AuthRetryableFetchError' || error.status === 0);
 }
 
-/** verifyOtp refused the code: wrong, already used or expired. Network and rate-limit errors keep their own text. */
-export function codeErrorMessage(error: AuthErrorLike) {
-  if (isRateLimited(error) || isNetworkError(error)) return authErrorMessage(error);
-  return CODE_INVALID;
-}
-
 /** A user-readable message for an Auth error: the server's own text, except for the cases the app words itself
  *  (ARU-108 AC 7a). The screens translate the app's texts; any other text becomes the generic one in Russian. */
 export function authErrorMessage(error: AuthErrorLike): string {
@@ -85,7 +67,6 @@ export function authErrorMessage(error: AuthErrorLike): string {
   if (error.code === 'same_password') return SAME_PASSWORD;
   if (isInvalidCredentials(error)) return INVALID_CREDENTIALS;
   if (error.code === 'user_already_exists' || error.code === 'email_exists') return USER_EXISTS;
-  if (error.code === 'email_not_confirmed') return EMAIL_NOT_CONFIRMED;
   if (error.code === 'weak_password') return weakPasswordMessage(error.message);
   if (isRateLimited(error)) return RATE_LIMITED;
   if (isNetworkError(error)) return NETWORK_ERROR;

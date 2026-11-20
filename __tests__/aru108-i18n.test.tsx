@@ -9,7 +9,7 @@ import TabLayout from '@/app/(tabs)/_layout';
 import ProfileScreen from '@/app/(tabs)/profile';
 import ChangePasswordScreen from '@/app/change-password';
 import SignInScreen from '@/app/index';
-import ResetPasswordScreen from '@/app/reset-password';
+import ForgotPasswordScreen from '@/app/forgot-password';
 import { AccessGate } from '@/components/AccessGate';
 import {
   formatDateIn,
@@ -134,7 +134,8 @@ describe('AC 7a / AC 8: messages', () => {
     [{ code: 'invalid_credentials', status: 400, message: 'Invalid login credentials' }, 'Incorrect email or password.', 'Неверный email или пароль.'],
     [{ status: 400, message: 'Invalid login credentials' }, 'Incorrect email or password.', 'Неверный email или пароль.'],
     [{ code: 'user_already_exists', status: 422, message: 'User already registered' }, 'An account with this email already exists.', 'Аккаунт с этим email уже существует.'],
-    [{ code: 'email_not_confirmed', status: 400, message: 'Email not confirmed' }, 'Confirm your email first: open the link we sent you.', 'Сначала подтвердите email: откройте ссылку из письма.'],
+    // ARU-165 AC 13: auth.emailNotConfirmed is removed (no email in Sham; Confirm email is off): Auth's own text.
+    [{ code: 'email_not_confirmed', status: 400, message: 'Email not confirmed' }, 'Email not confirmed', 'Что-то пошло не так. Попробуйте снова.'],
     [{ code: 'weak_password', status: 422, message: 'Password should be at least 6 characters.' }, 'The password is too weak. Use at least 6 characters.', 'Слишком простой пароль. Используйте не менее 6 символов.'],
     [{ code: 'weak_password', status: 422, message: 'Password should be at least 8 characters.' }, 'The password is too weak. Use at least 8 characters.', 'Слишком простой пароль. Используйте не менее 8 символов.'],
     [{ code: 'over_email_send_rate_limit', status: 429, message: 'x' }, 'Too many requests. Please wait a few minutes and try again.', 'Слишком много запросов. Подождите несколько минут и попробуйте снова.'],
@@ -286,8 +287,8 @@ describe('AC 7 / AC 12: the part-1 screens in Russian and English', () => {
     for (const text of ['Домашние задания, проверки и занятия в одном месте.', 'Вход', 'Регистрация', 'Пароль', 'Войти']) {
       expect(screen.getByText(text)).toBeTruthy();
     }
-    // ARU-164: Username replaces Email; no Forgot password? (AC 9).
-    expect(screen.queryByText('Забыли пароль?')).toBeNull();
+    // ARU-164: Username replaces Email. ARU-165 AC 8: Forgot password? is back.
+    expect(screen.getByText('Забыли пароль?')).toBeTruthy();
     await fireEvent.changeText(screen.getByPlaceholderText('например, dana_s'), 'dana_s');
     await fireEvent.changeText(screen.getByPlaceholderText('Не менее 6 символов'), 'secret1');
     await fireEvent.press(screen.getByRole('button', { name: 'Войти' }));
@@ -342,25 +343,23 @@ describe('AC 7 / AC 12: the part-1 screens in Russian and English', () => {
     expect(screen.getByText('Учитель отклонил вашу заявку.')).toBeTruthy();
   });
 
-  it('Reset password in Russian: the step texts and a wrong code', async () => {
+  // ARU-165 AC 13 removed the email Reset password screen; Forgot password with a recovery code replaced it.
+  it('Forgot password in Russian: the texts and a wrong code', async () => {
     phone('ru-RU');
-    const resetPasswordWithCode = jest.fn(async () => {
-      throw new Error('This code is wrong or has expired. Check the email or send a new code.');
+    const recoverPassword = jest.fn(async () => {
+      throw new Error('Incorrect username or recovery code.');
     });
-    setStore(fakeStore(null, { resetPasswordWithCode }));
-    await render(inApp(<ResetPasswordScreen />));
-    expect(screen.getByText('Введите email, с которым вы регистрировались. Мы отправим код, чтобы задать новый пароль.')).toBeTruthy();
-    await fireEvent.changeText(screen.getByTestId('reset-email'), 'a@b.c');
-    await fireEvent.press(screen.getByRole('button', { name: 'Отправить код' }));
-    expect(await screen.findByText('Если для a@b.c есть аккаунт, мы отправили на него код. Это может занять несколько минут.')).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Отправить новый код \(\d+ с\)/ })).toBeTruthy();
-    await fireEvent.changeText(screen.getByTestId('reset-code'), '123456');
+    setStore(fakeStore(null, { recoverPassword }));
+    await render(inApp(<ForgotPasswordScreen />));
+    expect(screen.getByText('16 букв и цифр. Регистр, пробелы и дефисы не важны.')).toBeTruthy();
+    await fireEvent.changeText(screen.getByTestId('forgot-username'), 'dana');
+    await fireEvent.changeText(screen.getByTestId('forgot-code'), 'abcd efgh jkmn pqrs');
     await fireEvent.changeText(screen.getByTestId('new-password'), 'secret1');
     await fireEvent.changeText(screen.getByTestId('confirm-password'), 'secret2');
     expect(screen.getByText('Пароли не совпадают')).toBeTruthy();
     await fireEvent.changeText(screen.getByTestId('confirm-password'), 'secret1');
-    await fireEvent.press(screen.getByRole('button', { name: 'Сбросить пароль' }));
-    expect(await screen.findByText('Код неверный или устарел. Проверьте письмо или отправьте новый код.')).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: 'Задать новый пароль' }));
+    expect(await screen.findByText('Неверное имя пользователя или код восстановления.')).toBeTruthy();
   });
 
   it('Change password in Russian keeps its own wrong-password text', async () => {

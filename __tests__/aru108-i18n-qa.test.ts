@@ -113,7 +113,8 @@ describe('fallbacks', () => {
   });
 
   it('a known English error is translated into Russian', () => {
-    expect(translateMessage('ru', en['auth.emailNotConfirmed'])).toBe(ru['auth.emailNotConfirmed']);
+    // ARU-165 AC 13 removed auth.emailNotConfirmed (email reset gone); the same check with another known error.
+    expect(translateMessage('ru', en['auth.wrongCurrentPassword'])).toBe(ru['auth.wrongCurrentPassword']);
   });
 });
 

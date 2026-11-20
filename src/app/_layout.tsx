@@ -98,7 +98,11 @@ function AppStack() {
           {/* A pushed page (not a modal), so iOS swipe-back and Android back return to Profile. */}
           <Stack.Screen name="notifications" options={{ title: t('notifications.title') }} />
           <Stack.Screen name="change-password" options={{ title: t('changePassword.title'), presentation: 'modal' }} />
-          <Stack.Screen name="reset-password" options={{ title: t('reset.title') }} />
+          {/* ARU-165: Forgot password with a recovery code (signed out), and Profile → Recovery code. The old
+              reset-password route only redirects (AC 13). */}
+          <Stack.Screen name="forgot-password" options={{ title: t('forgot.title') }} />
+          <Stack.Screen name="recovery-code" options={{ title: t('recovery.newTitle'), presentation: 'modal' }} />
+          <Stack.Screen name="reset-password" options={{ headerShown: false }} />
           <Stack.Screen name="disciplines/new" options={{ title: t('disciplines.newTitle'), presentation: 'modal' }} />
           <Stack.Screen name="disciplines/[id]" options={{ title: t('disciplines.detailTitle') }} />
         </Stack>
