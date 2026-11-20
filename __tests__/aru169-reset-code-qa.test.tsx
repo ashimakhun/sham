@@ -58,6 +58,64 @@ describe('AC 1: search by username', () => {
   });
 });
 
+// ARU-178 / AC 1 revised: one leading "@" is removed for the username match only.
+describe('AC 1 (revised, ARU-178): one leading "@" is ignored for usernames', () => {
+  const requestNames = () => screen.queryAllByTestId(/^request-/).map((r) => r.props.testID.slice(8));
+
+  it('"@sam", "sam", "@SAM" and " @sa " find Student Sam; "@max" a mentor; "@tess" the teacher', async () => {
+    teacher();
+    await render(<RolesScreen />);
+    const search = screen.getByLabelText('Search users');
+    for (const q of ['@sam', 'sam', '@SAM', ' @sa ']) {
+      await fireEvent.changeText(search, q);
+      expect(shownNames()).toEqual(['S1']);
+    }
+    await fireEvent.changeText(search, '@max');
+    expect(shownNames()).toEqual(['M']);
+    await fireEvent.changeText(search, '@tess');
+    expect(shownNames()).toEqual(['T']);
+    await fireEvent.changeText(search, '@am');
+    expect(shownNames()).toEqual(['S1']);
+  });
+
+  it('"@" alone matches only names with "@"; "@@sam" and "@zzz_nobody" match nothing', async () => {
+    teacher({ users: [...Object.values(users), { id: 'X', name: 'Ann @home', role: 'student' }] });
+    await render(<RolesScreen />);
+    const search = screen.getByLabelText('Search users');
+    await fireEvent.changeText(search, '@');
+    expect(shownNames()).toEqual(['X']);
+    await fireEvent.changeText(search, '@@sam');
+    expect(shownNames()).toEqual([]);
+    await fireEvent.changeText(search, '@zzz_nobody');
+    expect(shownNames()).toEqual([]);
+    await fireEvent.changeText(search, 'Ann @ho');
+    expect(shownNames()).toEqual(['X']);
+  });
+
+  it('name search still works; a person without a username is found only by name', async () => {
+    teacher();
+    await render(<RolesScreen />);
+    const search = screen.getByLabelText('Search users');
+    await fireEvent.changeText(search, 'Student Su');
+    expect(shownNames()).toEqual(['S2']);
+    // S2 has no username: "@" + part of the name does not find it
+    await fireEvent.changeText(search, '@Sue');
+    expect(shownNames()).toEqual([]);
+  });
+
+  it('request rows still filter by name only: "@" + a requester username matches nothing', async () => {
+    teacher({
+      accessRequests: [{ id: 'P1', name: 'Pending Pat', username: 'pat', createdAt: '2026-10-01T10:00:00Z', status: 'pending' }],
+    });
+    await render(<RolesScreen />);
+    const search = screen.getByLabelText('Search users');
+    await fireEvent.changeText(search, '@pat');
+    expect(requestNames()).toEqual([]);
+    await fireEvent.changeText(search, 'Pending');
+    expect(requestNames()).toEqual(['P1']);
+  });
+});
+
 describe('AC 2 / edge: Reset password shares the disabled-while-busy rule', () => {
   it('while a confirmation is open every row button is disabled, and enabled again after Cancel', async () => {
     let answer: (v: boolean) => void = () => {};
