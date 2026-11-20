@@ -308,7 +308,14 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `make_recovery_code()` (refused once a code is saved) and `save_recovery_code(code)`; Edge-Function-only (service
    role) `replace_recovery_code()`, `recovery_check()` and `recovery_finish()`, which also ends every session of the
    account by deleting its `auth.sessions` rows. Needs no extension; changes no existing rows; deploy the two Edge
-   Functions, see [Password recovery](#password-recovery-aru-165)).
+   Functions, see [Password recovery](#password-recovery-aru-165)),
+   `0074_reset_codes.sql` (ARU-169: the teacher's one-time reset codes. Adds `reset_codes` (at most one per account:
+   SHA-256 hash, `expires_at` 24 hours ahead, `created_by`; deleted with the account); RLS on with no policies, so the
+   app reads none. Teacher-only `make_reset_code(target)` (accepted students and mentors of the own workspace, not
+   self, only with a username; returns the plain code once with its expiry) and `workspace_usernames()` (usernames of
+   the accepted accounts in the teacher's workspace, for Manage roles). Replaces `recovery_check()` (also accepts a
+   valid, unexpired reset code; same lock) and `recovery_finish()` (also deletes the reset code). The Edge Functions
+   are unchanged and need no redeploy; changes no existing rows).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. Turn off **Authentication → Email → Confirm email**, in development and production, **before** applying
    `0067_username_sign_in.sql` (ARU-164). Username accounts sign up with an internal address that can't receive mail,
@@ -376,10 +383,18 @@ Setup:
 3. Check: sign up a test account, save its code, sign out, use **Forgot password?** with the code; then
    `select count(*) from auth.sessions where user_id = '<id>'` shows only the new session.
 
-**Someone lost both the password and the recovery code** (or an older account that hasn't chosen a username yet, so
-has no code): an admin sets a new password in the SQL Editor and passes it on in person; the person then changes it
-in Profile → Change password and makes a new recovery code. (ARU-169 will add a one-time reset code the teacher makes
-for students and mentors.)
+**A student or mentor lost both the password and the recovery code** (ARU-169, migration `0074_reset_codes.sql`):
+the teacher opens Manage roles, taps **Reset password** on the person's row and gets a one-time **reset code**
+(same format, valid for 24 hours, shown once; a new one replaces the old). The teacher passes on **both the code and
+the `@username`** shown with it (accounts moved by ARU-168's 60-day job don't know their generated username). The
+person types them on **Forgot password?** in place of a recovery code, with a new password: the same lock, messages
+and result as a recovery code (all sessions end, the old recovery code and the reset code stop working, the Save
+screen shows a new code). Any successful recovery also ends a pending reset code. The teacher never sees or sets a
+password.
+
+**The teacher lost both** (or an older account that hasn't chosen a username yet, so has no code): an admin sets a
+new password in the SQL Editor and passes it on in person; the person then changes it in Profile → Change password
+and makes a new recovery code.
 
 ```sql
 update auth.users set encrypted_password = extensions.crypt('<new password>', extensions.gen_salt('bf'))
@@ -1064,6 +1079,10 @@ teacher" is that workspace's teacher, and nobody can see or change anything in a
 | Join a workspace with its invite code at sign-up (waits for approval) | ✓ | (joins as a student) | |
 | See / copy the workspace's invite code (Manage roles, ARU-146) | | | ✓ |
 | Switch student ↔ mentor    |           |                    | ✓       |
+| See others' `@username` on Manage roles (ARU-169) | | | ✓ (own workspace) |
+| Make a one-time reset code (ARU-169) | | | ✓ (accepted students and mentors of own workspace, not self) |
+| Use a reset code on Forgot password (signed out, own username) | ✓ | ✓ | |
+| See or set someone else's password | | | (nobody) |
 | Accept or reject new accounts |        |                    | ✓       |
 | Register / unregister own phone for push (`push_devices`, ARU-166; waiting / declined accounts: unregister only) | ✓ (own) | ✓ (own) | ✓ (own) |
 | See and change own notification switches (Profile → Notifications, `notification_settings`, ARU-166) | ✓ (own) | ✓ (own) | ✓ (own) |

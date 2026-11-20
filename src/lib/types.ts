@@ -84,6 +84,9 @@ export type AccessRequest = {
 /** ARU-146: at sign-up the user creates a workspace (and becomes its teacher) or joins one with its invite code. */
 export type WorkspaceChoice = { kind: 'create'; name: string } | { kind: 'join'; code: string };
 
+/** ARU-169: a teacher's one-time reset code for a student or mentor: shown once. `expiresAt` is ISO, server time. */
+export type ResetCode = { code: string; expiresAt: string };
+
 /** ARU-146: the teacher's own workspace and its invite code (Manage roles). */
 export type WorkspaceInvite = { name: string; code: string };
 

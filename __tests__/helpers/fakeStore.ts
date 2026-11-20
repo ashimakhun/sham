@@ -143,6 +143,8 @@ export function fakeStore(who: keyof typeof users | null, over: Partial<Store> =
     sendPaymentRequest: jest.fn(async () => {}),
     getPaymentProofUrl: jest.fn(async (path: string) => `https://signed.example/proofs/${path}`),
     accessRequests: [],
+    memberUsernames: {},
+    makeResetCode: jest.fn(async () => ({ code: 'ABCD-EFGH-JKMN-PQRS', expiresAt: '2026-05-13T09:05:00Z' })),
     notificationSettings: undefined,
     loadNotificationSettings: jest.fn(async () => {}),
     setNotification: jest.fn(async () => {}),

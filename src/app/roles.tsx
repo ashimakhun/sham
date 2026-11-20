@@ -1,16 +1,17 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Clipboard from 'expo-clipboard';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, SectionList, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, SectionList, View } from 'react-native';
 
 import { Button, EmptyState, ErrorText, RoleBadge, styles, ThemedSwitch } from '@/components/ui';
 import type { TextId } from '@/i18n';
 import { useI18n } from '@/i18n/context';
-import { confirmDestructive } from '@/lib/confirm';
+import { confirmAction, confirmDestructive } from '@/lib/confirm';
+import { CODE_FONT } from '@/lib/recovery';
 import { canManageRoles } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
-import type { AccessRequest, Role, User, WorkspaceInvite } from '@/lib/types';
+import type { AccessRequest, ResetCode, Role, User, WorkspaceInvite } from '@/lib/types';
 import { useAction } from '@/lib/useAction';
 import { Text, TextInput } from '@/components/AppText';
 import { font } from '@/lib/fonts';
@@ -55,6 +56,8 @@ export default function RolesScreen() {
     setAccessStatus,
     setAccountant,
     getWorkspaceInvite,
+    memberUsernames,
+    makeResetCode,
   } = useStore();
   const { t } = useI18n();
   const [query, setQuery] = useState('');
@@ -62,6 +65,8 @@ export default function RolesScreen() {
   const isTeacher = canManageRoles(currentUser?.role);
   // ARU-146 AC 8: the workspace's name and invite code, read through a teacher-only function (AC 9).
   const [invite, setInvite] = useState<WorkspaceInvite | null>(null);
+  // ARU-169 AC 4: the reset code just made, kept only while its sheet is open (gone after Done).
+  const [reset, setReset] = useState<{ user: User; username: string; code: ResetCode } | null>(null);
   useEffect(() => {
     if (!isTeacher) return;
     let live = true;
@@ -86,6 +91,8 @@ export default function RolesScreen() {
   }
 
   const q = query.trim().toLowerCase();
+  // ARU-178: the row shows "@username", so one leading "@" is ignored when matching the username (not the name).
+  const uq = q.startsWith('@') ? q.slice(1) : q;
   // Requests and Declined come oldest first from access_requests(); the search filters them by name too.
   const requests = (status: AccessRequest['status']) =>
     accessRequests
@@ -96,7 +103,12 @@ export default function RolesScreen() {
     ...SECTIONS.map((s) => ({
       title: t(s.title),
       data: users
-        .filter((u) => u.role === s.role && u.name.toLowerCase().includes(q))
+        // ARU-169 AC 1: the search matches the username too.
+        .filter(
+          (u) =>
+            u.role === s.role &&
+            (u.name.toLowerCase().includes(q) || (!!uq && !!memberUsernames[u.id]?.toLowerCase().includes(uq))),
+        )
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((user): Row => ({ kind: 'user', user })),
     })),
@@ -149,151 +161,287 @@ export default function RolesScreen() {
     });
   }
 
+  // ARU-169 AC 3–5: a one-time reset code for an accepted student or mentor. make_reset_code() enforces every rule.
+  function resetPassword(user: User) {
+    run(async () => {
+      const username = memberUsernames[user.id];
+      // Edge case: without a username a code would be useless; the server refuses it with the same text.
+      if (!username) throw new Error(t('db.reset_code_no_username', { name: user.name }));
+      const ok = await confirmAction(
+        t('roles.resetTitle'),
+        t('roles.resetMessage', { name: user.name }),
+        t('roles.resetConfirm'),
+      );
+      if (!ok) return;
+      const code = await makeResetCode(user.id);
+      setReset({ user, username, code });
+    });
+  }
+
   return (
-    <SectionList
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      contentInsetAdjustmentBehavior="automatic"
-      keyboardShouldPersistTaps="handled"
-      sections={sections}
-      initialNumToRender={30}
-      refreshing={loading}
-      onRefresh={() => refresh().catch(() => {})}
-      keyExtractor={(row) => (row.kind === 'user' ? row.user.id : `request-${row.request.id}`)}
-      stickySectionHeadersEnabled={false}
-      ListHeaderComponent={
-        <View style={{ gap: 8 }}>
-          {invite && <WorkspaceCard invite={invite} />}
-          <TextInput
-            accessibilityLabel={t('roles.searchLabel')}
-            placeholder={t('roles.searchPlaceholder')}
-            placeholderTextColor={colors.muted}
-            value={query}
-            onChangeText={setQuery}
-            autoCorrect={false}
-            autoCapitalize="none"
-            clearButtonMode="while-editing"
-            style={styles.input}
-          />
-          <ErrorText error={error} />
-        </View>
-      }
-      renderSectionHeader={({ section }) => (
-        <Text style={[styles.label, { marginTop: 8 }]}>{section.title.toUpperCase()}</Text>
-      )}
-      renderItem={({ item: row }) => {
-        if (row.kind === 'request') {
-          const r = row.request;
-          return (
-            <View testID={`request-${r.id}`} style={[styles.input, { flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text style={styles.body} numberOfLines={2}>
-                  {r.name}
-                </Text>
-                {/* ARU-164 AC 11: the username, never an email; no line for an older account without one. */}
-                {r.username ? (
-                  <Text style={styles.muted} numberOfLines={1}>
-                    {`@${r.username}`}
+    <>
+      <SectionList
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        contentInsetAdjustmentBehavior="automatic"
+        keyboardShouldPersistTaps="handled"
+        sections={sections}
+        initialNumToRender={30}
+        refreshing={loading}
+        onRefresh={() => refresh().catch(() => {})}
+        keyExtractor={(row) => (row.kind === 'user' ? row.user.id : `request-${row.request.id}`)}
+        stickySectionHeadersEnabled={false}
+        ListHeaderComponent={
+          <View style={{ gap: 8 }}>
+            {invite && <WorkspaceCard invite={invite} />}
+            <TextInput
+              accessibilityLabel={t('roles.searchLabel')}
+              placeholder={t('roles.searchPlaceholder')}
+              placeholderTextColor={colors.muted}
+              value={query}
+              onChangeText={setQuery}
+              autoCorrect={false}
+              autoCapitalize="none"
+              clearButtonMode="while-editing"
+              style={styles.input}
+            />
+            <ErrorText error={error} />
+          </View>
+        }
+        renderSectionHeader={({ section }) => (
+          <Text style={[styles.label, { marginTop: 8 }]}>{section.title.toUpperCase()}</Text>
+        )}
+        renderItem={({ item: row }) => {
+          if (row.kind === 'request') {
+            const r = row.request;
+            return (
+              <View testID={`request-${r.id}`} style={[styles.input, { flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={styles.body} numberOfLines={2}>
+                    {r.name}
                   </Text>
-                ) : null}
-                <Text style={styles.muted}>{t('roles.signedUp', { date: formatDate(r.createdAt) })}</Text>
-                {r.status === 'rejected' && (
-                  <View style={[styles.badge, { backgroundColor: DANGER_SOFT, alignSelf: 'flex-start' }]}>
-                    <Text style={[styles.badgeText, { color: colors.danger }]}>{t('roles.declinedBadge')}</Text>
+                  {/* ARU-164 AC 11: the username, never an email; no line for an older account without one. */}
+                  {r.username ? (
+                    <Text style={styles.muted} numberOfLines={1}>
+                      {`@${r.username}`}
+                    </Text>
+                  ) : null}
+                  <Text style={styles.muted}>{t('roles.signedUp', { date: formatDate(r.createdAt) })}</Text>
+                  {r.status === 'rejected' && (
+                    <View style={[styles.badge, { backgroundColor: DANGER_SOFT, alignSelf: 'flex-start' }]}>
+                      <Text style={[styles.badgeText, { color: colors.danger }]}>{t('roles.declinedBadge')}</Text>
+                    </View>
+                  )}
+                </View>
+                {/* ARU-114: icons instead of text buttons; disabled for every row while any action runs. */}
+                {r.status === 'pending' ? (
+                  <View style={{ flexDirection: 'row', gap: ICON_GAP }}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={t('roles.acceptLabel', { name: r.name })}
+                      accessibilityState={{ disabled: busy }}
+                      disabled={busy}
+                      hitSlop={ICON_HIT_SLOP}
+                      testID={`accept-request-${r.id}`}
+                      style={[iconCircle, { backgroundColor: colors.successSoft, opacity: busy ? 0.4 : 1 }]}
+                      onPress={() => accept(r)}>
+                      <Ionicons name="checkmark" size={20} color={colors.success} />
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={t('roles.rejectLabel', { name: r.name })}
+                      accessibilityState={{ disabled: busy }}
+                      disabled={busy}
+                      hitSlop={ICON_HIT_SLOP}
+                      testID={`reject-request-${r.id}`}
+                      style={[iconCircle, { backgroundColor: DANGER_SOFT, opacity: busy ? 0.4 : 1 }]}
+                      onPress={() => decline(r)}>
+                      <Ionicons name="close" size={20} color={colors.danger} />
+                    </Pressable>
                   </View>
-                )}
-              </View>
-              {/* ARU-114: icons instead of text buttons; disabled for every row while any action runs. */}
-              {r.status === 'pending' ? (
-                <View style={{ flexDirection: 'row', gap: ICON_GAP }}>
+                ) : (
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={t('roles.acceptLabel', { name: r.name })}
                     accessibilityState={{ disabled: busy }}
                     disabled={busy}
-                    hitSlop={ICON_HIT_SLOP}
+                    hitSlop={6}
                     testID={`accept-request-${r.id}`}
-                    style={[iconCircle, { backgroundColor: colors.successSoft, opacity: busy ? 0.4 : 1 }]}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      minHeight: 32,
+                      paddingHorizontal: 12,
+                      borderRadius: 16,
+                      backgroundColor: colors.successSoft,
+                      opacity: busy ? 0.4 : 1,
+                    }}
                     onPress={() => accept(r)}>
-                    <Ionicons name="checkmark" size={20} color={colors.success} />
+                    <Ionicons name="checkmark" size={16} color={colors.success} />
+                    <Text style={{ color: colors.success, fontSize: 14, ...font(500) }}>{t('roles.accept')}</Text>
                   </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={t('roles.rejectLabel', { name: r.name })}
-                    accessibilityState={{ disabled: busy }}
-                    disabled={busy}
-                    hitSlop={ICON_HIT_SLOP}
-                    testID={`reject-request-${r.id}`}
-                    style={[iconCircle, { backgroundColor: DANGER_SOFT, opacity: busy ? 0.4 : 1 }]}
-                    onPress={() => decline(r)}>
-                    <Ionicons name="close" size={20} color={colors.danger} />
-                  </Pressable>
+                )}
+              </View>
+            );
+          }
+          const item = row.user;
+          const username = memberUsernames[item.id];
+          // ARU-169 AC 2: students and mentors only; the teacher's own row has none.
+          const resetButton = (
+            <Button
+              title={t('roles.resetPassword')}
+              variant="secondary"
+              disabled={busy}
+              accessibilityLabel={t('roles.resetPasswordLabel', { name: item.name })}
+              testID={`reset-password-${item.id}`}
+              onPress={() => resetPassword(item)}
+            />
+          );
+          return (
+            <View testID={`user-${item.id}`} style={[styles.input, { flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
+              <View style={{ flex: 1, gap: 4, alignItems: 'flex-start' }}>
+                <Text style={styles.body} numberOfLines={2}>
+                  {item.name}
+                </Text>
+                {/* ARU-169 AC 1: the username under the name; no line for an account without one. */}
+                {username ? (
+                  <Text style={styles.muted} numberOfLines={1} testID={`username-${item.id}`}>
+                    {`@${username}`}
+                  </Text>
+                ) : null}
+                <RoleBadge role={item.role} />
+              </View>
+              {/* The teacher's row has no action: nothing in the app makes anyone a teacher. */}
+              {item.role === 'student' && (
+                <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                  <Button title={t('roles.makeMentor')} variant="secondary" disabled={busy} onPress={() => makeMentor(item)} />
+                  {resetButton}
                 </View>
-              ) : (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t('roles.acceptLabel', { name: r.name })}
-                  accessibilityState={{ disabled: busy }}
-                  disabled={busy}
-                  hitSlop={6}
-                  testID={`accept-request-${r.id}`}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 4,
-                    minHeight: 32,
-                    paddingHorizontal: 12,
-                    borderRadius: 16,
-                    backgroundColor: colors.successSoft,
-                    opacity: busy ? 0.4 : 1,
-                  }}
-                  onPress={() => accept(r)}>
-                  <Ionicons name="checkmark" size={16} color={colors.success} />
-                  <Text style={{ color: colors.success, fontSize: 14, ...font(500) }}>{t('roles.accept')}</Text>
-                </Pressable>
+              )}
+              {item.role === 'mentor' && (
+                <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                  <Button title={t('roles.makeStudent')} variant="secondary" disabled={busy} onPress={() => makeStudent(item)} />
+                  {/* ARU-65: the teacher turns Accountant on or off for a mentor (set_accountant() checks it). */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={styles.muted}>{t('roles.accountant')}</Text>
+                    <ThemedSwitch
+                      accessibilityLabel={t('roles.accountantLabel', { name: item.name })}
+                      value={!!item.isAccountant}
+                      disabled={busy}
+                      onValueChange={(on) => run(() => setAccountant(item.id, on))}
+                    />
+                  </View>
+                  {resetButton}
+                </View>
               )}
             </View>
           );
+        }}
+        ListEmptyComponent={
+          q ? (
+            <EmptyState title={t('roles.noMatch', { query: query.trim() })} />
+          ) : (
+            <EmptyState title={t('roles.empty')} />
+          )
         }
-        const item = row.user;
-        return (
-          <View testID={`user-${item.id}`} style={[styles.input, { flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
-            <View style={{ flex: 1, gap: 4, alignItems: 'flex-start' }}>
-              <Text style={styles.body} numberOfLines={2}>
-                {item.name}
+      />
+      {reset && (
+        <ResetCodeSheet
+          name={reset.user.name}
+          username={reset.username}
+          code={reset.code}
+          onDone={() => setReset(null)}
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * ARU-169 AC 4: the reset code just made, shown once: name, @username, the code (monospaced, selectable), Copy with a
+ * short "Copied", until when it works (server time, shown in local time and the chosen language) and Done. Closing
+ * it in any way forgets the code.
+ */
+function ResetCodeSheet({
+  name,
+  username,
+  code,
+  onDone,
+}: {
+  name: string;
+  username: string;
+  code: ResetCode;
+  onDone: () => void;
+}) {
+  const { t, formatDateTime } = useI18n();
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
+
+  async function copy() {
+    try {
+      await Clipboard.setStringAsync(code.code);
+    } catch {
+      return; // the clipboard isn't available: no "Copied"
+    }
+    setCopied(true);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onDone}>
+      <ScrollView style={styles.screen} contentContainerStyle={[styles.content, { gap: 16 }]} testID="reset-code-sheet">
+        <Text style={styles.h1} accessibilityRole="header">
+          {t('roles.resetCodeTitle')}
+        </Text>
+        <View style={{ gap: 2 }}>
+          <Text style={styles.body}>{name}</Text>
+          <Text style={styles.muted}>{`@${username}`}</Text>
+        </View>
+        <View style={[styles.card, { gap: 8 }]}>
+          <Text
+            selectable
+            testID="reset-code"
+            accessibilityLabel={`${t('roles.resetCodeTitle')}: ${code.code}`}
+            style={{ fontFamily: CODE_FONT, fontSize: 22, letterSpacing: 1, color: colors.text, textAlign: 'center' }}>
+            {code.code}
+          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('roles.resetCopyLabel')}
+              hitSlop={6}
+              onPress={copy}
+              testID="reset-copy"
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                minHeight: 32,
+                paddingHorizontal: 12,
+                borderRadius: 16,
+                backgroundColor: colors.primarySoft,
+              }}>
+              <Ionicons name="copy-outline" size={16} color={colors.primary} />
+              <Text style={{ color: colors.primary, fontSize: 14, ...font(500) }}>{t('roles.copy')}</Text>
+            </Pressable>
+            {copied && (
+              <Text style={{ color: colors.success, fontSize: 14 }} accessibilityLiveRegion="polite" testID="reset-copied">
+                {t('roles.copied')}
               </Text>
-              <RoleBadge role={item.role} />
-            </View>
-            {/* The teacher's row has no action: nothing in the app makes anyone a teacher. */}
-            {item.role === 'student' && (
-              <Button title={t('roles.makeMentor')} variant="secondary" disabled={busy} onPress={() => makeMentor(item)} />
-            )}
-            {item.role === 'mentor' && (
-              <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                <Button title={t('roles.makeStudent')} variant="secondary" disabled={busy} onPress={() => makeStudent(item)} />
-                {/* ARU-65: the teacher turns Accountant on or off for a mentor (set_accountant() checks it). */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={styles.muted}>{t('roles.accountant')}</Text>
-                  <ThemedSwitch
-                    accessibilityLabel={t('roles.accountantLabel', { name: item.name })}
-                    value={!!item.isAccountant}
-                    disabled={busy}
-                    onValueChange={(on) => run(() => setAccountant(item.id, on))}
-                  />
-                </View>
-              </View>
             )}
           </View>
-        );
-      }}
-      ListEmptyComponent={
-        q ? (
-          <EmptyState title={t('roles.noMatch', { query: query.trim() })} />
-        ) : (
-          <EmptyState title={t('roles.empty')} />
-        )
-      }
-    />
+        </View>
+        <Text style={styles.body}>
+          {t('roles.resetCodeText', { name, until: formatDateTime(code.expiresAt) })}
+        </Text>
+        <Button title={t('roles.resetDone')} onPress={onDone} />
+      </ScrollView>
+    </Modal>
   );
 }
 
