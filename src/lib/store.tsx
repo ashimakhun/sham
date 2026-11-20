@@ -12,6 +12,8 @@ import { dbErrorMessage, phoneLanguage, translate } from '@/i18n';
 import { PHOTO_TOO_LARGE } from './compressPhoto';
 import { newId } from './id';
 import { syncPushRegistration, unregisterThisPhone, type PushRpc } from './push';
+import { cancelAllReminders, syncReminders } from './reminderScheduler';
+import { remindersFor } from './reminders';
 import { PHOTOS_ZIP_ERROR } from './photoRetention';
 import { isAllowedProof, PROOF_MAX_BYTES, PROOF_RULE, proofFormat } from './paymentProof';
 import { NOTES_MAX } from './markdown';
@@ -488,6 +490,8 @@ type MaterialFileRow = {
 const NOTIFICATION_KINDS: NotificationKind[] = [
   'meeting_started',
   'new_homework',
+  // ARU-170 (0072): Homework due soon, a local reminder only.
+  'homework_due',
   'homework_reviewed',
   'photo_deletion',
   'homework_submitted',
@@ -874,6 +878,9 @@ async function finishInterruptedReset() {
   }
 }
 
+/** ARU-170: how long the store waits for a burst of loads to settle before rescheduling reminders. */
+export const REMINDER_DEBOUNCE_MS = 1500;
+
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
@@ -938,6 +945,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         e.code === 'user_not_found' || /user from sub claim in jwt does not exist|user not found/i.test(e.message ?? '');
       if (!gone) return false;
       setAccountNotice(ACCOUNT_DELETED);
+      // ARU-170 AC 3: the deleted account's reminders go before the session does.
+      await cancelAllReminders();
       await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
       return true;
     } catch {
@@ -968,6 +977,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (!s) parkedSession.current = null;
       applySession(s);
       if (!s) {
+        // ARU-170 AC 3: however the session ended, no reminder of the previous account stays (sign-out cancels first).
+        cancelAllReminders().catch(() => {});
         // Signed out: drop the previous user's data, and any load still running for them (ARU-157).
         loadRequest.current++;
         setProfiles([]);
@@ -1410,6 +1421,55 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => sub.remove();
   }, [userId, firstLoadDone, syncPushDevice]);
 
+  // ARU-170: local reminders. After every load (app start, pull to refresh, a live update, back to the foreground), a
+  // language change or a switch flip, the set is computed from the loaded data and put on the phone (AC 1). Debounced,
+  // because live updates come in bursts; an unchanged set isn't rescheduled (analysis note 2). The switches aren't part
+  // of load(): until they are loaded nothing changes on the phone, and every data change tries loading them again.
+  const reminderUser = profiles.find((u) => u.id === userId);
+  const reminderApproved = reminderUser?.accessStatus === 'approved';
+  const reminderLang = reminderUser?.language ?? phoneLanguage();
+  useEffect(() => {
+    if (!userId || !firstLoadDone || !reminderUser) return;
+    const timer = setTimeout(() => {
+      if (reminderApproved && !notificationSettings) {
+        loadNotificationSettings().catch(() => {});
+        return;
+      }
+      const reminders =
+        reminderApproved && notificationSettings
+          ? remindersFor({
+              userId,
+              role: reminderUser.role,
+              settings: notificationSettings,
+              courses,
+              courseMembers,
+              meetings,
+              assignments,
+              homework,
+              photoDeletionStart,
+              now: new Date(),
+              lang: reminderLang,
+            })
+          : [];
+      syncReminders({ approved: reminderApproved, reminders }).catch(() => {});
+    }, REMINDER_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [
+    userId,
+    firstLoadDone,
+    reminderUser,
+    reminderApproved,
+    reminderLang,
+    notificationSettings,
+    loadNotificationSettings,
+    courses,
+    courseMembers,
+    meetings,
+    assignments,
+    homework,
+    photoDeletionStart,
+  ]);
+
   const markChatRead = useCallback<Store['markChatRead']>(
     async (courseId, upToMessageId) => {
       // Clear at once (and drop any count request in flight), then save; the refetch after the save is the truth.
@@ -1556,6 +1616,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
     },
     signOut: async () => {
+      // ARU-170 AC 3: every reminder on this phone is cancelled first (local, so offline too).
+      await cancelAllReminders();
       // ARU-166 AC 4: this phone's registration goes first; offline (or slow), sign-out still happens.
       await unregisterThisPhone(pushRpc).catch(() => {});
       check(await supabase.auth.signOut());
@@ -1584,6 +1646,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         throw new Error(message);
       }
       setAccountNotice(ACCOUNT_DELETED);
+      // ARU-170 AC 3 (analysis note 7): the reminders go before the local session is cleared.
+      await cancelAllReminders();
       // The server already ended the account; only this device's stored session is left to remove.
       await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
     },

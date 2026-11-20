@@ -9,7 +9,7 @@ import { Button, Card, ErrorText, styles, ThemedSwitch } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import { askPushPermission, pushPermission, type PushPermission, pushSupported } from '@/lib/push';
 import { useStore } from '@/lib/store';
-import { notificationSwitchesFor } from '@/lib/notifications';
+import { notificationSwitchesFor } from '@/lib/notificationSwitches';
 import { colors } from '@/lib/theme';
 import type { NotificationKind } from '@/lib/types';
 
@@ -56,7 +56,8 @@ export function NotificationsButton() {
  * ARU-166: the Notifications page. One switch per kind the role gets (today's order and labels), saved on the account.
  * In an installed build the first open asks for permission (AC 1) and registers this phone (AC 2); with notifications
  * off for Sham it says so with Open settings (AC 3); in Expo Go and on the web it says push needs the installed app
- * (AC 6). The switches work in every case.
+ * (AC 6). The switches work in every case. ARU-170: Homework due soon right after New homework (students, mentors);
+ * every flip also reschedules this phone's reminders (the store watches the switches).
  */
 export function NotificationSettings() {
   const { currentUser, notificationSettings, loadNotificationSettings, setNotification, syncPushDevice } = useStore();

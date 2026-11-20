@@ -121,6 +121,15 @@ create function cron.schedule(job_name text, schedule text, command text) return
   on conflict (jobname) do update set schedule = excluded.schedule, command = excluded.command
   returning jobid
 $$;
+-- ARU-170: like pg_cron, removes the job by name (an error when there is none).
+create function cron.unschedule(job_name text) returns boolean language plpgsql as $$
+begin
+  delete from cron.job where jobname = job_name;
+  if not found then
+    raise exception 'could not find valid entry for job ''%''', job_name;
+  end if;
+  return true;
+end $$;
 
 create schema net;
 create table net.requests (

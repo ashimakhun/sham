@@ -293,7 +293,12 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `telegram_link_codes` with their policies and triggers, and the functions `create_telegram_link_code()`,
    `set_telegram_notification()`, `disconnect_telegram()`, `link_telegram_chat()` and `unlink_telegram_chat()`.
    `notification_settings` is not touched (0069 copied the switches); run it after 0069; see
-   [Removing the Telegram bot](#removing-the-telegram-bot-aru-171)).
+   [Removing the Telegram bot](#removing-the-telegram-bot-aru-171)),
+   `0072_local_reminders.sql` (ARU-170: meeting started and photo deletion become reminders the phone schedules
+   itself. Adds `notification_settings.notify_homework_due` (on by default) and the `homework_due` kind to
+   `set_notification()`; unschedules the `meeting-start-notifications` cron job and drops `claim_started_meetings()`.
+   `photo_deletion_warnings`, `claim_photo_deletion_warnings()` and `course_meetings.start_notified_at` stay, unused;
+   no RLS change, deletes no data; see [Reminders](#reminders-aru-170)).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. Turn off **Authentication → Email → Confirm email**, in development and production, **before** applying
    `0067_username_sign_in.sql` (ARU-164). Username accounts sign up with an internal address that can't receive mail,
@@ -401,8 +406,9 @@ Push texts never name a person: they say what happened and where (for example "N
    (and `--platform android`).
 5. Deploy the notification functions again (they now send push): `npx supabase functions deploy
    chat-message-notifications homework-reviewed-notifications homework-submitted-notifications
-   meeting-notes-notifications meeting-start-notifications new-account-notifications new-homework-notifications
-   new-material-notifications photo-deletion --no-verify-jwt`.
+   meeting-notes-notifications new-account-notifications new-homework-notifications
+   new-material-notifications photo-deletion --no-verify-jwt` (since ARU-170 there is no
+   `meeting-start-notifications`, and `photo-deletion` sends nothing, see [Reminders](#reminders-aru-170)).
 6. Optional: only if **push security** (enhanced security for push notifications) is turned on for the project in
    Expo, create an access token on expo.dev and set it: `npx supabase secrets set EXPO_ACCESS_TOKEN=<token>`.
    Without it nothing changes.
@@ -413,6 +419,38 @@ example post in a course chat from another account) or send a test with Expo's p
 (https://expo.dev/notifications) to the token in that row. A push shows as a banner even while Sham is open; tapping
 it opens Sham. Each function's response (in `net._http_response`) reports `recipients`, `sent`, `skipped`, `failed`
 and `removed`.
+
+#### Reminders (ARU-170)
+
+Three notifications are **reminders the phone schedules itself** from the data the app already loaded; the server
+sends nothing for them (`src/lib/reminders.ts` decides what, `src/lib/reminderScheduler.ts` schedules it with
+`expo-notifications`). Title "Sham", in the app language at scheduling time, on the **General** Android channel:
+
+* **Meeting started:** at the start time of every Scheduled meeting of a course the person listens to.
+* **Homework due soon** (a new switch, right after **New homework**, students and mentors): **24 hours before** an
+  assignment's due time, only while more than 24 hours are left and the person hasn't sent homework for it.
+* **Photo deletion:** at **09:00 phone time** on the day 30 days and the day 7 days before a stored photo's deletion
+  date; photos whose marks fall on the same day share one reminder with the count and the earliest date.
+
+The app reschedules after every load (app start, pull to refresh, a live update, back to the foreground), a language
+change or a switch flip, only for Approved accounts with notification permission granted (on iOS and Android, also in
+Expo Go; never on the web). At most the 60 soonest are scheduled (iOS keeps 64); later loads add the rest. Sign out
+and account deletion cancel them first, also offline. Only the app's own reminders (identifiers starting with
+`sham-reminder:`) are ever cancelled. **A change made while the app is closed** (a meeting moved or canceled, a new
+due time) **is picked up only the next time the app opens and loads**, so a reminder for a canceled meeting can still
+fire if Sham wasn't opened since. Android may deliver a few minutes late (no exact-alarm permission is asked).
+
+**Old app builds:** once `0072_local_reminders.sql` has run, phones still on a build without ARU-170 get no meeting
+started or photo deletion notice at all. Ship the migration together with the app update.
+
+**Setup (a person, once, after `0072_local_reminders.sql` has run):** delete the old function and its Vault secrets:
+
+```bash
+npx supabase functions delete meeting-start-notifications
+```
+```sql
+delete from vault.secrets where name in ('meeting_notify_url', 'meeting_notify_secret');
+```
 
 ### Removing the Telegram bot (ARU-171)
 
@@ -441,9 +479,13 @@ sender is `supabase/functions/_shared/push.ts`.
 
 #### Meeting started (ARU-41)
 
-Listeners get "<course title> meeting has started" within 2 minutes of a Scheduled meeting's start, if they left
-**Meeting started** on. A `pg_cron` job calls the Edge Function `meeting-start-notifications` every
-minute; the function claims the meetings that just started (`claim_started_meetings()`, at most once each) and sends.
+> **Since ARU-170 this is a reminder the phone schedules itself** (see [Reminders](#reminders-aru-170)):
+> `0072_local_reminders.sql` unschedules the job below and drops `claim_started_meetings()`, and the function is
+> deleted. The steps below are kept for history only; don't run them on a new project.
+
+Listeners got "<course title> meeting has started" within 2 minutes of a Scheduled meeting's start, if they left
+**Meeting started** on. A `pg_cron` job called the Edge Function `meeting-start-notifications` every
+minute; the function claimed the meetings that just started (`claim_started_meetings()`, at most once each) and sent.
 
 1. Dashboard → **Database → Extensions**: turn on **pg_cron** and **pg_net**.
 2. Run `supabase/migrations/0035_meeting_start_notifications.sql` (it stops with a message if step 1 is missing).
@@ -774,13 +816,10 @@ Once a day (03:17 UTC) a `pg_cron` job calls the Edge Function `photo-deletion`.
   keeps its path and is retried the next day.
 - **Leftovers:** deletes files in the `homework` bucket that no homework points to and that are older than 24 hours
   (photos of failed sends, ARU-105). Every run, the first included.
-- **Push warnings:** when a photo is 30 days or less, then 7 days or less, from its deletion date, its sender gets
-  one push per run: "<N> homework photo(s) will be deleted on <date>. Open Sham → Homework to download them.", if
-  they are Approved and left **Photo deletion** on. Each mark is recorded once
-  (`photo_deletion_warnings`), whether or not a message could be sent, so turning the switch on later sends nothing
-  for marks already passed.
+- **Warnings:** since ARU-170 the job sends none and records no `photo_deletion_warnings` rows; its response has no
+  warning counts. The 30- and 7-day warnings are reminders on the sender's phone (see [Reminders](#reminders-aru-170)).
 
-Until the steps below are done, nothing is deleted, no warning is sent and the start date stays empty.
+Until the steps below are done, nothing is deleted and the start date stays empty.
 
 1. Dashboard → **Database → Extensions**: turn on **pg_cron** and **pg_net** (already on if you set up
    [Meeting started](#meeting-started-aru-41)).
@@ -789,7 +828,6 @@ Until the steps below are done, nothing is deleted, no warning is sent and the s
    ```bash
    npx supabase secrets set PHOTO_DELETION_SECRET=<secret>
    ```
-   (The warnings are sent as push, see [Push notifications](#push-notifications-aru-166).)
 4. Deploy the function (the cron job sends the secret in `x-cron-secret`, not a Supabase JWT):
    ```bash
    npx supabase functions deploy photo-deletion --no-verify-jwt

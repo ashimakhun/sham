@@ -280,9 +280,8 @@ select t.eq((select array_agg(user_id) from homework_submitted_recipient(t.x('XH
 insert into auth.users (id, email, raw_user_meta_data) values (t.x('P2'), 'qp2@x.test', '{"full_name":"Pia New"}');
 select t.eq((select array_agg(user_id) from new_account_notification(t.x('P2'))), array[t.id('T')],
   'AC10 a new account in the first workspace: only its teacher, not W2''s');
-update course_meetings set starts_at = now() - interval '30 seconds', start_notified_at = null where id = t.x('XMS');
-select t.eq((select array_agg(u) from claim_started_meetings() c, unnest(c.listener_ids) u), array[t.x('XS')],
-  'AC10 a W2 meeting starts: only W2''s listener');
+-- ARU-170: claim_started_meetings() is dropped (meeting started is a local reminder on the listener's phone, from
+-- meetings RLS already scopes to the workspace).
 
 -- AC 2: manage-roles.sql's "first teacher" query works per workspace: refused while the workspace has a teacher,
 -- applied when it has none.

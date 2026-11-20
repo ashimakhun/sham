@@ -3,15 +3,13 @@
 //   1. sets the deletion start date if it is still empty (start_photo_deletion(): today + 30 days, AC 1);
 //   2. deletes leftover files from failed sends (unreferenced, older than 24 hours; every run, the first included, AC 7);
 //   3. deletes the photos that are due (not on the first run, AC 1), file first and then the row (AC 2, AC 3);
-//   4. records the 30-day and 7-day marks and sends one push per sender (AC 4).
-// No Deno-only imports: Supabase, Storage and the sender are passed in, so Jest can test it.
+// ARU-170: the 30-day and 7-day warnings are no longer sent from here: the app schedules them on the sender's phone as
+// local reminders. The job records no photo_deletion_warnings rows and its response has no warning counts.
+// No Deno-only imports: Supabase and Storage are passed in, so Jest can test it.
 
-import { localizedMessage, type SendResult, type NotificationMessage } from './notification.ts';
-import { type NotificationLanguage, notificationText } from './notification-texts.ts';
 import { timingSafeEqual } from './timing-safe-equal.ts';
 
 export type DuePhoto = { homework_id: string; photo_path: string };
-export type PhotoWarning = { user_id: string; photo_count: number; earliest: string };
 
 export type PhotoDeletionDeps = {
   /** start_photo_deletion(): the start date and whether this call set it. */
@@ -27,10 +25,6 @@ export type PhotoDeletionDeps = {
   remove: (paths: string[]) => Promise<void>;
   /** mark_homework_photos_removed(ids, paths): how many rows changed. */
   markRemoved: (photos: DuePhoto[]) => Promise<number>;
-  /** claim_photo_deletion_warnings(). */
-  claimWarnings: () => Promise<PhotoWarning[]>;
-  /** sendPushMessages() (push.ts, ARU-166) with the service-role client and fetch. */
-  send: (messages: NotificationMessage[]) => Promise<SendResult>;
   log?: (line: string) => void;
 };
 
@@ -49,49 +43,7 @@ export type PhotoDeletionReport = {
   failed: number;
   leftovers_deleted: number;
   leftovers_failed: number;
-  warnings_sent: number;
-  warnings_skipped: number;
-  warnings_failed: number;
 };
-
-const RU_MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
-const EN_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-/**
- * A UTC date (YYYY-MM-DD) as the app shows it (ARU-108 dates): "8 Dec 2026" in English, "8 декабря 2026" in Russian.
- * Built by hand, so it doesn't depend on the server's locale data or time zone.
- */
-export function formatUtcDay(day: string, lang: NotificationLanguage = 'en') {
-  const [y, m, d] = day.split('-').map(Number);
-  return `${d} ${(lang === 'ru' ? RU_MONTHS : EN_MONTHS)[m - 1]} ${y}`;
-}
-
-/** Russian plural form for a count: one (1, 21, …), few (2–4, 22–24, …) or many (0, 5–20, 11–14, …). */
-function pluralForm(n: number): 'One' | 'Few' | 'Many' {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return 'One';
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'Few';
-  return 'Many';
-}
-
-/** AC 4: the message text in one language (English: "photo" for 1, "photos" otherwise). */
-export function photoDeletionText(count: number, earliest: string, lang: NotificationLanguage = 'en') {
-  const form = lang === 'en' ? (count === 1 ? 'One' : 'Many') : pluralForm(count);
-  return notificationText(lang, `photoDeletion${form}`, { count: String(count), date: formatUtcDay(earliest, lang) });
-}
-
-/** One message per sender, in their own language (ARU-110: profiles.language, then device_language, then English). */
-export function photoDeletionMessages(warnings: PhotoWarning[]): NotificationMessage[] {
-  return warnings
-    .filter((w) => w.photo_count > 0)
-    .map((w) =>
-      localizedMessage(w.user_id, 'photo_deletion', {
-        en: photoDeletionText(w.photo_count, w.earliest, 'en'),
-        ru: photoDeletionText(w.photo_count, w.earliest, 'ru'),
-      }),
-    );
-}
 
 const chunks = <T>(items: T[], size: number) =>
   Array.from({ length: Math.ceil(items.length / size) }, (_, i) => items.slice(i * size, i * size + size));
@@ -103,7 +55,7 @@ const json = (body: unknown, status = 200) =>
 
 /**
  * The function: 401 without the right secret (AC 9). A failure in one step is logged and the other steps still run,
- * except that nothing is deleted or warned when the start date can't be read (500).
+ * except that nothing is deleted when the start date can't be read (500).
  */
 export async function handlePhotoDeletionRequest(
   request: Request,
@@ -129,9 +81,6 @@ export async function handlePhotoDeletionRequest(
     failed: 0,
     leftovers_deleted: 0,
     leftovers_failed: 0,
-    warnings_sent: 0,
-    warnings_skipped: 0,
-    warnings_failed: 0,
   };
 
   // AC 7: leftovers, on every run.
@@ -176,23 +125,9 @@ export async function handlePhotoDeletionRequest(
     }
   }
 
-  // AC 4: warnings. The marks are recorded before sending, so a failed message is never sent again (analysis note 2).
-  try {
-    const messages = photoDeletionMessages(await deps.claimWarnings());
-    if (messages.length) {
-      const sent = await deps.send(messages);
-      report.warnings_sent = sent.sent;
-      report.warnings_skipped = sent.skipped;
-      report.warnings_failed = sent.failed.length;
-    }
-  } catch (e) {
-    log(`warnings failed: ${message(e)}`);
-  }
-
   log(
     `start ${report.start_date}${report.start_date_set ? ' (set now)' : ''}, deleted ${report.deleted}, ` +
-      `failed ${report.failed}, leftovers ${report.leftovers_deleted} (failed ${report.leftovers_failed}), ` +
-      `warnings sent ${report.warnings_sent}, skipped ${report.warnings_skipped}, failed ${report.warnings_failed}`,
+      `failed ${report.failed}, leftovers ${report.leftovers_deleted} (failed ${report.leftovers_failed})`,
   );
   return json(report);
 }

@@ -250,11 +250,10 @@ describe('AC 9: the notification functions send push, not Telegram', () => {
     'homework-reviewed-notifications',
     'homework-submitted-notifications',
     'meeting-notes-notifications',
-    'meeting-start-notifications',
     'new-account-notifications',
     'new-homework-notifications',
     'new-material-notifications',
-    'photo-deletion',
+    // ARU-170: meeting-start-notifications is deleted and photo-deletion sends nothing (local reminders instead).
   ])('%s', (name) => {
     const source = fs.readFileSync(`supabase/functions/${name}/index.ts`, 'utf8');
     expect(source).toContain('sendPushMessages');

@@ -1,13 +1,12 @@
 /**
  * @jest-environment node
  */
-// QA ARU-112: gaps in photo-deletion.test.ts: the push text is exactly the story's (AC 4); the secret in a Bearer
+// QA ARU-112: gaps in photo-deletion.test.ts (ARU-170: the AC 4 warning text moved to the app's reminders); the secret in a Bearer
 // header, in another case or with extra text, or a GET, is refused and nothing runs, so only the cron job's
 // x-cron-secret works (AC 9); with the right secret every step runs in order, file first and then the row (AC 2/3).
 import {
   handlePhotoDeletionRequest,
   type PhotoDeletionDeps,
-  photoDeletionText,
 } from "./photo-deletion";
 
 const SECRET = "s3cret-photo";
@@ -25,8 +24,6 @@ const deps = () => {
     due: f("due", [{ homework_id: "h1", photo_path: "S1/h1.jpg" }]),
     remove: f("remove", undefined),
     markRemoved: f("mark", 1),
-    claimWarnings: f("warnings", []),
-    send: f("send", { sent: 0, skipped: 0, failed: [], removed: 0 }),
   };
   return { d, calls };
 };
@@ -36,15 +33,6 @@ const req = (headers: Record<string, string>, method = "POST") =>
     headers,
     body: method === "POST" ? "{}" : undefined,
   });
-
-it('AC 4: the text is exactly the story\'s, "photo" for 1 and "photos" otherwise', () => {
-  expect(photoDeletionText(1, "2026-12-08")).toBe(
-    "1 homework photo will be deleted on 8 Dec 2026. Open Sham → Homework to download them.",
-  );
-  expect(photoDeletionText(3, "2027-01-31")).toBe(
-    "3 homework photos will be deleted on 31 Jan 2027. Open Sham → Homework to download them.",
-  );
-});
 
 it.each([
   [
@@ -81,6 +69,5 @@ it("AC 2 / AC 3 / AC 9: the right x-cron-secret runs every step, file first and 
     "due",
     "remove",
     "mark",
-    "warnings",
   ]);
 });

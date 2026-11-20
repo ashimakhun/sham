@@ -1,23 +1,16 @@
 /**
  * @jest-environment node
  */
-// ARU-112: the photo-deletion function's logic with Supabase, Storage and the sender mocked (AC 1–4, 7, 9), and once
-// end to end with the real push sender and a mocked Expo push service (the Photo deletion switch is respected).
+// ARU-112: the photo-deletion function's logic with Supabase and Storage mocked (AC 1–3, 7, 9). ARU-170 AC 13: the
+// job no longer warns (the warnings are local reminders on the phone): no claim, no send, no warning counts.
 import {
   type DuePhoto,
-  formatUtcDay,
   handlePhotoDeletionRequest,
   MAX_PHOTOS_PER_RUN,
   type PhotoDeletionDeps,
   type PhotoDeletionReport,
-  photoDeletionMessages,
-  photoDeletionText,
-  type PhotoWarning,
   REMOVE_CHUNK,
 } from './photo-deletion';
-import { type SendResult, type NotificationMessage } from './notification';
-import { sendPushMessages } from './push';
-import { pushClient, pushFetch } from './push-test-helpers';
 
 const SECRET = 'photo-secret-123';
 const post = (headers: Record<string, string> = { 'x-cron-secret': SECRET }, method = 'POST') =>
@@ -27,7 +20,6 @@ type World = {
   firstRun?: boolean;
   leftovers?: string[];
   due?: DuePhoto[];
-  warnings?: PhotoWarning[];
   /** remove() throws when the call contains one of these paths. */
   failPaths?: string[];
   startFails?: boolean;
@@ -37,7 +29,6 @@ function deps(world: World = {}) {
   const calls: string[] = [];
   const removed: string[][] = [];
   const marked: DuePhoto[][] = [];
-  const sent: NotificationMessage[][] = [];
   const logs: string[] = [];
   const d: PhotoDeletionDeps = {
     start: jest.fn(async () => {
@@ -63,18 +54,9 @@ function deps(world: World = {}) {
       marked.push(photos);
       return photos.length;
     }),
-    claimWarnings: jest.fn(async () => {
-      calls.push('warnings');
-      return world.warnings ?? [];
-    }),
-    send: jest.fn(async (messages: NotificationMessage[]): Promise<SendResult> => {
-      calls.push('send');
-      sent.push(messages);
-      return { sent: messages.length, skipped: 0, failed: [], removed: 0 };
-    }),
     log: (line) => logs.push(line),
   };
-  return { d, calls, removed, marked, sent, logs };
+  return { d, calls, removed, marked, logs };
 }
 
 const photo = (n: number): DuePhoto => ({ homework_id: `h${n}`, photo_path: `S1/h${n}.jpg` });
@@ -105,15 +87,15 @@ describe('AC 9: only the cron job', () => {
 });
 
 describe('AC 1: the first run', () => {
-  it('sets the start date, removes leftovers and sends warnings, but deletes no homework photo', async () => {
-    const { d, calls } = deps({ firstRun: true, leftovers: ['x/old.jpg'], due: [photo(1)], warnings: [] });
+  it('sets the start date and removes leftovers, but deletes no homework photo', async () => {
+    const { d, calls } = deps({ firstRun: true, leftovers: ['x/old.jpg'], due: [photo(1)] });
     const res = await handlePhotoDeletionRequest(post(), SECRET, d);
     expect(res.status).toBe(200);
     const r = await report(res);
     expect(r).toMatchObject({ start_date_set: true, start_date: '2026-12-08', deleted: 0, leftovers_deleted: 1 });
     expect(d.due).not.toHaveBeenCalled();
     expect(d.markRemoved).not.toHaveBeenCalled();
-    expect(calls).toEqual(['start', 'leftovers', 'remove:1', 'warnings']);
+    expect(calls).toEqual(['start', 'leftovers', 'remove:1']);
   });
 
   it('when the start date can\'t be read, nothing is deleted or sent (500)', async () => {
@@ -128,7 +110,7 @@ describe('AC 2 / AC 3: deleting due photos', () => {
   it('deletes the files first, then marks the rows; counts are reported', async () => {
     const { d, calls, removed, marked } = deps({ due: [photo(1), photo(2)] });
     const r = await report(await handlePhotoDeletionRequest(post(), SECRET, d));
-    expect(calls).toEqual(['start', 'leftovers', 'due', 'remove:2', 'mark', 'warnings']);
+    expect(calls).toEqual(['start', 'leftovers', 'due', 'remove:2', 'mark']);
     expect(removed).toEqual([['S1/h1.jpg', 'S1/h2.jpg']]);
     expect(marked).toEqual([[photo(1), photo(2)]]);
     expect(r).toMatchObject({ start_date_set: false, deleted: 2, failed: 0 });
@@ -143,11 +125,11 @@ describe('AC 2 / AC 3: deleting due photos', () => {
     expect(logs.join('\n')).toMatch(/photo delete failed for 1 photo/);
   });
 
-  it('a failed mark counts as failed, and the warnings still run', async () => {
-    const { d } = deps({ due: [photo(1)], warnings: [{ user_id: 'S1', photo_count: 1, earliest: '2026-12-08' }] });
+  it('a failed mark counts as failed', async () => {
+    const { d } = deps({ due: [photo(1)] });
     (d.markRemoved as jest.Mock).mockRejectedValueOnce(new Error('db hiccup'));
     const r = await report(await handlePhotoDeletionRequest(post(), SECRET, d));
-    expect(r).toMatchObject({ deleted: 0, failed: 1, warnings_sent: 1 });
+    expect(r).toMatchObject({ deleted: 0, failed: 1 });
   });
 
   it('an empty day does nothing and reports zeros', async () => {
@@ -160,12 +142,8 @@ describe('AC 2 / AC 3: deleting due photos', () => {
       failed: 0,
       leftovers_deleted: 0,
       leftovers_failed: 0,
-      warnings_sent: 0,
-      warnings_skipped: 0,
-      warnings_failed: 0,
     });
     expect(d.remove).not.toHaveBeenCalled();
-    expect(d.send).not.toHaveBeenCalled();
   });
 
   it('edge case: one run asks for at most MAX_PHOTOS_PER_RUN, in chunks of REMOVE_CHUNK', async () => {
@@ -186,71 +164,21 @@ describe('AC 7: leftovers', () => {
   });
 });
 
-describe('AC 4: warnings', () => {
-  it('one message per sender with the count and the earliest date', async () => {
-    const { d, sent } = deps({
-      warnings: [
-        { user_id: 'S1', photo_count: 2, earliest: '2026-12-08' },
-        { user_id: 'M2', photo_count: 1, earliest: '2027-01-03' },
-      ],
-    });
+describe('ARU-170 AC 13: no warnings from the job', () => {
+  it('the deps have no warning step and the report no warning counts', async () => {
+    const { d, calls, logs } = deps({ due: [photo(1)] });
+    expect(Object.keys(d).sort()).toEqual(['due', 'leftovers', 'log', 'markRemoved', 'remove', 'start']);
     const r = await report(await handlePhotoDeletionRequest(post(), SECRET, d));
-    expect(sent).toEqual([
-      [
-        {
-          userId: 'S1',
-          kind: 'photo_deletion',
-          text: '2 homework photos will be deleted on 8 Dec 2026. Open Sham → Homework to download them.',
-        },
-        {
-          userId: 'M2',
-          kind: 'photo_deletion',
-          text: '1 homework photo will be deleted on 3 Jan 2027. Open Sham → Homework to download them.',
-        },
-      ],
-    ]);
-    expect(r.warnings_sent).toBe(2);
+    expect(Object.keys(r).some((k) => k.startsWith('warning'))).toBe(false);
+    expect(calls).toEqual(['start', 'leftovers', 'due', 'remove:1', 'mark']);
+    expect(logs.join('\n')).not.toMatch(/warning/i);
   });
 
-  it('"photo" for 1, "photos" otherwise', () => {
-    expect(photoDeletionText(1, '2026-12-08')).toMatch(/^1 homework photo will/);
-    expect(photoDeletionText(3, '2026-12-08')).toMatch(/^3 homework photos will/);
-  });
-
-  it('the date is the UTC day, whatever the server\'s time zone', () => {
-    expect(formatUtcDay('2026-12-31')).toBe('31 Dec 2026');
-    expect(formatUtcDay('2027-01-01')).toBe('1 Jan 2027');
-  });
-
-  it('a row without photos sends nothing', () => {
-    expect(photoDeletionMessages([{ user_id: 'S1', photo_count: 0, earliest: '2026-12-08' }])).toEqual([]);
-  });
-
-  it('end to end: the Photo deletion switch is respected (off = skipped, not failed)', async () => {
-    const links = [
-      { user_id: 'S1', chat_id: 1, notify_photo_deletion: true },
-      { user_id: 'S2', chat_id: 2, notify_photo_deletion: false },
-    ];
-    const { client } = pushClient(links);
-    const fetchFn = pushFetch();
-    const { d } = deps({
-      warnings: [
-        { user_id: 'S1', photo_count: 1, earliest: '2026-12-08' },
-        { user_id: 'S2', photo_count: 4, earliest: '2026-12-09' },
-      ],
-    });
-    d.send = (messages) => sendPushMessages(client, fetchFn.fetch, messages, { sleep: async () => {} });
-    const r = await report(await handlePhotoDeletionRequest(post(), SECRET, d));
-    expect(r).toMatchObject({ warnings_sent: 1, warnings_skipped: 1, warnings_failed: 0 });
-    expect(fetchFn.mock).toHaveBeenCalledTimes(1);
-    expect(fetchFn.sent()).toEqual([[1, expect.stringContaining('1 homework photo will be deleted on 8 Dec 2026')]]);
-  });
-
-  it('a failed warning step doesn\'t undo the deletions', async () => {
-    const { d } = deps({ due: [photo(1)] });
-    (d.claimWarnings as jest.Mock).mockRejectedValueOnce(new Error('db hiccup'));
-    const res = await handlePhotoDeletionRequest(post(), SECRET, d);
-    expect(res.status).toBe(200);
-    expect((await report(res)).deleted).toBe(1);
+  it('the function source no longer claims warnings or sends anything', () => {
+    const fs = jest.requireActual<{ readFileSync: (f: string, e: 'utf8') => string }>('fs');
+    for (const file of ['supabase/functions/_shared/photo-deletion.ts', 'supabase/functions/photo-deletion/index.ts']) {
+      const source = fs.readFileSync(file, 'utf8');
+      expect(source).not.toMatch(/rpc<[^>]*>\('claim_photo_deletion_warnings'|sendPushMessages|sendTelegramMessages/);
+    }
   });
 });

@@ -153,8 +153,9 @@ describe('AC 4: server code', () => {
 
   it.each([
     'chat-message-notifications', 'homework-reviewed-notifications', 'homework-submitted-notifications',
-    'meeting-notes-notifications', 'meeting-start-notifications', 'new-account-notifications',
-    'new-homework-notifications', 'new-material-notifications', 'photo-deletion',
+    'meeting-notes-notifications', 'new-account-notifications',
+    'new-homework-notifications', 'new-material-notifications',
+    // ARU-170: meeting-start-notifications is deleted and photo-deletion sends nothing (local reminders instead).
   ])('AC 5: %s still sends through the push sender', (fn) => {
     const src = read(`supabase/functions/${fn}/index.ts`);
     expect(src).toMatch(/from '\.\.\/_shared\/push\.ts'/);

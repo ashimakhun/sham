@@ -340,4 +340,6 @@ export type NotificationKind =
   | 'general_chat'
   | 'new_material'
   | 'photo_deletion'
-  | 'meeting_notes';
+  | 'meeting_notes'
+  // ARU-170: Homework due soon, a reminder the phone schedules itself (no push counterpart).
+  | 'homework_due';
