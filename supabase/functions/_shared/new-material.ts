@@ -1,13 +1,13 @@
 // ARU-102: the new-material-notifications Edge Function's logic. Called by the triggers from migration 0048 (through
 // pg_net) once per inserted Blog post or Knowledge base PDF, with {"type": "blog" | "file", "id": "<id>"} and
 // "Authorization: Bearer <secret>". Asks new_material_recipients() who gets the message (the Approved readers of the
-// item, except its author, who have a Telegram link with New materials on) and sends "New blog post from <author
+// item, except its author, who have New materials on) and sends "New blog post from <author
 // name>: <post title>" or "New file in the knowledge base from <author name>: <file name>" through the ARU-48 helper
 // in one call, with kind new_material. Nothing is retried. No Deno-only imports, so Jest can test it.
 
-import { localizedMessage, type SendResult, type TelegramMessage } from './telegram.ts';
-import { telegramText, telegramTexts } from './telegram-texts.ts';
-import { timingSafeEqual } from './telegram-bot.ts';
+import { localizedMessage, type SendResult, type NotificationMessage } from './notification.ts';
+import { notificationText, notificationTexts } from './notification-texts.ts';
+import { timingSafeEqual } from './timing-safe-equal.ts';
 
 export type NewMaterialType = 'blog' | 'file';
 
@@ -18,27 +18,27 @@ export type NewMaterialDeps = {
   /** Calls new_material_recipients(type, item) with the service role. Throws on a database error. */
   recipients: (type: NewMaterialType, id: string) => Promise<NewMaterialRecipient[]>;
   /** sendPushMessages() (push.ts, ARU-166) with the service-role client and fetch. */
-  send: (messages: TelegramMessage[]) => Promise<SendResult>;
+  send: (messages: NotificationMessage[]) => Promise<SendResult>;
   log?: (line: string) => void;
 };
 
-/** What a call returns (and logs), so a call can be checked from net._http_response without Telegram. */
+/** What a call returns (and logs), so a call can be checked from net._http_response without a phone. */
 export type NewMaterialReport = { recipients: number } & SendResult;
 
 /** The message text, exactly as the story sets it (plain text: names and titles as typed; never the body, link,
  *  description or the PDF). */
 export function newMaterialText(type: NewMaterialType, _authorName: string, title: string) {
   // ARU-166: no person's name; the author's name is not used (the parameter stays for the existing callers).
-  return telegramText('en', type === 'blog' ? 'newBlogPost' : 'newKnowledgeFile', { title });
+  return notificationText('en', type === 'blog' ? 'newBlogPost' : 'newKnowledgeFile', { title });
 }
 
 /** One message per recipient row. */
-export function newMaterialMessages(type: NewMaterialType, rows: NewMaterialRecipient[]): TelegramMessage[] {
+export function newMaterialMessages(type: NewMaterialType, rows: NewMaterialRecipient[]): NotificationMessage[] {
   return rows.map((r) =>
     localizedMessage(
       r.user_id,
       'new_material',
-      telegramTexts(type === 'blog' ? 'newBlogPost' : 'newKnowledgeFile', { title: r.item_title }),
+      notificationTexts(type === 'blog' ? 'newBlogPost' : 'newKnowledgeFile', { title: r.item_title }),
     ),
   );
 }

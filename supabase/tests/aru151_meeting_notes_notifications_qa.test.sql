@@ -11,7 +11,7 @@
 --     nothing is queued and nobody is returned;
 --   * a rejected publish (notes too long) rolls back: not announced, no call; the next valid publish announces once;
 --   * an empty Vault URL queues nothing;
---   * set_telegram_notification: signed out is refused, a null value keeps its sham: hint, the new kind and an older
+--   * set_notification (set_telegram_notification until ARU-171): signed out is refused, a null value keeps its sham: hint, the new kind and an older
 --     one save.
 -- Fixture (t.seed): teacher T; mentors M (owns A), N (owns B), M2; students S1, S2, S3.
 select t.seed();
@@ -39,9 +39,9 @@ insert into course_members (course_id, user_id, added_by) values
   (t.id('A'), t.u('P'), t.id('M')),
   (t.id('A'), t.u('L'), t.id('M')),
   (t.id('A'), t.id('M'), t.id('M'));
-insert into telegram_links (user_id, chat_id) values
-  (t.id('T'), 6001), (t.id('M'), 6002), (t.id('N'), 6003), (t.id('M2'), 6004),
-  (t.id('S1'), 6005), (t.id('S2'), 6006), (t.u('P'), 6007), (t.u('L'), 6008);
+insert into notification_settings (user_id) values
+  (t.id('T')), (t.id('M')), (t.id('N')), (t.id('M2')),
+  (t.id('S1')), (t.id('S2')), (t.u('P')), (t.u('L'));
 insert into course_meetings (id, course_id, starts_at, status, created_by) values
   (t.mid('c1'), t.id('A'), now() - interval '3 days', 'completed', t.id('M')),
   (t.mid('c2'), t.id('A'), now() - interval '2 days', 'completed', t.id('M')),
@@ -50,7 +50,7 @@ insert into course_meetings (id, course_id, starts_at, status, created_by) value
 -- Workspace W2: course X (owner XT, teacher of W2), listener XS, one completed meeting, a public note by XS. Inserted
 -- without triggers, with explicit workspaces.
 set session_replication_role = replica;
-insert into telegram_links (user_id, chat_id, workspace_id) values (t.u('XT'), 6009, t.u('W2')), (t.u('XS'), 6010, t.u('W2'));
+insert into notification_settings (user_id, workspace_id) values (t.u('XT'), t.u('W2')), (t.u('XS'), t.u('W2'));
 insert into courses (id, title, created_by, workspace_id) values (t.u('X'), 'Xylophone', t.u('XT'), t.u('W2'));
 insert into course_members (course_id, user_id, added_by, workspace_id) values (t.u('X'), t.u('XS'), t.u('XT'), t.u('W2'));
 insert into course_meetings (id, course_id, starts_at, status, created_by, workspace_id)
@@ -107,7 +107,7 @@ grant execute on all functions in schema t to anon, authenticated, service_role;
 -- Function settings and trigger shape.
 select t.ok((select bool_and(prosecdef and proconfig @> array['search_path=public']) from pg_proc
   where proname in ('meeting_notes_recipients', 'meeting_listener_notes_announce', 'queue_meeting_notes_notification',
-                    'notify_meeting_notes_published', 'set_telegram_notification')
+                    'notify_meeting_notes_published', 'set_notification')
   and pronamespace = 'public'::regnamespace), 'all new functions: security definer, search_path=public');
 select t.eq((select count(*) from pg_proc where proname in ('meeting_notes_recipients', 'meeting_listener_notes_announce',
   'queue_meeting_notes_notification', 'notify_meeting_notes_published') and pronamespace = 'public'::regnamespace),
@@ -121,14 +121,14 @@ select t.ok(not has_function_privilege('anon', 'meeting_listener_notes_announce(
   and not has_function_privilege('anon', 'notify_meeting_notes_published()', 'execute'),
   'anon can''t run the trigger functions');
 
--- set_telegram_notification keeps the ARU-111 hints for the new kind.
+-- set_notification (set_telegram_notification until ARU-171) keeps the ARU-111 hints for the new kind.
 select t.login(null);
-select t.throws('select set_telegram_notification(''meeting_notes'', false)', '42501', 'signed out: refused');
+select t.throws('select set_notification(''meeting_notes'', false)', '42501', 'signed out: refused');
 reset role;
-select t.eq(t.hint('S1', 'select set_telegram_notification(''meeting_notes'', null)'), 'sham:choose_on_off',
+select t.eq(t.hint('S1', 'select set_notification(''meeting_notes'', null)'), 'sham:choose_on_off',
   'null: sham:choose_on_off');
-select t.eq(t.hint('S1', 'select set_telegram_notification(''meeting_notes'', true)'), '', 'meeting_notes saves');
-select t.eq(t.hint('S1', 'select set_telegram_notification(''photo_deletion'', true)'), '', 'photo_deletion still saves');
+select t.eq(t.hint('S1', 'select set_notification(''meeting_notes'', true)'), '', 'meeting_notes saves');
+select t.eq(t.hint('S1', 'select set_notification(''photo_deletion'', true)'), '', 'photo_deletion still saves');
 
 -- The owner also listed as a listener: returned once. P is Pending: left out.
 select t.login('S1');

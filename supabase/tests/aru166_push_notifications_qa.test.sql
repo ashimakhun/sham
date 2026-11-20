@@ -80,8 +80,17 @@ update notification_settings set workspace_id = default_workspace() where user_i
 select t.ok((select workspace_id = t.u('W2') from notification_settings where user_id = t.u('X')),
   'guard: settings never change workspace');
 
--- AC 8: the migration's copy, for a Telegram link of an account in another workspace (the row goes to W2).
+-- AC 8: the migration's copy, for a Telegram link of an account in another workspace (the row goes to W2). ARU-171
+-- (0071) dropped telegram_links, so the links go into a stand-in with the same columns (a temp table, found first).
 delete from notification_settings;
+create temp table telegram_links (
+  user_id uuid primary key, chat_id bigint not null,
+  notify_meeting_started boolean not null default true, notify_new_homework boolean not null default true,
+  notify_homework_reviewed boolean not null default true, notify_photo_deletion boolean not null default true,
+  notify_homework_submitted boolean not null default true, notify_chat_message boolean not null default true,
+  notify_general_chat boolean not null default true, notify_new_material boolean not null default true,
+  notify_meeting_notes boolean not null default true, notify_new_account boolean not null default true
+);
 insert into telegram_links (user_id, chat_id) values (t.u('X'), 7701), (t.id('M'), 7702);
 update telegram_links set notify_general_chat = false, notify_meeting_notes = false where user_id = t.u('X');
 \set copy_sql `sed -n '/^insert into notification_settings (/,/^on conflict (user_id) do nothing;/p' supabase/migrations/0069_push_notifications.sql`
@@ -112,11 +121,11 @@ select t.ok(not exists (select 1 from push_devices where user_id = t.u('X'))
   and not exists (select 1 from notification_settings where user_id = t.u('X')),
   'AC4 X''s phone and switches (W2) are gone');
 
--- AC 9: no recipient function depends on a Telegram link any more (also the ones the story didn't replace).
+-- AC 9: no recipient function depends on a Telegram link any more (also the ones the story didn't replace). Since
+-- ARU-171 (0071) no function reads telegram_links at all.
 select t.ok(not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-  where n.nspname = 'public' and p.prosrc ilike '%telegram_links%'
-    and p.proname not in ('disconnect_telegram', 'link_telegram_chat', 'set_telegram_notification', 'unlink_telegram_chat')),
-  'AC9 only the Telegram page''s own functions still read telegram_links');
+  where n.nspname = 'public' and p.prosrc ilike '%telegram_links%'),
+  'AC9 no function reads telegram_links');
 -- Every function a notification Edge Function calls still keeps waiting / declined accounts out (Approved only).
 select t.ok((select bool_and(p.prosrc ilike '%approved%') from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public' and p.proname in ('chat_message_recipients', 'general_message_recipients',
@@ -124,10 +133,9 @@ select t.ok((select bool_and(p.prosrc ilike '%approved%') from pg_proc p join pg
     'homework_submitted_recipient', 'new_account_notification', 'claim_started_meetings', 'claim_photo_deletion_warnings')),
   'AC9 every recipient function still checks Approved');
 
--- AC 9: a waiting or declined member of the course never gets meeting notes, linked to Telegram or not.
+-- AC 9: a waiting or declined member of the course never gets meeting notes.
 insert into course_members (course_id, user_id, added_by) values (t.id('A'), t.u('P'), t.id('M')), (t.id('A'), t.u('D'), t.id('M')),
   (t.id('A'), t.id('S2'), t.id('M'));
-insert into telegram_links (user_id, chat_id) values (t.u('P'), 7703);
 set session_replication_role = replica;
 insert into course_meetings (id, course_id, starts_at, status, created_by) values
   (t.u('mtg'), t.id('A'), now() - interval '1 day', 'completed', t.id('M'));

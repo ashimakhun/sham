@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 // ARU-151: the meeting-notes-notifications function's logic, with the recipient lookup and the sending helper mocked
-// (AC 1, 9, 10), and end to end with the real ARU-48 helper and a mocked Telegram (AC 1 languages, AC 7 switch).
+// (AC 1, 9, 10), and end to end with the real push sender and a mocked Expo push service (AC 1 languages, AC 7 switch).
 import {
   handleMeetingNotesRequest,
   type MeetingNotesDeps,
@@ -10,8 +10,10 @@ import {
   type MeetingNotesRecipient,
   meetingNotesText,
 } from './meeting-notes';
-import { sendTelegramMessages, type SendResult, type ServiceClient, type TelegramMessage } from './telegram';
-import { TELEGRAM_TEXTS } from './telegram-texts';
+import { type SendResult, type NotificationMessage } from './notification';
+import { sendPushMessages } from './push';
+import { pushClient, pushFetch } from './push-test-helpers';
+import { NOTIFICATION_TEXTS } from './notification-texts';
 
 const SECRET = 'notes-secret-123';
 const ID = '3c1d2e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f';
@@ -28,11 +30,11 @@ const post = (
 const ok: SendResult = { sent: 0, skipped: 0, failed: [], removed: 0 };
 
 function deps(rows: MeetingNotesRecipient[], result: Partial<SendResult> = {}) {
-  const sent: TelegramMessage[][] = [];
+  const sent: NotificationMessage[][] = [];
   const logs: string[] = [];
   const d: MeetingNotesDeps = {
     recipients: jest.fn(async () => rows),
-    send: jest.fn(async (messages: TelegramMessage[]) => {
+    send: jest.fn(async (messages: NotificationMessage[]) => {
       sent.push(messages);
       return { ...ok, sent: messages.length, ...result };
     }),
@@ -76,9 +78,9 @@ describe('AC 10: the secret', () => {
 
 describe('AC 1: the message', () => {
   it('the catalog has the story\'s English and Russian texts, with a note', () => {
-    expect(TELEGRAM_TEXTS.meetingNotesPublished.en).toBe('New notes on a {course} meeting');
-    expect(TELEGRAM_TEXTS.meetingNotesPublished.ru).toBe('Новые заметки к встрече курса {course}');
-    expect(TELEGRAM_TEXTS.meetingNotesPublished.note).toMatch(/^Meeting notes · /);
+    expect(NOTIFICATION_TEXTS.meetingNotesPublished.en).toBe('New notes on a {course} meeting');
+    expect(NOTIFICATION_TEXTS.meetingNotesPublished.ru).toBe('Новые заметки к встрече курса {course}');
+    expect(NOTIFICATION_TEXTS.meetingNotesPublished.note).toMatch(/^Meeting notes · /);
   });
 
   it('names and titles as typed (plain text)', () => {
@@ -139,19 +141,19 @@ describe('AC 9: failures are logged and dropped', () => {
 
   it('the helper throwing: 200 with every message reported failed', async () => {
     const { d } = deps(rows);
-    (d.send as jest.Mock).mockRejectedValueOnce(new Error('telegram down'));
+    (d.send as jest.Mock).mockRejectedValueOnce(new Error('push down'));
     const res = await handleMeetingNotesRequest(post(), SECRET, d);
     expect(res.status).toBe(200);
     expect((await res.json()).failed).toEqual([
-      { userId: 'T', error: 'telegram down' },
-      { userId: 'M', error: 'telegram down' },
-      { userId: 'M2', error: 'telegram down' },
+      { userId: 'T', error: 'push down' },
+      { userId: 'M', error: 'push down' },
+      { userId: 'M2', error: 'push down' },
     ]);
   });
 });
 
-describe('with the real helper: languages (AC 1) and the Meeting notes switch (AC 7)', () => {
-  function client(on: boolean): ServiceClient {
+describe('with the real push sender: languages (AC 1) and the Meeting notes switch (AC 7)', () => {
+  function client(on: boolean) {
     const links = [
       { user_id: 'T', chat_id: 11, notify_meeting_notes: true },
       { user_id: 'M', chat_id: 12, notify_meeting_notes: on },
@@ -160,25 +162,15 @@ describe('with the real helper: languages (AC 1) and the Meeting notes switch (A
       { id: 'T', language: 'ru', device_language: null },
       { id: 'M', language: 'en', device_language: null },
     ];
-    return {
-      from: (table) => ({
-        select: () => ({
-          in: async () => ({ data: table === 'profiles' ? profiles : links, error: null }),
-        }),
-        delete: () => ({ eq: () => ({ eq: async () => ({ data: null, error: null }) }) }),
-      }),
-    };
+    return pushClient(links, profiles).client;
   }
   const run = async (on: boolean) => {
-    const fetchFn = jest.fn(async () => new Response('{"ok":true}', { status: 200 }));
+    const fetchFn = pushFetch();
     const { d } = deps(rows.slice(0, 2));
     d.send = (messages) =>
-      sendTelegramMessages(client(on), 'TOKEN', fetchFn as unknown as typeof fetch, messages, { sleep: async () => {} });
+      sendPushMessages(client(on), fetchFn.fetch, messages, { sleep: async () => {} });
     const res = await handleMeetingNotesRequest(post(), SECRET, d);
-    const texts = (fetchFn.mock.calls as unknown as [string, RequestInit][]).map((c) => {
-      const b = JSON.parse(c[1].body as string);
-      return [b.chat_id, b.text];
-    });
+    const texts = fetchFn.sent();
     return { body: await res.json(), texts };
   };
 

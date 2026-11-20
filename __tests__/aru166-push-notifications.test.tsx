@@ -187,14 +187,12 @@ describe('push.ts', () => {
 
 describe('Profile → Notifications (AC 7)', () => {
   it.each(['S1', 'M', 'T'] as const)('%s: "Notifications >" opens the page; no Telegram button', async (who) => {
-    process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME = 'ShamSchoolBot';
     setStore(fakeStore(who));
     await render(<ProfileScreen />);
     await act(async () => {});
     expect(screen.queryByRole('button', { name: 'Telegram notifications' })).toBeNull();
     await fireEvent.press(screen.getByRole('button', { name: 'Notifications' }));
     expect(router.push).toHaveBeenCalledWith('/notifications');
-    delete process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME;
   });
 });
 

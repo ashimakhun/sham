@@ -1,19 +1,10 @@
-// Telegram notifications (ARU-48): the bot's username and the switches shown per role.
+// The notification switches shown per role on the Notifications page (ARU-166), in order. They were the Telegram
+// switches (ARU-48) until ARU-171 removed Telegram; the kinds, order and labels are unchanged.
 import { currentLanguage, type Language, translate } from '@/i18n';
 
-import type { Role, TelegramKind } from './types';
+import type { NotificationKind, Role } from './types';
 
-/** The bot's username from EXPO_PUBLIC_TELEGRAM_BOT_USERNAME (without "@"); empty means Telegram is off in the app. */
-export function telegramBotUsername(): string {
-  return (process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME ?? '').trim().replace(/^@/, '');
-}
-
-/** The link the Connect button opens: the Telegram app if installed, otherwise its web page. */
-export function telegramStartUrl(username: string, code: string): string {
-  return `https://t.me/${username}?start=${encodeURIComponent(code)}`;
-}
-
-export const TELEGRAM_SWITCHES: { kind: TelegramKind; label: string }[] = [
+export const NOTIFICATION_SWITCHES: { kind: NotificationKind; label: string }[] = [
   { kind: 'meeting_started', label: 'Meeting started' },
   { kind: 'new_homework', label: 'New homework' },
   { kind: 'homework_reviewed', label: 'Homework reviewed' },
@@ -37,7 +28,7 @@ export const TELEGRAM_SWITCHES: { kind: TelegramKind; label: string }[] = [
  * (ARU-102), meeting notes (ARU-151), homework submitted to courses they own (ARU-89) and new accounts (ARU-84). Mentors: everything but new
  * accounts. Students: also no homework submitted.
  */
-const KINDS_FOR: Record<Role, TelegramKind[]> = {
+const KINDS_FOR: Record<Role, NotificationKind[]> = {
   teacher: ['homework_submitted', 'chat_message', 'general_chat', 'new_material', 'meeting_notes', 'new_account'],
   mentor: [
     'meeting_started',
@@ -63,9 +54,9 @@ const KINDS_FOR: Record<Role, TelegramKind[]> = {
 };
 
 /** ARU-113 AC 6: the switches a role sees, with their labels in the app's language. */
-export function telegramSwitchesFor(role: Role, lang: Language = currentLanguage()) {
-  return TELEGRAM_SWITCHES.filter((s) => KINDS_FOR[role].includes(s.kind)).map((s) => ({
+export function notificationSwitchesFor(role: Role, lang: Language = currentLanguage()) {
+  return NOTIFICATION_SWITCHES.filter((s) => KINDS_FOR[role].includes(s.kind)).map((s) => ({
     ...s,
-    label: translate(lang, `telegram.switch.${s.kind}`),
+    label: translate(lang, `notifications.switch.${s.kind}`),
   }));
 }

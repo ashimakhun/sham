@@ -16,7 +16,7 @@ export const TEACHER_CANT_DELETE = "The teacher's account can't be deleted.";
 /** AC 2: what will happen. "Deleted account" is shown in bold. */
 export const DELETE_EXPLANATION_BEFORE =
   'Your profile, homework and photos, course memberships, attendance marks, feedback, likes, materials and PDFs you ' +
-  'shared, and your Telegram link are deleted. Your chat messages and the work you did for others (checked homework, ' +
+  'shared, and your notification settings are deleted. Your chat messages and the work you did for others (checked homework, ' +
   'meetings, notes) stay, shown as ';
 export const DELETE_EXPLANATION_AFTER = ". This can't be undone.";
 

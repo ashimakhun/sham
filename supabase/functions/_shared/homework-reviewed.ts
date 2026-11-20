@@ -5,9 +5,9 @@
 // helper, which skips unlinked users and those with Homework reviewed off. Nothing is retried by a later call.
 // No Deno-only imports, so Jest can test it.
 
-import { localizedMessage, type SendResult, type TelegramMessage } from './telegram.ts';
-import { telegramText, telegramTexts } from './telegram-texts.ts';
-import { timingSafeEqual } from './telegram-bot.ts';
+import { localizedMessage, type SendResult, type NotificationMessage } from './notification.ts';
+import { notificationText, notificationTexts } from './notification-texts.ts';
+import { timingSafeEqual } from './timing-safe-equal.ts';
 
 /** One row of homework_reviewed_recipient(). */
 export type HomeworkRecipient = { course_title: string; user_id: string };
@@ -16,21 +16,21 @@ export type HomeworkReviewedDeps = {
   /** Calls homework_reviewed_recipient(homework_id) with the service role. Throws on a database error. */
   recipient: (homeworkId: string) => Promise<HomeworkRecipient[]>;
   /** sendPushMessages() (push.ts, ARU-166) with the service-role client and fetch. */
-  send: (messages: TelegramMessage[]) => Promise<SendResult>;
+  send: (messages: NotificationMessage[]) => Promise<SendResult>;
   log?: (line: string) => void;
 };
 
-/** What a call returns (and logs), so a call can be checked from net._http_response without Telegram. */
+/** What a call returns (and logs), so a call can be checked from net._http_response without a phone. */
 export type HomeworkReviewedReport = { recipients: number } & SendResult;
 
 /** The message text, exactly as the product owner set it (plain text: the title is shown as typed). */
 export function homeworkReviewedText(courseTitle: string) {
-  return telegramText('en', 'homeworkReviewed', { course: courseTitle });
+  return notificationText('en', 'homeworkReviewed', { course: courseTitle });
 }
 
 /** One message per recipient row (in practice zero or one: the sender). */
-export function homeworkReviewedMessages(rows: HomeworkRecipient[]): TelegramMessage[] {
-  return rows.map((r) => localizedMessage(r.user_id, 'homework_reviewed', telegramTexts('homeworkReviewed', { course: r.course_title })));
+export function homeworkReviewedMessages(rows: HomeworkRecipient[]): NotificationMessage[] {
+  return rows.map((r) => localizedMessage(r.user_id, 'homework_reviewed', notificationTexts('homeworkReviewed', { course: r.course_title })));
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

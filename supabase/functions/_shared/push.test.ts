@@ -7,7 +7,7 @@ import { meetingNotesMessages } from './meeting-notes';
 import { newAccountMessages } from './new-account';
 import { newMaterialMessages } from './new-material';
 import { EXPO_PUSH_URL, type PushServiceClient, sendPushMessages } from './push';
-import { localizedMessage, type TelegramMessage } from './telegram';
+import { localizedMessage, type NotificationMessage } from './notification';
 
 type Device = { user_id: string; token: string };
 type Settings = { user_id: string } & Record<string, unknown>;
@@ -60,7 +60,7 @@ function fakeFetch(answers: ((batch: Sent[]) => { status: number; body: unknown 
   return { fetch: fn as unknown as typeof fetch, calls };
 }
 const noWait = { sleep: async () => {} };
-const msg = (userId: string, kind: TelegramMessage['kind'] = 'chat_message'): TelegramMessage => ({
+const msg = (userId: string, kind: NotificationMessage['kind'] = 'chat_message'): NotificationMessage => ({
   userId,
   kind,
   text: `hello ${userId}`,

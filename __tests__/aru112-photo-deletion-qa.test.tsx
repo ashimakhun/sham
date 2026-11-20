@@ -1,17 +1,17 @@
 // QA ARU-112: gaps in aru112-photo-deletion.test.tsx: an open details screen switches to the "Photo removed…" note
 // live when the job clears the photo (AC 6); a removed photo is no longer counted by ARU-107's banner, Download my
-// photos and deletion warning (AC 6); the teacher's Telegram page has no Photo deletion switch while students and
-// mentors do (AC 5). The Telegram text is checked in supabase/functions/_shared/photo-deletion-qa.test.ts.
+// photos and deletion warning (AC 6); the teacher's Notifications page has no Photo deletion switch while students and
+// mentors do (AC 5). The push text is checked in supabase/functions/_shared/photo-deletion-qa.test.ts.
 import { render, screen } from "@testing-library/react-native";
 
 import HomeworkDetailScreen from "@/app/homework/[id]";
-import TelegramScreen from "@/app/telegram";
+import NotificationsScreen from "@/app/notifications";
 import {
   deletionWarning,
   PHOTO_REMOVED,
   storedOwnPhotos,
 } from "@/lib/photoRetention";
-import type { TelegramLink } from "@/lib/types";
+import type { NotificationKind } from "@/lib/types";
 
 import { fakeStore, hw, member } from "./helpers/fakeStore";
 import { params, setStore } from "./helpers/mocks";
@@ -19,22 +19,16 @@ import { params, setStore } from "./helpers/mocks";
 jest.mock("expo-router", () => require("./helpers/mocks").expoRouter);
 jest.mock("@/lib/store", () => require("./helpers/mocks").store);
 
-const linked: TelegramLink = {
-  linkedAt: "2026-11-01T10:00:00.000Z",
-  switches: {
+// The account's saved switches (notification_settings, ARU-166); a kind not in it reads as on.
+const linked = {
     meeting_started: true,
     new_homework: true,
     homework_reviewed: true,
     chat_message: true,
-  },
-};
+  } as Record<NotificationKind, boolean>;
 
 beforeEach(() => {
   jest.clearAllMocks();
-  process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME = "ShamSchoolBot";
-});
-afterEach(() => {
-  delete process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME;
 });
 
 const base = {
@@ -102,10 +96,10 @@ it.each([
   ["M", true],
   ["T", false],
 ] as const)(
-  "AC 5: on the Telegram page %s %s the Photo deletion switch",
+  "AC 5: on the Notifications page %s %s the Photo deletion switch",
   async (who, has) => {
-    setStore(fakeStore(who, { telegram: linked }));
-    await render(<TelegramScreen />);
+    setStore(fakeStore(who, { notificationSettings: linked }));
+    await render(<NotificationsScreen />);
     expect(!!screen.queryByRole("switch", { name: "Photo deletion" })).toBe(
       has,
     );

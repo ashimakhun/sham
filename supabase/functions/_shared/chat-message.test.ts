@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 // ARU-44: the chat-message-notifications function's logic, with the recipients lookup and the sending helper mocked
-// (AC 1, 7, 8), and once end to end with the real ARU-48 helper and a mocked Telegram (AC 5: switch and link).
+// (AC 1, 7, 8), and once end to end with the real push sender and a mocked Expo push service (AC 5: switch and phone).
 import {
   type ChatMessageDeps,
   type ChatMessageRecipients,
@@ -10,7 +10,9 @@ import {
   chatMessageText,
   handleChatMessageRequest,
 } from './chat-message';
-import { sendTelegramMessages, type SendResult, type ServiceClient, type TelegramMessage } from './telegram';
+import { type SendResult, type NotificationMessage } from './notification';
+import { sendPushMessages } from './push';
+import { pushClient, pushFetch } from './push-test-helpers';
 
 const SECRET = 'chat-secret-123';
 const MSG = '0b6f1c1e-2a3b-4c5d-8e9f-001122334455';
@@ -28,11 +30,11 @@ const post = (
 const ok: SendResult = { sent: 0, skipped: 0, failed: [], removed: 0 };
 
 function deps(found: ChatMessageRecipients | null, result: Partial<SendResult> = {}) {
-  const sent: TelegramMessage[][] = [];
+  const sent: NotificationMessage[][] = [];
   const logs: string[] = [];
   const d: ChatMessageDeps = {
     recipients: jest.fn(async () => found),
-    send: jest.fn(async (messages: TelegramMessage[]) => {
+    send: jest.fn(async (messages: NotificationMessage[]) => {
       sent.push(messages);
       return { ...ok, sent: messages.length, ...result };
     }),
@@ -152,33 +154,19 @@ describe('AC 7: the helper result is logged; failures are dropped, not retried',
   });
 });
 
-describe('end to end with the ARU-48 helper', () => {
-  it('AC 5: unlinked and switched-off recipients are skipped; plain text', async () => {
-    const links = [
+describe('end to end with the push sender', () => {
+  it('AC 5: recipients without a phone or with the switch off are skipped; plain text', async () => {
+    const { client } = pushClient([
       { user_id: 'O', chat_id: 11, notify_chat_message: true, notify_meeting_started: false },
       { user_id: 'T1', chat_id: 22, notify_chat_message: false, notify_meeting_started: true },
-    ];
-    const client = {
-      from: () => ({
-        select: () => ({
-          in: (_c: string, ids: string[]) =>
-            Promise.resolve({ data: links.filter((l) => ids.includes(l.user_id)), error: null }),
-        }),
-        delete: () => ({ eq: () => ({ eq: () => Promise.resolve({ data: null, error: null }) }) }),
-      }),
-    } as unknown as ServiceClient;
-    const fetchFn = jest.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    ]);
+    const push = pushFetch();
     const res = await handleChatMessageRequest(post(), SECRET, {
       recipients: async () => ({ course_title: 'Algebra *1*', recipient_ids: ['O', 'T1', 'S9'] }),
-      send: (messages) =>
-        sendTelegramMessages(client, 'TOKEN', fetchFn as unknown as typeof fetch, messages, { sleep: async () => {} }),
+      send: (messages) => sendPushMessages(client, push.fetch, messages, { sleep: async () => {} }),
     });
     expect(await res.json()).toMatchObject({ recipients: 3, sent: 1, skipped: 2, failed: [] });
-    expect(fetchFn).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe('https://api.telegram.org/botTOKEN/sendMessage');
-    const body = JSON.parse(init.body as string);
-    expect(body).toMatchObject({ chat_id: 11, text: 'New message in the Algebra *1* chat' });
-    expect(body.parse_mode).toBeUndefined();
+    expect(push.requests).toHaveLength(1);
+    expect(push.sent()).toEqual([[11, 'New message in the Algebra *1* chat']]);
   });
 });

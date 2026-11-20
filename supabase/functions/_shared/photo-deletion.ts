@@ -7,7 +7,7 @@
 // local reminders. The job records no photo_deletion_warnings rows and its response has no warning counts.
 // No Deno-only imports: Supabase and Storage are passed in, so Jest can test it.
 
-import { timingSafeEqual } from './telegram-bot.ts';
+import { timingSafeEqual } from './timing-safe-equal.ts';
 
 export type DuePhoto = { homework_id: string; photo_path: string };
 

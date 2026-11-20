@@ -162,18 +162,18 @@ select t.eq((select count(*) from claim_photo_deletion_warnings()), 0::bigint, '
 reset role;
 
 -- AC 5: the switch toggles only its column; every older kind still toggles.
-insert into telegram_links (user_id, chat_id) values (t.id('S1'), 111) on conflict do nothing;
+insert into notification_settings (user_id) values (t.id('S1')) on conflict do nothing;
 select t.login('S1');
-select set_telegram_notification('photo_deletion', false);
+select set_notification('photo_deletion', false);
 reset role;
 select t.ok((select not notify_photo_deletion and notify_homework_reviewed and notify_new_homework and notify_meeting_started
-  and notify_chat_message and notify_general_chat and notify_new_material from telegram_links where user_id = t.id('S1')),
+  and notify_chat_message and notify_general_chat and notify_new_material from notification_settings where user_id = t.id('S1')),
   'AC5 turning Photo deletion off changes only that switch');
 select t.login('S1');
-select set_telegram_notification(k, false) from unnest(array['meeting_started', 'new_homework', 'homework_reviewed',
+select set_notification(k, false) from unnest(array['meeting_started', 'new_homework', 'homework_reviewed',
   'chat_message', 'new_account', 'homework_submitted', 'general_chat', 'new_material']) k;
-select set_telegram_notification('photo_deletion', true);
+select set_notification('photo_deletion', true);
 reset role;
 select t.ok((select notify_photo_deletion and not (notify_meeting_started or notify_new_homework or notify_homework_reviewed
   or notify_chat_message or notify_new_account or notify_homework_submitted or notify_general_chat or notify_new_material)
-  from telegram_links where user_id = t.id('S1')), 'AC5 every older kind still toggles, and Photo deletion turns back on');
+  from notification_settings where user_id = t.id('S1')), 'AC5 every older kind still toggles, and Photo deletion turns back on');

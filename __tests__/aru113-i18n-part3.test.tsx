@@ -1,14 +1,13 @@
-// ARU-113 (Russian version, part 3): Materials, chats, payments, accountant, Manage roles, the Telegram page and
-// Delete account read from the catalog. In Russian no catalog English is left on screen (AC 1) except the two Telegram
-// buttons (AC 11); user text stays as written (AC 8); plurals, sizes and dates follow the language (AC 4, AC 5);
+// ARU-113 (Russian version, part 3): Materials, chats, payments, accountant, Manage roles, the notification switches
+// (the Telegram page until ARU-171) and Delete account read from the catalog. In Russian no catalog English is left on
+// screen (AC 1); user text stays as written (AC 8); plurals, sizes and dates follow the language (AC 4, AC 5);
 // confirmations are in Russian (AC 2, AC 11) and app errors too (AC 3).
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { Alert, Platform } from 'react-native';
 
 import MaterialsScreen from '@/app/(tabs)/materials';
 import RolesScreen from '@/app/roles';
-import TelegramScreen from '@/app/telegram';
+import NotificationsScreen from '@/app/notifications';
 import { DeleteAccountForm } from '@/components/DeleteAccountForm';
 import { formatDateIn, translate, translateKnown } from '@/i18n';
 import en from '@/i18n/en.json';
@@ -17,8 +16,8 @@ import { periodText, requestCountText } from '@/lib/billing';
 import { ownedCoursesProblem } from '@/lib/deleteAccount';
 import { formatSize, nameFromFile, PDF_RULE } from '@/lib/files';
 import { PHOTO_PERMISSION } from '@/lib/paymentProof';
-import { telegramSwitchesFor } from '@/lib/telegram';
-import type { Material, TelegramLink, User } from '@/lib/types';
+import { notificationSwitchesFor } from '@/lib/notifications';
+import type { Material, NotificationKind, User } from '@/lib/types';
 
 import { fakeStore, users } from './helpers/fakeStore';
 import { setStore } from './helpers/mocks';
@@ -44,7 +43,7 @@ const ENGLISH = Object.entries(en as Record<string, string>)
 const pieces = (text: string) => text.split(/\{\w+\}/).map((p) => p.trim()).filter((p) => /[a-z]{3}/i.test(p) && p.length > 3);
 const ENGLISH_PIECES = [...new Set(ENGLISH.flatMap(pieces))];
 /** AC 11: the only app English allowed on these screens. */
-const ALLOWED = ['Connect Telegram', 'Disconnect'];
+const ALLOWED: string[] = [];
 
 function rendered(): string[] {
   const out: string[] = [];
@@ -77,18 +76,12 @@ const post: Material = {
   body: 'Read **every** day',
   createdAt: '2026-10-20T10:00:00.000Z',
 };
-const linked: TelegramLink = {
-  linkedAt: '2026-11-01T10:00:00.000Z',
-  switches: { meeting_started: true, new_homework: true, homework_reviewed: true, chat_message: true },
-};
+// The account's saved switches (notification_settings, ARU-166); a kind not in it reads as on.
+const linked = { meeting_started: true, new_homework: true, homework_reviewed: true, chat_message: true } as Record<NotificationKind, boolean>;
 
 beforeEach(async () => {
   jest.clearAllMocks();
-  process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME = 'ShamSchoolBot';
   await AsyncStorage.clear();
-});
-afterEach(() => {
-  delete process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME;
 });
 
 describe('AC 1 / AC 8: screens in Russian, user text as written', () => {
@@ -123,36 +116,20 @@ describe('AC 1 / AC 8: screens in Russian, user text as written', () => {
   });
 });
 
-describe('AC 6 / AC 11: the Telegram page', () => {
-  it('not connected: Russian page, the Connect button stays English', async () => {
-    as('S1', 'ru', { telegram: null });
-    await render(inApp(<TelegramScreen />));
-    await flush();
-    expectNoCatalogEnglish();
-    expect(screen.getByRole('button', { name: 'Connect Telegram' })).toBeTruthy();
-  });
-
-  it('connected: Russian switches and a Russian Disconnect confirmation, the button stays English', async () => {
-    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const os = Platform.OS;
-    Platform.OS = 'ios';
-    as('S1', 'ru', { telegram: linked });
-    await render(inApp(<TelegramScreen />));
+// ARU-171: the Telegram page is gone; its switches (and their Russian labels) are on the Notifications page (ARU-166).
+describe('AC 6: the notification switches', () => {
+  it('the Notifications page in Russian: Russian switches, no catalog English', async () => {
+    as('S1', 'ru', { notificationSettings: linked });
+    await render(inApp(<NotificationsScreen />));
     await flush();
     expectNoCatalogEnglish();
     expect(screen.getByText('Встреча началась')).toBeTruthy();
-    await fireEvent.press(screen.getByRole('button', { name: 'Disconnect' }));
-    const [title, message, buttons] = alert.mock.calls[0];
-    expect(title).toBe('Отключить Telegram');
-    expect(message).toBe('Больше не получать уведомления Sham в Telegram?');
-    expect(buttons?.map((b) => b.text)).toEqual(['Отмена', 'Отключить']);
-    Platform.OS = os;
   });
 
   it.each(['T', 'M', 'S1'] as const)('%s: switch labels in Russian, the same switches as in English', (who) => {
     const role = users[who].role;
-    const ruSwitches = telegramSwitchesFor(role, 'ru');
-    const enSwitches = telegramSwitchesFor(role, 'en');
+    const ruSwitches = notificationSwitchesFor(role, 'ru');
+    const enSwitches = notificationSwitchesFor(role, 'en');
     expect(ruSwitches.map((s) => s.kind)).toEqual(enSwitches.map((s) => s.kind));
     for (const s of ruSwitches) expect(s.label).toMatch(/[а-яё]/i);
   });

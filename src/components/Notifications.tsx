@@ -18,7 +18,7 @@ const errorText = (e: unknown, fallback: string) => (e instanceof Error ? e.mess
 
 /**
  * ARU-166 AC 7: on the Profile tab, "Notifications >" opens the Notifications page (src/app/notifications.tsx). It sits
- * where "Telegram notifications >" was and is shown for every role, whether or not a Telegram bot is configured.
+ * where ARU-101's Telegram button was and is shown for every role.
  */
 export function NotificationsButton() {
   const { t } = useI18n();

@@ -6,11 +6,11 @@
 //   * general_messages (ARU-87, 0046) with {"general_message_id": "<id>"}: asks general_message_recipients() (every
 //     Approved user but the author) and sends "New message in the general chat" with kind general_chat (the General
 //     chat switch).
-// The ARU-48 helper skips people who aren't linked or have that switch off. No Deno-only imports, so Jest can test it.
+// The push sender skips people who have that switch off or no phone. No Deno-only imports, so Jest can test it.
 
-import { localizedMessage, type SendResult, type TelegramMessage } from './telegram.ts';
-import { telegramText, telegramTexts } from './telegram-texts.ts';
-import { timingSafeEqual } from './telegram-bot.ts';
+import { localizedMessage, type SendResult, type NotificationMessage } from './notification.ts';
+import { notificationText, notificationTexts } from './notification-texts.ts';
+import { timingSafeEqual } from './timing-safe-equal.ts';
 
 /** What chat_message_recipients() returns for a known message; null for an unknown (or deleted) one. */
 export type ChatMessageRecipients = { course_title: string; recipient_ids: string[] | null };
@@ -24,35 +24,35 @@ export type ChatMessageDeps = {
   /** Calls general_message_recipients(message) with the service role (ARU-87). Throws on a database error. */
   generalRecipients?: (messageId: string) => Promise<GeneralMessageRecipients | null>;
   /** sendPushMessages() (push.ts, ARU-166) with the service-role client and fetch. */
-  send: (messages: TelegramMessage[]) => Promise<SendResult>;
+  send: (messages: NotificationMessage[]) => Promise<SendResult>;
   log?: (line: string) => void;
 };
 
-/** What a call returns (and logs), so a run can be checked from net._http_response without Telegram. */
+/** What a call returns (and logs), so a run can be checked from net._http_response without a phone. */
 export type ChatMessageReport = { message_id: string; recipients: number } & SendResult;
 /** The same for a general chat message (ARU-87). */
 export type GeneralMessageReport = { general_message_id: string; recipients: number } & SendResult;
 
 /** The message text, exactly as the product owner set it (plain text: the title is shown as typed). */
 export function chatMessageText(courseTitle: string) {
-  return telegramText('en', 'chatMessage', { course: courseTitle });
+  return notificationText('en', 'chatMessage', { course: courseTitle });
 }
 
 /** One chat_message message per recipient (AC 1). Never includes the chat text or its author. */
-export function chatMessageMessages(found: ChatMessageRecipients | null): TelegramMessage[] {
+export function chatMessageMessages(found: ChatMessageRecipients | null): NotificationMessage[] {
   if (!found) return [];
   // ARU-110: each recipient gets it in their own language.
-  const texts = telegramTexts('chatMessage', { course: found.course_title });
+  const texts = notificationTexts('chatMessage', { course: found.course_title });
   return (found.recipient_ids ?? []).map((userId) => localizedMessage(userId, 'chat_message', texts));
 }
 
 /** The general chat text (ARU-87): no message body, no author. */
-export const GENERAL_CHAT_TEXT = telegramText('en', 'generalChat');
+export const GENERAL_CHAT_TEXT = notificationText('en', 'generalChat');
 
 /** One general_chat message per recipient (ARU-87 AC 4). */
-export function generalMessageMessages(found: GeneralMessageRecipients | null): TelegramMessage[] {
+export function generalMessageMessages(found: GeneralMessageRecipients | null): NotificationMessage[] {
   if (!found) return [];
-  const texts = telegramTexts('generalChat');
+  const texts = notificationTexts('generalChat');
   return (found.recipient_ids ?? []).map((userId) => localizedMessage(userId, 'general_chat', texts));
 }
 
