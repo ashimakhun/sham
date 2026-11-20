@@ -1,8 +1,8 @@
 /**
  * @jest-environment node
  */
-// ARU-112: the photo-deletion function's logic with Supabase, Storage and Telegram mocked (AC 1–4, 7, 9), and once
-// end to end with the real ARU-48 sending helper and a mocked Telegram (the Photo deletion switch is respected).
+// ARU-112: the photo-deletion function's logic with Supabase, Storage and the sender mocked (AC 1–4, 7, 9), and once
+// end to end with the real push sender and a mocked Expo push service (the Photo deletion switch is respected).
 import {
   type DuePhoto,
   formatUtcDay,
@@ -15,7 +15,9 @@ import {
   type PhotoWarning,
   REMOVE_CHUNK,
 } from './photo-deletion';
-import { sendTelegramMessages, type SendResult, type ServiceClient, type TelegramMessage } from './telegram';
+import { type SendResult, type NotificationMessage } from './notification';
+import { sendPushMessages } from './push';
+import { pushClient, pushFetch } from './push-test-helpers';
 
 const SECRET = 'photo-secret-123';
 const post = (headers: Record<string, string> = { 'x-cron-secret': SECRET }, method = 'POST') =>
@@ -35,7 +37,7 @@ function deps(world: World = {}) {
   const calls: string[] = [];
   const removed: string[][] = [];
   const marked: DuePhoto[][] = [];
-  const sent: TelegramMessage[][] = [];
+  const sent: NotificationMessage[][] = [];
   const logs: string[] = [];
   const d: PhotoDeletionDeps = {
     start: jest.fn(async () => {
@@ -65,7 +67,7 @@ function deps(world: World = {}) {
       calls.push('warnings');
       return world.warnings ?? [];
     }),
-    send: jest.fn(async (messages: TelegramMessage[]): Promise<SendResult> => {
+    send: jest.fn(async (messages: NotificationMessage[]): Promise<SendResult> => {
       calls.push('send');
       sent.push(messages);
       return { sent: messages.length, skipped: 0, failed: [], removed: 0 };
@@ -229,26 +231,19 @@ describe('AC 4: warnings', () => {
       { user_id: 'S1', chat_id: 1, notify_photo_deletion: true },
       { user_id: 'S2', chat_id: 2, notify_photo_deletion: false },
     ];
-    const client = {
-      from: () => ({
-        select: () => ({ in: async () => ({ data: links, error: null }) }),
-        delete: () => ({ eq: () => ({ eq: async () => ({ data: null, error: null }) }) }),
-      }),
-    } as unknown as ServiceClient;
-    const fetchFn = jest.fn(async () => new Response('{"ok":true}', { status: 200 })) as unknown as typeof fetch;
+    const { client } = pushClient(links);
+    const fetchFn = pushFetch();
     const { d } = deps({
       warnings: [
         { user_id: 'S1', photo_count: 1, earliest: '2026-12-08' },
         { user_id: 'S2', photo_count: 4, earliest: '2026-12-09' },
       ],
     });
-    d.send = (messages) => sendTelegramMessages(client, 'tok', fetchFn, messages, { sleep: async () => {} });
+    d.send = (messages) => sendPushMessages(client, fetchFn.fetch, messages, { sleep: async () => {} });
     const r = await report(await handlePhotoDeletionRequest(post(), SECRET, d));
     expect(r).toMatchObject({ warnings_sent: 1, warnings_skipped: 1, warnings_failed: 0 });
-    expect(fetchFn).toHaveBeenCalledTimes(1);
-    const body = JSON.parse(((fetchFn as jest.Mock).mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
-    expect(body).toMatchObject({ chat_id: 1, text: expect.stringContaining('1 homework photo will be deleted on 8 Dec 2026') });
-    expect(body.parse_mode).toBeUndefined();
+    expect(fetchFn.mock).toHaveBeenCalledTimes(1);
+    expect(fetchFn.sent()).toEqual([[1, expect.stringContaining('1 homework photo will be deleted on 8 Dec 2026')]]);
   });
 
   it('a failed warning step doesn\'t undo the deletions', async () => {

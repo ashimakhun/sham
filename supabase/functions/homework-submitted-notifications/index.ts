@@ -1,10 +1,9 @@
-// ARU-89: a Telegram message to a course's owner when a listener submits homework. Called by the trigger from
+// ARU-89: a push notification to a course's owner when a listener submits homework. Called by the trigger from
 // migration 0045 (through pg_net, with "Authorization: Bearer <secret>" and {"homework_id": "<id>"}). The logic is in
-// ../_shared/homework-submitted.ts (tested with Jest); this file only wires it to Supabase and Telegram.
+// ../_shared/homework-submitted.ts (tested with Jest); this file only wires it to Supabase and push.
 //
 // Secrets (Supabase dashboard → Edge Functions → Secrets, or `npx supabase secrets set ...`):
-//   EXPO_ACCESS_TOKEN               optional (ARU-166): only if push security is turned on in Expo. Since ARU-166 this
-//                                   function sends push notifications, not Telegram: TELEGRAM_BOT_TOKEN is no longer read.
+//   EXPO_ACCESS_TOKEN               optional (ARU-166): only if push security is turned on in Expo. The function sends push (ARU-166).
 //   HOMEWORK_SUBMITTED_NOTIFY_SECRET  a random string; the same value goes into Vault as 'homework_submitted_notify_secret'
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase.
 //

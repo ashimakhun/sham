@@ -6,7 +6,7 @@
 // the general chat path never touching the course chat lookup (and the other way round), the text never including a
 // message body, and the wiring between the function, the migration, the app switch and the README.
 import { type ChatMessageDeps, GENERAL_CHAT_TEXT, type GeneralMessageRecipients, handleChatMessageRequest } from './chat-message';
-import { SWITCH_COLUMN, type SendResult, type TelegramMessage } from './telegram';
+import { SWITCH_COLUMN, type SendResult, type NotificationMessage } from './notification';
 
 const fs = jest.requireActual<{ readFileSync: (p: string, e: string) => string }>('fs');
 const read = (p: string) => fs.readFileSync(p, 'utf8');
@@ -24,7 +24,7 @@ function deps(found: GeneralMessageRecipients | null, over: Partial<ChatMessageD
   const d: ChatMessageDeps = {
     recipients: jest.fn(async () => ({ course_title: 'Algebra', recipient_ids: ['C1'] })),
     generalRecipients: jest.fn(async () => found),
-    send: jest.fn(async (messages: TelegramMessage[]): Promise<SendResult> => ({ sent: messages.length, skipped: 0, failed: [], removed: 0 })),
+    send: jest.fn(async (messages: NotificationMessage[]): Promise<SendResult> => ({ sent: messages.length, skipped: 0, failed: [], removed: 0 })),
     log: jest.fn(),
     ...over,
   };

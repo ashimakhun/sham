@@ -51,9 +51,9 @@ grant execute on function t.warn() to service_role;
 select t.ok(exists (select 1 from information_schema.columns where table_name = 'homework'
   and column_name = 'photo_removed_at' and is_nullable = 'YES'), 'data: homework.photo_removed_at is nullable');
 select t.ok((select bool_and(photo_removed_at is null) from homework), 'data: existing homework has no removal time');
-select t.ok(exists (select 1 from information_schema.columns where table_name = 'telegram_links'
+select t.ok(exists (select 1 from information_schema.columns where table_name = 'notification_settings'
   and column_name = 'notify_photo_deletion' and column_default = 'true' and is_nullable = 'NO'),
-  'AC5 telegram_links.notify_photo_deletion defaults to on');
+  'AC5 notification_settings.notify_photo_deletion defaults to on');
 select t.ok((select relrowsecurity from pg_class where relname = 'photo_deletion_warnings'), 'AC9 warnings table has RLS on');
 
 -- AC 9: only the service role runs the job's functions.
@@ -192,16 +192,16 @@ select t.eq((select count(*) from leftover_homework_photos(1)), 1::bigint, 'AC7 
 reset role;
 
 -- AC 5: the switch.
-insert into telegram_links (user_id, chat_id) values (t.id('S1'), 111);
-select t.ok((select notify_photo_deletion from telegram_links where user_id = t.id('S1')), 'AC5 a new link has it on');
+insert into notification_settings (user_id) values (t.id('S1'));
+select t.ok((select notify_photo_deletion from notification_settings where user_id = t.id('S1')), 'AC5 a new link has it on');
 select t.login('S1');
-select t.lives($$select set_telegram_notification('photo_deletion', false)$$, 'AC5 a student turns it off');
+select t.lives($$select set_notification('photo_deletion', false)$$, 'AC5 a student turns it off');
 reset role;
 select t.ok((select not notify_photo_deletion and notify_new_material and notify_homework_reviewed
-  from telegram_links where user_id = t.id('S1')), 'AC5 only Photo deletion changed');
+  from notification_settings where user_id = t.id('S1')), 'AC5 only Photo deletion changed');
 select t.login('S1');
-select t.lives($$select set_telegram_notification('new_material', false)$$, 'every existing kind still toggles');
-select t.throws($$select set_telegram_notification('nope', true)$$, '22023', 'an unknown kind is still refused');
+select t.lives($$select set_notification('new_material', false)$$, 'every existing kind still toggles');
+select t.throws($$select set_notification('nope', true)$$, '22023', 'an unknown kind is still refused');
 reset role;
 
 -- AC 8: the daily job, with its URL and secret read from Vault on each run.

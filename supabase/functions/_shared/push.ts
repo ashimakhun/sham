@@ -1,11 +1,10 @@
-// ARU-166: the shared push sender. Every notification Edge Function sends through it (instead of Telegram's
-// sendTelegramMessages since ARU-166): each message goes to every phone its recipient registered (push_devices), if
-// that recipient has the message's kind switched on in notification_settings (no row = every switch on), through
-// Expo's push service (in front of Apple's APNs and Google's FCM). Messages are the same as before (TelegramMessage,
+// ARU-166: the shared push sender. Every notification Edge Function sends through it: each message goes to every
+// phone its recipient registered (push_devices), if that recipient has the message's kind switched on in notification_settings (no row = every switch on), through
+// Expo's push service (in front of Apple's APNs and Google's FCM). Messages are the same as before (NotificationMessage,
 // with every language), and the result keeps the same shape: sent, skipped, failed and removed.
 //
 // * The text is in the recipient's language (profiles.language, then device_language, then English; ARU-110).
-// * The title is "Sham". Texts name no person (ARU-166 AC 10): that's the catalog's job (telegram-texts.ts).
+// * The title is "Sham". Texts name no person (ARU-166 AC 10): that's the catalog's job (notification-texts.ts).
 // * At most 100 notifications per request (Expo's limit). Network errors, 429 and 5xx are retried within this call
 //   (at most 3 tries in all) and never by a later call. Any other error fails that request's notifications.
 // * Only push tickets are read: a ticket with DeviceNotRegistered deletes that registration (counted in `removed`).
@@ -14,11 +13,11 @@
 //
 // No Deno-only imports: the service-role client and fetch are passed in, so Jest can test it.
 
-import { type NotificationKind, type SendResult, SWITCH_COLUMN, type TelegramMessage } from './telegram.ts';
-import { recipientLanguage, type TelegramLanguage } from './telegram-texts.ts';
+import { type NotificationKind, type SendResult, SWITCH_COLUMN, type NotificationMessage } from './notification.ts';
+import { recipientLanguage, type NotificationLanguage } from './notification-texts.ts';
 
 export type { SendResult };
-export type PushMessage = TelegramMessage;
+export type PushMessage = NotificationMessage;
 
 export const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 export const PUSH_TITLE = 'Sham';
@@ -60,7 +59,7 @@ export function kindIsOn(row: SettingsRow | undefined, kind: NotificationKind) {
 }
 
 async function languagesOf(client: PushServiceClient, messages: PushMessage[]) {
-  const languages = new Map<string, TelegramLanguage>();
+  const languages = new Map<string, NotificationLanguage>();
   const ids = [...new Set(messages.filter((m) => m.texts?.ru).map((m) => m.userId))];
   if (!ids.length) return languages;
   try {

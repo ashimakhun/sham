@@ -1,5 +1,5 @@
 -- QA ARU-87: gaps in aru87_every_chat_message.test.sql: the column's shape (not null, default true), switching General
--- chat off leaves every other switch alone (and the other way round), set_telegram_notification() refusing a null
+-- chat off leaves every other switch alone (and the other way round), set_notification() refusing a null
 -- value and anon, empty Vault values skipping the general chat call, the exact headers and timeout, one call per row of
 -- a multi-row insert, an update queueing nothing, the trigger's shape, the teacher as author in both chats, and a
 -- Pending account with a leftover Telegram link never in the general chat recipients.
@@ -19,30 +19,30 @@ $$;
 grant execute on all functions in schema t to anon, authenticated, service_role;
 
 -- The column: not null, default true.
-select t.ok((select attnotnull from pg_attribute where attrelid = 'telegram_links'::regclass and attname = 'notify_general_chat'),
+select t.ok((select attnotnull from pg_attribute where attrelid = 'notification_settings'::regclass and attname = 'notify_general_chat'),
   'AC6 notify_general_chat is not null');
 select t.eq((select pg_get_expr(adbin, adrelid) from pg_attrdef d join pg_attribute a on a.attrelid = d.adrelid and a.attnum = d.adnum
-  where d.adrelid = 'telegram_links'::regclass and a.attname = 'notify_general_chat'), 'true', 'AC6 default true');
+  where d.adrelid = 'notification_settings'::regclass and a.attname = 'notify_general_chat'), 'true', 'AC6 default true');
 
 -- Switches are independent of each other.
-insert into telegram_links (user_id, chat_id) values (t.id('T'), 4001), (t.u('P'), 4002);
+insert into notification_settings (user_id) values (t.id('T')), (t.u('P'));
 select t.login('T');
-select t.lives('select set_telegram_notification(''general_chat'', false)', 'AC6 the teacher turns General chat off');
+select t.lives('select set_notification(''general_chat'', false)', 'AC6 the teacher turns General chat off');
 reset role;
 select t.ok((select notify_chat_message and notify_new_account and notify_homework_submitted and notify_meeting_started
-  and notify_new_homework and notify_homework_reviewed and not notify_general_chat from telegram_links where user_id = t.id('T')),
+  and notify_new_homework and notify_homework_reviewed and not notify_general_chat from notification_settings where user_id = t.id('T')),
   'AC6 every other switch stays on');
 select t.login('T');
-select t.lives('select set_telegram_notification(''chat_message'', false)', 'the teacher turns Chat messages off');
-select t.lives('select set_telegram_notification(''general_chat'', true)', 'and General chat back on');
+select t.lives('select set_notification(''chat_message'', false)', 'the teacher turns Chat messages off');
+select t.lives('select set_notification(''general_chat'', true)', 'and General chat back on');
 reset role;
-select t.ok((select notify_general_chat and not notify_chat_message from telegram_links where user_id = t.id('T')),
+select t.ok((select notify_general_chat and not notify_chat_message from notification_settings where user_id = t.id('T')),
   'AC6 Chat messages and General chat are saved separately');
 select t.login('T');
-select t.throws('select set_telegram_notification(''general_chat'', null)', '22023', 'a null value is refused');
+select t.throws('select set_notification(''general_chat'', null)', '22023', 'a null value is refused');
 reset role;
 select t.login(null);
-select t.throws('select set_telegram_notification(''general_chat'', false)', '42501', 'anon can''t change a switch');
+select t.throws('select set_notification(''general_chat'', false)', '42501', 'anon can''t change a switch');
 reset role;
 
 -- Recipients: the teacher as author is left out of both; a Pending account with a leftover link never gets the

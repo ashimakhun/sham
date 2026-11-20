@@ -10,7 +10,7 @@ import {
   type HomeworkSubmittedRecipient,
   homeworkSubmittedText,
 } from './homework-submitted';
-import type { SendResult, TelegramMessage } from './telegram';
+import type { SendResult, NotificationMessage } from './notification';
 
 const fs = jest.requireActual<{ readFileSync: (p: string, e: string) => string }>('fs');
 const read = (p: string) => fs.readFileSync(p, 'utf8');
@@ -26,7 +26,7 @@ function deps(rows: HomeworkSubmittedRecipient[]) {
   const logs: string[] = [];
   const d: HomeworkSubmittedDeps = {
     recipient: jest.fn(async () => rows),
-    send: jest.fn(async (m: TelegramMessage[]): Promise<SendResult> => ({ sent: m.length, skipped: 0, failed: [], removed: 0 })),
+    send: jest.fn(async (m: NotificationMessage[]): Promise<SendResult> => ({ sent: m.length, skipped: 0, failed: [], removed: 0 })),
     log: (line) => logs.push(line),
   };
   return { d, logs };

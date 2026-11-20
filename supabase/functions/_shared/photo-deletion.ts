@@ -3,12 +3,12 @@
 //   1. sets the deletion start date if it is still empty (start_photo_deletion(): today + 30 days, AC 1);
 //   2. deletes leftover files from failed sends (unreferenced, older than 24 hours; every run, the first included, AC 7);
 //   3. deletes the photos that are due (not on the first run, AC 1), file first and then the row (AC 2, AC 3);
-//   4. records the 30-day and 7-day marks and sends one Telegram message per sender (AC 4).
-// No Deno-only imports: Supabase, Storage and Telegram are passed in, so Jest can test it.
+//   4. records the 30-day and 7-day marks and sends one push per sender (AC 4).
+// No Deno-only imports: Supabase, Storage and the sender are passed in, so Jest can test it.
 
-import { localizedMessage, type SendResult, type TelegramMessage } from './telegram.ts';
-import { type TelegramLanguage, telegramText } from './telegram-texts.ts';
-import { timingSafeEqual } from './telegram-bot.ts';
+import { localizedMessage, type SendResult, type NotificationMessage } from './notification.ts';
+import { type NotificationLanguage, notificationText } from './notification-texts.ts';
+import { timingSafeEqual } from './timing-safe-equal.ts';
 
 export type DuePhoto = { homework_id: string; photo_path: string };
 export type PhotoWarning = { user_id: string; photo_count: number; earliest: string };
@@ -30,7 +30,7 @@ export type PhotoDeletionDeps = {
   /** claim_photo_deletion_warnings(). */
   claimWarnings: () => Promise<PhotoWarning[]>;
   /** sendPushMessages() (push.ts, ARU-166) with the service-role client and fetch. */
-  send: (messages: TelegramMessage[]) => Promise<SendResult>;
+  send: (messages: NotificationMessage[]) => Promise<SendResult>;
   log?: (line: string) => void;
 };
 
@@ -61,7 +61,7 @@ const EN_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'
  * A UTC date (YYYY-MM-DD) as the app shows it (ARU-108 dates): "8 Dec 2026" in English, "8 декабря 2026" in Russian.
  * Built by hand, so it doesn't depend on the server's locale data or time zone.
  */
-export function formatUtcDay(day: string, lang: TelegramLanguage = 'en') {
+export function formatUtcDay(day: string, lang: NotificationLanguage = 'en') {
   const [y, m, d] = day.split('-').map(Number);
   return `${d} ${(lang === 'ru' ? RU_MONTHS : EN_MONTHS)[m - 1]} ${y}`;
 }
@@ -76,13 +76,13 @@ function pluralForm(n: number): 'One' | 'Few' | 'Many' {
 }
 
 /** AC 4: the message text in one language (English: "photo" for 1, "photos" otherwise). */
-export function photoDeletionText(count: number, earliest: string, lang: TelegramLanguage = 'en') {
+export function photoDeletionText(count: number, earliest: string, lang: NotificationLanguage = 'en') {
   const form = lang === 'en' ? (count === 1 ? 'One' : 'Many') : pluralForm(count);
-  return telegramText(lang, `photoDeletion${form}`, { count: String(count), date: formatUtcDay(earliest, lang) });
+  return notificationText(lang, `photoDeletion${form}`, { count: String(count), date: formatUtcDay(earliest, lang) });
 }
 
 /** One message per sender, in their own language (ARU-110: profiles.language, then device_language, then English). */
-export function photoDeletionMessages(warnings: PhotoWarning[]): TelegramMessage[] {
+export function photoDeletionMessages(warnings: PhotoWarning[]): NotificationMessage[] {
   return warnings
     .filter((w) => w.photo_count > 0)
     .map((w) =>

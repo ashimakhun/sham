@@ -1,11 +1,10 @@
-// ARU-102: a Telegram message when a new Blog post or Knowledge base PDF is shared on Materials. Called by the
+// ARU-102: a push notification when a new Blog post or Knowledge base PDF is shared on Materials. Called by the
 // triggers from migration 0048 (through pg_net, with "Authorization: Bearer <secret>" and {"type": "blog" | "file",
 // "id": "<id>"}). The logic is in ../_shared/new-material.ts (tested with Jest); this file only wires it to Supabase
-// and Telegram.
+// and push.
 //
 // Secrets (Supabase dashboard → Edge Functions → Secrets, or `npx supabase secrets set ...`):
-//   EXPO_ACCESS_TOKEN         optional (ARU-166): only if push security is turned on in Expo. Since ARU-166 this
-//                             function sends push notifications, not Telegram: TELEGRAM_BOT_TOKEN is no longer read.
+//   EXPO_ACCESS_TOKEN         optional (ARU-166): only if push security is turned on in Expo. The function sends push (ARU-166).
 //   NEW_MATERIAL_NOTIFY_SECRET  a random string; the same value goes into Vault as 'new_material_notify_secret'
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase.
 //

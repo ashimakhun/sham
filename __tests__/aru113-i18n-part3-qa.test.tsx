@@ -1,10 +1,10 @@
 // QA ARU-113: gaps in aru113-i18n-part3.test.tsx. The dev test renders Materials (Blog), Manage roles, Delete account
-// and the Telegram page, and only looks for the catalog's own English, so text never put in the catalog would pass.
+// and the notification switches, and only looks for the catalog's own English, so text never put in the catalog would pass.
 // Here every other in-scope screen is rendered in Russian and scanned for any Latin word that isn't user text (AC 1,
 // AC 8): Knowledge base, Material details with likes, New material, Upload PDF, File, Edit file, course chat, General
 // chat, Pay, the payment section and materials section on course details, Select courses, Payments, the accountant
-// blocks on Profile, Manage roles with requests and a search with no match, and "Telegram notifications are not
-// available.". Also: the confirmations Make mentor, Reject, Unselect (Keep), delete material and delete file with
+// blocks on Profile, Manage roles with requests and a search with no match, and the Notifications page (the Telegram
+// page until ARU-171). Also: the confirmations Make mentor, Reject, Unselect (Keep), delete material and delete file with
 // Russian buttons (AC 2); likes 0 / 22 and the "2 000" limit with a non-breaking space (AC 4); Russian chat and
 // material dates, and English ones on a Russian phone (AC 5); Materials keeping Knowledge base and the author filter
 // after a language switch (AC 7); English screens with no Cyrillic (AC 1).
@@ -28,7 +28,7 @@ import EditFileScreen from "@/app/materials/files/[id]/edit";
 import NewFileScreen from "@/app/materials/files/new";
 import NewMaterialScreen from "@/app/materials/new";
 import RolesScreen from "@/app/roles";
-import TelegramScreen from "@/app/telegram";
+import NotificationsScreen from "@/app/notifications";
 import { formatDateIn } from "@/i18n";
 import { DeleteAccountForm } from "@/components/DeleteAccountForm";
 import { LanguageProvider } from "@/i18n/LanguageProvider";
@@ -189,7 +189,7 @@ function as(
   });
 }
 
-// User text on these screens (AC 8) and names the app keeps as they are (Sham, Telegram, PDF; AC 11's two buttons).
+// User text on these screens (AC 8) and names the app keeps as they are (Sham, PDF).
 const USER = [
   ...Object.values(users).map((u) => u.name),
   ...likers.map((u) => u.name).reverse(),
@@ -212,9 +212,6 @@ const USER = [
   declined.name,
   `@${declined.username}`,
   "zzz-nobody",
-  "Connect Telegram",
-  "Disconnect",
-  "Telegram",
   "Sham",
   "PDF",
   // ARU-108: Profile's Language switch names each language in that language.
@@ -263,10 +260,6 @@ const cyrillic = () =>
 beforeEach(() => {
   jest.clearAllMocks();
   for (const k of Object.keys(params)) delete params[k as keyof typeof params];
-  process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME = "ShamSchoolBot";
-});
-afterEach(() => {
-  delete process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME;
 });
 
 type Case = [
@@ -544,10 +537,10 @@ describe("AC 1 / AC 8: every other in-scope screen in Russian has no Latin app t
     expect(latinLeft()).toEqual([]);
   });
 
-  it('Telegram not configured: "Telegram notifications are not available." is in Russian', async () => {
-    delete process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME;
+  // ARU-171: the Telegram page is gone; its switches are on the Notifications page.
+  it("the Notifications page is in Russian", async () => {
     as("S1", "ru");
-    await render(inApp(<TelegramScreen />));
+    await render(inApp(<NotificationsScreen />));
     await flush();
     expect(rendered().join(" ")).toMatch(/[а-яё]/i);
     expect(latinLeft()).toEqual([]);

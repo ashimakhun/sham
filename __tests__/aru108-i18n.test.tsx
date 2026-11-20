@@ -41,7 +41,6 @@ jest.mock('expo-router', () => {
 jest.mock('@/lib/store', () => require('./helpers/mocks').store);
 jest.mock('expo-localization', () => ({ getLocales: jest.fn(() => [{ languageTag: 'en-US', languageCode: 'en' }]) }));
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
-jest.mock('@/components/Telegram', () => ({ TelegramButton: () => null }));
 jest.mock('@/components/Accountant', () => ({ AccountantSection: () => null }));
 
 const locales = Localization.getLocales as jest.Mock;

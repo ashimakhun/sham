@@ -12,8 +12,8 @@ grant usage on schema t to service_role;
 insert into course_members (course_id, user_id, added_by) values
   (t.id('A'), t.id('S1'), t.id('M')),
   (t.id('A'), t.id('M2'), t.id('M'));
-insert into telegram_links (user_id, chat_id) values
-  (t.id('T'), 4001), (t.id('M'), 4002), (t.id('N'), 4003), (t.id('M2'), 4004), (t.id('S1'), 4005), (t.id('S2'), 4006);
+insert into notification_settings (user_id) values
+  (t.id('T')), (t.id('M')), (t.id('N')), (t.id('M2')), (t.id('S1')), (t.id('S2'));
 
 -- Recipients as "a,b,c" (fixture names, sorted), as the service role.
 create function t.who(kind text, item uuid) returns text language plpgsql as $$
@@ -89,14 +89,9 @@ update courses set created_by = t.id('N') where id = t.id('A');
 select t.eq(t.who('file', t.mid('f1')), 'M2,N,S1,T', 'AC3 the course''s current owner is a recipient');
 
 -- Switches: other switches off still get it; New materials off doesn't.
-update telegram_links set notify_chat_message = false, notify_general_chat = false where user_id = t.id('S2');
-update telegram_links set notify_new_material = false where user_id = t.id('N');
+update notification_settings set notify_chat_message = false, notify_general_chat = false where user_id = t.id('S2');
+update notification_settings set notify_new_material = false where user_id = t.id('N');
 -- ARU-166 (0069): Telegram links and switches no longer filter recipients (the push sender checks
 -- notification_settings), so N (Telegram switch off) and the unlinked S3 are in.
 select t.eq(t.who('blog', t.mid('p1')), 'M2,N,S1,S2,S3,T', 'ARU-166 recipients no longer depend on Telegram links or switches');
 
--- set_telegram_notification for a user without a link: no error, nothing created.
-select t.login('S3');
-select t.lives($$select set_telegram_notification('new_material', false)$$, 'AC5 no link: the switch call is a no-op');
-reset role;
-select t.eq((select count(*) from telegram_links where user_id = t.id('S3')), 0::bigint, 'AC5 no link row is created');

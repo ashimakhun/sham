@@ -20,9 +20,9 @@ insert into course_members (course_id, user_id, added_by) values
   (t.id('A'), t.id('M2'), t.id('M')),
   (t.id('A'), t.u('P'), t.id('M')),
   (t.id('A'), t.u('R'), t.id('M'));
-insert into telegram_links (user_id, chat_id) values
-  (t.id('T'), 3001), (t.id('M'), 3002), (t.id('N'), 3003), (t.id('M2'), 3004),
-  (t.id('S1'), 3005), (t.id('S2'), 3006), (t.u('P'), 3007), (t.u('R'), 3008);
+insert into notification_settings (user_id) values
+  (t.id('T')), (t.id('M')), (t.id('N')), (t.id('M2')),
+  (t.id('S1')), (t.id('S2')), (t.u('P')), (t.u('R'));
 
 grant usage on schema t to service_role;
 grant execute on all functions in schema t to service_role;
@@ -60,21 +60,21 @@ create function t.calls() returns bigint language sql security definer as $$ sel
 grant execute on function t.calls() to anon, authenticated, service_role;
 
 -- AC 5: the column and the switch.
-select t.ok((select bool_and(notify_new_material) from telegram_links), 'AC5 on by default for existing links');
+select t.ok((select bool_and(notify_new_material) from notification_settings), 'AC5 on by default for existing links');
 select t.login('S1');
-select t.lives('select set_telegram_notification(''new_material'', false)', 'AC5 a student turns it off');
+select t.lives('select set_notification(''new_material'', false)', 'AC5 a student turns it off');
 reset role;
-select t.ok(not (select notify_new_material from telegram_links where user_id = t.id('S1')), 'AC5 saved off');
-select t.ok((select notify_new_material from telegram_links where user_id = t.id('S2')), 'AC5 only the caller''s row');
+select t.ok(not (select notify_new_material from notification_settings where user_id = t.id('S1')), 'AC5 saved off');
+select t.ok((select notify_new_material from notification_settings where user_id = t.id('S2')), 'AC5 only the caller''s row');
 select t.ok((select notify_general_chat and notify_chat_message and notify_new_account and notify_homework_submitted
-  from telegram_links where user_id = t.id('S1')), 'other switches untouched');
+  from notification_settings where user_id = t.id('S1')), 'other switches untouched');
 select t.login('S1');
-select t.lives('select set_telegram_notification(''new_material'', true)', 'AC5 back on');
-select t.lives('select set_telegram_notification(''general_chat'', true)', 'ARU-87 kind still works');
-select t.lives('select set_telegram_notification(''homework_submitted'', true)', 'ARU-89 kind still works');
-select t.lives('select set_telegram_notification(''new_account'', true)', 'ARU-84 kind still works');
-select t.lives('select set_telegram_notification(''meeting_started'', true)', 'ARU-48 kind still works');
-select t.throws('select set_telegram_notification(''nope'', true)', '22023', 'unknown kind is still an error');
+select t.lives('select set_notification(''new_material'', true)', 'AC5 back on');
+select t.lives('select set_notification(''general_chat'', true)', 'ARU-87 kind still works');
+select t.lives('select set_notification(''homework_submitted'', true)', 'ARU-89 kind still works');
+select t.lives('select set_notification(''new_account'', true)', 'ARU-84 kind still works');
+select t.lives('select set_notification(''meeting_started'', true)', 'ARU-48 kind still works');
+select t.throws('select set_notification(''nope'', true)', '22023', 'unknown kind is still an error');
 reset role;
 
 -- AC 10: grants.
@@ -111,10 +111,10 @@ select t.eq(t.calls(), 0::bigint, 'AC8 no secrets: no call');
 select t.eq(t.recipients('blog', t.mid('b1')), 'Mentor Max|Exam tips: M2,N,S1,S2,S3,T',
   'AC1/AC4 blog post: everyone Approved but the author, linked or not (ARU-166); not P or R');
 -- AC 5: a switch off -> left out; back on -> back in.
-update telegram_links set notify_new_material = false where user_id = t.id('S2');
+update notification_settings set notify_new_material = false where user_id = t.id('S2');
 -- ARU-166: the Telegram switch no longer filters here; the push sender checks notification_settings.
 select t.eq(t.recipients('blog', t.mid('b1')), 'Mentor Max|Exam tips: M2,N,S1,S2,S3,T', 'ARU-166 a Telegram switch no longer filters');
-update telegram_links set notify_new_material = true where user_id = t.id('S2');
+update notification_settings set notify_new_material = true where user_id = t.id('S2');
 select t.eq(t.recipients('blog', t.mid('nope')), '', 'AC10 unknown id: nothing');
 select t.eq(t.recipients('file', t.mid('b1')), '', 'AC10 a blog id asked as a file: nothing');
 select t.eq(t.recipients('video', t.mid('b1')), '', 'AC10 unknown type: nothing');

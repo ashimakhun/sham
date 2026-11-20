@@ -5,7 +5,7 @@
 // string, an upper-case uuid, special characters and a long title kept as typed, two recipients in one helper call
 // with their own course titles, and the secret never logged.
 import { handleNewHomeworkRequest, type NewHomeworkDeps, type NewHomeworkRecipient } from './new-homework';
-import type { TelegramMessage } from './telegram';
+import type { NotificationMessage } from './notification';
 
 const SECRET = 'top-secret-value';
 const ID = '6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d';
@@ -18,10 +18,10 @@ function call(body: unknown, auth: string | null, url = 'https://x.test/function
 
 function deps(rows: NewHomeworkRecipient[]) {
   const logs: string[] = [];
-  const sent: TelegramMessage[][] = [];
+  const sent: NotificationMessage[][] = [];
   const d: NewHomeworkDeps = {
     recipients: jest.fn(async () => rows),
-    send: jest.fn(async (messages: TelegramMessage[]) => {
+    send: jest.fn(async (messages: NotificationMessage[]) => {
       sent.push(messages);
       return { sent: messages.length, skipped: 0, failed: [], removed: 0 };
     }),

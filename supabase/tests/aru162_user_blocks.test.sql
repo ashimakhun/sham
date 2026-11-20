@@ -49,7 +49,7 @@ insert into materials (id, teacher_id, title, body) values (t.r('blog'), t.id('M
 insert into material_files (id, author_id, name, storage_path, size_bytes) values
   (t.r('pdf'), t.id('M'), 'Guide.pdf', t.id('M') || '/' || t.r('pdf') || '.pdf', 100);
 set session_replication_role = origin;
-insert into telegram_links (user_id, chat_id) values (t.id('S1'), 9001), (t.id('T'), 9002), (t.id('M'), 9003), (t.id('S2'), 9004);
+insert into notification_settings (user_id) values (t.id('S1')), (t.id('T')), (t.id('M')), (t.id('S2'));
 
 -- Data.
 select t.ok((select relrowsecurity from pg_class where oid = 'user_blocks'::regclass), 'data: RLS is on');

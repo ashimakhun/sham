@@ -21,8 +21,8 @@ end $$;
 grant execute on function t.recipients(uuid) to service_role;
 
 -- Existing links (made before this test's sign-ups) have the switch on.
-insert into telegram_links (user_id, chat_id) values (t.id('M'), 111), (t.id('S1'), 222);
-select t.ok((select bool_and(notify_new_account) from telegram_links), 'AC3 links get New accounts on by default');
+insert into notification_settings (user_id) values (t.id('M')), (t.id('S1'));
+select t.ok((select bool_and(notify_new_account) from notification_settings), 'AC3 links get New accounts on by default');
 
 -- Empty strings in Vault are treated as missing.
 insert into vault.decrypted_secrets (name, decrypted_secret) values ('new_account_notify_url', ''), ('new_account_notify_secret', '');

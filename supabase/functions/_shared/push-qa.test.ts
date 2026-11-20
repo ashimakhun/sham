@@ -15,7 +15,7 @@ import { newHomeworkMessages } from './new-homework';
 import { newMaterialMessages } from './new-material';
 import { photoDeletionMessages } from './photo-deletion';
 import { EXPO_PUSH_URL, type PushServiceClient, sendPushMessages } from './push';
-import { type NotificationKind, SWITCH_COLUMN, type TelegramMessage } from './telegram';
+import { type NotificationKind, SWITCH_COLUMN, type NotificationMessage } from './notification';
 
 type Device = { user_id: string; token: string };
 type Settings = { user_id: string } & Record<string, unknown>;
@@ -77,7 +77,7 @@ const noWait = { sleep: async () => {} };
 const NAMES = ['Aigerim', 'Nurlanovna', 'Sam', 'Student', 'Dana', 'Serikova', 'Айгерім'];
 const U = 'U1'; // never linked Telegram: the sender doesn't care (AC 9)
 
-const KINDS: [NotificationKind, TelegramMessage[]][] = [
+const KINDS: [NotificationKind, NotificationMessage[]][] = [
   ['meeting_started', meetingStartMessages([{ meeting_id: 'm', course_title: 'Algebra', listener_ids: [U] }])],
   ['new_homework', newHomeworkMessages([{ user_id: U, course_title: 'Algebra' }])],
   ['homework_reviewed', homeworkReviewedMessages([{ user_id: U, course_title: 'Algebra' }])],
@@ -168,7 +168,7 @@ describe('AC 9 / AC 10: every kind, through the real sender', () => {
 });
 
 describe('AC 13: retries within one call, never later', () => {
-  const one = (): [PushServiceClient, TelegramMessage[]] => [
+  const one = (): [PushServiceClient, NotificationMessage[]] => [
     fakeClient({ devices: [{ user_id: U, token: 'ExponentPushToken[a]' }] }).client,
     [{ userId: U, kind: 'chat_message', text: 'x' }],
   ];
@@ -255,10 +255,19 @@ it('AC 13: a notification function with the real sender still reports recipients
   expect(f.calls[0].batch[0].body).toBe('New notes on a Algebra meeting');
 });
 
-it('the bot\'s /start and /stop replies still go through Telegram (not removed before ARU-171)', () => {
-  const fs = jest.requireActual<{ readFileSync: (f: string, e: 'utf8') => string; existsSync: (f: string) => boolean }>('fs');
-  const webhook = fs.readFileSync('supabase/functions/telegram-webhook/index.ts', 'utf8');
-  expect(webhook).toContain('sendTelegramText');
-  expect(webhook).toMatch(/Deno\.env\.get\('TELEGRAM_BOT_TOKEN'\)/);
-  expect(fs.existsSync('src/app/telegram.tsx')).toBe(true);
+it('ARU-171: the bot is gone: no webhook function, no Telegram page, no function reads the bot token or calls Telegram', () => {
+  const fs = jest.requireActual<{
+    readFileSync: (f: string, e: 'utf8') => string;
+    existsSync: (f: string) => boolean;
+    readdirSync: (d: string) => string[];
+  }>('fs');
+  expect(fs.existsSync('supabase/functions/telegram-webhook')).toBe(false);
+  expect(fs.existsSync('src/app/telegram.tsx')).toBe(false);
+  for (const dir of fs.readdirSync('supabase/functions')) {
+    const file = `supabase/functions/${dir}/index.ts`;
+    if (!fs.existsSync(file)) continue;
+    const source = fs.readFileSync(file, 'utf8');
+    expect(source).not.toContain('TELEGRAM_BOT_TOKEN');
+    expect(source).not.toContain('api.telegram.org');
+  }
 });

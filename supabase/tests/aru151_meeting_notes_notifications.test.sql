@@ -24,11 +24,11 @@ insert into course_members (course_id, user_id, added_by) values
   (t.id('A'), t.id('M2'), t.id('M')),
   (t.id('A'), t.u('P'), t.id('M')),
   (t.id('A'), t.u('R'), t.id('M'));
-insert into telegram_links (user_id, chat_id) values
-  (t.id('T'), 5001), (t.id('M'), 5002), (t.id('N'), 5003), (t.id('M2'), 5004),
-  (t.id('S1'), 5005), (t.id('S2'), 5006), (t.u('P'), 5007), (t.u('R'), 5008);
+insert into notification_settings (user_id) values
+  (t.id('T')), (t.id('M')), (t.id('N')), (t.id('M2')),
+  (t.id('S1')), (t.id('S2')), (t.u('P')), (t.u('R'));
 set session_replication_role = replica;
-insert into telegram_links (user_id, chat_id, workspace_id) values (t.u('XT'), 5009, t.u('W2'));
+insert into notification_settings (user_id, workspace_id) values (t.u('XT'), t.u('W2'));
 set session_replication_role = origin;
 insert into course_meetings (id, course_id, starts_at, status, created_by) values
   (t.mid('c1'), t.id('A'), now() - interval '3 days', 'completed', t.id('M')),
@@ -76,7 +76,7 @@ create function t.last_body() returns jsonb language sql security definer as $$
 grant execute on function t.last_body() to anon, authenticated, service_role;
 
 -- Data: columns, grants, triggers.
-select t.ok((select bool_and(notify_meeting_notes) from telegram_links), 'AC7 on by default for existing links');
+select t.ok((select bool_and(notify_meeting_notes) from notification_settings), 'AC7 on by default for existing links');
 select t.eq((select column_default from information_schema.columns where table_name = 'meeting_listener_notes'
   and column_name = 'announced'), 'false', 'data: announced defaults to false');
 select t.ok(not has_function_privilege('anon', 'meeting_notes_recipients(uuid)', 'execute')
@@ -98,21 +98,21 @@ reset role;
 
 -- AC 7: the switch.
 select t.login('S1');
-select t.lives('select set_telegram_notification(''meeting_notes'', false)', 'AC7 a student turns it off');
+select t.lives('select set_notification(''meeting_notes'', false)', 'AC7 a student turns it off');
 reset role;
-select t.ok(not (select notify_meeting_notes from telegram_links where user_id = t.id('S1')), 'AC7 saved off');
-select t.ok((select notify_meeting_notes from telegram_links where user_id = t.id('M2')), 'AC7 only the caller''s row');
+select t.ok(not (select notify_meeting_notes from notification_settings where user_id = t.id('S1')), 'AC7 saved off');
+select t.ok((select notify_meeting_notes from notification_settings where user_id = t.id('M2')), 'AC7 only the caller''s row');
 select t.ok((select notify_new_material and notify_general_chat and notify_photo_deletion and notify_chat_message
-  from telegram_links where user_id = t.id('S1')), 'AC7 other switches untouched');
+  from notification_settings where user_id = t.id('S1')), 'AC7 other switches untouched');
 select t.login('S1');
-select t.lives('select set_telegram_notification(''meeting_notes'', true)', 'AC7 back on');
-select t.lives('select set_telegram_notification(''photo_deletion'', true)', 'ARU-112 kind still works');
-select t.lives('select set_telegram_notification(''new_material'', true)', 'ARU-102 kind still works');
-select t.lives('select set_telegram_notification(''general_chat'', true)', 'ARU-87 kind still works');
-select t.lives('select set_telegram_notification(''homework_submitted'', true)', 'ARU-89 kind still works');
-select t.lives('select set_telegram_notification(''new_account'', true)', 'ARU-84 kind still works');
-select t.lives('select set_telegram_notification(''meeting_started'', true)', 'ARU-48 kind still works');
-select t.throws('select set_telegram_notification(''nope'', true)', '22023', 'an unknown kind is still refused');
+select t.lives('select set_notification(''meeting_notes'', true)', 'AC7 back on');
+select t.lives('select set_notification(''photo_deletion'', true)', 'ARU-112 kind still works');
+select t.lives('select set_notification(''new_material'', true)', 'ARU-102 kind still works');
+select t.lives('select set_notification(''general_chat'', true)', 'ARU-87 kind still works');
+select t.lives('select set_notification(''homework_submitted'', true)', 'ARU-89 kind still works');
+select t.lives('select set_notification(''new_account'', true)', 'ARU-84 kind still works');
+select t.lives('select set_notification(''meeting_started'', true)', 'ARU-48 kind still works');
+select t.throws('select set_notification(''nope'', true)', '22023', 'an unknown kind is still refused');
 reset role;
 
 -- AC 1 / AC 10: a note saved with Publish on queues one call {"id": <note>} with the secret.
@@ -187,12 +187,12 @@ delete from meeting_listener_notes where id = t.note('S1', 'c2');
 
 -- AC 7, changed by ARU-166 (0069): the Telegram switch and link no longer filter recipients; the push sender checks
 -- notification_settings instead (supabase/tests/aru166_push_notifications.test.sql).
-update telegram_links set notify_meeting_notes = false where user_id = t.id('M');
+update notification_settings set notify_meeting_notes = false where user_id = t.id('M');
 select t.eq(t.recipients(t.note('S1', 'c1')), 'Student Sam|Algebra: M,M2,T', 'ARU-166 a Telegram switch off no longer filters');
-update telegram_links set notify_meeting_notes = true where user_id = t.id('M');
-delete from telegram_links where user_id = t.id('M2');
+update notification_settings set notify_meeting_notes = true where user_id = t.id('M');
+delete from notification_settings where user_id = t.id('M2');
 select t.eq(t.recipients(t.note('S1', 'c1')), 'Student Sam|Algebra: M,M2,T', 'ARU-166 not linked: still a recipient');
-insert into telegram_links (user_id, chat_id) values (t.id('M2'), 5004);
+insert into notification_settings (user_id) values (t.id('M2'));
 
 -- Edge: a hidden course is never hidden from its listeners, owner or teacher.
 update courses set hidden = true where id = t.id('A');

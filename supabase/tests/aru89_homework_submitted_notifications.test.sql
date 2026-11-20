@@ -41,19 +41,19 @@ create function t.calls() returns bigint language sql security definer as $$ sel
 grant execute on function t.calls() to anon, authenticated, service_role;
 
 -- AC 4: the column and the switch.
-insert into telegram_links (user_id, chat_id) values (t.id('M'), 2001), (t.id('S1'), 2002);
-select t.ok((select notify_homework_submitted from telegram_links where user_id = t.id('M')), 'AC4 on by default');
+insert into notification_settings (user_id) values (t.id('M')), (t.id('S1'));
+select t.ok((select notify_homework_submitted from notification_settings where user_id = t.id('M')), 'AC4 on by default');
 select t.login('M');
-select t.lives('select set_telegram_notification(''homework_submitted'', false)', 'AC4 the owner turns it off');
+select t.lives('select set_notification(''homework_submitted'', false)', 'AC4 the owner turns it off');
 reset role;
-select t.ok(not (select notify_homework_submitted from telegram_links where user_id = t.id('M')), 'AC4 saved off');
-select t.ok((select notify_homework_submitted from telegram_links where user_id = t.id('S1')), 'AC4 only the caller''s row');
-select t.ok((select notify_chat_message and notify_new_account from telegram_links where user_id = t.id('M')),
+select t.ok(not (select notify_homework_submitted from notification_settings where user_id = t.id('M')), 'AC4 saved off');
+select t.ok((select notify_homework_submitted from notification_settings where user_id = t.id('S1')), 'AC4 only the caller''s row');
+select t.ok((select notify_chat_message and notify_new_account from notification_settings where user_id = t.id('M')),
   'other switches untouched');
 select t.login('M');
-select t.lives('select set_telegram_notification(''homework_submitted'', true)', 'AC4 back on');
-select t.lives('select set_telegram_notification(''new_account'', true)', 'ARU-84 kind still works');
-select t.throws('select set_telegram_notification(''nope'', true)', '22023', 'unknown kind is still an error');
+select t.lives('select set_notification(''homework_submitted'', true)', 'AC4 back on');
+select t.lives('select set_notification(''new_account'', true)', 'ARU-84 kind still works');
+select t.throws('select set_notification(''nope'', true)', '22023', 'unknown kind is still an error');
 reset role;
 
 -- AC 8: grants.
