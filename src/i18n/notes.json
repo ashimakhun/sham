@@ -877,5 +877,10 @@
   "db.signup_email_mismatch": "Database error · a sign-up whose Auth address isn't the username's internal address (ARU-164)",
   "db.display_name_invalid": "Database error · a sign-up with a blank or too long display name, from outside the app (ARU-164)",
   "db.username_taken": "Database error · a sign-up with a username already used (ARU-164)",
-  "db.address_change_refused": "Database error · a change of the account's Auth address from outside the app (ARU-175)"
+  "db.address_change_refused": "Database error · a change of the account's Auth address from outside the app (ARU-175)",
+  "chooseUsername.title": "Choose a username screen · title; older accounts see it before anything else (ARU-168)",
+  "chooseUsername.text": "Choose a username screen · explanation under the title (ARU-168)",
+  "chooseUsername.usernameA11y": "Choose a username screen · accessibility label of the Username field (ARU-168)",
+  "chooseUsername.displayNameA11y": "Choose a username screen · accessibility label of the Display name field (ARU-168)",
+  "db.username_already_set": "Database error · choosing a username for an account that already has one, e.g. on a second device (ARU-168)"
 }
