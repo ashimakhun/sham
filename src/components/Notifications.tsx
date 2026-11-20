@@ -9,16 +9,16 @@ import { Button, Card, ErrorText, styles, ThemedSwitch } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import { askPushPermission, pushPermission, type PushPermission, pushSupported } from '@/lib/push';
 import { useStore } from '@/lib/store';
-import { telegramSwitchesFor } from '@/lib/telegram';
+import { notificationSwitchesFor } from '@/lib/notificationSwitches';
 import { colors } from '@/lib/theme';
-import type { TelegramKind } from '@/lib/types';
+import type { NotificationKind } from '@/lib/types';
 
 // The fallback is passed in already translated; e.message is shown through ErrorText, which translates app messages.
 const errorText = (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback);
 
 /**
  * ARU-166 AC 7: on the Profile tab, "Notifications >" opens the Notifications page (src/app/notifications.tsx). It sits
- * where "Telegram notifications >" was and is shown for every role, whether or not a Telegram bot is configured.
+ * where ARU-101's Telegram button was and is shown for every role.
  */
 export function NotificationsButton() {
   const { t } = useI18n();
@@ -56,7 +56,8 @@ export function NotificationsButton() {
  * ARU-166: the Notifications page. One switch per kind the role gets (today's order and labels), saved on the account.
  * In an installed build the first open asks for permission (AC 1) and registers this phone (AC 2); with notifications
  * off for Sham it says so with Open settings (AC 3); in Expo Go and on the web it says push needs the installed app
- * (AC 6). The switches work in every case.
+ * (AC 6). The switches work in every case. ARU-170: Homework due soon right after New homework (students, mentors);
+ * every flip also reschedules this phone's reminders (the store watches the switches).
  */
 export function NotificationSettings() {
   const { currentUser, notificationSettings, loadNotificationSettings, setNotification, syncPushDevice } = useStore();
@@ -66,7 +67,7 @@ export function NotificationSettings() {
   const [error, setError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   // Switches flip at once and go back if saving fails (AC 8).
-  const [pending, setPending] = useState<Partial<Record<TelegramKind, boolean>>>({});
+  const [pending, setPending] = useState<Partial<Record<NotificationKind, boolean>>>({});
 
   const refresh = useCallback(
     (ask: boolean) => {
@@ -95,7 +96,7 @@ export function NotificationSettings() {
 
   if (!currentUser) return null;
 
-  function toggle(kind: TelegramKind, value: boolean) {
+  function toggle(kind: NotificationKind, value: boolean) {
     setPending((p) => ({ ...p, [kind]: value }));
     setError(null);
     // AC 1: turning a switch on asks when Sham has never asked on this phone.
@@ -138,7 +139,7 @@ export function NotificationSettings() {
           />
         </View>
       )}
-      {telegramSwitchesFor(currentUser.role, lang).map(({ kind, label }) => (
+      {notificationSwitchesFor(currentUser.role, lang).map(({ kind, label }) => (
         <View key={kind} style={[styles.row, { minHeight: 44 }]}>
           <Text style={[styles.body, { flex: 1 }]}>{label}</Text>
           <ThemedSwitch

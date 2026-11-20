@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 // ARU-84: the new-account-notifications function's logic, with the recipient lookup and the sending helper mocked
-// (AC 1, 5, 6, 7), and once end to end with the real ARU-48 helper and a mocked Telegram (AC 3 switch, plain text).
+// (AC 1, 5, 6, 7), and once end to end with the real push sender and a mocked Expo push service (AC 3 switch, plain text).
 import {
   handleNewAccountRequest,
   type NewAccountDeps,
@@ -10,7 +10,9 @@ import {
   type NewAccountRecipient,
   newAccountText,
 } from './new-account';
-import { sendTelegramMessages, type SendResult, type ServiceClient, type TelegramMessage } from './telegram';
+import { type SendResult, type NotificationMessage } from './notification';
+import { sendPushMessages } from './push';
+import { pushClient, pushFetch } from './push-test-helpers';
 
 const SECRET = 'acc-secret-123';
 const USER = '0b9a2c3e-1d4f-4a5b-8c6d-7e8f9a0b1c2d';
@@ -27,11 +29,11 @@ const post = (
 const ok: SendResult = { sent: 0, skipped: 0, failed: [], removed: 0 };
 
 function deps(rows: NewAccountRecipient[], result: Partial<SendResult> = {}) {
-  const sent: TelegramMessage[][] = [];
+  const sent: NotificationMessage[][] = [];
   const logs: string[] = [];
   const d: NewAccountDeps = {
     recipient: jest.fn(async () => rows),
-    send: jest.fn(async (messages: TelegramMessage[]) => {
+    send: jest.fn(async (messages: NotificationMessage[]) => {
       sent.push(messages);
       return { ...ok, sent: messages.length, ...result };
     }),
@@ -126,27 +128,22 @@ describe('AC6: failures are logged and dropped', () => {
 
   it('the helper throwing: 200 with the failure reported', async () => {
     const { d } = deps([dana]);
-    (d.send as jest.Mock).mockRejectedValueOnce(new Error('telegram down'));
+    (d.send as jest.Mock).mockRejectedValueOnce(new Error('push down'));
     const res = await handleNewAccountRequest(post(), SECRET, d);
     expect(res.status).toBe(200);
-    expect((await res.json()).failed).toEqual([{ userId: 'T', error: 'telegram down' }]);
+    expect((await res.json()).failed).toEqual([{ userId: 'T', error: 'push down' }]);
   });
 });
 
-describe('AC3: with the real helper, the New accounts switch decides', () => {
-  function client(on: boolean): ServiceClient {
+describe('AC3: with the real push sender, the New accounts switch decides', () => {
+  function client(on: boolean) {
     const row = { user_id: 'T', chat_id: 77, notify_chat_message: true, notify_new_account: on };
-    return {
-      from: () => ({
-        select: () => ({ in: async () => ({ data: [row], error: null }) }),
-        delete: () => ({ eq: () => ({ eq: async () => ({ data: null, error: null }) }) }),
-      }),
-    };
+    return pushClient([row]).client;
   }
   const run = async (on: boolean) => {
-    const fetchFn = jest.fn(async () => new Response('{"ok":true}', { status: 200 }));
+    const fetchFn = pushFetch();
     const { d } = deps([dana]);
-    d.send = (messages) => sendTelegramMessages(client(on), 'TOKEN', fetchFn as unknown as typeof fetch, messages);
+    d.send = (messages) => sendPushMessages(client(on), fetchFn.fetch, messages);
     const res = await handleNewAccountRequest(post(), SECRET, d);
     return { body: await res.json(), fetchFn };
   };
@@ -154,13 +151,12 @@ describe('AC3: with the real helper, the New accounts switch decides', () => {
   it('on: sent as plain text to the teacher\'s chat', async () => {
     const { body, fetchFn } = await run(true);
     expect(body.sent).toBe(1);
-    const sentBody = JSON.parse((fetchFn.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
-    expect(sentBody).toEqual({ chat_id: 77, text: TEXT, disable_web_page_preview: true });
+    expect(fetchFn.sent()).toEqual([[77, TEXT]]);
   });
 
-  it('off: skipped, Telegram not called', async () => {
+  it('off: skipped, nothing sent', async () => {
     const { body, fetchFn } = await run(false);
     expect(body).toMatchObject({ sent: 0, skipped: 1 });
-    expect(fetchFn).not.toHaveBeenCalled();
+    expect(fetchFn.mock).not.toHaveBeenCalled();
   });
 });

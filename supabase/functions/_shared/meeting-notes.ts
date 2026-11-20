@@ -1,13 +1,13 @@
 // ARU-151: the meeting-notes-notifications Edge Function's logic. Called by the trigger from migration 0062 (through
 // pg_net) once per note, when it is first published, with {"id": "<note id>"} and "Authorization: Bearer <secret>".
 // Asks meeting_notes_recipients() who gets the message (the note's Approved readers except its author: the course's
-// current listeners, its owner and the teacher, who have a Telegram link with Meeting notes on) and sends "New notes
+// current listeners, its owner and the teacher, who have Meeting notes on) and sends "New notes
 // from <author name> on a <course title> meeting" in each recipient's language through the ARU-48 helper in one call,
 // with kind meeting_notes. Nothing is retried. No Deno-only imports, so Jest can test it.
 
-import { localizedMessage, type SendResult, type TelegramMessage } from './telegram.ts';
-import { telegramText, telegramTexts } from './telegram-texts.ts';
-import { timingSafeEqual } from './telegram-bot.ts';
+import { localizedMessage, type SendResult, type NotificationMessage } from './notification.ts';
+import { notificationText, notificationTexts } from './notification-texts.ts';
+import { timingSafeEqual } from './timing-safe-equal.ts';
 
 /** One row of meeting_notes_recipients(). */
 export type MeetingNotesRecipient = { user_id: string; author_name: string; course_title: string };
@@ -16,26 +16,26 @@ export type MeetingNotesDeps = {
   /** Calls meeting_notes_recipients(note) with the service role. Throws on a database error. */
   recipients: (id: string) => Promise<MeetingNotesRecipient[]>;
   /** sendPushMessages() (push.ts, ARU-166) with the service-role client and fetch. */
-  send: (messages: TelegramMessage[]) => Promise<SendResult>;
+  send: (messages: NotificationMessage[]) => Promise<SendResult>;
   log?: (line: string) => void;
 };
 
-/** What a call returns (and logs), so a call can be checked from net._http_response without Telegram. */
+/** What a call returns (and logs), so a call can be checked from net._http_response without a phone. */
 export type MeetingNotesReport = { recipients: number } & SendResult;
 
 /** The English text, exactly as the story sets it (plain text: names and titles as typed; never the notes). */
 export function meetingNotesText(_authorName: string, courseTitle: string) {
   // ARU-166: no person's name; the author's name is not used (the parameter stays for the existing callers).
-  return telegramText('en', 'meetingNotesPublished', { course: courseTitle });
+  return notificationText('en', 'meetingNotesPublished', { course: courseTitle });
 }
 
 /** One message per recipient row, in every language (each recipient gets theirs, ARU-110). */
-export function meetingNotesMessages(rows: MeetingNotesRecipient[]): TelegramMessage[] {
+export function meetingNotesMessages(rows: MeetingNotesRecipient[]): NotificationMessage[] {
   return rows.map((r) =>
     localizedMessage(
       r.user_id,
       'meeting_notes',
-      telegramTexts('meetingNotesPublished', { course: r.course_title }),
+      notificationTexts('meetingNotesPublished', { course: r.course_title }),
     ),
   );
 }

@@ -171,7 +171,6 @@ const APP_MESSAGE_IDS: [TextId, Params?][] = [
   ['materials.notFound'],
   ['materials.cantDeleteFile'],
   ['materials.noFileLink'],
-  ['telegram.linkFailed'],
   ['chat.loadError'],
   ['chat.loadOlderError'],
   ['homework.photosZipError'],

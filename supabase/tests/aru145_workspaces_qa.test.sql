@@ -82,7 +82,8 @@ insert into materials (id, teacher_id, title, body) values (t.x('XMAT'), t.x('XT
 insert into material_likes (material_id, user_id) values (t.x('XMAT'), t.x('XS'));
 insert into material_files (id, author_id, name, storage_path, size_bytes)
   values (t.x('XF'), t.x('XT'), 'X pdf', t.x('XT') || '/' || t.x('XF') || '.pdf', 100);
-insert into telegram_links (user_id, chat_id) values (t.x('XS'), 7001), (t.x('XT'), 7002), (t.id('S1'), 7003), (t.id('T'), 7004), (t.id('M'), 7005);
+-- ARU-171: the Telegram links here became notification settings rows (XS's is added below, with a switch off).
+insert into notification_settings (user_id) values (t.x('XT')), (t.id('S1')), (t.id('T')), (t.id('M'));
 insert into photo_deletion_warnings (homework_id, mark, user_id, deletion_date) values (t.x('XH'), 30, t.x('XS'), current_date + 20);
 -- ARU-158 (0064): a W2 report (the guard takes the workspace from the reporter).
 insert into content_reports (reporter_id, content_kind, content_id, author_id, content_text, course_id, reason)
@@ -99,8 +100,8 @@ insert into material_files (id, author_id, name, storage_path, size_bytes, cours
   values (t.x('AF'), t.id('M'), 'A pdf', t.id('M') || '/' || t.x('AF') || '.pdf', 100, t.id('A'), true);
 
 -- Every W2 row was set to W2 by the guard (no row defaults to the oldest workspace).
-select t.eq((select count(*) from information_schema.columns c where c.table_schema = 'public' and c.column_name = 'workspace_id'), 26::bigint,
-  'data: 26 workspace-scoped tables (23 + profiles; content_reports since ARU-158; push_devices and notification_settings since ARU-166)');
+select t.eq((select count(*) from information_schema.columns c where c.table_schema = 'public' and c.column_name = 'workspace_id'), 25::bigint,
+  'data: 25 workspace-scoped tables (23 + profiles; content_reports since ARU-158; push_devices and notification_settings since ARU-166; telegram_links dropped by ARU-171)');
 do $$
 declare r record; n bigint; missing text := '';
 begin
@@ -142,8 +143,8 @@ select t.eq((select count(*) from courses) + (select count(*) from general_messa
 select t.xlogin('XT');
 select t.eq((select count(*) from profiles where workspace_id <> t.x('W2')), 0::bigint, 'AC5 W2 teacher: no first-workspace account');
 select t.eq((select count(*) from homework) + (select count(*) from course_meetings where course_id = t.id('A'))
-  + (select count(*) from material_files where id = t.x('AF')) + (select count(*) from telegram_links where user_id = t.id('T')),
-  1::bigint, 'AC5 W2 teacher: only W2''s homework; no meeting, PDF or Telegram link of the first workspace');
+  + (select count(*) from material_files where id = t.x('AF')) + (select count(*) from notification_settings where user_id = t.id('T')),
+  1::bigint, 'AC5 W2 teacher: only W2''s homework; no meeting, PDF or notification settings of the first workspace');
 select t.eq((select count(*) from storage.objects where name like t.id('S1') || '/%'), 0::bigint, 'AC6 W2 teacher: no first-workspace homework photo');
 select t.ok(not exists (select 1 from access_requests() where id = t.x('P1')), 'AC9 W2 teacher: the first workspace''s waiting account is not listed');
 reset role;
@@ -279,9 +280,8 @@ select t.eq((select array_agg(user_id) from homework_submitted_recipient(t.x('XH
 insert into auth.users (id, email, raw_user_meta_data) values (t.x('P2'), 'qp2@x.test', '{"full_name":"Pia New"}');
 select t.eq((select array_agg(user_id) from new_account_notification(t.x('P2'))), array[t.id('T')],
   'AC10 a new account in the first workspace: only its teacher, not W2''s');
-update course_meetings set starts_at = now() - interval '30 seconds', start_notified_at = null where id = t.x('XMS');
-select t.eq((select array_agg(u) from claim_started_meetings() c, unnest(c.listener_ids) u), array[t.x('XS')],
-  'AC10 a W2 meeting starts: only W2''s listener');
+-- ARU-170: claim_started_meetings() is dropped (meeting started is a local reminder on the listener's phone, from
+-- meetings RLS already scopes to the workspace).
 
 -- AC 2: manage-roles.sql's "first teacher" query works per workspace: refused while the workspace has a teacher,
 -- applied when it has none.
@@ -342,9 +342,4 @@ select t.eq((select w.name || '/' || p.role::text || '/' || p.access_status::tex
 
 -- AC 11: the global tables have no workspace and keep working for both workspaces.
 select t.ok((select count(*) from information_schema.columns where table_schema = 'public' and column_name = 'workspace_id'
-  and table_name in ('app_settings', 'telegram_link_codes', 'photo_zip_links', 'workspaces')) = 0, 'AC11 no workspace column on the global tables');
-select t.xlogin('XS');
-select t.ok(pg_temp.err('select create_telegram_link_code()') = 'no error', 'AC11 a W2 account still gets a Telegram link code');
-select t.login('S1');
-select t.ok(pg_temp.err('select create_telegram_link_code()') = 'no error', 'AC11 a first-workspace account too');
-reset role;
+  and table_name in ('app_settings', 'photo_zip_links', 'workspaces')) = 0, 'AC11 no workspace column on the global tables');

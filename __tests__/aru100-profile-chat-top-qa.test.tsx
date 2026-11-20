@@ -17,10 +17,6 @@ const hidden = { includeHiddenElements: true };
 
 beforeEach(() => {
   jest.clearAllMocks();
-  process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME = 'ShamSchoolBot';
-});
-afterEach(() => {
-  delete process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME;
 });
 
 const chat = () => screen.getByRole('button', { name: /^Open general chat/ });

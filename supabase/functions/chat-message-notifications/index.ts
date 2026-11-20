@@ -1,12 +1,11 @@
-// ARU-44: a Telegram message "New message in the <course title> chat" when someone else writes in a course chat; since
+// ARU-44: a push notification "New message in the <course title> chat" when someone else writes in a course chat; since
 // ARU-87 (0046) for every message, and also "New message in the general chat" for the general chat. Called through
 // pg_net by the after-insert triggers on course_messages (0036, {"message_id"}) and general_messages (0046,
 // {"general_message_id"}), with `Authorization: Bearer <CHAT_NOTIFY_SECRET>`. The logic is in ../_shared/chat-message.ts (tested with Jest); this file
-// only wires it to Supabase and Telegram.
+// only wires it to Supabase and push.
 //
 // Secrets (Supabase dashboard → Edge Functions → Secrets, or `npx supabase secrets set ...`):
-//   EXPO_ACCESS_TOKEN optional (ARU-166): only if push security is turned on in Expo. Since ARU-166 this
-//                     function sends push notifications, not Telegram: TELEGRAM_BOT_TOKEN is no longer read.
+//   EXPO_ACCESS_TOKEN optional (ARU-166): only if push security is turned on in Expo. The function sends push (ARU-166).
 //   CHAT_NOTIFY_SECRET  a random string; the same value goes into Vault as 'chat_notify_secret'
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase.
 //

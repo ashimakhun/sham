@@ -10,8 +10,8 @@ An educational mobile app where teachers, mentors and students work together:
   completed meeting they assign homework, and listeners mark that they attended. The pencil in the course name card
   opens **Edit course** (discipline and owner, ARU-103).
 - **Meeting notes** (ARU-142, ARU-143): listeners, the owner and the teacher each write their own signed notes on a
-  completed meeting; a **Publish** switch keeps them private or shares them with the course (and can send a Telegram
-  message, ARU-151).
+  completed meeting; a **Publish** switch keeps them private or shares them with the course (and can send a push
+  notification, ARU-151).
 - **Listeners** send homework (text + optional photo) for an assignment from the **New** list on the Homework tab.
 - **Mentors and the teacher** see all homework, leave a comment and mark it as checked (never their own).
 - **All homework lives on the Homework tab** (ARU-80; course details no longer lists it); its **Checked** list has a
@@ -52,9 +52,10 @@ An educational mobile app where teachers, mentors and students work together:
   makes a new code after the current password is checked. The email reset (ARU-77) is gone; the old
   `/reset-password` link opens the sign-in screen. See [Password recovery](#password-recovery-aru-165).
 - **Homework photos** (ARU-105, ARU-107, ARU-112): compressed when picked and deleted 6 months after the homework is
-  checked; senders get a warning banner (and Telegram warnings) and can download their photos as a ZIP.
-- **Telegram notifications** from the Sham bot (ARU-48 and later): meeting started, new homework, homework reviewed,
-  photo deletion, homework submitted, chat messages, new materials, meeting notes and new accounts.
+  checked; senders get a warning banner (and push warnings) and can download their photos as a ZIP.
+- **Push notifications** (ARU-166; through the Sham Telegram bot until ARU-171 removed it): meeting started, new
+  homework, homework reviewed, photo deletion, homework submitted, chat messages, new materials, meeting notes and new
+  accounts, each with its own switch on **Profile → Notifications**.
 - **English and Russian** (ARU-108 to ARU-113): the phone's language by default, with a Language switch on Profile.
 
 How each feature behaves today is described in the Linear project document **Sham: product documentation**.
@@ -92,7 +93,7 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `0022_attendance_from_start.sql` (ARU-45: attendance can be marked once a meeting has started, not only when it is
    completed, and never on a canceled meeting; replaces two functions, deletes nothing),
    `0023_telegram_links.sql` (ARU-48: Telegram notifications setup; adds two tables and five functions, changes
-   nothing else; see [Telegram notifications](#telegram-notifications)),
+   nothing else; removed by 0071, see [Removing the Telegram bot](#removing-the-telegram-bot-aru-171)),
    `0024_material_likes.sql` (ARU-52: likes on Blog posts; adds a table, deletes nothing; it doesn't depend on 0023),
    `0025_course_feedback.sql` (ARU-53: listeners rate a started course; adds a table, a helper and a trigger, deletes
    nothing; it doesn't depend on 0023 or 0024),
@@ -117,19 +118,19 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    with policies, a trigger and functions, deletes nothing; accounts already approved start with everything read),
    `0035_meeting_start_notifications.sql` (ARU-41: Telegram message when a meeting starts; adds
    `course_meetings.start_notified_at`, `claim_started_meetings()` and a `pg_cron` job, and replaces `update_meeting()`;
-   deletes nothing. Turn on **pg_cron** and **pg_net** first, see [Telegram notifications](#telegram-notifications)),
+   deletes nothing. Turn on **pg_cron** and **pg_net** first, see [Push notifications](#push-notifications-aru-166)),
    `0036_chat_message_notifications.sql` (ARU-44: Telegram message for new course chat messages; adds the
    `chat_message_recipients()` function and an after-insert trigger on `course_messages`, turns on `pg_net` where the
    server offers it; no table, column or policy changes, deletes nothing; needs 0023; until the Vault secrets below
-   are stored the trigger does nothing; see [Telegram notifications](#telegram-notifications)),
+   are stored the trigger does nothing; see [Push notifications](#push-notifications-aru-166)),
    `0037_homework_reviewed_notifications.sql` (ARU-49: Telegram message to a homework's sender when it is checked;
    adds `homework_reviewed_recipient()` and an `after update` trigger on `homework`, turns on `pg_net` where the
    server offers it; no table, column, policy or data changes. See
-   [Telegram notifications](#telegram-notifications) → Homework reviewed),
+   [Push notifications](#push-notifications-aru-166) → Homework reviewed),
    `0038_new_homework_notifications.sql` (ARU-50: Telegram message to a course's listeners when new homework is
    assigned; adds `new_homework_recipients()` and an after-insert trigger on `homework_assignments`, turns on `pg_net`
    if the server offers it; no table, column or policy changes, deletes nothing. Works without the Vault secrets (it
-   then sends nothing), see [Telegram notifications](#telegram-notifications)),
+   then sends nothing), see [Push notifications](#push-notifications-aru-166)),
    `0039_accountant_payments.sql` (ARU-66: accountants and the teacher mark which listeners of a paid course paid each
    month or are exempt; adds the `course_payments` and `course_payment_exemptions` tables with RLS (accountants and
    the teacher, current listeners of paid courses only, hidden courses as in 0019), `can_manage_payment()` and
@@ -159,12 +160,12 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    approval; adds `telegram_links.notify_new_account` (default true, existing links get true), the kind `new_account`
    in `set_telegram_notification()`, `new_account_notification()` and an after-insert trigger on `profiles` (pending
    sign-ups only), turns on `pg_net` if the server offers it; no policy changes, deletes nothing. Sign-up never fails
-   because of it; see [Telegram notifications](#telegram-notifications) → New accounts),
+   because of it; see [Push notifications](#push-notifications-aru-166) → New accounts),
    `0045_homework_submitted_notifications.sql` (ARU-89: Telegram message to a course's owner when a listener submits
    homework; adds `telegram_links.notify_homework_submitted` (default true), the kind `homework_submitted` in
    `set_telegram_notification()` (keeps 0044's kinds), `homework_submitted_recipient()` and an after-insert trigger
    on `homework`, turns on `pg_net` if the server offers it; no policy changes, deletes nothing; needs 0044. Works
-   without the Vault secrets (it then sends nothing), see [Telegram notifications](#telegram-notifications) →
+   without the Vault secrets (it then sends nothing), see [Push notifications](#push-notifications-aru-166) →
    Homework submitted),
    `0046_every_chat_message_notifications.sql` (ARU-87: a Telegram message for every chat message; replaces
    `chat_message_recipients()` without the read-position rules (one message per post, not per batch), adds
@@ -172,7 +173,7 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    (keeps 0044/0045's kinds), `general_message_recipients()` and an after-insert trigger on `general_messages` that
    calls the same `chat-message-notifications` function with the same Vault secrets; no policy changes, deletes
    nothing; needs 0036 and 0045. Redeploy `chat-message-notifications` after it, see
-   [Telegram notifications](#telegram-notifications) → New chat messages),
+   [Push notifications](#push-notifications-aru-166) → New chat messages),
    `0047_payment_requests.sql` (ARU-99: a listener of a paid course sends one proof of payment per course and month;
    adds the table `course_payment_requests` (in realtime), the private bucket `payment-proofs` (photos and PDFs, 10 MB)
    with its policies (own folder; accountants and the teacher read current listeners' proofs; the teacher reads and
@@ -183,7 +184,7 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `set_telegram_notification()` (keeps 0044/0045/0046's kinds), `new_material_recipients()` and after-insert
    triggers on `materials` and `material_files`, turns on `pg_net` if the server offers it; no policy changes,
    deletes nothing; needs 0046. Works without the Vault secrets (it then sends nothing), see
-   [Telegram notifications](#telegram-notifications) → New materials),
+   [Push notifications](#push-notifications-aru-166) → New materials),
    `0049_homework_photo_limits.sql` (ARU-105: the `homework` bucket accepts only JPEG files up to 10 MB (the app
    resizes and compresses photos when they're picked); adds `homework_photo_in_use()` and two storage policies that
    let a sender read and delete their own photo in their own folder while no homework row points to it, so a failed
@@ -251,7 +252,7 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `set_telegram_notification()` (keeps every earlier kind), `meeting_listener_notes.announced` (set by the database;
    every note that is public when it runs counts as announced), `meeting_notes_recipients()` and the triggers that
    queue the `pg_net` call; no RLS changes; needs the Vault secrets and the function from
-   [Telegram notifications](#telegram-notifications) → Meeting notes),
+   [Push notifications](#push-notifications-aru-166) → Meeting notes),
    `0063_revoke_anon_security_definer.sql` (ARU-154: signed-out visitors can no longer execute `handle_new_user()`,
    `homework_assignments_before_insert()`, `my_role()` or `is_my_student()`; signed-in users keep the last two; no RLS
    or data changes),
@@ -291,6 +292,16 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    older account except teachers a `user-xxxxxx` username. Both erase the real email and sign-up name from Auth, see
    [Usernames for older accounts](#usernames-for-older-accounts-aru-168); pg_cron must be on; changes no rows itself
    except the new setting),
+   `0071_remove_telegram.sql` (ARU-171: removes Telegram completely. Drops `telegram_links` (every stored chat ID) and
+   `telegram_link_codes` with their policies and triggers, and the functions `create_telegram_link_code()`,
+   `set_telegram_notification()`, `disconnect_telegram()`, `link_telegram_chat()` and `unlink_telegram_chat()`.
+   `notification_settings` is not touched (0069 copied the switches); run it after 0069; see
+   [Removing the Telegram bot](#removing-the-telegram-bot-aru-171)),
+   `0072_local_reminders.sql` (ARU-170: meeting started and photo deletion become reminders the phone schedules
+   itself. Adds `notification_settings.notify_homework_due` (on by default) and the `homework_due` kind to
+   `set_notification()`; unschedules the `meeting-start-notifications` cron job and drops `claim_started_meetings()`.
+   `photo_deletion_warnings`, `claim_photo_deletion_warnings()` and `course_meetings.start_notified_at` stay, unused;
+   no RLS change, deletes no data; see [Reminders](#reminders-aru-170)),
    `0073_recovery_codes.sql` (ARU-165: recovery codes. Adds `recovery_codes` (one row per account: the code's SHA-256
    hash, `saved_at`; deleted with the account) and `recovery_attempts` (wrong attempts and the 15-minute lock per
    username); RLS on with no policies, so the app reads neither. Signed-in functions `my_recovery_code_saved()`,
@@ -419,11 +430,12 @@ Push texts never name a person: they say what happened and where (for example "N
    (and `--platform android`).
 5. Deploy the notification functions again (they now send push): `npx supabase functions deploy
    chat-message-notifications homework-reviewed-notifications homework-submitted-notifications
-   meeting-notes-notifications meeting-start-notifications new-account-notifications new-homework-notifications
-   new-material-notifications photo-deletion --no-verify-jwt`.
+   meeting-notes-notifications new-account-notifications new-homework-notifications
+   new-material-notifications photo-deletion --no-verify-jwt` (since ARU-170 there is no
+   `meeting-start-notifications`, and `photo-deletion` sends nothing, see [Reminders](#reminders-aru-170)).
 6. Optional: only if **push security** (enhanced security for push notifications) is turned on for the project in
    Expo, create an access token on expo.dev and set it: `npx supabase secrets set EXPO_ACCESS_TOKEN=<token>`.
-   Without it nothing changes. The functions no longer read `TELEGRAM_BOT_TOKEN`.
+   Without it nothing changes.
 
 **Checking one push:** sign in on the development build with an approved account, open **Profile → Notifications**
 and allow notifications. The phone's row appears in `push_devices` (Table editor). Then either trigger an event (for
@@ -432,42 +444,72 @@ example post in a course chat from another account) or send a test with Expo's p
 it opens Sham. Each function's response (in `net._http_response`) reports `recipients`, `sent`, `skipped`, `failed`
 and `removed`.
 
-### Telegram notifications
+#### Reminders (ARU-170)
 
-> **Since ARU-166 Telegram no longer sends notifications**: the functions below send push notifications instead (see
-> [Push notifications](#push-notifications-aru-166)), and Profile shows **Notifications** instead of **Telegram
-> notifications**. The bot still answers `/start` and `/stop`. ARU-171 removes the Telegram sections, the bot and its
-> tables. The steps below are kept until then.
+Three notifications are **reminders the phone schedules itself** from the data the app already loaded; the server
+sends nothing for them (`src/lib/reminders.ts` decides what, `src/lib/reminderScheduler.ts` schedules it with
+`expo-notifications`). Title "Sham", in the app language at scheduling time, on the **General** Android channel:
 
-Notifications go through the Sham Telegram bot (ARU-48). Each user connects on **Profile → Telegram notifications**
-and chooses which types they get. Until the steps below are done the card stays hidden and nothing else changes.
+* **Meeting started:** at the start time of every Scheduled meeting of a course the person listens to.
+* **Homework due soon** (a new switch, right after **New homework**, students and mentors): **24 hours before** an
+  assignment's due time, only while more than 24 hours are left and the person hasn't sent homework for it.
+* **Photo deletion:** at **09:00 phone time** on the day 30 days and the day 7 days before a stored photo's deletion
+  date; photos whose marks fall on the same day share one reminder with the count and the earliest date.
 
-1. In Telegram, message **@BotFather**, send `/newbot` and keep the **token** it gives you secret.
-2. Set the Edge Function secrets (dashboard → Edge Functions → Secrets, or the CLI). `TELEGRAM_WEBHOOK_SECRET` is
-   any random string of letters, digits, `_` and `-`:
+The app reschedules after every load (app start, pull to refresh, a live update, back to the foreground), a language
+change or a switch flip, only for Approved accounts with notification permission granted (on iOS and Android, also in
+Expo Go; never on the web). At most the 60 soonest are scheduled (iOS keeps 64); later loads add the rest. Sign out
+and account deletion cancel them first, also offline. Only the app's own reminders (identifiers starting with
+`sham-reminder:`) are ever cancelled. **A change made while the app is closed** (a meeting moved or canceled, a new
+due time) **is picked up only the next time the app opens and loads**, so a reminder for a canceled meeting can still
+fire if Sham wasn't opened since. Android may deliver a few minutes late (no exact-alarm permission is asked).
+
+**Old app builds:** once `0072_local_reminders.sql` has run, phones still on a build without ARU-170 get no meeting
+started or photo deletion notice at all. Ship the migration together with the app update.
+
+**Setup (a person, once, after `0072_local_reminders.sql` has run):** delete the old function and its Vault secrets:
+
+```bash
+npx supabase functions delete meeting-start-notifications
+```
+```sql
+delete from vault.secrets where name in ('meeting_notify_url', 'meeting_notify_secret');
+```
+
+### Removing the Telegram bot (ARU-171)
+
+Since ARU-166 notifications are sent as push, and ARU-171 removed everything Sham kept for Telegram: the Telegram
+page, the bot's webhook function, the link codes and every stored chat ID (`0071_remove_telegram.sql`). A person does
+these steps once, after the PR is merged and `0071_remove_telegram.sql` has run:
+
+1. Remove the bot's webhook at Telegram, then delete the deployed function:
    ```bash
-   npx supabase secrets set TELEGRAM_BOT_TOKEN=<token> TELEGRAM_WEBHOOK_SECRET=<random string>
+   curl "https://api.telegram.org/bot<token>/deleteWebhook"
+   npx supabase functions delete telegram-webhook
    ```
-3. Deploy the bot's webhook (Telegram sends no Supabase JWT; the secret header protects it):
-   ```bash
-   npx supabase functions deploy telegram-webhook --no-verify-jwt
-   ```
-4. Point the bot at it once:
-   ```bash
-   curl "https://api.telegram.org/bot<token>/setWebhook" \
-     -d url=https://<project-ref>.supabase.co/functions/v1/telegram-webhook \
-     -d secret_token=<the same random string> -d 'allowed_updates=["message"]'
-   ```
-5. Put the bot's username (without `@`) in `.env.local` as `EXPO_PUBLIC_TELEGRAM_BOT_USERNAME` and restart `npm start`.
+2. Unset the secrets: `npx supabase secrets unset TELEGRAM_BOT_TOKEN TELEGRAM_WEBHOOK_SECRET`, and remove
+   `EXPO_PUBLIC_TELEGRAM_BOT_USERNAME` from `.env.local` and the EAS environment.
+3. Optional: delete the bot in Telegram (**@BotFather** → `/deletebot`).
 
-The bot only answers `/start <code>` (from the app's Connect button) and `/stop`, in private chats. Notifications
-themselves are sent by `supabase/functions/_shared/telegram.ts` from the notification stories' functions.
+Telegram messages already in people's chats stay there; Sham can't delete them. After the webhook is removed,
+anything sent to the bot gets no answer and nothing reaches Sham. Old app builds (from before ARU-166) still have the
+Telegram page: it shows its existing load error, and nothing else in them breaks.
+
+### Notification functions
+
+Each notification is sent by its own Edge Function as a push (see [Push notifications](#push-notifications-aru-166)),
+to the people below who left that switch on in **Profile → Notifications** and have a phone registered. The shared
+sender is `supabase/functions/_shared/push.ts`.
 
 #### Meeting started (ARU-41)
 
-Listeners get "<course title> meeting has started" within 2 minutes of a Scheduled meeting's start, if they connected
-Telegram and left **Meeting started** on. A `pg_cron` job calls the Edge Function `meeting-start-notifications` every
-minute; the function claims the meetings that just started (`claim_started_meetings()`, at most once each) and sends.
+> **Since ARU-170 this is a reminder the phone schedules itself** (see [Reminders](#reminders-aru-170)):
+> `0072_local_reminders.sql` unschedules the job below and drops `claim_started_meetings()`, and the function is
+> deleted. The steps below are kept for history only; don't run them on a new project.
+
+Listeners got "<course title> meeting has started" within 2 minutes of a Scheduled meeting's start, if they left
+**Meeting started** on. A `pg_cron` job called the Edge Function `meeting-start-notifications` every
+minute; the function claimed the meetings that just started (`claim_started_meetings()`, at most once each) and sent.
 
 1. Dashboard → **Database → Extensions**: turn on **pg_cron** and **pg_net**.
 2. Run `supabase/migrations/0035_meeting_start_notifications.sql` (it stops with a message if step 1 is missing).
@@ -494,7 +536,7 @@ To change a Vault value later: `select vault.update_secret((select id from vault
 #### New chat messages (ARU-44, ARU-87)
 
 When someone posts in a course chat, the other people in that chat (owner, listeners, every teacher; Approved only)
-get "New message in the <course title> chat" if they linked Telegram and have **Chat messages** on. Since ARU-87
+get "New message in the <course title> chat" if they have **Chat messages** on. Since ARU-87
 (migration 0046) this is **one message per post**, whether or not they have opened the chat since the last one (the
 ARU-44 "one per batch of unread messages" rule is gone). An after-insert trigger on `course_messages` (migration 0036)
 queues one `pg_net` call to the Edge Function `chat-message-notifications`, which asks `chat_message_recipients()`
@@ -507,13 +549,13 @@ secrets, and the function asks `general_message_recipients()`. So after migratio
 is needed; no new secret.
 
 Failures are logged and dropped, never retried, and never stop a message from being posted. There is no throttling by
-design: a busy chat sends one Telegram message per post. The shared helper sends at most 25 messages a second within
-a 50-second budget, so about 1,250 recipients per post; any beyond that are logged as failed and dropped. The trigger's
+design: a busy chat sends one push per post. The push sender sends up to 100 notifications per request within a
+50-second budget; any it can't send in time are logged as failed and dropped. The trigger's
 `pg_net` timeout is 30 s, so for a very large general chat `net._http_response` may show a timeout while the function
 is still sending.
 
 1. **Database → Extensions**: turn on `pg_net` (then run migration 0036 if it isn't applied yet).
-2. Pick a random secret (e.g. `openssl rand -hex 32`) and set it, with the bot token from above, as function secrets:
+2. Pick a random secret (e.g. `openssl rand -hex 32`) and set it as the function's secret:
    ```bash
    npx supabase secrets set CHAT_NOTIFY_SECRET=<random secret>
    ```
@@ -537,7 +579,7 @@ chat-message-notifications → Logs) has one line per post.
 #### Homework reviewed (ARU-49)
 
 When a mentor or the teacher marks homework as checked (status `submitted` → `checked`), its sender gets "Your
-homework for <course title> was reviewed", if they are still Approved, can still see the course, connected Telegram
+homework for <course title> was reviewed", if they are still Approved, can still see the course,
 and left **Homework reviewed** on. An `after update` trigger on `homework` (migration 0037) reads the URL and secret
 from Vault and queues one `pg_net` POST `{"homework_id": "<id>"}` with `Authorization: Bearer <secret>` to the Edge
 Function `homework-reviewed-notifications`, which asks `homework_reviewed_recipient()` (service role only) who gets
@@ -546,8 +588,7 @@ the trigger only logs a warning and nothing is sent. A failed send is logged and
 
 1. Dashboard → **Database → Extensions**: make sure **pg_net** is on (the migration turns it on when it can).
 2. Run `supabase/migrations/0037_homework_reviewed_notifications.sql`.
-3. Make a random secret (`openssl rand -hex 24`) and set it as the function's secret (`TELEGRAM_BOT_TOKEN` is
-   already set for ARU-48):
+3. Make a random secret (`openssl rand -hex 24`) and set it as the function's secret:
    ```bash
    npx supabase secrets set HOMEWORK_REVIEWED_NOTIFY_SECRET=<secret>
    ```
@@ -563,7 +604,7 @@ the trigger only logs a warning and nothing is sent. A failed send is logged and
 6. Check: mark a homework checked, then
    `select status_code, content from net._http_response order by created desc limit 5;` shows `200` with
    `{"recipients":1,"sent":1,…}` (`recipients` is 0 when the sender isn't Approved or can't see the course;
-   `skipped` is 1 when they haven't connected Telegram or turned the switch off). A `401` means the two secrets
+   `skipped` is 1 when they have no phone registered or turned the switch off). A `401` means the two secrets
    differ; the function's logs (dashboard → Edge Functions → homework-reviewed-notifications → Logs) show each call.
 
 To change a Vault value later: `select vault.update_secret((select id from vault.secrets where name = 'homework_reviewed_notify_secret'), '<new>');`.
@@ -571,10 +612,10 @@ To change a Vault value later: `select vault.update_secret((select id from vault
 #### New homework (ARU-50)
 
 When the course owner or the teacher assigns homework, the course's Approved listeners (students and mentors, never
-the assigner) get "New homework assigned to you in <course title>" within seconds, if they connected Telegram and left
+the assigner) get "New homework assigned to you in <course title>" within seconds, if they left
 **New homework** on. An after-insert trigger on `homework_assignments` queues one `pg_net` call to the Edge Function
 `new-homework-notifications` with the assignment id; the function asks `new_homework_recipients()` for the listeners
-at that moment and sends through the shared helper. If anything is missing or down, assigning still works and the
+at that moment and sends through the push sender. If anything is missing or down, assigning still works and the
 message is dropped (never resent later).
 
 1. Dashboard → **Database → Extensions**: make sure **pg_net** is on.
@@ -600,7 +641,7 @@ To change a Vault value later: `select vault.update_secret((select id from vault
 #### New accounts (ARU-84)
 
 When someone creates an account (a new profile waiting for approval), the teacher gets "New account waiting for your
-approval: <name>. Open Sham → Manage roles to accept or decline." within seconds, if they connected Telegram and left
+approval: <name>. Open Sham → Manage roles to accept or decline." within seconds, if they left
 **New accounts** on (a switch only the teacher sees). An after-insert trigger on `profiles` (only rows inserted as
 `pending`) queues one `pg_net` POST `{"user_id": "<id>"}` with `Authorization: Bearer <secret>` to the Edge Function
 `new-account-notifications`, which asks `new_account_notification()` (service role only) whether the account is still
@@ -624,7 +665,7 @@ trigger runs inside the Auth sign-up and only logs a warning); a failed send is 
    select vault.create_secret('<secret>', 'new_account_notify_secret');
    ```
 6. Check: create an account, then `select status_code, content from net._http_response order by created desc limit 5;`
-   shows `200` with `{"recipients":1,"sent":1,…}` (`skipped` is 1 when the teacher hasn't connected Telegram or turned
+   shows `200` with `{"recipients":1,"sent":1,…}` (`skipped` is 1 when the teacher has no phone registered or turned
    **New accounts** off). A `401` means the two secrets differ.
 
 To change a Vault value later: `select vault.update_secret((select id from vault.secrets where name = 'new_account_notify_secret'), '<new>');`.
@@ -632,7 +673,7 @@ To change a Vault value later: `select vault.update_secret((select id from vault
 #### Homework submitted (ARU-89)
 
 When a listener submits homework, the course's current owner (teacher or mentor, if Approved) gets "New homework to
-check from <sender name> in <course title>: <assignment title>" within seconds, if they connected Telegram and left
+check from <sender name> in <course title>: <assignment title>" within seconds, if they left
 **Homework submitted** on (teachers and mentors see this switch; students don't). An after-insert trigger on
 `homework` queues one `pg_net` POST `{"homework_id": "<id>"}` with `Authorization: Bearer <secret>` to the Edge
 Function `homework-submitted-notifications`, which asks `homework_submitted_recipient()` (service role only) for the
@@ -664,7 +705,7 @@ To change a Vault value later: `select vault.update_secret((select id from vault
 When a teacher or mentor shares a new **Blog** post or **Knowledge base** PDF, everyone who can see it in the app
 (every Approved account; for a course-only PDF only the teacher, the course's owner and its listeners), except its
 author, gets "New blog post from <author name>: <post title>" or "New file in the knowledge base from <author name>:
-<file name>" within seconds, if they connected Telegram and left **New materials** on (every role sees this switch).
+<file name>" within seconds, if they left **New materials** on (every role sees this switch).
 After-insert triggers on `materials` and `material_files` queue one `pg_net` POST `{"type": "blog" | "file", "id":
 "<id>"}` with `Authorization: Bearer <secret>` to the Edge Function `new-material-notifications`, which asks
 `new_material_recipients()` (service role only) who gets it at that moment and sends. Edits and deletions send
@@ -696,7 +737,7 @@ To change a Vault value later: `select vault.update_secret((select id from vault
 When someone publishes notes on a course meeting (saves them with **Publish** on, or turns Publish on later), the
 people who can read them in the app (the course's current listeners, its current owner and the teacher; Approved, same
 workspace), except the author, get "New notes from <author name> on a <course title> meeting" in their language within
-seconds, if they connected Telegram and left **Meeting notes** on (every role sees this switch). A note sends at most
+seconds, if they left **Meeting notes** on (every role sees this switch). A note sends at most
 one message in its life: text edits, notes made private, and notes made private and public again send nothing, and
 notes that were already public when 0062 ran never send. Before-insert/update and after-insert/update triggers on
 `meeting_listener_notes` mark the note announced and queue one `pg_net` POST `{"id": "<note id>"}` with
@@ -799,13 +840,10 @@ Once a day (03:17 UTC) a `pg_cron` job calls the Edge Function `photo-deletion`.
   keeps its path and is retried the next day.
 - **Leftovers:** deletes files in the `homework` bucket that no homework points to and that are older than 24 hours
   (photos of failed sends, ARU-105). Every run, the first included.
-- **Telegram warnings:** when a photo is 30 days or less, then 7 days or less, from its deletion date, its sender gets
-  one message per run: "<N> homework photo(s) will be deleted on <date>. Open Sham → Homework to download them.", if
-  they connected Telegram, are Approved and left **Photo deletion** on. Each mark is recorded once
-  (`photo_deletion_warnings`), whether or not a message could be sent, so turning the switch on later sends nothing
-  for marks already passed.
+- **Warnings:** since ARU-170 the job sends none and records no `photo_deletion_warnings` rows; its response has no
+  warning counts. The 30- and 7-day warnings are reminders on the sender's phone (see [Reminders](#reminders-aru-170)).
 
-Until the steps below are done, nothing is deleted, no warning is sent and the start date stays empty.
+Until the steps below are done, nothing is deleted and the start date stays empty.
 
 1. Dashboard → **Database → Extensions**: turn on **pg_cron** and **pg_net** (already on if you set up
    [Meeting started](#meeting-started-aru-41)).
@@ -814,8 +852,6 @@ Until the steps below are done, nothing is deleted, no warning is sent and the s
    ```bash
    npx supabase secrets set PHOTO_DELETION_SECRET=<secret>
    ```
-   (`TELEGRAM_BOT_TOKEN` is already set for [Telegram notifications](#telegram-notifications); without it the photos
-   are still deleted, and the warnings are counted as failed.)
 4. Deploy the function (the cron job sends the secret in `x-cron-secret`, not a Supabase JWT):
    ```bash
    npx supabase functions deploy photo-deletion --no-verify-jwt
@@ -851,7 +887,7 @@ own workspace and refuses anything that would link two workspaces. Each workspac
 teacher" below always means the teacher of the account's own workspace. At sign-up (ARU-146) a user either
 **creates a workspace**, and becomes its teacher at once, or **joins a workspace** with its invite code. The teacher
 sees the code at the top of **Profile → Manage roles** and copies it to share it. An account's workspace can only be changed from the SQL Editor. The
-Telegram bot, the photo-deletion schedule and the daily jobs are shared; notifications only go to accounts of the
+photo-deletion schedule and the daily jobs are shared; notifications only go to accounts of the
 event's workspace.
 
 Everyone who joins a workspace in the app starts as a **student** whose request to join **waits for the teacher**:
@@ -899,19 +935,18 @@ an ID is missing from one file, a Russian text or a note is empty, or the `{plac
 Moved to the catalog so far (part 1): sign-in and create account, Forgot password (ARU-165) and Change password, the waiting / declined
 screens, the tab bar and the Profile tab; (part 2, ARU-109) the Homework and Courses tabs, homework, course, listener,
 feedback, meeting and discipline screens; (part 3, ARU-113) Materials, the chats, Pay, the accountant screens, Manage
-roles, the Telegram notifications page and Delete account. Every screen is now in both languages; the only app English
-left in Russian is the Telegram page's **Connect Telegram** / **Disconnect** buttons, which match the bot's English
-replies (product owner decision). Database errors (ARU-111): a function's `raise exception` carries `hint = 'sham:<code>'` (and its values in `detail`
+roles, the notification switches (the Telegram page until ARU-171) and Delete account. Every screen is now in both
+languages. Database errors (ARU-111): a function's `raise exception` carries `hint = 'sham:<code>'` (and its values in `detail`
 as JSON); `dbErrorMessage()` in `src/i18n/index.ts` shows the server's English message in English and the catalog
 text `db.<code>` in Russian, with "Нет доступа к этому действию." for an access refusal without a code and the
 generic text otherwise. A new user-facing `raise exception` needs a code and a `db.<code>` catalog entry
 (`supabase/tests/aru111_db_error_codes.test.sql` and `__tests__/aru111-db-errors.test.ts` check both).
 
-Telegram notifications (ARU-110) go out in each recipient's language: the one they chose in Profile, else the phone
-language the app saved on their account at start (`profiles.device_language`), else English. Their texts are in
-`supabase/functions/_shared/telegram-texts.ts` (English, Russian and a note each, checked by
-`telegram-i18n.test.ts`); a new notification kind adds its texts there and builds its messages with
-`localizedMessage()`. The bot's own `/start` / `/stop` replies stay English (product owner decision).
+Push notifications (ARU-110, sent as push since ARU-166) go out in each recipient's language: the one they chose in
+Profile, else the phone language the app saved on their account at start (`profiles.device_language`), else English.
+Their texts are in `supabase/functions/_shared/notification-texts.ts` (English, Russian and a note each, checked by
+`notification-texts.test.ts`); a new notification kind adds its texts there and builds its messages with
+`localizedMessage()` (`supabase/functions/_shared/notification.ts`).
 
 Shared pieces follow the chosen language too: `ErrorText` shows an app message the catalog knows in that language and
 any other text (a database error) as it came (`translateKnown`, with the app's messages listed in `APP_MESSAGE_IDS` in
@@ -1030,19 +1065,18 @@ teacher" is that workspace's teacher, and nobody can see or change anything in a
 | See / copy the workspace's invite code (Manage roles, ARU-146) | | | ✓ |
 | Switch student ↔ mentor    |           |                    | ✓       |
 | Accept or reject new accounts |        |                    | ✓       |
-| Connect Telegram and choose own notifications (no longer reachable from Profile since ARU-166) | ✓ (own) | ✓ (own) | ✓ (own) |
 | Register / unregister own phone for push (`push_devices`, ARU-166; waiting / declined accounts: unregister only) | ✓ (own) | ✓ (own) | ✓ (own) |
 | See and change own notification switches (Profile → Notifications, `notification_settings`, ARU-166) | ✓ (own) | ✓ (own) | ✓ (own) |
 | See anyone else's phones or switches | | | (nobody) |
-| Get push notifications (ARU-166): the same people as the Telegram rows below, linked or not, with that switch on, on every registered phone | as below | as below | as below |
-| Get a Telegram message for every new course chat message (ARU-44, ARU-87; linked, **Chat messages** on) | courses they're in | own courses + courses they're in | all courses |
-| Get a Telegram message for every new general chat message (ARU-87; linked, **General chat** on) | ✓ | ✓ | ✓ |
-| Get "Your homework … was reviewed" in Telegram (ARU-49) | own homework, when checked | own homework (sent as a listener), when checked | (never sends homework) |
-| Get "New homework" Telegram messages (ARU-50) | courses they're in | courses they're in (not their own) |  |
-| Get "New account waiting for your approval" in Telegram (ARU-84; linked, **New accounts** on) |  |  | ✓ (every new sign-up) |
-| Get "New homework to check" in Telegram (ARU-89; linked, **Homework submitted** on) | never | courses they own | courses they own |
-| Get "New blog post" / "New file in the knowledge base" in Telegram (ARU-102; linked, **New materials** on) | items they can see, not their own | items they can see, not their own | items they can see, not their own |
-| Get "New notes from … on a … meeting" in Telegram (ARU-151; linked, **Meeting notes** on) | courses they're in, not their own notes | courses they own or are in, not their own notes | all courses, not their own notes |
+| Get push notifications (ARU-166): the people in the rows below, with that switch on, on every registered phone | as below | as below | as below |
+| Get a push for every new course chat message (ARU-44, ARU-87; **Chat messages** on) | courses they're in | own courses + courses they're in | all courses |
+| Get a push for every new general chat message (ARU-87; **General chat** on) | ✓ | ✓ | ✓ |
+| Get "Your homework … was reviewed" (ARU-49; **Homework reviewed** on) | own homework, when checked | own homework (sent as a listener), when checked | (never sends homework) |
+| Get "New homework" (ARU-50; **New homework** on) | courses they're in | courses they're in (not their own) |  |
+| Get "New account waiting for your approval" (ARU-84; **New accounts** on) |  |  | ✓ (every new sign-up) |
+| Get "New homework to check" (ARU-89; **Homework submitted** on) | never | courses they own | courses they own |
+| Get "New blog post" / "New file in the knowledge base" (ARU-102; **New materials** on) | items they can see, not their own | items they can see, not their own | items they can see, not their own |
+| Get "New notes on a … meeting" (ARU-151; **Meeting notes** on) | courses they're in, not their own notes | courses they own or are in, not their own notes | all courses, not their own notes |
 | Turn Accountant on / off for a mentor (ARU-65) | |         | ✓       |
 | Select / unselect paid courses |         | accountants (any course they can see) |  |
 | See paid courses, change their payment period | | accountants (all they can see) | ✓ (all) |

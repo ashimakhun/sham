@@ -142,7 +142,9 @@ it('AC 8: no settings row reads as all on; a flip saves through set_notification
   await act(async () => {
     await store.loadNotificationSettings();
   });
-  expect(Object.values(store.notificationSettings ?? {})).toHaveLength(10);
+  // ARU-170: the ten ARU-166 kinds plus homework_due.
+  expect(Object.values(store.notificationSettings ?? {})).toHaveLength(11);
+  expect(store.notificationSettings?.homework_due).toBe(true);
   expect(Object.values(store.notificationSettings ?? {}).every(Boolean)).toBe(true);
   await act(async () => {
     await store.setNotification('chat_message', false);

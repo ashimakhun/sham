@@ -21,7 +21,7 @@ import {
   syncPushRegistration,
   unregisterThisPhone,
 } from '@/lib/push';
-import type { TelegramKind } from '@/lib/types';
+import type { NotificationKind } from '@/lib/types';
 
 import { fakeStore } from './helpers/fakeStore';
 import { refocus, setStore } from './helpers/mocks';
@@ -187,14 +187,12 @@ describe('push.ts', () => {
 
 describe('Profile → Notifications (AC 7)', () => {
   it.each(['S1', 'M', 'T'] as const)('%s: "Notifications >" opens the page; no Telegram button', async (who) => {
-    process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME = 'ShamSchoolBot';
     setStore(fakeStore(who));
     await render(<ProfileScreen />);
     await act(async () => {});
     expect(screen.queryByRole('button', { name: 'Telegram notifications' })).toBeNull();
     await fireEvent.press(screen.getByRole('button', { name: 'Notifications' }));
     expect(router.push).toHaveBeenCalledWith('/notifications');
-    delete process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME;
   });
 });
 
@@ -212,9 +210,10 @@ describe('Notifications page', () => {
     ['T', ['Homework submitted', 'Chat messages', 'General chat', 'New materials', 'Meeting notes', 'New accounts']],
     [
       'M',
-      ['Meeting started', 'New homework', 'Homework reviewed', 'Photo deletion', 'Homework submitted', 'Chat messages', 'General chat', 'New materials', 'Meeting notes'],
+      // ARU-170 AC 9: Homework due soon right after New homework.
+      ['Meeting started', 'New homework', 'Homework due soon', 'Homework reviewed', 'Photo deletion', 'Homework submitted', 'Chat messages', 'General chat', 'New materials', 'Meeting notes'],
     ],
-    ['S1', ['Meeting started', 'New homework', 'Homework reviewed', 'Photo deletion', 'Chat messages', 'General chat', 'New materials', 'Meeting notes']],
+    ['S1', ['Meeting started', 'New homework', 'Homework due soon', 'Homework reviewed', 'Photo deletion', 'Chat messages', 'General chat', 'New materials', 'Meeting notes']],
   ] as const)('AC 7: %s sees today\'s switches, in today\'s order', async (who, expected) => {
     await renderPage(fakeStore(who));
     expect(labels()).toEqual(expected);
@@ -227,7 +226,7 @@ describe('Notifications page', () => {
   });
 
   it('AC 8: saved values show; a flip saves at once', async () => {
-    const settings = { chat_message: false } as Record<TelegramKind, boolean>;
+    const settings = { chat_message: false } as Record<NotificationKind, boolean>;
     const { store } = await renderPage(fakeStore('S1', { notificationSettings: settings }));
     const chat = screen.getByRole('switch', { name: 'Chat messages' });
     expect(chat.props.value).toBe(false);
@@ -275,13 +274,14 @@ describe('Notifications page', () => {
     expect(store.syncPushDevice).not.toHaveBeenCalled();
     const json = JSON.stringify(view.toJSON());
     expect(json.indexOf('Notifications work in the installed Sham app.')).toBeLessThan(json.indexOf('Meeting started'));
-    expect(labels()).toHaveLength(8);
+    // ARU-170 AC 9: 8 + Homework due soon.
+    expect(labels()).toHaveLength(9);
   });
 
   it('AC 1: with the prompt never answered (e.g. dismissed), turning a switch on asks', async () => {
     // The first open's request leaves it undetermined (the person closed the app before answering).
     N.__setAnswer({ status: 'undetermined', ios: { status: IOS.NOT_DETERMINED } });
-    await renderPage(fakeStore('S1', { notificationSettings: { chat_message: false } as Record<TelegramKind, boolean> }));
+    await renderPage(fakeStore('S1', { notificationSettings: { chat_message: false } as Record<NotificationKind, boolean> }));
     expect(N.requestPermissionsAsync).toHaveBeenCalledTimes(1);
     N.__setAnswer(null);
     await fireEvent(screen.getByRole('switch', { name: 'Chat messages' }), 'valueChange', true);

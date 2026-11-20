@@ -1,32 +1,31 @@
 /**
  * @jest-environment node
  */
-// QA ARU-110: gaps in telegram-i18n.test.ts: each of the 9 texts goes end to end (the Edge Function's request handler
-// → sendTelegramMessages → Telegram) in Russian to a Russian recipient and in today's exact English to an English one,
-// so no handler drops the Russian text; the English texts are byte for byte those on main; the profiles read asks only
-// for id and the two language columns, once per send; odd language values and a missing profile fall back to English;
-// a 429 retry resends the Russian text; a 403 still removes the link; the bot's replies stay English for a Russian
-// account and a Russian Telegram app (criterion change); names with {placeholders} in them are shown as typed.
+// QA ARU-110: gaps in notification-texts.test.ts (telegram-i18n.test.ts until ARU-171): each of the 9 texts goes end to
+// end (the Edge Function's request handler → the push sender → a mocked Expo push service; Telegram until ARU-166) in
+// Russian to a Russian recipient and in today's exact English to an English one, so no handler drops the Russian
+// text; the profiles read asks only for id and the two language columns, once per send; odd language values and a
+// missing profile fall back to English; a 429 retry resends the Russian text; a phone the push service no longer
+// knows is still removed; names with {placeholders} in them are shown as typed. (ARU-171 removed the bot, and with it
+// the check that its replies stay English.)
 import { handleChatMessageRequest } from "./chat-message";
 import { handleHomeworkReviewedRequest } from "./homework-reviewed";
 import { handleHomeworkSubmittedRequest } from "./homework-submitted";
-import { handleMeetingStartRequest } from "./meeting-start";
 import { handleNewAccountRequest } from "./new-account";
 import { handleNewHomeworkRequest } from "./new-homework";
 import { handleNewMaterialRequest } from "./new-material";
-import {
-  CONNECTED,
-  DISCONNECTED,
-  EXPIRED,
-  handleTelegramUpdate,
-} from "./telegram-bot";
-import {
-  sendTelegramMessages,
-  type ServiceClient,
-  type TelegramMessage,
-} from "./telegram";
+import { localizedMessage, type NotificationMessage } from "./notification";
+import { notificationTexts } from "./notification-texts";
+import { sendPushMessages } from "./push";
+import { pushClient, pushFetch, tokenFor } from "./push-test-helpers";
 import { homeworkSubmittedMessages } from "./homework-submitted";
-import { meetingStartMessages } from "./meeting-start";
+
+// ARU-170: the meeting-start Edge Function is gone (meeting started is a local reminder on the phone now). Its message
+// builder is rebuilt here from the kept catalog text, so these language checks keep their event.
+const meetingStartMessages = (meetings: { meeting_id: string; course_title: string; listener_ids: string[] }[]) =>
+  meetings.flatMap((m) =>
+    m.listener_ids.map((userId) => localizedMessage(userId, "meeting_started", notificationTexts("meetingStarted", { course: m.course_title }))),
+  );
 
 const SECRET = "s3cret";
 const ID = "11111111-1111-4111-8111-111111111111";
@@ -47,52 +46,16 @@ type Profile = {
   device_language: string | null;
 };
 
+// Recipients with a phone ("chat" n = their phone) and every switch on, and their profiles (push-test-helpers.ts).
 function fakeClient(
   profiles: Profile[],
-  links = profiles.map((p, i) => ({ user_id: p.id, chat_id: i + 1 })),
+  links: { user_id: string; chat_id: number }[] = profiles.map((p, i) => ({ user_id: p.id, chat_id: i + 1 })),
 ) {
-  const reads: { table: string; columns: string; ids: string[] }[] = [];
-  const deleted: string[] = [];
-  const client: ServiceClient = {
-    from: (table) => ({
-      select: (columns) => ({
-        in: async (_col, ids) => {
-          reads.push({ table, columns, ids: [...ids] });
-          if (table === "profiles")
-            return {
-              data: profiles.filter((p) => ids.includes(p.id)),
-              error: null,
-            };
-          return {
-            data: links
-              .filter((l) => ids.includes(l.user_id))
-              .map((l) => ({ ...SWITCHES, ...l })),
-            error: null,
-          };
-        },
-      }),
-      delete: () => ({
-        eq: (_c, userId) => ({
-          eq: async () => {
-            deleted.push(String(userId));
-            return { data: null, error: null };
-          },
-        }),
-      }),
-    }),
-  };
-  return { client, reads, deleted };
+  return pushClient(
+    links.map((l) => ({ ...SWITCHES, ...l })),
+    profiles,
+  );
 }
-
-const okFetch = () =>
-  jest.fn(
-    async () => new Response('{"ok":true}', { status: 200 }),
-  ) as unknown as typeof fetch;
-const sent = (f: typeof fetch) =>
-  (f as unknown as jest.Mock).mock.calls.map((c) => {
-    const b = JSON.parse(c[1].body);
-    return [b.chat_id, b.text];
-  });
 
 const post = (
   body: unknown,
@@ -110,26 +73,10 @@ const EN: Profile = { id: "EN", language: "en", device_language: "ru" };
 // What each Edge Function's handler sends for one event to RU (chat 1) and EN (chat 2). English is copied from main.
 const kinds: [
   string,
-  (send: (m: TelegramMessage[]) => Promise<never>) => Promise<Response>,
+  (send: (m: NotificationMessage[]) => Promise<never>) => Promise<Response>,
   string,
   string,
 ][] = [
-  [
-    "meeting started",
-    (send) =>
-      handleMeetingStartRequest(post({}, { "x-cron-secret": SECRET }), SECRET, {
-        claim: async () => [
-          {
-            meeting_id: "m",
-            course_title: "Алгебра",
-            listener_ids: ["RU", "EN"],
-          },
-        ],
-        send,
-      } as never),
-    "Встреча курса Алгебра началась",
-    "Алгебра meeting has started",
-  ],
   [
     "course chat message",
     (send) =>
@@ -247,14 +194,14 @@ describe("AC 3 / AC 4: every kind, end to end through its Edge Function handler"
     "%s: Russian to the Russian recipient, today's English to the English one",
     async (_k, run, ru, en) => {
       const { client, reads } = fakeClient([RU, EN]);
-      const fetchFn = okFetch();
-      const send = ((m: TelegramMessage[]) =>
-        sendTelegramMessages(client, "TOKEN", fetchFn, m, {
+      const push = pushFetch();
+      const send = ((m: NotificationMessage[]) =>
+        sendPushMessages(client, push.fetch, m, {
           sleep: async () => {},
         })) as never;
       const res = await run(send);
       expect(res.status).toBe(200);
-      expect(sent(fetchFn)).toEqual([
+      expect(push.sent()).toEqual([
         [1, ru],
         [2, en],
       ]);
@@ -280,16 +227,15 @@ describe("AC 1: odd values and missing profiles", () => {
     ["German", { language: "de", device_language: "de" }],
   ])("%s → English", async (_n, langs) => {
     const { client } = fakeClient([{ id: "U", ...langs } as Profile]);
-    const fetchFn = okFetch();
-    await sendTelegramMessages(
+    const push = pushFetch();
+    await sendPushMessages(
       client,
-      "T",
-      fetchFn,
+      push.fetch,
       meetingStartMessages([
         { meeting_id: "m", course_title: "A", listener_ids: ["U"] },
       ]),
     );
-    expect(sent(fetchFn)).toEqual([[1, "A meeting has started"]]);
+    expect(push.sent()).toEqual([[1, "A meeting has started"]]);
   });
 
   it("a recipient whose profile row is missing gets English; the others keep their language", async () => {
@@ -300,16 +246,15 @@ describe("AC 1: odd values and missing profiles", () => {
         { user_id: "GONE", chat_id: 2 },
       ],
     );
-    const fetchFn = okFetch();
-    await sendTelegramMessages(
+    const push = pushFetch();
+    await sendPushMessages(
       client,
-      "T",
-      fetchFn,
+      push.fetch,
       meetingStartMessages([
         { meeting_id: "m", course_title: "A", listener_ids: ["RU", "GONE"] },
       ]),
     );
-    expect(sent(fetchFn)).toEqual([
+    expect(push.sent()).toEqual([
       [1, "Встреча курса A началась"],
       [2, "A meeting has started"],
     ]);
@@ -320,16 +265,15 @@ describe("AC 1: odd values and missing profiles", () => {
       { id: "A", language: "ru", device_language: "en" },
       { id: "B", language: "en", device_language: "ru" },
     ]);
-    const fetchFn = okFetch();
-    await sendTelegramMessages(
+    const push = pushFetch();
+    await sendPushMessages(
       client,
-      "T",
-      fetchFn,
+      push.fetch,
       meetingStartMessages([
         { meeting_id: "m", course_title: "A", listener_ids: ["A", "B"] },
       ]),
     );
-    expect(sent(fetchFn).map(([, t]) => t)).toEqual([
+    expect(push.sent().map(([, t]) => t)).toEqual([
       "Встреча курса A началась",
       "A meeting has started",
     ]);
@@ -339,19 +283,10 @@ describe("AC 1: odd values and missing profiles", () => {
 describe("AC 7: sending behaves as today", () => {
   it("a 429 retry resends the Russian text", async () => {
     const { client } = fakeClient([RU]);
-    let n = 0;
-    const fetchFn = jest.fn(async () =>
-      ++n === 1
-        ? new Response(
-            '{"ok":false,"description":"Too Many Requests","parameters":{"retry_after":1}}',
-            { status: 429 },
-          )
-        : new Response('{"ok":true}', { status: 200 }),
-    ) as unknown as typeof fetch;
-    const res = await sendTelegramMessages(
+    const push = pushFetch([() => ({ status: 429, body: { errors: [{ message: "Too Many Requests" }] }, retryAfter: 1 })]);
+    const res = await sendPushMessages(
       client,
-      "T",
-      fetchFn,
+      push.fetch,
       meetingStartMessages([
         { meeting_id: "m", course_title: "A", listener_ids: ["RU"] },
       ]),
@@ -359,47 +294,44 @@ describe("AC 7: sending behaves as today", () => {
         sleep: async () => {},
       },
     );
-    expect(sent(fetchFn)).toEqual([
+    expect(push.sent()).toEqual([
       [1, "Встреча курса A началась"],
       [1, "Встреча курса A началась"],
     ]);
     expect(res.sent).toBe(1);
   });
 
-  it("a 403 for a Russian recipient still removes the link", async () => {
+  it("a phone the push service no longer knows (DeviceNotRegistered) is still removed for a Russian recipient", async () => {
     const { client, deleted } = fakeClient([RU]);
-    const fetchFn = jest.fn(
-      async () =>
-        new Response(
-          '{"ok":false,"description":"Forbidden: bot was blocked by the user"}',
-          { status: 403 },
-        ),
-    ) as unknown as typeof fetch;
-    const res = await sendTelegramMessages(
+    const push = pushFetch([
+      () => ({
+        status: 200,
+        body: { data: [{ status: "error", message: "gone", details: { error: "DeviceNotRegistered" } }] },
+      }),
+    ]);
+    const res = await sendPushMessages(
       client,
-      "T",
-      fetchFn,
+      push.fetch,
       meetingStartMessages([
         { meeting_id: "m", course_title: "A", listener_ids: ["RU"] },
       ]),
     );
     expect(res).toMatchObject({ sent: 0, removed: 1 });
-    expect(deleted).toEqual(["RU"]);
+    expect(deleted).toEqual([tokenFor(1)]);
   });
 
-  it("a recipient who isn't linked is skipped and no language is needed for them to be skipped", async () => {
+  it("a recipient without a phone is skipped and no language is needed for them to be skipped", async () => {
     const { client } = fakeClient([RU, EN], [{ user_id: "EN", chat_id: 2 }]);
-    const fetchFn = okFetch();
-    const res = await sendTelegramMessages(
+    const push = pushFetch();
+    const res = await sendPushMessages(
       client,
-      "T",
-      fetchFn,
+      push.fetch,
       meetingStartMessages([
         { meeting_id: "m", course_title: "A", listener_ids: ["RU", "EN"] },
       ]),
     );
     expect(res).toMatchObject({ sent: 1, skipped: 1 });
-    expect(sent(fetchFn)).toEqual([[2, "A meeting has started"]]);
+    expect(push.sent()).toEqual([[2, "A meeting has started"]]);
   });
 });
 
@@ -419,48 +351,5 @@ describe("AC 3: names and titles exactly as typed", () => {
     expect(m.texts?.ru).toBe(
       "Новое домашнее задание на проверку по курсу {name}: {assignment}",
     );
-  });
-});
-
-describe("AC 5 (revised): the bot replies stay English", () => {
-  const update = (text: string, language_code = "ru") => ({
-    message: {
-      text,
-      chat: { id: 7, type: "private" },
-      from: { id: 7, language_code },
-    },
-  });
-  const deps = (name: string | null) => {
-    const replies: string[] = [];
-    return {
-      replies,
-      d: {
-        linkChat: jest.fn(async () => name),
-        unlinkChat: jest.fn(async () => {}),
-        reply: jest.fn(async (_c: number, t: string) => {
-          replies.push(t);
-        }),
-      },
-    };
-  };
-
-  it('/start with a valid code for a Russian account, from a Russian Telegram app: the English "Connected…" with the name as typed', async () => {
-    const { d, replies } = deps("Анна");
-    await handleTelegramUpdate(update("/start abc123") as never, d);
-    expect(replies).toEqual([CONNECTED("Анна")]);
-    expect(replies[0]).toMatch(/^Connected to Sham as Анна\./);
-  });
-
-  it('/start with an expired code from a ru-RU Telegram app: the English "This link has expired…"', async () => {
-    const { d, replies } = deps(null);
-    await handleTelegramUpdate(update("/start old", "ru-RU") as never, d);
-    expect(replies).toEqual([EXPIRED]);
-  });
-
-  it('/stop from a Russian Telegram app: the English "Disconnected…", and the chat is unlinked', async () => {
-    const { d, replies } = deps(null);
-    await handleTelegramUpdate(update("/stop") as never, d);
-    expect(d.unlinkChat).toHaveBeenCalledWith(7);
-    expect(replies).toEqual([DISCONNECTED]);
   });
 });

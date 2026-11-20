@@ -1,18 +1,14 @@
-// ARU-110: the notification texts in English and Russian (sent as push since ARU-166; the file keeps its name until
-// ARU-171 removes Telegram). Since ARU-166 no text names a person (AC 10): it says what happened and where.
-// Originally the Telegram notification texts in English and Russian, with a note per text (which notification, when
-// it's sent) for the product owner's spreadsheet. Kept apart from the app catalog (src/i18n), which Edge Functions
-// can't import. telegram-texts.test.ts checks every text has both languages and a note, and the same {placeholders}.
-// A later notification kind adds its texts here (ARU-112's photo-deletion warning did).
-//
-// The bot's own replies (/start, /stop in telegram-bot.ts) stay English by product owner decision (ARU-110 analysis
-// comment, 2026-11-08), so they are not in this catalog.
+// ARU-110: the notification texts in English and Russian, sent as push since ARU-166 (this file was telegram-texts.ts
+// until ARU-171 removed Telegram). Since ARU-166 no text names a person (AC 10): it says what happened and where.
+// Each text has a note (which notification, when it's sent) for the product owner's spreadsheet. Kept apart from the
+// app catalog (src/i18n), which Edge Functions can't import. notification-texts.test.ts checks every text has both
+// languages and a note, and the same {placeholders}. A later notification kind adds its texts here.
 
-export type TelegramLanguage = 'en' | 'ru';
+export type NotificationLanguage = 'en' | 'ru';
 
 type Entry = { en: string; ru: string; note: string };
 
-export const TELEGRAM_TEXTS = {
+export const NOTIFICATION_TEXTS = {
   meetingStarted: {
     en: '{course} meeting has started',
     ru: 'Встреча курса {course} началась',
@@ -83,27 +79,27 @@ export const TELEGRAM_TEXTS = {
   },
 } satisfies Record<string, Entry>;
 
-export type TelegramTextId = keyof typeof TELEGRAM_TEXTS;
+export type NotificationTextId = keyof typeof NOTIFICATION_TEXTS;
 
 /**
  * A text with its {placeholders} filled in one pass, so a value that itself contains "{course}" is shown as typed.
- * Values are plain text (messages are sent without parse_mode).
+ * Values are plain text.
  */
-export function telegramText(lang: TelegramLanguage, id: TelegramTextId, params: Record<string, string> = {}) {
-  const template: string = TELEGRAM_TEXTS[id][lang] || TELEGRAM_TEXTS[id].en;
+export function notificationText(lang: NotificationLanguage, id: NotificationTextId, params: Record<string, string> = {}) {
+  const template: string = NOTIFICATION_TEXTS[id][lang] || NOTIFICATION_TEXTS[id].en;
   return template.replace(/\{(\w+)\}/g, (all, name: string) => (name in params ? params[name] : all));
 }
 
 /** The text in every language, for a message that each recipient gets in their own (AC 4). */
-export function telegramTexts(id: TelegramTextId, params: Record<string, string> = {}) {
-  return { en: telegramText('en', id, params), ru: telegramText('ru', id, params) };
+export function notificationTexts(id: NotificationTextId, params: Record<string, string> = {}) {
+  return { en: notificationText('en', id, params), ru: notificationText('ru', id, params) };
 }
 
 /**
  * AC 1: the language a user's notifications are sent in: the one they chose in Profile, else the phone language the
  * app saved on their account (device_language), else English.
  */
-export function recipientLanguage(profile: { language?: unknown; device_language?: unknown } | undefined): TelegramLanguage {
+export function recipientLanguage(profile: { language?: unknown; device_language?: unknown } | undefined): NotificationLanguage {
   const pick = (v: unknown) => (v === 'en' || v === 'ru' ? v : null);
   return pick(profile?.language) ?? pick(profile?.device_language) ?? 'en';
 }

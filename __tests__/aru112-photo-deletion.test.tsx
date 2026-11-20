@@ -4,11 +4,11 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import HomeworkDetailScreen from '@/app/homework/[id]';
-import TelegramScreen from '@/app/telegram';
+import NotificationsScreen from '@/app/notifications';
 import { HomeworkCard } from '@/components/HomeworkCard';
 import { PHOTO_REMOVED } from '@/lib/photoRetention';
-import { telegramSwitchesFor } from '@/lib/telegram';
-import type { TelegramLink } from '@/lib/types';
+import { notificationSwitchesFor } from '@/lib/notifications';
+import type { NotificationKind } from '@/lib/types';
 
 import { fakeStore, hw, member } from './helpers/fakeStore';
 import { params, setStore } from './helpers/mocks';
@@ -16,43 +16,41 @@ import { params, setStore } from './helpers/mocks';
 jest.mock('expo-router', () => require('./helpers/mocks').expoRouter);
 jest.mock('@/lib/store', () => require('./helpers/mocks').store);
 
-const linked = (over: Partial<TelegramLink['switches']> = {}): TelegramLink => ({
-  linkedAt: '2026-11-01T10:00:00.000Z',
-  switches: { meeting_started: true, new_homework: true, homework_reviewed: true, chat_message: true, ...over },
-});
+// The account's saved switches (notification_settings, ARU-166); a kind not in it reads as on.
+const linked = (over: Partial<Record<NotificationKind, boolean>> = {}) =>
+  ({ meeting_started: true, new_homework: true, homework_reviewed: true, chat_message: true, ...over }) as Record<
+    NotificationKind,
+    boolean
+  >;
 
 beforeEach(() => {
   jest.clearAllMocks();
-  process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME = 'ShamSchoolBot';
-});
-afterEach(() => {
-  delete process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME;
 });
 
 describe('AC 5: the Photo deletion switch', () => {
   it.each(['student', 'mentor'] as const)('%s has it right after Homework reviewed', (role) => {
-    const labels = telegramSwitchesFor(role).map((s) => s.label);
+    const labels = notificationSwitchesFor(role).map((s) => s.label);
     expect(labels[labels.indexOf('Homework reviewed') + 1]).toBe('Photo deletion');
   });
 
   it('the teacher does not have it', () => {
-    expect(telegramSwitchesFor('teacher').map((s) => s.kind)).not.toContain('photo_deletion');
+    expect(notificationSwitchesFor('teacher').map((s) => s.kind)).not.toContain('photo_deletion');
   });
 
   it('is on for an existing link that never set it, and turning it off saves only that kind', async () => {
-    const store = fakeStore('S1', { telegram: linked() });
+    const store = fakeStore('S1', { notificationSettings: linked() });
     setStore(store);
-    await render(<TelegramScreen />);
+    await render(<NotificationsScreen />);
     const sw = screen.getByRole('switch', { name: 'Photo deletion' });
     expect(sw.props.value).toBe(true);
     await fireEvent(sw, 'valueChange', false);
-    expect(store.setTelegramNotification).toHaveBeenCalledWith('photo_deletion', false);
-    expect(store.setTelegramNotification).toHaveBeenCalledTimes(1);
+    expect(store.setNotification).toHaveBeenCalledWith('photo_deletion', false);
+    expect(store.setNotification).toHaveBeenCalledTimes(1);
   });
 
   it('shows a saved off as off', async () => {
-    setStore(fakeStore('M', { telegram: linked({ photo_deletion: false }) }));
-    await render(<TelegramScreen />);
+    setStore(fakeStore('M', { notificationSettings: linked({ photo_deletion: false }) }));
+    await render(<NotificationsScreen />);
     expect(screen.getByRole('switch', { name: 'Photo deletion' }).props.value).toBe(false);
   });
 });
@@ -110,7 +108,7 @@ describe('AC 6: after removal', () => {
 
 describe('ARU-133: in Russian', () => {
   it('the switch and the removed-photo note come from the catalog', async () => {
-    const { telegramSwitchesFor: forRole } = jest.requireActual('@/lib/telegram') as typeof import('@/lib/telegram');
+    const { notificationSwitchesFor: forRole } = jest.requireActual('@/lib/notifications') as typeof import('@/lib/notifications');
     expect(forRole('student', 'ru').find((s) => s.kind === 'photo_deletion')?.label).toBe('Удаление фото');
     expect(forRole('student', 'en').find((s) => s.kind === 'photo_deletion')?.label).toBe('Photo deletion');
     const { translate } = jest.requireActual('@/i18n') as typeof import('@/i18n');

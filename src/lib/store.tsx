@@ -11,6 +11,8 @@ import { dbErrorMessage, phoneLanguage, translate } from '@/i18n';
 import { PHOTO_TOO_LARGE } from './compressPhoto';
 import { newId } from './id';
 import { syncPushRegistration, unregisterThisPhone, type PushRpc } from './push';
+import { cancelAllReminders, syncReminders } from './reminderScheduler';
+import { remindersFor } from './reminders';
 import { PHOTOS_ZIP_ERROR } from './photoRetention';
 import { isAllowedProof, PROOF_MAX_BYTES, PROOF_RULE, proofFormat } from './paymentProof';
 import { NOTES_MAX } from './markdown';
@@ -68,8 +70,7 @@ import type {
   NewMaterial,
   NewMaterialFile,
   NewMeeting,
-  TelegramKind,
-  TelegramLink,
+  NotificationKind,
   User,
 } from './types';
 
@@ -263,23 +264,13 @@ export type Store = {
   setAccessStatus: (userId: string, status: 'approved' | 'rejected') => Promise<void>;
   /** Teacher only (ARU-13): switches a user between student and mentor via set_user_role(), then refetches. */
   setUserRole: (userId: string, role: 'student' | 'mentor') => Promise<void>;
-  /** The signed-in user's Telegram link (ARU-48): undefined until loaded, null when not connected. */
-  telegram: TelegramLink | null | undefined;
-  /** Refetches the Telegram link (the Profile tab calls it on focus and when the app comes back). */
-  loadTelegram: () => Promise<void>;
-  /** A new one-time code for the bot's /start link (approved accounts only). */
-  createTelegramLinkCode: () => Promise<string>;
-  /** Turns one Telegram notification type on or off. */
-  setTelegramNotification: (kind: TelegramKind, enabled: boolean) => Promise<void>;
-  /** Removes the Telegram link and its switches. */
-  disconnectTelegram: () => Promise<void>;
   /** ARU-166: the signed-in user's notification switches (saved on the account): undefined until loaded. An account
    *  that never set one has no row, which reads as every switch on (AC 8). */
-  notificationSettings: Record<TelegramKind, boolean> | undefined;
+  notificationSettings: Record<NotificationKind, boolean> | undefined;
   /** ARU-166: refetches the switches (the Notifications page calls it on focus). An error keeps what was loaded. */
   loadNotificationSettings: () => Promise<void>;
   /** ARU-166: turns one notification kind on or off for the account (set_notification). Throws when saving fails. */
-  setNotification: (kind: TelegramKind, enabled: boolean) => Promise<void>;
+  setNotification: (kind: NotificationKind, enabled: boolean) => Promise<void>;
   /** ARU-166: registers this phone for push (or removes its registration when notifications are off). Never throws. */
   syncPushDevice: () => Promise<void>;
   /** ARU-107 AC 2: the app-wide deletion start date (YYYY-MM-DD, UTC), or null until ARU-112's daily job first runs.
@@ -507,29 +498,12 @@ type MaterialFileRow = {
   created_at: string;
   updated_at: string;
 };
-type TelegramLinkRow = {
-  linked_at: string;
-  notify_meeting_started: boolean;
-  notify_new_homework: boolean;
-  notify_homework_reviewed: boolean;
-  notify_chat_message: boolean;
-  /** ARU-84 (0044); undefined before that migration runs. */
-  notify_new_account?: boolean;
-  /** ARU-89 (0045); undefined before that migration runs. */
-  notify_homework_submitted?: boolean;
-  /** ARU-87 (0046); undefined before that migration runs. */
-  notify_general_chat?: boolean;
-  /** ARU-102 (0048); undefined before that migration runs. */
-  notify_new_material?: boolean;
-  /** ARU-112 (0053); undefined before that migration runs. */
-  notify_photo_deletion?: boolean;
-  /** ARU-151 (0062); undefined before that migration runs. */
-  notify_meeting_notes?: boolean;
-};
 // ARU-166: notification_settings columns, in the app's kinds. A missing row or column reads as on (AC 8).
-const NOTIFICATION_KINDS: TelegramKind[] = [
+const NOTIFICATION_KINDS: NotificationKind[] = [
   'meeting_started',
   'new_homework',
+  // ARU-170 (0072): Homework due soon, a local reminder only.
+  'homework_due',
   'homework_reviewed',
   'photo_deletion',
   'homework_submitted',
@@ -540,25 +514,10 @@ const NOTIFICATION_KINDS: TelegramKind[] = [
   'new_account',
 ];
 const toNotificationSettings = (row: Record<string, unknown> | undefined) =>
-  Object.fromEntries(NOTIFICATION_KINDS.map((k) => [k, row?.[`notify_${k}`] !== false])) as Record<TelegramKind, boolean>;
+  Object.fromEntries(NOTIFICATION_KINDS.map((k) => [k, row?.[`notify_${k}`] !== false])) as Record<NotificationKind, boolean>;
 // ARU-166: the two database calls src/lib/push.ts makes.
 const pushRpc: PushRpc = (fn, args) => supabase.rpc(fn, args);
 
-const toTelegramLink = (r: TelegramLinkRow): TelegramLink => ({
-  linkedAt: r.linked_at,
-  switches: {
-    meeting_started: r.notify_meeting_started,
-    new_homework: r.notify_new_homework,
-    homework_reviewed: r.notify_homework_reviewed,
-    chat_message: r.notify_chat_message,
-    new_account: r.notify_new_account ?? true,
-    homework_submitted: r.notify_homework_submitted ?? true,
-    general_chat: r.notify_general_chat ?? true,
-    new_material: r.notify_new_material ?? true,
-    photo_deletion: r.notify_photo_deletion ?? true,
-    meeting_notes: r.notify_meeting_notes ?? true,
-  },
-});
 type MaterialRow = {
   id: string;
   teacher_id: string;
@@ -924,6 +883,9 @@ async function withSignedPhotoUrls(items: Homework[]) {
   return items.map((h) => (h.photoPath ? { ...h, photoUrl: urls.get(h.photoPath) ?? undefined } : h));
 }
 
+/** ARU-170: how long the store waits for a burst of loads to settle before rescheduling reminders. */
+export const REMINDER_DEBOUNCE_MS = 1500;
+
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
@@ -933,8 +895,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [contentReports, setContentReports] = useState<ContentReport[]>([]);
   // ARU-162: the people I've blocked (ids).
   const [blockedIds, setBlockedIds] = useState<string[]>([]);
-  const [telegram, setTelegram] = useState<TelegramLink | null | undefined>(undefined);
-  const [notificationSettings, setNotificationSettings] = useState<Record<TelegramKind, boolean> | undefined>(undefined);
+  const [notificationSettings, setNotificationSettings] = useState<Record<NotificationKind, boolean> | undefined>(undefined);
   const [homework, setHomework] = useState<Homework[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [materialFiles, setMaterialFiles] = useState<MaterialFile[]>([]);
@@ -996,6 +957,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         e.code === 'session_not_found' || /session from session_id claim in jwt does not exist/i.test(e.message ?? '');
       if (!gone && !ended) return false;
       setAccountNotice(gone ? ACCOUNT_DELETED : PASSWORD_CHANGED_SIGNED_OUT);
+      // ARU-170 AC 3: the deleted (or signed-out) account's reminders go before the session does.
+      await cancelAllReminders();
       await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
       return true;
     } catch {
@@ -1011,13 +974,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const { data } = supabase.auth.onAuthStateChange((_event, s) => {
       applySession(s);
       if (!s) {
+        // ARU-170 AC 3: however the session ended, no reminder of the previous account stays (sign-out cancels first).
+        cancelAllReminders().catch(() => {});
         // Signed out: drop the previous user's data, and any load still running for them (ARU-157).
         loadRequest.current++;
         setProfiles([]);
         setAccessRequests([]);
         setContentReports([]);
         setBlockedIds([]);
-        setTelegram(undefined);
         setMyUsername(undefined);
         setRecoveryCodeSaved(undefined);
         setPendingRecoveryCode(null);
@@ -1131,7 +1095,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (!current()) return;
       const all = rows<ProfileRow>(profileRows).map(toUser);
       const me = all.find((u) => u.id === userId);
-      // ARU-110 AC 2: once per sign-in (app start), save the phone language for Telegram messages of a user who never
+      // ARU-110 AC 2: once per sign-in (app start), save the phone language for notifications of a user who never
       // chose one. Only once 0052 has added the column; never blocks or shows an error (retried on the next start).
       const myRow = rows<ProfileRow>(profileRows).find((r) => r.id === userId);
       if (myRow && deviceLanguageFor.current !== userId) {
@@ -1441,16 +1405,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Stable, so the chat screen can call it from effects without re-running them on every store update.
-  // ARU-48: the own row only (RLS). Not in load(): the Profile tab refetches it on focus and on returning to the app.
-  // Stable, so the screen can call it from focus effects. An error (e.g. offline) keeps what was loaded.
-  const loadTelegram = useCallback(async () => {
-    if (!userId) return;
-    const res = await supabase.from('telegram_links').select('*').eq('user_id', userId);
-    check(res);
-    const row = ((res.data as TelegramLinkRow[] | null) ?? [])[0];
-    setTelegram(row ? toTelegramLink(row) : null);
-  }, [userId]);
-
   // ARU-166: the own row only (RLS); none means every switch on. Not in load(): the Notifications page refetches it.
   const loadNotificationSettings = useCallback(async () => {
     if (!userId) return;
@@ -1474,6 +1428,55 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     });
     return () => sub.remove();
   }, [userId, firstLoadDone, syncPushDevice]);
+
+  // ARU-170: local reminders. After every load (app start, pull to refresh, a live update, back to the foreground), a
+  // language change or a switch flip, the set is computed from the loaded data and put on the phone (AC 1). Debounced,
+  // because live updates come in bursts; an unchanged set isn't rescheduled (analysis note 2). The switches aren't part
+  // of load(): until they are loaded nothing changes on the phone, and every data change tries loading them again.
+  const reminderUser = profiles.find((u) => u.id === userId);
+  const reminderApproved = reminderUser?.accessStatus === 'approved';
+  const reminderLang = reminderUser?.language ?? phoneLanguage();
+  useEffect(() => {
+    if (!userId || !firstLoadDone || !reminderUser) return;
+    const timer = setTimeout(() => {
+      if (reminderApproved && !notificationSettings) {
+        loadNotificationSettings().catch(() => {});
+        return;
+      }
+      const reminders =
+        reminderApproved && notificationSettings
+          ? remindersFor({
+              userId,
+              role: reminderUser.role,
+              settings: notificationSettings,
+              courses,
+              courseMembers,
+              meetings,
+              assignments,
+              homework,
+              photoDeletionStart,
+              now: new Date(),
+              lang: reminderLang,
+            })
+          : [];
+      syncReminders({ approved: reminderApproved, reminders }).catch(() => {});
+    }, REMINDER_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [
+    userId,
+    firstLoadDone,
+    reminderUser,
+    reminderApproved,
+    reminderLang,
+    notificationSettings,
+    loadNotificationSettings,
+    courses,
+    courseMembers,
+    meetings,
+    assignments,
+    homework,
+    photoDeletionStart,
+  ]);
 
   const markChatRead = useCallback<Store['markChatRead']>(
     async (courseId, upToMessageId) => {
@@ -1706,6 +1709,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
     },
     signOut: async () => {
+      // ARU-170 AC 3: every reminder on this phone is cancelled first (local, so offline too).
+      await cancelAllReminders();
       // ARU-166 AC 4: this phone's registration goes first; offline (or slow), sign-out still happens.
       await unregisterThisPhone(pushRpc).catch(() => {});
       check(await supabase.auth.signOut());
@@ -1734,6 +1739,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         throw new Error(message);
       }
       setAccountNotice(ACCOUNT_DELETED);
+      // ARU-170 AC 3 (analysis note 7): the reminders go before the local session is cleared.
+      await cancelAllReminders();
       // The server already ended the account; only this device's stored session is left to remove.
       await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
     },
@@ -2432,18 +2439,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // profiles is not in realtime: refetch so the user moves to their new section.
       await load();
     },
-    telegram,
-    loadTelegram,
-    createTelegramLinkCode: async () => {
-      const res = await supabase.rpc('create_telegram_link_code');
-      check(res);
-      if (typeof res.data !== 'string' || !res.data) throw new Error('Could not get a Telegram link. Try again.');
-      return res.data;
-    },
-    setTelegramNotification: async (kind, enabled) => {
-      check(await supabase.rpc('set_telegram_notification', { kind, enabled }));
-      await loadTelegram();
-    },
     notificationSettings,
     loadNotificationSettings,
     setNotification: async (kind, enabled) => {
@@ -2451,10 +2446,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setNotificationSettings((current) => ({ ...(current ?? toNotificationSettings(undefined)), [kind]: enabled }));
     },
     syncPushDevice,
-    disconnectTelegram: async () => {
-      check(await supabase.rpc('disconnect_telegram'));
-      setTelegram(null);
-    },
     accessRequests,
     setAccessStatus: async (target, status) => {
       requireRole('teacher');

@@ -1,23 +1,32 @@
 /**
  * @jest-environment node
  */
-// ARU-110 (Russian version, part 4): Telegram notifications in each recipient's language. The catalog check (AC 9),
+// ARU-110 (Russian version, part 4): notifications in each recipient's language (sent as push since ARU-166; this was
+// telegram-i18n.test.ts until ARU-171). The catalog check (AC 9),
 // every kind in English (unchanged) and Russian (AC 3), the language order (AC 1), mixed recipients of one event
 // (AC 4), switches unchanged (AC 7) and a failed language read falling back to English.
 import { chatMessageMessages, GENERAL_CHAT_TEXT, generalMessageMessages } from './chat-message';
 import { homeworkReviewedMessages } from './homework-reviewed';
 import { homeworkSubmittedMessages } from './homework-submitted';
-import { meetingStartMessages } from './meeting-start';
 import { newAccountMessages } from './new-account';
 import { newHomeworkMessages } from './new-homework';
 import { newMaterialMessages } from './new-material';
-import { localizedMessage, sendTelegramMessages, type ServiceClient, type TelegramMessage } from './telegram';
-import { recipientLanguage, TELEGRAM_TEXTS, telegramText } from './telegram-texts';
+import { localizedMessage, type NotificationMessage } from './notification';
+import { sendPushMessages } from './push';
+import { pushClient, pushFetch } from './push-test-helpers';
+import { recipientLanguage, NOTIFICATION_TEXTS, notificationText, notificationTexts } from './notification-texts';
+
+// ARU-170: the meeting-start Edge Function is gone (meeting started is a local reminder on the phone now). Its message
+// builder is rebuilt here from the kept catalog text, so these language checks keep their event.
+const meetingStartMessages = (meetings: { meeting_id: string; course_title: string; listener_ids: string[] }[]) =>
+  meetings.flatMap((m) =>
+    m.listener_ids.map((userId) => localizedMessage(userId, 'meeting_started', notificationTexts('meetingStarted', { course: m.course_title }))),
+  );
 
 const placeholders = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(',');
 
 describe('AC 9: the catalog', () => {
-  it.each(Object.entries(TELEGRAM_TEXTS))('%s has English, Russian, a note and the same placeholders', (_id, entry) => {
+  it.each(Object.entries(NOTIFICATION_TEXTS))('%s has English, Russian, a note and the same placeholders', (_id, entry) => {
     expect(entry.en.trim()).not.toBe('');
     expect(entry.ru).toMatch(/[а-яё]/i);
     expect(entry.note).toMatch(/ · /);
@@ -25,12 +34,12 @@ describe('AC 9: the catalog', () => {
   });
 
   it('a value is shown as typed, even with braces or formatting characters', () => {
-    expect(telegramText('ru', 'meetingStarted', { course: 'Math {course} *_<b>' })).toBe('Встреча курса Math {course} *_<b> началась');
+    expect(notificationText('ru', 'meetingStarted', { course: 'Math {course} *_<b>' })).toBe('Встреча курса Math {course} *_<b> началась');
   });
 });
 
 describe('AC 3: every kind, English as today and Russian', () => {
-  const ru = (m: TelegramMessage[]) => m.map((x) => x.texts?.ru);
+  const ru = (m: NotificationMessage[]) => m.map((x) => x.texts?.ru);
   it.each([
     [
       'meeting started',
@@ -112,32 +121,8 @@ describe('AC 1: the language order', () => {
   });
 });
 
-// A service-role client with links and profiles, recording what it read.
-function fakeClient(
-  links: { user_id: string; chat_id: number; notify_meeting_started?: boolean }[],
-  profiles: { id: string; language: string | null; device_language: string | null }[],
-  { profilesError = false } = {},
-) {
-  const tables: string[] = [];
-  const client: ServiceClient = {
-    from: (table) => ({
-      select: () => ({
-        in: async () => {
-          tables.push(table);
-          if (table === 'profiles') {
-            return profilesError ? { data: null, error: { message: 'boom' } } : { data: profiles, error: null };
-          }
-          return { data: links.map((l) => ({ notify_meeting_started: true, ...l })), error: null };
-        },
-      }),
-      delete: () => ({ eq: () => ({ eq: async () => ({ data: null, error: null }) }) }),
-    }),
-  };
-  return { client, tables };
-}
-const okFetch = () => jest.fn(async () => new Response('{"ok":true}', { status: 200 })) as unknown as typeof fetch;
-const sentTexts = (fetchFn: typeof fetch) =>
-  (fetchFn as unknown as jest.Mock).mock.calls.map((c) => [JSON.parse(c[1].body).chat_id, JSON.parse(c[1].body).text]);
+// Recipients as { user_id, chat_id (their phone), switches } and their profiles; see push-test-helpers.ts.
+const tablesRead = (reads: { table: string }[]) => reads.map((r) => r.table);
 
 describe('AC 4 / AC 7: one event, each recipient in their own language', () => {
   const messages = meetingStartMessages([{ meeting_id: 'm', course_title: 'Algebra', listener_ids: ['RU', 'EN', 'NONE', 'DEV', 'OFF'] }]);
@@ -157,44 +142,44 @@ describe('AC 4 / AC 7: one event, each recipient in their own language', () => {
   ];
 
   it('Russian, English, English and Russian; a kind turned off is still skipped', async () => {
-    const { client, tables } = fakeClient(links, profiles);
-    const fetchFn = okFetch();
-    const res = await sendTelegramMessages(client, 'T', fetchFn, messages, { sleep: async () => {} });
-    expect(sentTexts(fetchFn)).toEqual([
+    const { client, reads } = pushClient(links, profiles);
+    const push = pushFetch();
+    const res = await sendPushMessages(client, push.fetch, messages, { sleep: async () => {} });
+    expect(push.sent()).toEqual([
       [1, 'Встреча курса Algebra началась'],
       [2, 'Algebra meeting has started'],
       [3, 'Algebra meeting has started'],
       [4, 'Встреча курса Algebra началась'],
     ]);
     expect(res).toMatchObject({ sent: 4, skipped: 1, failed: [] });
-    expect(tables).toEqual(['telegram_links', 'profiles']);
+    expect(tablesRead(reads)).toEqual(['notification_settings', 'push_devices', 'profiles']);
   });
 
   it('a failed language read sends English to everyone', async () => {
-    const { client } = fakeClient(links, profiles, { profilesError: true });
-    const fetchFn = okFetch();
-    const res = await sendTelegramMessages(client, 'T', fetchFn, messages, { sleep: async () => {} });
-    expect(sentTexts(fetchFn).map(([, text]) => text)).toEqual(Array(4).fill('Algebra meeting has started'));
+    const { client } = pushClient(links, profiles, { profilesError: true });
+    const push = pushFetch();
+    const res = await sendPushMessages(client, push.fetch, messages, { sleep: async () => {} });
+    expect(push.sent().map(([, text]) => text)).toEqual(Array(4).fill('Algebra meeting has started'));
     expect(res.sent).toBe(4);
   });
 
   it('plain messages (no Russian text) read no profiles and are sent as before', async () => {
-    const { client, tables } = fakeClient([{ user_id: 'RU', chat_id: 1 }], profiles);
-    const fetchFn = okFetch();
-    await sendTelegramMessages(client, 'T', fetchFn, [{ userId: 'RU', kind: 'meeting_started', text: 'hello' }]);
-    expect(sentTexts(fetchFn)).toEqual([[1, 'hello']]);
-    expect(tables).toEqual(['telegram_links']);
+    const { client, reads } = pushClient([{ user_id: 'RU', chat_id: 1 }], profiles);
+    const push = pushFetch();
+    await sendPushMessages(client, push.fetch, [{ userId: 'RU', kind: 'meeting_started', text: 'hello' }]);
+    expect(push.sent()).toEqual([[1, 'hello']]);
+    expect(tablesRead(reads)).not.toContain('profiles');
   });
 
   it('AC 8: the language is read at send time, so a switch applies to the next message', async () => {
     const one = [localizedMessage('U', 'meeting_started', { en: 'started', ru: 'началась' })];
-    const before = fakeClient([{ user_id: 'U', chat_id: 9 }], [{ id: 'U', language: 'en', device_language: null }]);
-    const after = fakeClient([{ user_id: 'U', chat_id: 9 }], [{ id: 'U', language: 'ru', device_language: null }]);
-    const f1 = okFetch();
-    const f2 = okFetch();
-    await sendTelegramMessages(before.client, 'T', f1, one);
-    await sendTelegramMessages(after.client, 'T', f2, one);
-    expect(sentTexts(f1)).toEqual([[9, 'started']]);
-    expect(sentTexts(f2)).toEqual([[9, 'началась']]);
+    const before = pushClient([{ user_id: 'U', chat_id: 9 }], [{ id: 'U', language: 'en', device_language: null }]);
+    const after = pushClient([{ user_id: 'U', chat_id: 9 }], [{ id: 'U', language: 'ru', device_language: null }]);
+    const f1 = pushFetch();
+    const f2 = pushFetch();
+    await sendPushMessages(before.client, f1.fetch, one);
+    await sendPushMessages(after.client, f2.fetch, one);
+    expect(f1.sent()).toEqual([[9, 'started']]);
+    expect(f2.sent()).toEqual([[9, 'началась']]);
   });
 });

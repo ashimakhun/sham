@@ -10,7 +10,9 @@ import {
   type NewHomeworkDeps,
   type NewHomeworkRecipient,
 } from './new-homework';
-import { sendTelegramMessages, type SendResult, type ServiceClient, type TelegramMessage } from './telegram';
+import { type SendResult, type NotificationMessage } from './notification';
+import { sendPushMessages } from './push';
+import { pushClient, pushFetch } from './push-test-helpers';
 
 const SECRET = 'top-secret-value';
 const ID = '6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d';
@@ -27,14 +29,14 @@ function request(body: unknown, auth: string | null = `Bearer ${SECRET}`, method
 
 function deps(rows: NewHomeworkRecipient[] = [], result?: Partial<SendResult>) {
   const logs: string[] = [];
-  const sent: TelegramMessage[][] = [];
+  const sent: NotificationMessage[][] = [];
   const asked: string[] = [];
   const d: NewHomeworkDeps = {
     recipients: jest.fn(async (id: string) => {
       asked.push(id);
       return rows;
     }),
-    send: jest.fn(async (messages: TelegramMessage[]) => {
+    send: jest.fn(async (messages: NotificationMessage[]) => {
       sent.push(messages);
       return { sent: messages.length, skipped: 0, failed: [], removed: 0, ...result };
     }),
@@ -149,38 +151,25 @@ describe('handleNewHomeworkRequest', () => {
     expect(logs[0]).toContain('db down');
   });
 
-  it('end to end with the real helper: only linked listeners with New homework on get the text', async () => {
+  it('end to end with the real push sender: only listeners with a phone and New homework on get the text', async () => {
     const links = [
       { user_id: 'u1', chat_id: 101, notify_new_homework: true },
       { user_id: 'u2', chat_id: 102, notify_new_homework: false },
     ];
-    const client: ServiceClient = {
-      from: () => ({
-        select: () => ({
-          in: (_column: string, ids: string[]) =>
-            Promise.resolve({ data: links.filter((l) => ids.includes(l.user_id)), error: null }),
-        }),
-        delete: () => ({ eq: () => ({ eq: () => Promise.resolve({ data: null, error: null }) }) }),
-      }),
-    };
-    const fetchMock = jest.fn(async () => new Response('{"ok":true}', { status: 200 }));
+    const { client } = pushClient(links);
+    const fetchMock = pushFetch();
     const logs: string[] = [];
     const res = await handleNewHomeworkRequest(request({ assignment_id: ID }), SECRET, {
       recipients: async () => [algebra('u1'), algebra('u2'), algebra('u3')],
       send: (messages) =>
-        sendTelegramMessages(client, 'TOKEN', fetchMock as unknown as typeof fetch, messages, {
+        sendPushMessages(client, fetchMock.fetch, messages, {
           sleep: async () => {},
         }),
       log: (line) => logs.push(line),
     });
     expect(res.status).toBe(200);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe('https://api.telegram.org/botTOKEN/sendMessage');
-    const body = JSON.parse(String(init.body));
-    expect(body.chat_id).toBe(101);
-    expect(body.text).toBe('New homework assigned to you in Algebra 101');
-    expect(body.parse_mode).toBeUndefined();
+    expect(fetchMock.mock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.sent()).toEqual([[101, 'New homework assigned to you in Algebra 101']]);
     expect(await res.json()).toMatchObject({ recipients: 3, sent: 1, skipped: 2 });
   });
 });

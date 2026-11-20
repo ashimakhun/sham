@@ -189,8 +189,17 @@ select t.ok((select not (notify_meeting_started or notify_new_homework or notify
   or notify_new_account) from notification_settings), 'AC8 all ten are off');
 reset role;
 
--- AC 8: the migration copies Telegram switch values (its own statement, run again on links made here).
+-- AC 8: the migration copies Telegram switch values (its own statement, run again on links made here). ARU-171 (0071)
+-- dropped telegram_links, so the links go into a stand-in with the same columns (a temp table, found first by name).
 delete from notification_settings;
+create temp table telegram_links (
+  user_id uuid primary key, chat_id bigint not null,
+  notify_meeting_started boolean not null default true, notify_new_homework boolean not null default true,
+  notify_homework_reviewed boolean not null default true, notify_photo_deletion boolean not null default true,
+  notify_homework_submitted boolean not null default true, notify_chat_message boolean not null default true,
+  notify_general_chat boolean not null default true, notify_new_material boolean not null default true,
+  notify_meeting_notes boolean not null default true, notify_new_account boolean not null default true
+);
 insert into telegram_links (user_id, chat_id) values (t.id('S1'), 6601), (t.id('T'), 6602);
 update telegram_links set notify_chat_message = false, notify_photo_deletion = false where user_id = t.id('S1');
 update telegram_links set notify_new_account = false where user_id = t.id('T');

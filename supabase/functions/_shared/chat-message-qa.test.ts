@@ -5,7 +5,7 @@
 // bodies, an unknown message (200, nothing sent), a known message with no recipients or a null list, the report a call
 // returns, and the wiring between the Edge Function, the migration and the README (names must match exactly).
 import { type ChatMessageDeps, type ChatMessageRecipients, handleChatMessageRequest } from './chat-message';
-import type { SendResult, TelegramMessage } from './telegram';
+import type { SendResult, NotificationMessage } from './notification';
 
 const fs = jest.requireActual<{ readFileSync: (p: string, e: string) => string }>('fs');
 const read = (p: string) => fs.readFileSync(p, 'utf8');
@@ -17,7 +17,7 @@ const URL_ = 'https://x.supabase.co/functions/v1/chat-message-notifications';
 function deps(found: ChatMessageRecipients | null) {
   const d: ChatMessageDeps = {
     recipients: jest.fn(async () => found),
-    send: jest.fn(async (messages: TelegramMessage[]): Promise<SendResult> => ({
+    send: jest.fn(async (messages: NotificationMessage[]): Promise<SendResult> => ({
       sent: messages.length - 1,
       skipped: 1,
       failed: [],

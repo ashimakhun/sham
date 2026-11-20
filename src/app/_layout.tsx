@@ -95,8 +95,7 @@ function AppStack() {
           <Stack.Screen name="accountant/courses" options={{ title: t('accountant.selectTitle') }} />
           <Stack.Screen name="accountant/[id]" options={{ title: t('accountant.paymentsTitle') }} />
           <Stack.Screen name="general-chat" options={{ title: t('chat.generalTitle') }} />
-          {/* ARU-101: a pushed page (not a modal), so iOS swipe-back and Android back return to Profile. */}
-          <Stack.Screen name="telegram" options={{ title: t('telegram.title') }} />
+          {/* A pushed page (not a modal), so iOS swipe-back and Android back return to Profile. */}
           <Stack.Screen name="notifications" options={{ title: t('notifications.title') }} />
           <Stack.Screen name="change-password" options={{ title: t('changePassword.title'), presentation: 'modal' }} />
           {/* ARU-165: Forgot password with a recovery code (signed out), and Profile → Recovery code. The old

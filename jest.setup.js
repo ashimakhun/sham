@@ -7,8 +7,7 @@ jest.mock('@expo/vector-icons/Ionicons', () => {
   return { __esModule: true, default: Ionicons };
 });
 
-// AsyncStorage has no native module under Jest; use the in-memory mock the package ships (ARU-79 keeps the Telegram
-// card's collapsed choice there).
+// AsyncStorage has no native module under Jest; use the in-memory mock the package ships.
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
@@ -74,8 +73,10 @@ jest.mock('expo-splash-screen', () => ({
 // ARU-166: expo-notifications has no native module under Jest. Permission, channel, token and handler calls are
 // jest.fn()s; a test sets the permission with require('expo-notifications').__setPermission({ status, ios }) and what
 // asking answers with __setAnswer(...), and reads the calls from the mocks.
+// ARU-170: local reminders are kept in memory: __scheduled() lists them (identifier, content, trigger) and
+// __addScheduled(request) adds one scheduled by someone else (a push or another feature) to check it's never cancelled.
 jest.mock('expo-notifications', () => {
-  const state = { permission: { status: 'undetermined', granted: false, canAskAgain: true }, answer: null };
+  const state = { permission: { status: 'undetermined', granted: false, canAskAgain: true }, answer: null, scheduled: [] };
   const IosAuthorizationStatus = { NOT_DETERMINED: 0, DENIED: 1, AUTHORIZED: 2, PROVISIONAL: 3, EPHEMERAL: 4 };
   return {
     IosAuthorizationStatus,
@@ -88,6 +89,29 @@ jest.mock('expo-notifications', () => {
     setNotificationChannelAsync: jest.fn(async (id, channel) => ({ id, ...channel })),
     getExpoPushTokenAsync: jest.fn(async () => ({ type: 'expo', data: 'ExponentPushToken[test-token]' })),
     setNotificationHandler: jest.fn(),
+    SchedulableTriggerInputTypes: {
+      CALENDAR: 'calendar',
+      DAILY: 'daily',
+      WEEKLY: 'weekly',
+      MONTHLY: 'monthly',
+      YEARLY: 'yearly',
+      DATE: 'date',
+      TIME_INTERVAL: 'timeInterval',
+    },
+    scheduleNotificationAsync: jest.fn(async (request) => {
+      const identifier = request.identifier ?? `n${state.scheduled.length + 1}`;
+      state.scheduled = state.scheduled.filter((r) => r.identifier !== identifier);
+      state.scheduled.push({ identifier, content: request.content, trigger: request.trigger });
+      return identifier;
+    }),
+    getAllScheduledNotificationsAsync: jest.fn(async () => state.scheduled.map((r) => ({ ...r }))),
+    cancelScheduledNotificationAsync: jest.fn(async (identifier) => {
+      state.scheduled = state.scheduled.filter((r) => r.identifier !== identifier);
+    }),
+    __scheduled: () => state.scheduled,
+    __addScheduled: (request) => {
+      state.scheduled.push(request);
+    },
     __setPermission: (p) => {
       state.permission = { granted: p.status === 'granted', canAskAgain: true, ...p };
     },
@@ -97,6 +121,7 @@ jest.mock('expo-notifications', () => {
     __reset: () => {
       state.permission = { status: 'undetermined', granted: false, canAskAgain: true };
       state.answer = null;
+      state.scheduled = [];
     },
   };
 });

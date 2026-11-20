@@ -1,5 +1,5 @@
 // QA ARU-116: gaps in aru116-themed-switch.test.tsx, which checks ThemedSwitch on its own: every switch on the 5
-// screens (Telegram page for each role, Accountant on Manage roles, Hidden course, Hidden discipline new and details)
+// screens (Notifications page for each role, Accountant on Manage roles, Hidden course, Hidden discipline new and details)
 // renders ON and OFF with the theme track and a white knob, OFF keeps the system track (AC 1–4); a switch disabled
 // while saving keeps the theme colour and is dimmed on Android only (AC 5); labels and the saved value are unchanged
 // (AC 7); the green Checked badge stays green (out of scope).
@@ -7,13 +7,13 @@ import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { Platform, StyleSheet } from "react-native";
 
 import RolesScreen from "@/app/roles";
-import TelegramScreen from "@/app/telegram";
+import NotificationsScreen from "@/app/notifications";
 import NewCourseScreen from "@/app/courses/new";
 import DisciplineScreen from "@/app/disciplines/[id]";
 import NewDisciplineScreen from "@/app/disciplines/new";
 import { StatusBadge } from "@/components/ui";
 import { colors } from "@/lib/theme";
-import type { Discipline, TelegramLink, User } from "@/lib/types";
+import type { Discipline, NotificationKind, User } from "@/lib/types";
 
 import { fakeStore, users } from "./helpers/fakeStore";
 import { params, setStore } from "./helpers/mocks";
@@ -22,15 +22,13 @@ jest.mock("expo-router", () => require("./helpers/mocks").expoRouter);
 jest.mock("expo-router/react-navigation", () => ({ useHeaderHeight: () => 0 }));
 jest.mock("@/lib/store", () => require("./helpers/mocks").store);
 
-const linked: TelegramLink = {
-  linkedAt: "2026-11-01T10:00:00.000Z",
-  switches: {
+// The account's saved switches (notification_settings, ARU-166); a kind not in it reads as on.
+const linked = {
     meeting_started: true,
     new_homework: false,
     homework_reviewed: true,
     chat_message: false,
-  },
-};
+  } as Record<NotificationKind, boolean>;
 const math: Discipline = {
   id: "DM",
   name: "Math",
@@ -44,11 +42,9 @@ const everyone = Object.values({ ...users, M: accountantM });
 const original = Platform.OS;
 beforeEach(() => {
   jest.clearAllMocks();
-  process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME = "ShamSchoolBot";
 });
 afterEach(() => {
   Platform.OS = original;
-  delete process.env.EXPO_PUBLIC_TELEGRAM_BOT_USERNAME;
 });
 
 // The rendered native switch: onTintColor = ON track, tintColor = OFF track, thumbTintColor = knob.
@@ -68,10 +64,10 @@ const deferred = () => {
 
 describe("AC 1–4: every switch in the app, ON and OFF", () => {
   it.each(["S1", "M", "T"] as const)(
-    "Telegram notifications page (%s): every switch, on or off",
+    "Notifications page (%s): every switch, on or off",
     async (who) => {
-      setStore(fakeStore(who, { telegram: linked }));
-      await render(<TelegramScreen />);
+      setStore(fakeStore(who, { notificationSettings: linked }));
+      await render(<NotificationsScreen />);
       const all = screen.getAllByRole("switch");
       expect(all.length).toBeGreaterThanOrEqual(4);
       expect(all.some((s) => s.props.value === true)).toBe(true);
@@ -137,8 +133,8 @@ describe("AC 1–4: every switch in the app, ON and OFF", () => {
   });
 
   it("AC 1 is not the old system green: no switch has a green track", async () => {
-    setStore(fakeStore("T", { telegram: linked }));
-    await render(<TelegramScreen />);
+    setStore(fakeStore("T", { notificationSettings: linked }));
+    await render(<NotificationsScreen />);
     for (const sw of screen.getAllByRole("switch")) {
       expect(sw.props.onTintColor).not.toBe(colors.success);
       expect(String(sw.props.onTintColor).toLowerCase()).not.toMatch(
@@ -160,14 +156,14 @@ describe("AC 5 / AC 7: while saving", () => {
   });
   afterEach(() => spy.mockRestore());
 
-  it("Telegram: the saving switch is disabled and keeps the theme colour; the others stay enabled; it saves the new value", async () => {
+  it("Notifications: the saving switch is disabled and keeps the theme colour; the others stay enabled; it saves the new value", async () => {
     const save = deferred();
-    const store = fakeStore("M", { telegram: linked });
-    (store.setTelegramNotification as jest.Mock).mockImplementation(
+    const store = fakeStore("M", { notificationSettings: linked });
+    (store.setNotification as jest.Mock).mockImplementation(
       () => save.promise,
     );
     setStore(store);
-    await render(<TelegramScreen />);
+    await render(<NotificationsScreen />);
     const first = screen.getAllByRole("switch")[0];
     const label = first.props.accessibilityLabel as string;
     await fireEvent(first, "valueChange", false);
@@ -178,7 +174,7 @@ describe("AC 5 / AC 7: while saving", () => {
     expect(
       screen.getAllByRole("switch").filter((s) => s.props.disabled).length,
     ).toBe(1);
-    expect(store.setTelegramNotification).toHaveBeenCalledWith(
+    expect(store.setNotification).toHaveBeenCalledWith(
       expect.any(String),
       false,
     );

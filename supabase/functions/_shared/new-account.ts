@@ -5,9 +5,9 @@
 // helper, which skips an unlinked teacher or one with New accounts off. Nothing is retried by a later call.
 // No Deno-only imports, so Jest can test it.
 
-import { localizedMessage, type SendResult, type TelegramMessage } from './telegram.ts';
-import { telegramText, telegramTexts } from './telegram-texts.ts';
-import { timingSafeEqual } from './telegram-bot.ts';
+import { localizedMessage, type SendResult, type NotificationMessage } from './notification.ts';
+import { notificationText, notificationTexts } from './notification-texts.ts';
+import { timingSafeEqual } from './timing-safe-equal.ts';
 
 /** One row of new_account_notification(): the waiting account's name and the teacher's id. */
 export type NewAccountRecipient = { account_name: string; user_id: string };
@@ -16,21 +16,21 @@ export type NewAccountDeps = {
   /** Calls new_account_notification(user_id) with the service role. Throws on a database error. */
   recipient: (userId: string) => Promise<NewAccountRecipient[]>;
   /** sendPushMessages() (push.ts, ARU-166) with the service-role client and fetch. */
-  send: (messages: TelegramMessage[]) => Promise<SendResult>;
+  send: (messages: NotificationMessage[]) => Promise<SendResult>;
   log?: (line: string) => void;
 };
 
-/** What a call returns (and logs), so a call can be checked from net._http_response without Telegram. */
+/** What a call returns (and logs), so a call can be checked from net._http_response without a phone. */
 export type NewAccountReport = { recipients: number } & SendResult;
 
 /** The English text. Since ARU-166 it names no person, so the name is not used (kept for the existing callers). */
 export function newAccountText(_name?: string) {
-  return telegramText('en', 'newAccount');
+  return notificationText('en', 'newAccount');
 }
 
 /** One message per recipient row (in practice zero or one: the teacher). */
-export function newAccountMessages(rows: NewAccountRecipient[]): TelegramMessage[] {
-  return rows.map((r) => localizedMessage(r.user_id, 'new_account', telegramTexts('newAccount')));
+export function newAccountMessages(rows: NewAccountRecipient[]): NotificationMessage[] {
+  return rows.map((r) => localizedMessage(r.user_id, 'new_account', notificationTexts('newAccount')));
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
