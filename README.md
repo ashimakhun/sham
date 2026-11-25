@@ -664,7 +664,7 @@ To change a Vault value later: `select vault.update_secret((select id from vault
 #### New accounts (ARU-84)
 
 When someone creates an account (a new profile waiting for approval), the teacher gets "New account waiting for your
-approval: <name>. Open Sham → Manage roles to accept or decline." within seconds, if they left
+approval. Open Sham → Manage roles to accept or decline." within seconds, if they left
 **New accounts** on (a switch only the teacher sees). An after-insert trigger on `profiles` (only rows inserted as
 `pending`) queues one `pg_net` POST `{"user_id": "<id>"}` with `Authorization: Bearer <secret>` to the Edge Function
 `new-account-notifications`, which asks `new_account_notification()` (service role only) whether the account is still
@@ -696,7 +696,7 @@ To change a Vault value later: `select vault.update_secret((select id from vault
 #### Homework submitted (ARU-89)
 
 When a listener submits homework, the course's current owner (teacher or mentor, if Approved) gets "New homework to
-check from <sender name> in <course title>: <assignment title>" within seconds, if they left
+check in <course title>: <assignment title>" within seconds, if they left
 **Homework submitted** on (teachers and mentors see this switch; students don't). An after-insert trigger on
 `homework` queues one `pg_net` POST `{"homework_id": "<id>"}` with `Authorization: Bearer <secret>` to the Edge
 Function `homework-submitted-notifications`, which asks `homework_submitted_recipient()` (service role only) for the
@@ -727,8 +727,7 @@ To change a Vault value later: `select vault.update_secret((select id from vault
 
 When a teacher or mentor shares a new **Blog** post or **Knowledge base** PDF, everyone who can see it in the app
 (every Approved account; for a course-only PDF only the teacher, the course's owner and its listeners), except its
-author, gets "New blog post from <author name>: <post title>" or "New file in the knowledge base from <author name>:
-<file name>" within seconds, if they left **New materials** on (every role sees this switch).
+author, gets "New blog post: <post title>" or "New file in the knowledge base: <file name>" within seconds, if they left **New materials** on (every role sees this switch).
 After-insert triggers on `materials` and `material_files` queue one `pg_net` POST `{"type": "blog" | "file", "id":
 "<id>"}` with `Authorization: Bearer <secret>` to the Edge Function `new-material-notifications`, which asks
 `new_material_recipients()` (service role only) who gets it at that moment and sends. Edits and deletions send
@@ -759,7 +758,7 @@ To change a Vault value later: `select vault.update_secret((select id from vault
 
 When someone publishes notes on a course meeting (saves them with **Publish** on, or turns Publish on later), the
 people who can read them in the app (the course's current listeners, its current owner and the teacher; Approved, same
-workspace), except the author, get "New notes from <author name> on a <course title> meeting" in their language within
+workspace), except the author, get "New notes on a <course title> meeting" in their language within
 seconds, if they left **Meeting notes** on (every role sees this switch). A note sends at most
 one message in its life: text edits, notes made private, and notes made private and public again send nothing, and
 notes that were already public when 0062 ran never send. Before-insert/update and after-insert/update triggers on
@@ -1003,17 +1002,23 @@ components import the hook from `src/i18n/context.tsx`, which doesn't load the s
 ```
 src/app/                  screens (Expo Router — every file is a route)
   index.tsx               sign in / create account
-  (tabs)/                 Homework · Courses (My courses / All courses) · Materials · Profile tabs
+  (tabs)/                 Homework · Courses (Courses / Disciplines) · Materials · Profile tabs
   homework/new.tsx        a listener sends homework for an assignment (opened from New)
   homework/[id].tsx       homework details; mentor marks it checked
   homework/photos.tsx     Download by course: a sender's homework photos as ZIPs of at most 50 (ARU-107)
   courses/new.tsx         teacher or mentor creates a course (visible or hidden)
-  courses/[id].tsx        course details, meetings, a Listeners row, linked Knowledge base PDFs, feedback and homework
+  courses/[id].tsx        course details, meetings, a Listeners row, linked Knowledge base PDFs and feedback
   courses/[id]/feedback.tsx  a listener adds or edits their feedback (stars + review)
   courses/[id]/members.tsx  Listeners page: the list; teacher or mentor removes (X) and adds (ARU-97)
   courses/[id]/listeners.tsx  teacher or mentor adds listeners
   courses/[id]/chat.tsx   course chat (owner, listeners and the teacher)
   general-chat.tsx        general chat for every accepted account (from Profile)
+  disciplines/            new.tsx teacher creates a discipline; [id].tsx discipline screen (rating, reviews, courses)
+  notifications.tsx       Profile → Notifications: push permission and switches (ARU-166, ARU-170)
+  report.tsx              report a message, notes, a Blog post, a PDF or a review (ARU-158)
+  reports.tsx             the teacher's Reports: delete content or dismiss (ARU-158)
+  blocked.tsx             Profile → Blocked people, Unblock (ARU-162)
+  delete-account.tsx      delete own account with the password (ARU-75)
   change-password.tsx     the signed-in user changes their own password (from Profile)
   forgot-password.tsx     Forgot password?: username + recovery code + new password (signed out, ARU-165)
   recovery-code.tsx       Profile → Recovery code: a new recovery code after the current password (ARU-165)
@@ -1022,7 +1027,8 @@ src/app/                  screens (Expo Router — every file is a route)
   courses/[id]/owner.tsx  teacher or mentor changes the course owner (opened from Edit course)
   courses/[id]/meetings/  schedule / edit a meeting; [meetingId]/notes.tsx notes; [meetingId]/assign-homework.tsx;
                           [meetingId]/attendance.tsx who attended
-  roles.tsx               teacher accepts / rejects new accounts and switches users between student and mentor
+  roles.tsx               teacher accepts / rejects new accounts, switches users between student and mentor, and
+                          makes one-time reset codes (ARU-169)
   accountant/courses.tsx  an accountant selects / unselects paid courses
   accountant/[id].tsx     a paid course's period (Change period, Unselect) and listeners: Paid / Unpaid / Exempt this
                           month, payment requests with View proof (accountants and the teacher)
@@ -1030,11 +1036,20 @@ src/app/                  screens (Expo Router — every file is a route)
   materials/new.tsx       teacher or mentor shares a Blog post
   materials/[id].tsx      Blog post details and likes
   materials/files/        Knowledge base PDFs: new.tsx upload, [id].tsx details and Open PDF, [id]/edit.tsx edit
-src/components/           shared UI (AccessGate.tsx: the only screen a waiting or declined account sees)
+src/components/           shared UI (AccessGate.tsx: the gate screens before the tabs: "We've updated our Terms",
+                          Choose a username, Save your recovery code, waiting / declined; ContentMenu.tsx: Report /
+                          Block / Delete menu)
 src/lib/supabase.ts       Supabase client
 src/lib/store.tsx         data loading, actions, live updates
+src/lib/reminders.ts      phone reminders (ARU-170); reminderScheduler.ts schedules them; push.ts registers the phone
+src/lib/legal.ts          legal page addresses, version and contact email (ARU-159)
+legal/                    Privacy Policy and Terms of Use pages, English and Russian (GitHub Pages)
 supabase/migrations/      database schema + row-level security (the real access rules)
+supabase/functions/       Edge Functions: push notifications, password recovery, delete account, photo ZIP and
+                          deletion, the Linear webhook for the agents
 supabase/manage-roles.sql admin queries: list users, make the first teacher
+supabase/reports.sql      operator queries: open reports of every workspace, resolve, delete content (ARU-158)
+supabase/manage-words.sql operator queries: the offensive word list (ARU-163)
 ```
 
 ## Roles and access
@@ -1165,13 +1180,13 @@ instructions are in [`.claude/skills/`](.claude/skills/).
 A few rules are enforced in the app only, not by the database: a student sees only the title and description of
 courses they are not in (course titles stay readable so they can be listed); a mentor who is a listener of a course
 doesn't see the others' attendance there; checked homework and a meeting's homework check can't be undone in the app
-(the database would allow it); Pay shows only from the payment period's first day to the month's end; and Set
-exempt shows only on Unpaid listeners. The full list is in section 5 of "Sham: product documentation".
+(the database would allow it); listeners send no payment requests (ARU-161; the database still accepts one); Set
+exempt shows only on Unpaid listeners; a blocked person's content is hidden by the app (ARU-162); and the teacher
+deletes other people's Blog posts and reviews only from Reports (ARU-158). The full list is in section 5 of "Sham: product documentation".
 
 ## Work in progress
 
-- **Bug ARU-153:** saving your first note on a meeting doesn't close the Notes editor (it stays open with Save
-  greyed out). In the dev pipeline.
+- Nothing is in development right now.
 - Waiting for the product owner (Needs Clarification): several photos per homework (ARU-150) and moving file
   storage to Cloudflare R2 (ARU-106).
 
