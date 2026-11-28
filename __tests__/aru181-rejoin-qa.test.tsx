@@ -108,6 +108,63 @@ describe('AC4 / AC5 / AC10: database errors from the store', () => {
   });
 });
 
+// ARU-188 re-test: every hint the two functions can raise (0079), and offline, in both languages and both modes.
+const ALL_HINTS = [
+  ['sham:invite_code_unknown', 'No workspace has this invite code.', 'P0002', 'db.invite_code_unknown'],
+  ['sham:workspace_name_length', 'Workspace name must be 1 to 80 characters.', '23514', 'db.workspace_name_length'],
+  ['sham:workspace_already_member', 'You already belong to a workspace.', '55000', 'db.workspace_already_member'],
+  ['sham:sign_in_again', 'Please sign in again.', '42501', 'db.sign_in_again'],
+  ['sham:workspace_locked', "An account's workspace can't be changed.", '42501', 'db.workspace_locked'],
+  ['sham:workspace_mismatch', 'This belongs to another workspace.', '42501', 'db.workspace_mismatch'],
+] as const;
+const CASES = (['en', 'ru'] as const).flatMap((lang) =>
+  (['join', 'create'] as const).flatMap((mode) => ALL_HINTS.map((h) => [lang, mode, ...h] as const)),
+);
+
+async function submitIn(lang: 'en' | 'ru', mode: 'join' | 'create', rejoinWorkspace: jest.Mock) {
+  setStore(deactivated({ rejoinWorkspace }, lang));
+  await render(<Ru />);
+  const tr = (key: Parameters<typeof translate>[1]) => translate(lang, key);
+  if (mode === 'create') await fireEvent.press(screen.getByRole('tab', { name: tr('signIn.workspaceCreate') }));
+  const field = screen.getByPlaceholderText(tr(mode === 'create' ? 'signIn.workspaceNamePlaceholder' : 'signIn.inviteCodePlaceholder'));
+  await fireEvent.changeText(field, 'zzzz9999');
+  await fireEvent.press(screen.getByRole('button', { name: tr(mode === 'create' ? 'gate.create' : 'gate.join') }));
+  await act(async () => {});
+  return { tr, field };
+}
+
+describe('ARU-188 re-test: every database hint and offline, EN and RU, Join and Create', () => {
+  it.each(CASES)('%s %s: %s', async (lang, mode, hint, message, code, key) => {
+    const rejoinWorkspace = jest.fn(async () => dbError(hint, message, code)());
+    const { tr, field } = await submitIn(lang, mode, rejoinWorkspace);
+    if (lang === 'ru') expect(screen.queryByText(tr('common.genericError'))).toBeNull();
+    expect(screen.getByText(tr(key))).toBeTruthy();
+    expect(field.props.value).toBe('zzzz9999');
+  });
+
+  it.each([
+    ['en', 'join'],
+    ['en', 'create'],
+    ['ru', 'join'],
+    ['ru', 'create'],
+  ] as const)('%s %s: offline shows the connection message, then a retry works', async (lang, mode) => {
+    const rejoinWorkspace = jest
+      .fn()
+      .mockImplementationOnce(async () => {
+        throw new Error(translate('en', 'auth.network'));
+      })
+      .mockImplementationOnce(async () => {});
+    const { tr, field } = await submitIn(lang, mode, rejoinWorkspace);
+    expect(screen.getByText(tr('auth.network'))).toBeTruthy();
+    expect(screen.queryByText(tr('common.genericError'))).toBeNull();
+    expect(field.props.value).toBe('zzzz9999');
+    await fireEvent.press(screen.getByRole('button', { name: tr(mode === 'create' ? 'gate.create' : 'gate.join') }));
+    await act(async () => {});
+    expect(rejoinWorkspace).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText(tr('auth.network'))).toBeNull();
+  });
+});
+
 describe('AC11: the keyboard', () => {
   it('the Done key sends the form, and does nothing while the field is empty', async () => {
     const store = deactivated();
