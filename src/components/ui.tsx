@@ -34,6 +34,9 @@ export function Card({ children, onPress, style, accessible, testID }: CardProps
       testID={testID}
       onPress={onPress}
       accessible={accessible}
+      // ARU-205: a grouped card that opens something is announced as a button; its name is its own text, so no label
+      // is set. A card that holds its own buttons (accessible={false}) gets no role: a button must not wrap buttons.
+      accessibilityRole={accessible === false ? undefined : 'button'}
       // ARU-204: a card that opts out of grouping holds its own buttons, so it is no keyboard stop either.
       // react-native-web's Pressable renders tabIndex 0 unless -1 is passed (as for ARU-201's owner line).
       focusable={accessible === false ? false : undefined}
