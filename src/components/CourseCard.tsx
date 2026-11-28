@@ -1,15 +1,21 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useRef } from 'react';
-import { Pressable, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Pressable, View, type ViewInstance } from 'react-native';
 
 import { Text } from '@/components/AppText';
 
+import {
+  CourseDescriptionDialog,
+  DescriptionPreview,
+  ShowDescriptionButton,
+  focusAfterClose,
+} from '@/components/CourseDescription';
 import { DisciplineLabel } from '@/components/Disciplines';
 import { RatingSummary } from '@/components/RatingSummary';
 import { Card, HiddenBadge, OwnerLine, UnreadBadge, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
-import { feedbackFor } from '@/lib/feedback';
+import { feedbackFor, ratingSummaryLabel } from '@/lib/feedback';
 import { inCourseChat, seesOnlyCourseSummary } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
@@ -29,7 +35,7 @@ type Props = {
 const TAP_GUARD_MS = 800;
 
 export function CourseCard({ course, tag, onOpen }: Props) {
-  const { getUser, currentUser, courseMembers, unreadCount, courseFeedback } = useStore();
+  const { getUser, getDiscipline, currentUser, courseMembers, unreadCount, courseFeedback } = useStore();
   const { t, lang } = useI18n();
   // A student who is not a listener sees only the title and description (ARU-24).
   const summaryOnly = seesOnlyCourseSummary(currentUser, course, courseMembers);
@@ -40,6 +46,16 @@ export function CourseCard({ course, tag, onOpen }: Props) {
   // Average rating and count (ARU-53); nothing when the course has no feedback.
   const feedback = feedbackFor(courseFeedback, course.id);
   const lastTap = useRef(0);
+  // ARU-194: whether the description is cut short at 2 lines (measured on the real layout), and its pop-up.
+  const [cutShort, setCutShort] = useState(false);
+  const showMore = cutShort && !!course.description;
+  const [descriptionOpen, setDescriptionOpen] = useState(false);
+  const showButton = useRef<ViewInstance>(null);
+  const closeDescription = () => {
+    setDescriptionOpen(false);
+    focusAfterClose(showButton);
+  };
+  const ownerName = getUser(course.createdById)?.name ?? t('common.unknown');
 
   const open = (pathname: '/courses/[id]' | '/courses/[id]/chat') => {
     const now = Date.now();
@@ -49,7 +65,8 @@ export function CourseCard({ course, tag, onOpen }: Props) {
     router.push({ pathname, params: { id: course.id } });
   };
 
-  const content = (
+  // Top of the card: tag, title, discipline and the 2-line description.
+  const top = (
     <>
       {tag ? (
         <View style={[styles.badge, { backgroundColor: colors.primarySoft }]}>
@@ -72,24 +89,109 @@ export function CourseCard({ course, tag, onOpen }: Props) {
       )}
       {/* ARU-63 AC 6: only a discipline the viewer can see. */}
       <DisciplineLabel course={course} />
-      {course.description ? (
-        <Text style={styles.body} numberOfLines={2}>
-          {course.description}
-        </Text>
-      ) : null}
-      {!summaryOnly && (
-        <OwnerLine name={getUser(course.createdById)?.name ?? t('common.unknown')} date={formatDate(course.createdAt)} />
-      )}
+      {course.description ? <DescriptionPreview text={course.description} onTruncatedChange={setCutShort} /> : null}
+    </>
+  );
+  // Bottom of the card: owner line and rating.
+  const bottom = (
+    <>
+      {!summaryOnly && <OwnerLine name={ownerName} date={formatDate(course.createdAt)} />}
       <RatingSummary items={feedback} style={styles.muted} />
       {/* ARU-161: no payment due / overdue line for listeners (ARU-66 / ARU-148's line and red border removed). */}
     </>
   );
-  if (!showChat)
+  const content = (
+    <>
+      {top}
+      {bottom}
+    </>
+  );
+
+  const chatButton = (
+    // A nested Pressable takes the touch itself, so the card's onPress does not also fire.
+    <Pressable
+      accessibilityRole="button"
+      // The count is only in the icon's label, never the content's (ARU-34): unchanged at 0 (ARU-31 AC 11).
+      accessibilityLabel={withUnreadLabel(t('courses.openChat', { title: course.title }), unread, lang)}
+      onPress={() => open('/courses/[id]/chat')}
+      hitSlop={4}
+      style={({ pressed }) => ({
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: pressed ? colors.primarySoft : 'transparent',
+      })}>
+      <Ionicons name="chatbubble-outline" size={24} color={colors.primary} />
+      {/* Centred on the 24 pt icon's top-right corner (it spans 10–34 in the 44×44 target), so it covers part of the
+          bubble's outline (ARU-57). Anchored by `right`, so a wider "99+" pill grows inwards over the icon and stays
+          inside the target and the content column keeps its size. */}
+      <UnreadBadge count={unread} ring style={{ position: 'absolute', top: 0, right: 0 }} />
+    </Pressable>
+  );
+
+  if (showMore) {
+    // ARU-194: Show description sits right under the description, outside every open-course Pressable, so screen
+    // readers reach it on its own and its tap opens only the pop-up (it never goes through open() or lastTap). The
+    // card opts out of grouping (as with the chat icon, ARU-27); the top is the open-course button, and its label
+    // reads what the whole card shows (tag, title, discipline, description, owner line, rating: ARU-34). The bottom
+    // still opens the course by touch but is hidden from screen readers, since the top's label already reads it.
+    const discipline = getDiscipline(course.disciplineId);
+    const label = [
+      tag,
+      course.title,
+      course.hidden ? t('common.hidden') : undefined,
+      discipline ? t('disciplines.a11yLabel', { name: discipline.name }) : undefined,
+      course.description,
+      summaryOnly ? undefined : `${t('courses.ownerPrefix')} ${ownerName} · ${formatDate(course.createdAt)}`,
+      ratingSummaryLabel(feedback, lang),
+    ]
+      .filter(Boolean)
+      .join(', ');
+    const hasBottom = !summaryOnly || feedback.length > 0;
     return (
-      <Card onPress={() => open('/courses/[id]')}>
-        {content}
-      </Card>
+      <>
+        <Card
+          onPress={() => open('/courses/[id]')}
+          accessible={false}
+          style={showChat ? { flexDirection: 'row', alignItems: 'center', gap: 8 } : undefined}>
+          <View style={{ flex: showChat ? 1 : undefined, gap: 8 }}>
+            <Pressable
+              testID="course-card-open"
+              accessibilityRole="button"
+              accessibilityLabel={label}
+              onPress={() => open('/courses/[id]')}
+              style={{ gap: 8 }}>
+              {top}
+            </Pressable>
+            <ShowDescriptionButton ref={showButton} title={course.title} onPress={() => setDescriptionOpen(true)} />
+            {hasBottom ? (
+              <Pressable
+                onPress={() => open('/courses/[id]')}
+                accessible={false}
+                importantForAccessibility="no-hide-descendants"
+                accessibilityElementsHidden
+                aria-hidden
+                style={{ gap: 8 }}>
+                {bottom}
+              </Pressable>
+            ) : null}
+          </View>
+          {showChat ? chatButton : null}
+        </Card>
+        {/* Outside the card, so no touch inside the pop-up can reach the card's onPress. */}
+        <CourseDescriptionDialog
+          visible={descriptionOpen}
+          title={course.title}
+          description={course.description ?? ''}
+          onClose={closeDescription}
+        />
+      </>
     );
+  }
+
+  if (!showChat) return <Card onPress={() => open('/courses/[id]')}>{content}</Card>;
 
   return (
     // The card opts out of accessibility grouping so screen readers reach the chat icon on its own; the content
@@ -99,33 +201,10 @@ export function CourseCard({ course, tag, onOpen }: Props) {
       onPress={() => open('/courses/[id]')}
       accessible={false}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => open('/courses/[id]')}
-        style={{ flex: 1, gap: 8 }}>
+      <Pressable accessibilityRole="button" onPress={() => open('/courses/[id]')} style={{ flex: 1, gap: 8 }}>
         {content}
       </Pressable>
-      {/* A nested Pressable takes the touch itself, so the card's onPress does not also fire. */}
-      <Pressable
-        accessibilityRole="button"
-        // The count is only in the icon's label, never the content's (ARU-34): unchanged at 0 (ARU-31 AC 11).
-        accessibilityLabel={withUnreadLabel(t('courses.openChat', { title: course.title }), unread, lang)}
-        onPress={() => open('/courses/[id]/chat')}
-        hitSlop={4}
-        style={({ pressed }) => ({
-          width: 44,
-          height: 44,
-          borderRadius: 22,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: pressed ? colors.primarySoft : 'transparent',
-        })}>
-        <Ionicons name="chatbubble-outline" size={24} color={colors.primary} />
-        {/* Centred on the 24 pt icon's top-right corner (it spans 10–34 in the 44×44 target), so it covers part of the
-            bubble's outline (ARU-57). Anchored by `right`, so a wider "99+" pill grows inwards over the icon and stays
-            inside the target and the content column keeps its size. */}
-        <UnreadBadge count={unread} ring style={{ position: 'absolute', top: 0, right: 0 }} />
-      </Pressable>
+      {chatButton}
     </Card>
   );
 }
