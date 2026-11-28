@@ -122,3 +122,38 @@ describe('ARU-194 QA · AC 8: nothing hidden from screen readers is a keyboard s
     }
   });
 });
+
+describe('ARU-194 QA re-test · AC 8: the card that opts out of grouping is not an extra keyboard stop', () => {
+  type Node = { type: unknown; props: Record<string, unknown>; children: unknown[] };
+  /** Host elements that take a press but have opted out of accessibility (accessible={false}). */
+  function ungroupedPressables(root: Node) {
+    const out: Node[] = [];
+    const walk = (n: unknown) => {
+      if (!n || typeof n !== 'object') return;
+      const node = n as Node;
+      if (typeof node.type === 'string' && node.props?.accessible === false && typeof node.props.onClick === 'function')
+        out.push(node);
+      node.children?.forEach(walk);
+    };
+    walk(root);
+    return out;
+  }
+
+  it.each([
+    ['plain card (mentor who is not in the chat)', 'N'],
+    ['card with the chat icon (teacher)', 'T'],
+  ] as const)('cut-short %s: the outer card is not focusable (web: no tab stop before the course button)', async (_, who) => {
+    setStore(fakeStore(who));
+    const { container } = await render(<CourseCard course={longCourse} />);
+    await measureApart(44, 110);
+    expect(screen.getByRole('button', showLabel)).toBeTruthy();
+    const pressables = ungroupedPressables(container as unknown as Node);
+    // The outer card and the owner line part.
+    expect(pressables.length).toBeGreaterThanOrEqual(2);
+    for (const p of pressables) {
+      // react-native-web's Pressable renders tabIndex 0 unless tabIndex={-1} is passed, so a card with
+      // accessible={false} is still reached with Tab: a stop with no role and no name before the course button.
+      expect(p.props.tabIndex).toBe(-1);
+    }
+  });
+});
