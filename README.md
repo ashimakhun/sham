@@ -354,7 +354,16 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    `0080_signup_language.sql` (ARU-189: `handle_new_user()`, every 0075 rule kept, also saves the language picked on
    the Create account form (`language` in the sign-up's user data) in `profiles.language` when it is exactly `'en'` or
    `'ru'`; any other value, or none, is ignored (null: the phone's language) and never refuses the sign-up. No table,
-   column, policy or grant changes; changes no existing rows).
+   column, policy or grant changes; changes no existing rows),
+   `0081_homework_photos.sql` (ARU-191: up to 10 photos per homework. Adds `homework_files` (homework, path,
+   position, kind `photo`, workspace; readable with its homework, workspace-guarded) and copies every existing
+   `homework.photo_path` into it as position 1. App users add rows only through `submit_homework(...)`, which saves the
+   homework and all its photos in one transaction (paths in `<uid>/<homework id>/`, at most 10:
+   `sham:homework_too_many_photos`); nobody changes them afterwards. `photo_path` stays for older app builds: a trigger
+   copies it into the list. Every photo reader (storage policies, listener removal, course / discipline deletion,
+   the ZIP, the daily deletion job) reads the list; `photo_zip_links` gets `photo_paths`. Then redeploy the
+   `homework-photos-zip` Edge Function (see [Download my photos](#download-my-photos-aru-107)); `photo-deletion` is
+   unchanged and needs no redeploy).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. Turn off **Authentication → Email → Confirm email**, in development and production, **before** applying
    `0067_username_sign_in.sql` (ARU-164). Username accounts sign up with an internal address that can't receive mail,

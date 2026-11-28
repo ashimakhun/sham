@@ -10,7 +10,7 @@ import { DownloadMyPhotosButton, PhotoDeletionBanner } from '@/components/PhotoD
 import { EmptyState, Segmented, styles, UnreadBadge } from '@/components/ui';
 import type { TextId } from '@/i18n';
 import { useI18n } from '@/i18n/context';
-import { deletionWarning, storedOwnPhotos } from '@/lib/photoRetention';
+import { deletionWarning, storedOwnPhotos, storedPhotoCount } from '@/lib/photoRetention';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
 import type { Homework, HomeworkAssignment, HomeworkStatus } from '@/lib/types';
@@ -136,6 +136,8 @@ export default function HomeworkScreen() {
   // ARU-107: the user's own stored photos (any status), the 30-day warning (AC 4) and Download my photos (AC 5). Only
   // in the sender's views: students' lists, and mentors' Listener side. All courses, whatever the course filter.
   const myPhotos = listenerView ? storedOwnPhotos(visibleHomework, me) : [];
+  // ARU-191: photos, not homework (over 50 photos opens Download by course).
+  const myPhotoCount = storedPhotoCount(myPhotos);
   const warning = listenerView ? deletionWarning(visibleHomework, me, photoDeletionStart, new Date(now)) : null;
 
   const empty = emptyText(
@@ -173,9 +175,9 @@ export default function HomeworkScreen() {
       ListHeaderComponent={
         <View style={{ gap: 12 }}>
           {showSwitcher && <TabSwitch value={tab} onChange={switchTab} newCount={fresh.length} />}
-          {warning && <PhotoDeletionBanner warning={warning} totalPhotos={myPhotos.length} />}
+          {warning && <PhotoDeletionBanner warning={warning} totalPhotos={myPhotoCount} />}
           <Segmented<Filter> value={shown} onChange={setFilter} options={options} />
-          {listenerView && shown === 'checked' && <DownloadMyPhotosButton totalPhotos={myPhotos.length} />}
+          {listenerView && shown === 'checked' && <DownloadMyPhotosButton totalPhotos={myPhotoCount} />}
           {filterByCourse && (
             <AuthorFilter
               noun="course"

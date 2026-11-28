@@ -1,5 +1,5 @@
 // ARU-105 AC 7 / AC 10: the real StoreProvider against a fake Supabase client, for the homework photo upload order:
-// a leftover at <uid>/<id>.jpg is removed before every upload, a failed save removes the uploaded photo, "already
+// leftovers are removed before every upload (ARU-191: at <uid>/<id>/<n>.jpg, and the save is submit_homework()), a failed save removes the uploaded photo, "already
 // exists" is a failed send (never success), and a bucket refusal shows "The photo must be up to 10 MB.".
 import { act, render } from '@testing-library/react-native';
 import { AppState, Text } from 'react-native';
@@ -78,7 +78,14 @@ jest.mock('@/lib/supabase', () => {
         onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
       },
       from: (table: string) => query(table),
-      rpc: () => ok([]),
+      // ARU-191: the homework and its photos are saved by submit_homework() (0081).
+      rpc: (name: string, args: Record<string, unknown>) => {
+        if (name !== 'submit_homework') return ok([]);
+        mockLog.push('homework.insert');
+        mockState.inserted = args;
+        if (!mockState.insertError) mockState.savedRows.push(String(args.homework_id));
+        return Promise.resolve({ data: null, error: mockState.insertError });
+      },
       channel,
       removeChannel: () => {},
       storage: { from: () => bucket },
@@ -127,15 +134,15 @@ beforeEach(() => {
 afterEach(() => jest.restoreAllMocks());
 
 describe('ARU-105: sending homework with a photo', () => {
-  it('AC 10 b: removes any leftover at <uid>/<id>.jpg, then uploads, then saves the homework with that path', async () => {
+  it('AC 10 b: removes any leftover at <uid>/<id>/<n>.jpg, then uploads, then saves the homework with that path', async () => {
     await mount();
     await act(() => send());
     expect(mockLog).toEqual(expect.arrayContaining(['remove', 'upload', 'homework.insert']));
     expect(mockLog.indexOf('remove')).toBeLessThan(mockLog.indexOf('upload'));
     expect(mockLog.indexOf('upload')).toBeLessThan(mockLog.indexOf('homework.insert'));
-    expect(mockState.removed).toEqual([['S1/h1.jpg']]);
-    expect(mockState.uploads).toEqual(['S1/h1.jpg']);
-    expect(mockState.inserted).toMatchObject({ id: 'h1', photo_path: 'S1/h1.jpg' });
+    expect(mockState.removed).toEqual([Array.from({ length: 10 }, (_, i) => `S1/h1/${i + 1}.jpg`)]);
+    expect(mockState.uploads).toEqual(['S1/h1/1.jpg']);
+    expect(mockState.inserted).toMatchObject({ homework_id: 'h1', photo_paths: ['S1/h1/1.jpg'] });
   });
 
   it('without a photo nothing touches Storage', async () => {
@@ -144,7 +151,7 @@ describe('ARU-105: sending homework with a photo', () => {
       store.addHomework({ id: 'h1', courseId: 'A', assignmentId: 'as1', title: 'Fractions', description: '' }),
     );
     expect(mockLog).toEqual(['homework.insert']);
-    expect(mockState.inserted).toMatchObject({ photo_path: null });
+    expect(mockState.inserted).toMatchObject({ photo_paths: [] });
   });
 
   it('AC 10 a: a failed save removes the uploaded photo and shows the error', async () => {
@@ -152,7 +159,7 @@ describe('ARU-105: sending homework with a photo', () => {
     mockState.insertError = { code: '42501', message: 'new row violates row-level security policy' };
     await expect(send()).rejects.toThrow('new row violates row-level security policy');
     expect(mockLog.slice(-2)).toEqual(['homework.insert', 'remove']);
-    expect(mockState.removed.at(-1)).toEqual(['S1/h1.jpg']);
+    expect(mockState.removed.at(-1)).toEqual(['S1/h1/1.jpg']);
   });
 
   it('AC 10 a: another homework for the assignment (23505) removes the photo and says it was already sent', async () => {

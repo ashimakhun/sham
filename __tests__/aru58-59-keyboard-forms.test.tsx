@@ -86,11 +86,11 @@ describe('ARU-58: meeting notes editor', () => {
 });
 
 describe('ARU-59: Add homework', () => {
-  it('Attach a photo and Send to mentor are inside the scrolling form; Description has a height cap', async () => {
+  it('Attach photos and Send to mentor are inside the scrolling form; Description has a height cap', async () => {
     params.assignmentId = 'a1';
     setStore(fakeStore('S1', { courseMembers: members, meetings: [C], assignments: [a1] }));
     await render(<NewHomeworkScreen />);
-    expectKeyboardForm(formOf(screen.getByRole('button', { name: 'Attach a photo' })));
+    expectKeyboardForm(formOf(screen.getByRole('button', { name: 'Attach photos' })));
     expectKeyboardForm(formOf(screen.getByRole('button', { name: 'Send to mentor' })));
     const description = screen.getByPlaceholderText('What did you do? Any questions for your mentor?');
     expect(StyleSheet.flatten(description.props.style).maxHeight).toBeGreaterThan(0);

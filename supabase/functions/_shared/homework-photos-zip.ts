@@ -25,6 +25,9 @@ export type ZipPhoto = {
   homework_title: string;
   assignment_title: string | null;
   sent_at: string;
+  /** ARU-191 (0081): the photo's place in its homework (1-based) and how many photos the homework has. */
+  position?: number;
+  photo_count?: number;
 };
 
 export type PhotoZipDeps = {
@@ -33,9 +36,17 @@ export type PhotoZipDeps = {
   /** homework_photos_for_zip(user): empty for waiting, declined or unknown users. Throws on a database error. */
   photosFor: (userId: string) => Promise<ZipPhoto[]>;
   /** Stores a new link (its token hash). Throws on failure. */
-  saveLink: (link: { tokenHash: string; userId: string; homeworkIds: string[]; expiresAt: string }) => Promise<void>;
-  /** claim_photo_zip_link(hash): the link's user and homework if it is unused and unexpired (and marks it used). */
-  claimLink: (tokenHash: string) => Promise<{ userId: string; homeworkIds: string[] } | null>;
+  saveLink: (link: {
+    tokenHash: string;
+    userId: string;
+    homeworkIds: string[];
+    /** ARU-191: the exact photos (a homework's photos may be split over two parts). */
+    photoPaths: string[];
+    expiresAt: string;
+  }) => Promise<void>;
+  /** claim_photo_zip_link(hash): the link's user, homework and photos if it is unused and unexpired (and marks it
+   *  used). photoPaths is null for a link made before ARU-191. */
+  claimLink: (tokenHash: string) => Promise<{ userId: string; homeworkIds: string[]; photoPaths?: string[] | null } | null>;
   /** The photo's bytes from the homework bucket, or null when the file is gone. Throws on other errors. */
   download: (path: string) => Promise<Uint8Array | null>;
   /** Builds the ZIP (stored, not recompressed: the photos are JPEGs already). */
@@ -75,17 +86,24 @@ export function safeName(s: string) {
 }
 
 /** AC 5: "<Course> - <Assignment> - <YYYY-MM-DD>.jpg" (the day it was sent, UTC; the homework title without an
- *  assignment), with " (2)", " (3)" for repeats, in the order given. */
+ *  assignment), with " (2)", " (3)" for repeats, in the order given. ARU-191 AC 10: a homework with several photos
+ *  numbers them after that name ("… 1.jpg", "… 2.jpg"), so they sort together; a repeat is counted per homework. */
 export function zipFileNames(photos: ZipPhoto[]): string[] {
   const used = new Map<string, number>();
+  const baseOf = new Map<string, string>();
   return photos.map((p) => {
-    const course = safeName(p.course_title) || 'Course';
-    const what = safeName(p.assignment_title ?? '') || safeName(p.homework_title) || 'Homework';
-    const base = `${course} - ${what} - ${utcDay(new Date(p.sent_at))}`;
-    const key = base.toLowerCase();
-    const n = (used.get(key) ?? 0) + 1;
-    used.set(key, n);
-    return n === 1 ? `${base}.jpg` : `${base} (${n}).jpg`;
+    let base = baseOf.get(p.homework_id);
+    if (base === undefined) {
+      const course = safeName(p.course_title) || 'Course';
+      const what = safeName(p.assignment_title ?? '') || safeName(p.homework_title) || 'Homework';
+      const plain = `${course} - ${what} - ${utcDay(new Date(p.sent_at))}`;
+      const key = plain.toLowerCase();
+      const n = (used.get(key) ?? 0) + 1;
+      used.set(key, n);
+      base = n === 1 ? plain : `${plain} (${n})`;
+      baseOf.set(p.homework_id, base);
+    }
+    return (p.photo_count ?? 1) > 1 ? `${base} ${p.position ?? 1}.jpg` : `${base}.jpg`;
   });
 }
 
@@ -130,7 +148,8 @@ async function createLink(request: Request, deps: PhotoZipDeps): Promise<Respons
     await deps.saveLink({
       tokenHash: await deps.hash(token),
       userId: user.id,
-      homeworkIds: chosen.map((p) => p.homework_id),
+      homeworkIds: [...new Set(chosen.map((p) => p.homework_id))],
+      photoPaths: chosen.map((p) => p.photo_path),
       expiresAt,
     });
     deps.log?.(`link for ${user.id}: ${chosen.length} photo(s)`);
@@ -163,9 +182,14 @@ async function serveZip(request: Request, deps: PhotoZipDeps): Promise<Response>
   try {
     const link = await deps.claimLink(await deps.hash(token));
     if (!link) return gone();
+    // Re-read the user's photos now: anything they can no longer read, or that is gone, is left out. ARU-191: by the
+    // link's exact photos (a link made before it: by homework). A photo's number is its position in its homework, so a
+    // homework split over two parts numbers its photos the same way in both.
+    const wantedPaths = link.photoPaths ? new Set(link.photoPaths) : null;
     const wanted = new Set(link.homeworkIds);
-    // Re-read the user's photos now: anything they can no longer read, or that is gone, is left out.
-    const photos = (await deps.photosFor(link.userId)).filter((p) => wanted.has(p.homework_id));
+    const photos = (await deps.photosFor(link.userId)).filter((p) =>
+      wantedPaths ? wantedPaths.has(p.photo_path) : wanted.has(p.homework_id),
+    );
     const names = zipFileNames(photos);
     const files: { name: string; data: Uint8Array }[] = [];
     for (let i = 0; i < photos.length; i++) {

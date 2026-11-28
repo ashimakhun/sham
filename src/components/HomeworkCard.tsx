@@ -4,6 +4,7 @@ import { Text } from '@/components/AppText';
 
 import { Card, StatusBadge, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
+import { storedPhotos } from '@/lib/photo';
 import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
 import type { Homework } from '@/lib/types';
@@ -25,6 +26,7 @@ export function HomeworkCard({ item, showStatus = true }: { item: Homework; show
   const showStudent = currentUser?.role !== 'student';
   const showComment = !showStatus && item.status === 'checked';
   const comment = showComment ? commentPreview(item.mentorComment) : null;
+  const photoCount = storedPhotos(item).length;
 
   return (
     <Card onPress={() => router.push({ pathname: '/homework/[id]', params: { id: item.id } })}>
@@ -37,7 +39,12 @@ export function HomeworkCard({ item, showStatus = true }: { item: Homework; show
       <Text style={styles.muted}>
         {showStudent ? `${getUser(item.studentId)?.name ?? t('homework.unknownStudent')} · ` : ''}
         {formatDate(item.createdAt)}
-        {item.photoUrl ? ` · ${t('homework.withPhoto')}` : ''}
+        {/* ARU-191 AC 7: how many photos (stored ones: a missing file has no link); one photo keeps "📎 photo". */}
+        {photoCount === 1
+          ? ` · ${t('homework.withPhoto')}`
+          : photoCount > 1
+            ? ` · ${t('homework.cardPhotoCount', { count: photoCount })}`
+            : ''}
       </Text>
       {showComment &&
         (comment ? (

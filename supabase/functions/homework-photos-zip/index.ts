@@ -3,7 +3,8 @@
 // The logic is in ../_shared/homework-photos-zip.ts (tested with Jest); this file only wires it to Supabase.
 //
 // No secrets to set: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase.
-// Needs migration 0050_homework_photo_rule.sql (homework_photos_for_zip, claim_photo_zip_link, photo_zip_links).
+// Needs migration 0050_homework_photo_rule.sql (homework_photos_for_zip, claim_photo_zip_link, photo_zip_links) and
+// ARU-191's 0081_homework_photos.sql (one row per photo; photo_zip_links.photo_paths).
 //
 // Deploy without JWT verification, because the GET link is opened without an auth header. The POST checks the user's
 // token itself, and the GET accepts only a valid one-time token:
@@ -36,19 +37,25 @@ Deno.serve((request) =>
       if (error) throw new Error(error.message);
       return (data ?? []) as ZipPhoto[];
     },
-    async saveLink({ tokenHash, userId, homeworkIds, expiresAt }) {
+    async saveLink({ tokenHash, userId, homeworkIds, photoPaths, expiresAt }) {
       // Old links are useless after a minute: clear yesterday's on the way.
       await admin.from('photo_zip_links').delete().lt('expires_at', new Date(Date.now() - 86_400_000).toISOString());
       const { error } = await admin
         .from('photo_zip_links')
-        .insert({ token_hash: tokenHash, user_id: userId, homework_ids: homeworkIds, expires_at: expiresAt });
+        .insert({
+          token_hash: tokenHash,
+          user_id: userId,
+          homework_ids: homeworkIds,
+          photo_paths: photoPaths,
+          expires_at: expiresAt,
+        });
       if (error) throw new Error(error.message);
     },
     async claimLink(tokenHash) {
       const { data, error } = await admin.rpc('claim_photo_zip_link', { hash: tokenHash });
       if (error) throw new Error(error.message);
-      const row = (data as { user_id: string; homework_ids: string[] }[] | null)?.[0];
-      return row ? { userId: row.user_id, homeworkIds: row.homework_ids } : null;
+      const row = (data as { user_id: string; homework_ids: string[]; photo_paths?: string[] | null }[] | null)?.[0];
+      return row ? { userId: row.user_id, homeworkIds: row.homework_ids, photoPaths: row.photo_paths ?? null } : null;
     },
     async download(path) {
       const { data, error } = await admin.storage.from('homework').download(path);

@@ -2,6 +2,7 @@
 // shows each photo's deletion date, warns 30 days before and lets the sender download their photos as a ZIP.
 import { currentLanguage, formatDateIn, type Language, translate } from '@/i18n';
 
+import { storedPhotos } from './photo';
 import type { Homework } from './types';
 
 export const PHOTO_RULE = 'Photos are kept for 6 months after the homework is checked, then deleted.';
@@ -44,9 +45,14 @@ export function formatUtcDate(day: string, lang: Language = currentLanguage()) {
   return formatDateIn(lang, `${day}T00:00:00Z`, 'UTC');
 }
 
-/** Homework the user sent whose photo is still stored (a missing file has no signed URL). */
+/** Homework the user sent with at least one photo still stored (a missing file has no signed URL). */
 export function storedOwnPhotos(homework: Homework[], userId: string | undefined) {
-  return homework.filter((h) => !!userId && h.studentId === userId && !!h.photoPath && !!h.photoUrl);
+  return homework.filter((h) => !!userId && h.studentId === userId && storedPhotos(h).length > 0);
+}
+
+/** ARU-191: how many stored photos these homework have (a homework can have up to 10). */
+export function storedPhotoCount(homework: Homework[]) {
+  return homework.reduce((n, h) => n + storedPhotos(h).length, 0);
 }
 
 /** AC 4: the user's stored photos with a deletion date within WARNING_DAYS, and the earliest date; null when none. */
@@ -57,10 +63,13 @@ export function deletionWarning(
   now: Date = new Date(),
 ): { count: number; date: string } | null {
   const limit = addDays(utcDay(now), WARNING_DAYS);
+  // ARU-191: every stored photo counts (the text says "N photos"); a homework's photos share its date.
   const dates = storedOwnPhotos(homework, userId)
     .filter((h) => h.status === 'checked')
-    .map((h) => photoDeletionDate(h.checkedAt, start))
-    .filter((d): d is string => !!d && d <= limit)
+    .flatMap((h) => {
+      const date = photoDeletionDate(h.checkedAt, start);
+      return date && date <= limit ? storedPhotos(h).map(() => date) : [];
+    })
     .sort();
   return dates.length ? { count: dates.length, date: dates[0] } : null;
 }
@@ -71,10 +80,11 @@ export function deletionWarningText({ count, date }: { count: number; date: stri
 
 export type ZipEntry = { key: string; courseId: string; title: string; part: number; parts: number; count: number };
 
-/** AC 6: one entry per course with photos, a course over PHOTO_ZIP_MAX in parts; sorted by course title. */
+/** AC 6: one entry per course with photos (counted per photo, ARU-191), a course over PHOTO_ZIP_MAX in parts; sorted by course title. */
 export function zipEntries(photos: Homework[], courseTitle: (courseId: string) => string | undefined): ZipEntry[] {
   const byCourse = new Map<string, number>();
-  for (const h of photos) if (h.courseId) byCourse.set(h.courseId, (byCourse.get(h.courseId) ?? 0) + 1);
+  // ARU-191 AC 10: each photo counts toward the 50 per ZIP.
+  for (const h of photos) if (h.courseId) byCourse.set(h.courseId, (byCourse.get(h.courseId) ?? 0) + storedPhotos(h).length);
   return [...byCourse]
     .map(([courseId, n]) => ({ courseId, n, title: courseTitle(courseId) ?? translate(currentLanguage(), 'homework.photosCourseFallback') }))
     .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }) || a.courseId.localeCompare(b.courseId))

@@ -65,6 +65,8 @@ insert into homework_assignments (id, meeting_id, course_id, title, created_by, 
 insert into homework (id, student_id, course_id, assignment_id, title, photo_path, status, workspace_id)
   values (t.x('XH'), t.x('XS'), t.x('XC'), t.x('XA'), 'Xhomework', t.x('XS') || '/xh.jpg', 'submitted', t.x('W2'));
 set session_replication_role = origin;
+-- ARU-191: a second photo of W2's homework (the guard sets its workspace from the homework).
+insert into homework_files (homework_id, path, position) values (t.x('XH'), t.x('XS') || '/' || t.x('XH') || '/2.jpg', 2);
 insert into meeting_attendance (meeting_id, user_id) values (t.x('XMT'), t.x('XS'));
 insert into meeting_listener_notes (id, meeting_id, course_id, author_id, body, is_public)
   values (t.x('XN'), t.x('XMT'), t.x('XC'), t.x('XS'), 'X note', true);
@@ -100,8 +102,8 @@ insert into material_files (id, author_id, name, storage_path, size_bytes, cours
   values (t.x('AF'), t.id('M'), 'A pdf', t.id('M') || '/' || t.x('AF') || '.pdf', 100, t.id('A'), true);
 
 -- Every W2 row was set to W2 by the guard (no row defaults to the oldest workspace).
-select t.eq((select count(*) from information_schema.columns c where c.table_schema = 'public' and c.column_name = 'workspace_id'), 25::bigint,
-  'data: 25 workspace-scoped tables (23 + profiles; content_reports since ARU-158; push_devices and notification_settings since ARU-166; telegram_links dropped by ARU-171)');
+select t.eq((select count(*) from information_schema.columns c where c.table_schema = 'public' and c.column_name = 'workspace_id'), 26::bigint,
+  'data: 26 workspace-scoped tables (23 + profiles; content_reports since ARU-158; push_devices and notification_settings since ARU-166; telegram_links dropped by ARU-171; homework_files since ARU-191)');
 do $$
 declare r record; n bigint; missing text := '';
 begin
