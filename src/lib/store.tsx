@@ -6,7 +6,7 @@ import { periodProblem } from './billing';
 import { ACCOUNT_DELETED, DELETE_FAILED, DELETE_OFFLINE, WORKSPACE_DELETE_FAILED, WORKSPACE_DELETED } from './deleteAccount';
 import { FEEDBACK_MAX } from './feedback';
 import { fileFieldsError, isAllowedPdf, PDF_MAX_BYTES, PDF_RULE } from './files';
-import { dbErrorMessage, phoneLanguage, translate } from '@/i18n';
+import { dbErrorMessage, type Language, phoneLanguage, translate } from '@/i18n';
 
 import { PHOTO_TOO_LARGE } from './compressPhoto';
 import { newId } from './id';
@@ -142,7 +142,14 @@ export type Store = {
   signIn: (username: string, password: string) => Promise<void>;
   /** ARU-146: creates the account and, in the same step, the workspace (its teacher) or the request to join one (by
    *  invite code). Both travel in the sign-up's user data, so they also work with email confirmation on. */
-  signUp: (displayName: string, username: string, password: string, workspace: WorkspaceChoice) => Promise<void>;
+  signUp: (
+    displayName: string,
+    username: string,
+    password: string,
+    workspace: WorkspaceChoice,
+    /** ARU-189 AC 5 / AC 7: the language picked on the form, saved with the account; left out when not touched. */
+    language?: Language,
+  ) => Promise<void>;
   /** ARU-181: a deactivated account joins another workspace by invite code (rejoin_workspace(), as a waiting student)
    *  or creates its own (create_my_workspace(), as its teacher), then reloads so the gate shows the new status. Already
    *  in a workspace (another device, a retry after a lost response, AC 10): reloads, then throws that error. */
@@ -1769,7 +1776,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const res = await supabase.auth.signInWithPassword({ email: signInAddress(username), password });
       if (res.error) throw new Error(signInErrorMessage(res.error));
     },
-    signUp: async (name, username, password, workspace) => {
+    signUp: async (name, username, password, workspace, language) => {
       setAccountNotice(null);
       const choice =
         workspace.kind === 'create' ? { workspace_name: workspace.name.trim() } : { invite_code: workspace.code.trim().toUpperCase() };
@@ -1779,7 +1786,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         email: usernameAddress(username),
         password,
         // ARU-159 AC 5: the version of the documents agreed to with the checkbox, saved with the account.
-        options: { data: { username: normalizeUsername(username), full_name: name.trim(), ...choice, terms_version: LEGAL_VERSION } },
+        // ARU-189 AC 5: the language picked on the form, in the same step (handle_new_user(), 0080); only when the
+        // switch was touched (AC 7).
+        options: {
+          data: {
+            username: normalizeUsername(username),
+            full_name: name.trim(),
+            ...choice,
+            terms_version: LEGAL_VERSION,
+            ...(language ? { language } : {}),
+          },
+        },
       });
       if (res.error) throw new Error(signUpErrorMessage(res.error, workspace.kind));
       // With email confirmation on, Supabase answers an existing address with a user that has no identities instead

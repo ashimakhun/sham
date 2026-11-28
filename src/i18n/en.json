@@ -956,5 +956,6 @@
   "deleteWorkspace.nameMissing": "Type the workspace name.",
   "deleteWorkspace.failed": "Your account and workspace couldn't be deleted. Please try again.",
   "db.workspace_delete_teacher_only": "Only the teacher can delete the workspace.",
-  "db.workspace_delete_files_left": "Some files are still being removed. Please try again."
+  "db.workspace_delete_files_left": "Some files are still being removed. Please try again.",
+  "signIn.language": "Language"
 }

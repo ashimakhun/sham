@@ -44,3 +44,16 @@ export const I18nContext = createContext<I18n>(make('en'));
 export function useI18n() {
   return useContext(I18nContext);
 }
+
+/**
+ * ARU-189: the Create account form's Language switch, before any account exists. `picked` is the language picked on
+ * that form (remembered on this device, analysis note 2), or null when the switch wasn't touched (AC 7). `choose`
+ * changes the language shown on this device at once (AC 3, AC 4) and saves nothing on a server. LanguageProvider
+ * fills it; outside one (tests of a single screen) the switch does nothing.
+ */
+export type FormLanguage = { picked: Language | null; choose: (lang: Language) => void };
+export const FormLanguageContext = createContext<FormLanguage>({ picked: null, choose: () => {} });
+
+export function useFormLanguage() {
+  return useContext(FormLanguageContext);
+}

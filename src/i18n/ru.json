@@ -956,5 +956,6 @@
   "deleteWorkspace.nameMissing": "Введите название рабочего пространства.",
   "deleteWorkspace.failed": "Не удалось удалить аккаунт и рабочее пространство. Попробуйте ещё раз.",
   "db.workspace_delete_teacher_only": "Удалить рабочее пространство может только преподаватель.",
-  "db.workspace_delete_files_left": "Некоторые файлы ещё удаляются. Попробуйте ещё раз."
+  "db.workspace_delete_files_left": "Некоторые файлы ещё удаляются. Попробуйте ещё раз.",
+  "signIn.language": "Язык"
 }
