@@ -101,12 +101,13 @@ describe('Add homework while preparing', () => {
     const release = hang();
     await render(<NewHomeworkScreen />);
     await fireEvent.changeText(screen.getByPlaceholderText('What did you do? Any questions for your mentor?'), 'Done');
-    await startPress('Attach a photo');
+    // ARU-191 AC 1: the button is now "Attach photos".
+    await startPress('Attach photos');
     expect(screen.getByRole('button', { name: 'Preparing photo…' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Send to mentor' })).toBeDisabled();
     expect(store.addHomework).not.toHaveBeenCalled();
     await act(async () => release());
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Attach a photo' })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Attach photos' })).toBeEnabled());
   });
 });
 

@@ -9,6 +9,7 @@ import { fileFieldsError, isAllowedPdf, PDF_MAX_BYTES, PDF_RULE } from './files'
 import { dbErrorMessage, phoneLanguage, translate } from '@/i18n';
 
 import { PHOTO_TOO_LARGE } from './compressPhoto';
+import { MAX_HOMEWORK_PHOTOS } from './photo';
 import { newId } from './id';
 import { syncPushRegistration, unregisterThisPhone, type PushRpc } from './push';
 import { cancelAllReminders, syncReminders } from './reminderScheduler';
@@ -902,12 +903,30 @@ function rows<T>(res: Result & { data: unknown }): T[] {
   return (res.data as T[] | null) ?? [];
 }
 
+type HomeworkFileRow = { homework_id: string; path: string; position: number };
+
+/** ARU-191: each homework's photos from homework_files, in order. A homework with no row there keeps its photo_path
+ *  as one photo (sent before 0081 ran, or the list couldn't be loaded); photoPath is then the first photo. */
+export function withPhotoLists(items: Homework[], files: HomeworkFileRow[]): Homework[] {
+  const byHomework = new Map<string, HomeworkFileRow[]>();
+  for (const f of files) byHomework.set(f.homework_id, [...(byHomework.get(f.homework_id) ?? []), f]);
+  return items.map((h) => {
+    const list = byHomework.get(h.id)?.sort((a, b) => a.position - b.position);
+    const photos = list?.length ? list.map((f) => ({ path: f.path })) : h.photoPath ? [{ path: h.photoPath }] : [];
+    return { ...h, photos, photoPath: photos[0]?.path };
+  });
+}
+
 async function withSignedPhotoUrls(items: Homework[]) {
-  const paths = items.map((h) => h.photoPath).filter((p): p is string => !!p);
+  const paths = [...new Set(items.flatMap((h) => (h.photos ?? []).map((p) => p.path)))];
   if (!paths.length) return items;
   const { data } = await supabase.storage.from('homework').createSignedUrls(paths, 60 * 60);
   const urls = new Map(data?.map((d) => [d.path, d.signedUrl]));
-  return items.map((h) => (h.photoPath ? { ...h, photoUrl: urls.get(h.photoPath) ?? undefined } : h));
+  return items.map((h) => {
+    if (!h.photos?.length) return h;
+    const photos = h.photos.map((p) => ({ ...p, url: urls.get(p.path) ?? undefined }));
+    return { ...h, photos, photoUrl: photos[0].url };
+  });
 }
 
 /** ARU-170: how long the store waits for a burst of loads to settle before rescheduling reminders. */
@@ -1095,7 +1114,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     try {
       // RLS returns nothing but the own profile to an account that isn't approved (ARU-43), so these all succeed
       // (empty) for it and the app shows the waiting screen.
-      const [profileRows, hw, mats, crs, members, mtgs, asgs, att, files, likes, fb, discs, listenerNotes, own, agreements] = await Promise.all([
+      const [profileRows, hw, mats, crs, members, mtgs, asgs, att, files, likes, fb, discs, listenerNotes, own, agreements, hwFiles] = await Promise.all([
         // '*' so the app keeps working if the access_status column (0021) isn't there yet.
         supabase.from('profiles').select('*').order('full_name'),
         supabase.from('homework').select('*').order('created_at', { ascending: false }),
@@ -1125,6 +1144,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         Promise.resolve(supabase.from('legal_agreements').select('version').order('version', { ascending: false }).limit(1)).catch(
           () => null,
         ),
+        // ARU-191: every homework's photos (RLS: those of homework I can read). A failure (offline, or before 0081)
+        // gives null here: each homework then shows its photo_path as one photo.
+        Promise.resolve(supabase.from('homework_files').select('homework_id, path, position')).catch(() => null),
       ]);
       if (!current()) return;
       // ARU-165: only an account with a username has a recovery code: ask whether it is saved, before the data is
@@ -1135,7 +1157,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ? await Promise.resolve(supabase.rpc('my_recovery_code_saved')).catch(() => null)
         : null;
       if (!current()) return;
-      const signedHomework = await withSignedPhotoUrls(rows<HomeworkRow>(hw).map(toHomework));
+      const photoRows = hwFiles && !hwFiles.error ? ((hwFiles.data as HomeworkFileRow[] | null) ?? []) : [];
+      const signedHomework = await withSignedPhotoUrls(withPhotoLists(rows<HomeworkRow>(hw).map(toHomework), photoRows));
       if (!current()) return;
       const all = rows<ProfileRow>(profileRows).map(toUser);
       const me = all.find((u) => u.id === userId);
@@ -1925,7 +1948,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (!courseMembers.some((m) => m.courseId === input.courseId && m.userId === student.id)) {
         throw new Error('You are not a listener of this course.');
       }
-      // Before uploading the photo, so a rejected send leaves no stray file. A row with this form's id is an
+      // Before uploading the photos, so a rejected send leaves no stray file. A row with this form's id is an
       // earlier attempt that already saved: done.
       const sent = rows<{ id: string }>(
         await supabase
@@ -1939,28 +1962,46 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (sent.length > 0) throw new Error(ALREADY_SENT);
-      let photoPath: string | null = null;
-      if (input.photoUri) {
-        // The photo was resized and compressed when picked (ARU-105); this is exactly the file the form showed.
-        const file = await fetch(input.photoUri).then((r) => r.arrayBuffer());
-        // Named after the homework id. ARU-105 AC 10 b: a leftover from an earlier failed send of this form is removed
-        // first (0049 lets the sender delete it while no homework points to it), so only the photo shown now is
-        // stored. A missing file is fine; a failed removal stops the send.
-        photoPath = `${student.id}/${input.id}.jpg`;
-        const leftover = await supabase.storage.from('homework').remove([photoPath]);
+      // ARU-191: up to 10 photos, each resized and compressed when picked (ARU-105): exactly the files the form showed.
+      const uris = (input.photoUris ?? (input.photoUri ? [input.photoUri] : [])).slice(0, MAX_HOMEWORK_PHOTOS);
+      // Named `<uid>/<homework id>/<n>.jpg`, the only folder submit_homework() (0081) accepts for this homework.
+      const paths = uris.map((_, i) => `${student.id}/${input.id}/${i + 1}.jpg`);
+      const bucket = supabase.storage.from('homework');
+      if (paths.length) {
+        // ARU-105 AC 10 b / ARU-191 AC 5: leftovers of an earlier failed send of this form are removed first (0049 lets
+        // the sender delete them while no homework points to them), so only the photos shown now are stored. Every
+        // possible name, as an earlier attempt may have had more photos. Missing files are fine; a failed removal
+        // stops the send.
+        const leftover = await bucket.remove(
+          Array.from({ length: MAX_HOMEWORK_PHOTOS }, (_, i) => `${student.id}/${input.id}/${i + 1}.jpg`),
+        );
         if (leftover.error) throw new Error(leftover.error.message);
-        const upload = await supabase.storage.from('homework').upload(photoPath, file, { contentType: 'image/jpeg' });
-        // "Already exists" now means the leftover couldn't be removed: a failed send, never success.
-        if (upload.error) throw new Error(homeworkPhotoUploadError(upload.error));
       }
-      const res = await supabase.from('homework').insert({
-        id: input.id,
-        student_id: student.id,
+      // AC 5: all or nothing. A failed upload removes the ones uploaded so far (best effort: the next send removes
+      // leftovers first, and ARU-112's daily clean-up catches a form closed without retrying).
+      const uploaded: string[] = [];
+      const dropUploaded = () => (uploaded.length ? bucket.remove(uploaded).catch(() => {}) : Promise.resolve());
+      try {
+        for (let i = 0; i < uris.length; i++) {
+          const file = await fetch(uris[i]).then((r) => r.arrayBuffer());
+          const upload = await bucket.upload(paths[i], file, { contentType: 'image/jpeg' });
+          // "Already exists" now means the leftover couldn't be removed: a failed send, never success.
+          if (upload.error) throw new Error(homeworkPhotoUploadError(upload.error));
+          uploaded.push(paths[i]);
+        }
+      } catch (e) {
+        await dropUploaded();
+        throw e;
+      }
+      // The homework and all its photos in one transaction (0081): the mentor's "submitted" notification fires on
+      // the homework insert, so a send that fails half-way saves nothing.
+      const res = await supabase.rpc('submit_homework', {
+        homework_id: input.id,
         course_id: input.courseId,
         assignment_id: input.assignmentId,
         title: input.title.trim(),
         description: input.description.trim(),
-        photo_path: photoPath,
+        photo_paths: paths,
       });
       // A duplicate is either this form's earlier attempt (saved: fine) or another homework for the assignment.
       if (res.error?.code === '23505' && (await rowExists('homework', input.id))) {
@@ -1968,9 +2009,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (res.error) {
-        // ARU-105 AC 10 a: the homework wasn't saved, so its photo goes too (best effort: if this fails, the next
-        // send removes the leftover first, and ARU-107's daily clean-up catches a form closed without retrying).
-        if (photoPath) await supabase.storage.from('homework').remove([photoPath]).catch(() => {});
+        // ARU-105 AC 10 a: the homework wasn't saved, so its photos go too.
+        await dropUploaded();
         if (res.error.code === '23505') throw new Error(ALREADY_SENT);
       }
       checkInsert(res);
@@ -2098,9 +2138,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     countListenerHomework: async (courseId, userId) => {
       requireRole('teacher', 'mentor');
-      return rows<ListenerHomeworkRow>(
-        await supabase.rpc('listener_homework_photos', { course: courseId, member: userId }),
-      ).length;
+      // ARU-191: one row per photo (0081), so count homework, not rows.
+      return new Set(
+        rows<ListenerHomeworkRow>(await supabase.rpc('listener_homework_photos', { course: courseId, member: userId })).map(
+          (r) => r.id,
+        ),
+      ).size;
     },
     removeListener: async (courseId, userId) => {
       requireRole('teacher', 'mentor');

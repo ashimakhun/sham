@@ -10,23 +10,20 @@ import { PhotoPreview } from '@/components/PhotoPreview';
 
 import { Button, Card, EmptyState, ErrorText, Field, StatusBadge, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
+import { homeworkPhotos } from '@/lib/photo';
 import { canCheckHomework } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
 import { colors, formatDate, formatDateTime } from '@/lib/theme';
+import type { HomeworkPhoto } from '@/lib/types';
 
 export default function HomeworkDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { visibleHomework, currentUser, getUser, getCourse, checkHomework, assignments, meetings, getPhotoUrl } =
     useStore();
   const [comment, setComment] = useState('');
-  const [previewOpen, setPreviewOpen] = useState(false);
-  // The photo's file is gone (or its link couldn't be made): show "Photo unavailable" instead of an empty box.
-  const [photoFailed, setPhotoFailed] = useState(false);
-  // ARU-156: the loaded link may have expired (links last an hour). On the first error, ask once for a fresh link and
-  // show "Photo unavailable" only if that one fails too.
-  const [freshPhotoUrl, setFreshPhotoUrl] = useState<string | null>(null);
-  const retriedPhoto = useRef(false);
+  // ARU-191: the photo open in the full-screen preview (its path), if any.
+  const [previewPath, setPreviewPath] = useState<string | null>(null);
   const { busy, error, run } = useAction();
   const { t, lang } = useI18n();
 
@@ -42,17 +39,8 @@ export default function HomeworkDetailScreen() {
   // ARU-184: the "Assignment: …" row is left out when it would just repeat the heading (trimmed, ignoring case).
   const showAssignmentTitle =
     !!assignment && assignment.title.trim().toLowerCase() !== item.title.trim().toLowerCase();
-  const photoUrl = freshPhotoUrl ?? item.photoUrl;
-
-  function onPhotoError() {
-    const path = item?.photoPath;
-    if (retriedPhoto.current || !path) {
-      setPhotoFailed(true);
-      return;
-    }
-    retriedPhoto.current = true;
-    getPhotoUrl(path).then(setFreshPhotoUrl, () => setPhotoFailed(true));
-  }
+  // ARU-191 AC 6 / AC 8: every photo in order (a homework sent before ARU-191 has one).
+  const photos = homeworkPhotos(item);
 
   return (
     <View style={styles.screen}>
@@ -83,8 +71,9 @@ export default function HomeworkDetailScreen() {
             {student?.name} · {formatDate(item.createdAt)}
           </Text>
           {item.description ? <Text style={styles.body}>{item.description}</Text> : null}
-          {!item.photoPath && item.photoRemovedAt ? (
-            // ARU-112 AC 6: the daily job removed it; a note instead of the photo, with no preview and no Download.
+          {!photos.length && item.photoRemovedAt ? (
+            // ARU-112 AC 6 / ARU-191 AC 9: the daily job removed them; one note instead of the photos, with no preview
+            // and no Download.
             <View
               testID="homework-photo-removed"
               style={{
@@ -98,33 +87,15 @@ export default function HomeworkDetailScreen() {
               <Text style={styles.muted}>{t('homework.photoRemoved')}</Text>
             </View>
           ) : null}
-          {item.photoPath && (
-            // The whole photo, letterboxed (ARU-18 AC 1); tap for the full-screen preview.
-            <Pressable accessibilityRole="imagebutton" accessibilityLabel={t('homework.openPhoto')} onPress={() => setPreviewOpen(true)}>
-              {photoUrl && !photoFailed ? (
-                <Image
-                  testID="homework-photo"
-                  source={{ uri: photoUrl }}
-                  resizeMode="contain"
-                  style={{ width: '100%', height: 260, borderRadius: 10, backgroundColor: colors.border }}
-                  onError={onPhotoError}
-                />
-              ) : (
-                <View
-                  testID="homework-photo-unavailable"
-                  style={{
-                    width: '100%',
-                    height: 120,
-                    borderRadius: 10,
-                    backgroundColor: colors.border,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                  <Text style={styles.muted}>{t('photo.unavailable')}</Text>
-                </View>
-              )}
-            </Pressable>
-          )}
+          {photos.map((photo, i) => (
+            <HomeworkPhotoTile
+              key={`${i}:${photo.path}`}
+              photo={photo}
+              label={photos.length > 1 ? t('homework.openPhotoNumber', { n: i + 1 }) : t('homework.openPhoto')}
+              getPhotoUrl={getPhotoUrl}
+              onOpen={() => setPreviewPath(photo.path)}
+            />
+          ))}
         </Card>
 
         {item.status === 'checked' && (
@@ -157,14 +128,73 @@ export default function HomeworkDetailScreen() {
           </Card>
         )}
       </KeyboardForm>
-      {previewOpen && item.photoPath && (
+      {previewPath && (
         <PhotoPreview
-          path={item.photoPath}
+          path={previewPath}
           homeworkId={item.id}
-          title={item.title}
-          onClose={() => setPreviewOpen(false)}
+          title={photos.length > 1 ? `${item.title} ${photos.findIndex((p) => p.path === previewPath) + 1}` : item.title}
+          onClose={() => setPreviewPath(null)}
         />
       )}
     </View>
+  );
+}
+
+/**
+ * One photo of a homework (ARU-18 AC 1: the whole photo, letterboxed; tap for the full-screen preview). ARU-191 AC 6: a
+ * photo that fails shows "Photo unavailable" on its own. ARU-156: the loaded link may have expired (links last an
+ * hour): on the first error, ask once for a fresh link, and show "Photo unavailable" only if that one fails too.
+ */
+function HomeworkPhotoTile({
+  photo,
+  label,
+  getPhotoUrl,
+  onOpen,
+}: {
+  photo: HomeworkPhoto;
+  label: string;
+  getPhotoUrl: (path: string) => Promise<string>;
+  onOpen: () => void;
+}) {
+  const { t } = useI18n();
+  const [failed, setFailed] = useState(false);
+  const [freshUrl, setFreshUrl] = useState<string | null>(null);
+  const retried = useRef(false);
+  const url = freshUrl ?? photo.url;
+
+  function onError() {
+    if (retried.current) {
+      setFailed(true);
+      return;
+    }
+    retried.current = true;
+    getPhotoUrl(photo.path).then(setFreshUrl, () => setFailed(true));
+  }
+
+  return (
+    <Pressable accessibilityRole="imagebutton" accessibilityLabel={label} onPress={onOpen}>
+      {url && !failed ? (
+        <Image
+          testID="homework-photo"
+          source={{ uri: url }}
+          resizeMode="contain"
+          style={{ width: '100%', height: 260, borderRadius: 10, backgroundColor: colors.border }}
+          onError={onError}
+        />
+      ) : (
+        <View
+          testID="homework-photo-unavailable"
+          style={{
+            width: '100%',
+            height: 120,
+            borderRadius: 10,
+            backgroundColor: colors.border,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <Text style={styles.muted}>{t('photo.unavailable')}</Text>
+        </View>
+      )}
+    </Pressable>
   );
 }

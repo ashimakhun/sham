@@ -136,25 +136,26 @@ describe('Add homework (AC 1–3, AC 6)', () => {
     manipulator.__setImage('file:///IMG_1.HEIC', { width: 4000, height: 3000, bytes: 280_000, out: 'file:///cache/hw.jpg' });
     pick('file:///IMG_1.HEIC');
     await render(<NewHomeworkScreen />);
-    await fireEvent.press(screen.getByRole('button', { name: 'Attach a photo' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Attach photos' }));
     await waitFor(() => expect(preview()[0]?.props.source).toEqual({ uri: 'file:///cache/hw.jpg' }));
     expect(picker.launchImageLibraryAsync).toHaveBeenCalledWith(
       expect.objectContaining({ mediaTypes: ['images'], quality: 1, preferredAssetRepresentationMode: 'compatible' }),
     );
     await fireEvent.press(screen.getByRole('button', { name: 'Send to mentor' }));
-    expect(store.addHomework).toHaveBeenCalledWith(expect.objectContaining({ photoUri: 'file:///cache/hw.jpg' }));
+    expect(store.addHomework).toHaveBeenCalledWith(expect.objectContaining({ photoUris: ['file:///cache/hw.jpg'] }));
   });
 
-  it('Change photo replaces the preview with the newly prepared photo', async () => {
+  // ARU-191: a second pick adds to the list (there is no Change photo any more).
+  it('Add photos adds the newly prepared photo after the first', async () => {
     open();
     manipulator.__setImage('file:///one.jpg', { width: 4000, height: 3000, out: 'file:///cache/one.jpg' });
     manipulator.__setImage('file:///two.jpg', { width: 4000, height: 3000, out: 'file:///cache/two.jpg' });
     pick('file:///one.jpg');
     pick('file:///two.jpg');
     await render(<NewHomeworkScreen />);
-    await fireEvent.press(screen.getByRole('button', { name: 'Attach a photo' }));
-    await fireEvent.press(await screen.findByRole('button', { name: 'Change photo' }));
-    await waitFor(() => expect(preview()[0]?.props.source).toEqual({ uri: 'file:///cache/two.jpg' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Attach photos' }));
+    await fireEvent.press(await screen.findByRole('button', { name: 'Add photos' }));
+    await waitFor(() => expect(preview().map((p) => p.props.source)).toEqual([{ uri: 'file:///cache/one.jpg' }, { uri: 'file:///cache/two.jpg' }]));
   });
 
   it('AC 6: a photo that can\'t be prepared shows the message; the text and the earlier photo stay', async () => {
@@ -165,8 +166,8 @@ describe('Add homework (AC 1–3, AC 6)', () => {
     pick('file:///bad.jpg');
     await render(<NewHomeworkScreen />);
     await fireEvent.changeText(screen.getByPlaceholderText('What did you do? Any questions for your mentor?'), 'Done all');
-    await fireEvent.press(screen.getByRole('button', { name: 'Attach a photo' }));
-    await fireEvent.press(await screen.findByRole('button', { name: 'Change photo' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Attach photos' }));
+    await fireEvent.press(await screen.findByRole('button', { name: 'Add photos' }));
     expect(await screen.findByText(PHOTO_PREPARE_ERROR)).toBeTruthy();
     expect(preview()[0]?.props.source).toEqual({ uri: 'file:///cache/good.jpg' });
     expect(screen.getByPlaceholderText('What did you do? Any questions for your mentor?').props.value).toBe('Done all');
@@ -178,17 +179,17 @@ describe('Add homework (AC 1–3, AC 6)', () => {
     manipulator.__setImage('file:///bad.jpg', { fail: true });
     pick('file:///bad.jpg');
     await render(<NewHomeworkScreen />);
-    await fireEvent.press(screen.getByRole('button', { name: 'Attach a photo' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Attach photos' }));
     expect(await screen.findByText(PHOTO_PREPARE_ERROR)).toBeTruthy();
     expect(preview()).toHaveLength(0);
-    expect(screen.getByRole('button', { name: 'Attach a photo' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Attach photos' })).toBeTruthy();
   });
 
   it('a cancelled pick changes nothing', async () => {
     open();
     picker.launchImageLibraryAsync.mockResolvedValueOnce({ canceled: true, assets: null } as never);
     await render(<NewHomeworkScreen />);
-    await fireEvent.press(screen.getByRole('button', { name: 'Attach a photo' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Attach photos' }));
     expect(manipulator.ImageManipulator.manipulate).not.toHaveBeenCalled();
     expect(preview()).toHaveLength(0);
   });

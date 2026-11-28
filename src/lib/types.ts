@@ -93,6 +93,10 @@ export type WorkspaceInvite = { name: string; code: string };
 
 export type HomeworkStatus = 'submitted' | 'checked';
 
+/** ARU-191: one photo of a homework: its path in the "homework" bucket and a short-lived signed URL (none when the
+ *  file is gone or the link couldn't be made). */
+export type HomeworkPhoto = { path: string; url?: string };
+
 export type Homework = {
   id: string;
   /** Who submitted it: a listener of the course (student or mentor). */
@@ -101,9 +105,12 @@ export type Homework = {
   courseId?: string;
   title: string;
   description: string;
-  /** Path in the "homework" storage bucket. */
+  /** ARU-191: the homework's photos (up to 10), in the order picked. Read with homeworkPhotos() (src/lib/photo.ts),
+   *  which also covers a homework given only photoPath / photoUrl. */
+  photos?: HomeworkPhoto[];
+  /** Path in the "homework" storage bucket of the first photo (ARU-191: kept for code that shows one photo). */
   photoPath?: string;
-  /** Short-lived signed URL for displaying the photo. */
+  /** Short-lived signed URL for displaying the first photo. */
   photoUrl?: string;
   /** When the daily job removed the photo, 6 months after checking (ARU-112); photoPath is then empty. */
   photoRemovedAt?: string;
@@ -302,6 +309,9 @@ export type NewHomework = {
   assignmentId: string;
   title: string;
   description: string;
+  /** ARU-191: the prepared photos (up to 10), in order. */
+  photoUris?: string[];
+  /** One photo (before ARU-191); used when photoUris is not given. */
   photoUri?: string;
 };
 export type NewAssignment = {

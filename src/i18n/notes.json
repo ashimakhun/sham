@@ -167,7 +167,7 @@
   "homework.emptyListenersHint": "Homework tab (mentor, teacher) · empty list: hint",
   "homework.emptyMineTitle": "Homework tab (mentor, Listener) · empty list of sent homework: title",
   "homework.unknownStudent": "Homework cards · shown instead of a student whose profile can't be read",
-  "homework.withPhoto": "Homework cards · end of the info line when a photo is attached",
+  "homework.withPhoto": "Homework cards · end of the info line when one photo is attached (ARU-191: 2 or more show homework.cardPhotoCount)",
   "homework.checkedNoCommentCard": "Homework tab, Checked cards · shown when the checker left no comment",
   "homework.overdue": "Homework tab, New cards · red badge when the deadline has passed",
   "homework.due": "Homework tab New cards, Add homework, homework details · the assignment's deadline, {date} is date and time",
@@ -954,5 +954,18 @@
   "deleteWorkspace.nameMissing": "Delete workspace · error when no name was typed",
   "deleteWorkspace.failed": "Delete workspace · error when deleting failed",
   "db.workspace_delete_teacher_only": "Database error · someone other than the teacher tries to delete the workspace",
-  "db.workspace_delete_files_left": "Database error · Delete workspace found a file uploaded during the deletion"
+  "db.workspace_delete_files_left": "Database error · Delete workspace found a file uploaded during the deletion",
+  "homework.photosLabel": "Add homework · label above the photos (ARU-191: up to 10)",
+  "homework.attachPhotos": "Add homework · photo button when no photo is attached (opens the library, several at once)",
+  "homework.addPhotos": "Add homework · photo button when 1 to 9 photos are attached",
+  "homework.photoLimit": "Add homework · shown when 10 photos are attached or more were picked than fit",
+  "homework.attachedPhotoNumber": "Add homework · screen-reader label of an attached photo's thumbnail ({n}: its number)",
+  "homework.removePhotoNumber": "Add homework · screen-reader label of the ✕ that removes an attached photo ({n}: its number)",
+  "homework.openPhotoNumber": "Homework details · screen-reader label of a photo ({n}: its number)",
+  "homework.cardPhotoCount_one": "Homework cards · end of the info line: how many photos are attached (2 to 10)",
+  "homework.cardPhotoCount_few": "Homework cards · end of the info line: how many photos are attached (2 to 10)",
+  "homework.cardPhotoCount_many": "Homework cards · end of the info line: how many photos are attached (2 to 10)",
+  "homework.cardPhotoCount_other": "Homework cards · end of the info line: how many photos are attached (2 to 10)",
+  "db.homework_too_many_photos": "Database error · an 11th photo on a homework",
+  "db.homework_photo_not_yours": "Database error · a homework photo that isn't in the sender's own folder for it"
 }

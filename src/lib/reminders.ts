@@ -10,6 +10,7 @@
 // At most the 60 soonest are scheduled (AC 4; iOS keeps 64 pending notifications).
 import { type Language, translate } from '@/i18n';
 
+import { homeworkPhotos } from './photo';
 import { addDays, formatUtcDate, photoDeletionDate } from './photoRetention';
 import type { Course, CourseMember, Homework, HomeworkAssignment, Meeting, NotificationKind, Role } from './types';
 
@@ -105,7 +106,9 @@ export function remindersFor(input: ReminderInput): Reminder[] {
   if (on(settings, 'photo_deletion') && input.photoDeletionStart) {
     const byDay = new Map<string, { count: number; earliest: string }>();
     for (const h of input.homework) {
-      if (h.studentId !== userId || !h.photoPath || h.photoRemovedAt) continue;
+      // ARU-191: count photos, not homework (the text says "N photos").
+      const photos = homeworkPhotos(h).length;
+      if (h.studentId !== userId || !photos || h.photoRemovedAt) continue;
       const deletion = photoDeletionDate(h.checkedAt, input.photoDeletionStart);
       if (!deletion) continue;
       for (const days of PHOTO_MARK_DAYS) {
@@ -113,9 +116,9 @@ export function remindersFor(input: ReminderInput): Reminder[] {
         const day = addDays(deletion, -days);
         if (localNineOn(day) <= nowMs) continue;
         const group = byDay.get(day);
-        if (!group) byDay.set(day, { count: 1, earliest: deletion });
+        if (!group) byDay.set(day, { count: photos, earliest: deletion });
         else {
-          group.count += 1;
+          group.count += photos;
           if (deletion < group.earliest) group.earliest = deletion;
         }
       }
