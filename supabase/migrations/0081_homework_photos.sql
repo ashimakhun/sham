@@ -21,7 +21,9 @@
 --      workspace deletion (0040, 0078) find files by their first folder, so `<uid>/<homework id>/<n>.jpg` is covered.
 --   5. The deletion job (AC 9): due_homework_photos() lists photos (the batch limit counts photos);
 --      mark_homework_photos_removed() drops the rows of the deleted files and sets photo_removed_at only on homework
---      with no photo left, so a homework whose deletes partly failed is finished the next day.
+--      with no photo left, so a homework whose deletes partly failed is finished the next day. ARU-203: it also adds
+--      the photos it drops to homework.photos_removed_count (over every run), so Homework details can say how many
+--      were removed. Existing removed homework (one photo each before this list) get 1. App users can't set it.
 --   6. ZIP (AC 10): homework_photos_for_zip() returns one row per photo with its position and the homework's photo
 --      count; photo_zip_links remembers the exact photos of a link (a homework's photos may be split over two parts).
 -- No new Edge Function or cron job. The photo-deletion and homework-photos-zip functions change (redeploy them).
@@ -286,9 +288,28 @@ create or replace function due_homework_photos(max_photos integer) returns table
     limit max_photos
   $$;
 
--- After the files were deleted from Storage (or were already missing): drops their rows, then clears photo_path and
--- stores the removal time on each of those homework that has no photo left. Only rows that still point at a deleted
--- file change. Returns how many photos were marked.
+-- ARU-203: how many photos the job removed from the homework, over all its runs (0 = none). Readable like the rest of
+-- the row; not in the client update grant (0005), and the trigger below keeps app users from setting it on insert.
+-- Homework removed before this migration had exactly one photo (photo_path), so they get 1.
+alter table homework add column photos_removed_count integer not null default 0 check (photos_removed_count >= 0);
+update homework set photos_removed_count = 1 where photo_removed_at is not null;
+
+create function homework_keep_photos_removed_count() returns trigger
+  language plpgsql set search_path = public
+  as $$
+  begin
+    if current_user in ('anon', 'authenticated') then
+      new.photos_removed_count := case when tg_op = 'UPDATE' then old.photos_removed_count else 0 end;
+    end if;
+    return new;
+  end $$;
+revoke execute on function homework_keep_photos_removed_count() from public, anon, authenticated;
+create trigger homework_keep_photos_removed_count before insert or update on homework
+  for each row execute function homework_keep_photos_removed_count();
+
+-- After the files were deleted from Storage (or were already missing): drops their rows, adds them to
+-- photos_removed_count (ARU-203), then clears photo_path and stores the removal time on each of those homework that
+-- has no photo left. Only rows that still point at a deleted file change. Returns how many photos were marked.
 create or replace function mark_homework_photos_removed(homework_ids uuid[], photo_paths text[]) returns integer
   language plpgsql volatile security definer set search_path = public
   as $$
@@ -296,6 +317,7 @@ create or replace function mark_homework_photos_removed(homework_ids uuid[], pho
     n integer;
     legacy integer;
     done uuid[];
+    counts integer[];
     only_path uuid[];
   begin
     -- A photo_path with no list row at all (see homework_photo_paths): marked by its photo_path, as before.
@@ -308,8 +330,17 @@ create or replace function mark_homework_photos_removed(homework_ids uuid[], pho
       using unnest(homework_ids, photo_paths) as d (id, path)
       where f.homework_id = d.id and f.path = d.path
       returning f.homework_id
-    )
-    select count(*), coalesce(array_agg(distinct homework_id), '{}') into n, done from gone;
+    ),
+    per as (select g.homework_id, count(*)::integer as c from gone g group by g.homework_id)
+    select coalesce(sum(c), 0)::integer, coalesce(array_agg(homework_id), '{}'), coalesce(array_agg(c), '{}')
+      into n, done, counts
+    from per;
+    -- ARU-203: count what this run removed (a homework finished over several runs adds up every run).
+    update homework h set photos_removed_count = h.photos_removed_count + d.c
+    from unnest(done, counts) as d (id, c)
+    where h.id = d.id;
+    update homework h set photos_removed_count = h.photos_removed_count + 1
+    where h.id = any (only_path);
     -- Only homework with no photo left (a part that failed stays for the next run).
     update homework h set photo_path = null, photo_removed_at = now()
     where (h.id = any (done) or h.id = any (only_path))

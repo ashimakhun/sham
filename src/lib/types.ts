@@ -114,6 +114,8 @@ export type Homework = {
   photoUrl?: string;
   /** When the daily job removed the photo, 6 months after checking (ARU-112); photoPath is then empty. */
   photoRemovedAt?: string;
+  /** ARU-203: how many photos the daily job removed (0081); undefined before that migration runs. */
+  photosRemovedCount?: number;
   status: HomeworkStatus;
   createdAt: string;
   checkedById?: string;

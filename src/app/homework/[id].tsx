@@ -84,7 +84,12 @@ export default function HomeworkDetailScreen() {
                 alignItems: 'center',
                 justifyContent: 'center',
               }}>
-              <Text style={styles.muted}>{t('homework.photoRemoved')}</Text>
+              <Text style={styles.muted}>
+                {/* ARU-203: one photo (or an unknown count) keeps the old text; 2 or more say how many. */}
+                {(item.photosRemovedCount ?? 0) > 1
+                  ? t('homework.photosRemoved', { count: item.photosRemovedCount ?? 0 })
+                  : t('homework.photoRemoved')}
+              </Text>
             </View>
           ) : null}
           {photos.map((photo, i) => (

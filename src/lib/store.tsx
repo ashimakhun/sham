@@ -426,6 +426,8 @@ type HomeworkRow = {
   assignment_id?: string | null;
   /** ARU-112 (0053); undefined before that migration runs. */
   photo_removed_at?: string | null;
+  /** ARU-203 (0081); undefined before that migration runs. */
+  photos_removed_count?: number | null;
 };
 type AssignmentRow = {
   id: string;
@@ -620,6 +622,7 @@ const toHomework = (r: HomeworkRow): Homework => ({
   mentorComment: r.mentor_comment ?? undefined,
   assignmentId: r.assignment_id ?? undefined,
   photoRemovedAt: r.photo_removed_at ?? undefined,
+  photosRemovedCount: r.photos_removed_count ?? undefined,
 });
 
 const toAssignment = (r: AssignmentRow): HomeworkAssignment => ({
