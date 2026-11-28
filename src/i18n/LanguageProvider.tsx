@@ -41,10 +41,15 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }, [account]);
   // ARU-189 AC 4 / AC 6: a signed-in account's language replaces the form's pick (adjusted while rendering, as React
   // recommends for state that follows a value).
-  const [pickAccount, setPickAccount] = useState(account);
+  // ARU-202 / ARU-108 AC 6: the account's language also becomes the language last shown on this device, so the
+  // sign-in screen keeps it after sign-out instead of going back to an older pick or stored value.
+  const [pickAccount, setPickAccount] = useState<Language | null>(null);
   if (pickAccount !== account) {
     setPickAccount(account);
-    if (account) setPicked(null);
+    if (account) {
+      setPicked(null);
+      setLastShown(account);
+    }
   }
 
   useEffect(() => {
@@ -56,7 +61,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
           AsyncStorage.getItem(FORM_LANGUAGE_KEY),
         ]);
         if (!alive || choseHere.current) return;
-        if (isLanguage(saved)) setLastShown(saved);
+        // ARU-202: once an account has decided the language, storage read late must not replace it.
+        if (isLanguage(saved) && !accountRef.current) setLastShown(saved);
         // ARU-189 AC 4: a pick from an earlier visit shows again and still counts as picked (note 2), unless an
         // account has signed in meanwhile (its language replaces it).
         if (isLanguage(form) && !accountRef.current) {
