@@ -165,7 +165,7 @@ export function CourseCard({ course, tag, onOpen }: Props) {
               style={{ gap: 8 }}>
               {top}
             </Pressable>
-            <ShowDescriptionButton ref={showButton} title={course.title} onPress={() => setDescriptionOpen(true)} />
+            <ShowDescriptionButton ref={showButton} onPress={() => setDescriptionOpen(true)} />
             {hasBottom ? (
               <Pressable
                 onPress={() => open('/courses/[id]')}

@@ -16,7 +16,7 @@ jest.mock('@/lib/store', () => require('./helpers/mocks').store);
 
 const LONG = 'Line one of the course.\n\nSecond paragraph that goes on and on, well past two lines on any phone.';
 const longCourse: Course = { ...courseA, description: LONG };
-const showLabel = { name: 'Show description of Algebra' };
+const showLabel = { name: 'Show description' };
 const hidden = { includeHiddenElements: true };
 
 const layout = (height: number) => ({ nativeEvent: { layout: { x: 0, y: 0, width: 300, height } } });

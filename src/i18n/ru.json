@@ -278,7 +278,6 @@
   "courses.ownerNoCandidates": "Других преподавателей или менторов нет",
   "courses.openChat": "Открыть чат курса «{title}»",
   "courses.showDescription": "Показать описание",
-  "courses.showDescriptionLabel": "Показать описание курса «{title}»",
   "courses.descriptionClose": "Закрыть",
   "courses.deleteCourse": "Удалить курс",
   "courses.deleting": "Удаление…",

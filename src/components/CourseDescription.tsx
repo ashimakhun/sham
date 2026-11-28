@@ -103,11 +103,9 @@ export function DescriptionPreview({
 
 /** The link-style "Show description" button under a cut-short description. At least 44 × 44 pt. */
 export function ShowDescriptionButton({
-  title,
   onPress,
   ref,
 }: {
-  title: string;
   onPress: () => void;
   ref?: Ref<ViewInstance>;
 }) {
@@ -117,7 +115,8 @@ export function ShowDescriptionButton({
       ref={ref}
       testID="course-show-description"
       accessibilityRole="button"
-      accessibilityLabel={t('courses.showDescriptionLabel', { title })}
+      // Named only "Show description", also for screen readers (product decision, 28 Nov): no course title.
+      accessibilityLabel={t('courses.showDescription')}
       onPress={onPress}
       style={({ pressed }) => [s.link, pressed && { opacity: 0.6 }]}>
       <Text style={s.linkText}>{t('courses.showDescription')}</Text>

@@ -278,7 +278,6 @@
   "courses.ownerNoCandidates": "Change owner · empty state",
   "courses.openChat": "Course cards · screen-reader label of the chat icon ({title} is the course title)",
   "courses.showDescription": "Course cards · link-style button under a description that is cut short at 2 lines; opens the full description in a pop-up",
-  "courses.showDescriptionLabel": "Course cards · screen-reader label of the Show description button ({title} is the course title)",
   "courses.descriptionClose": "Course description pop-up · button that closes the pop-up",
   "courses.deleteCourse": "Course details (teacher) · button at the bottom; also the confirmation title",
   "courses.deleting": "Course details (teacher) · Delete course button while deleting",

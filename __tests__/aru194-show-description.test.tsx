@@ -17,7 +17,7 @@ jest.mock('@/lib/store', () => require('./helpers/mocks').store);
 
 const LONG = 'Line one of the course.\n\nSecond paragraph that goes on and on, well past two lines on any phone.';
 const longCourse: Course = { ...courseA, description: LONG };
-const showLabel = { name: 'Show description of Algebra' };
+const showLabel = { name: 'Show description' };
 const hidden = { includeHiddenElements: true };
 
 const layout = (height: number) => ({ nativeEvent: { layout: { x: 0, y: 0, width: 300, height } } });
@@ -99,7 +99,7 @@ describe('AC 1: shown only when cut short', () => {
     await act(async () => {});
     await measure(44, 110);
     expect(screen.getByText('Показать описание')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Показать описание курса «Algebra»' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Показать описание' })).toBeTruthy();
   });
 });
 
@@ -154,7 +154,7 @@ describe('AC 2–4: the pop-up', () => {
     );
     await act(async () => {});
     await measure(44, 110);
-    await fireEvent.press(screen.getByRole('button', { name: 'Показать описание курса «Algebra»' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Показать описание' }));
     expect(screen.getByRole('button', { name: 'Закрыть' })).toBeTruthy();
   });
 });
@@ -255,7 +255,7 @@ describe('AC 8: accessible', () => {
     const stops = focusable(container as unknown as Node);
     expect(stops.map((n) => n.props.accessibilityLabel)).toEqual([
       expect.stringContaining('Algebra'),
-      'Show description of Algebra',
+      'Show description',
     ]);
     const label = stops[0].props.accessibilityLabel as string;
     expect(label).toContain('Listener');
@@ -271,7 +271,7 @@ describe('AC 8: accessible', () => {
     const labels = focusable(container as unknown as Node).map((n) => n.props.accessibilityLabel);
     expect(labels).toEqual([
       expect.stringContaining('Algebra'),
-      'Show description of Algebra',
+      'Show description',
       'Open chat for Algebra',
     ]);
   });
