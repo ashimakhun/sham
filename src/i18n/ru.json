@@ -943,7 +943,7 @@
   "deleteWorkspace.irreversible": "Это нельзя отменить.",
   "deleteWorkspace.nameLabel": "Название рабочего пространства",
   "deleteWorkspace.submit": "Удалить рабочее пространство",
-  "deleteWorkspace.loadError": "Не удалось загрузить рабочее пространство. Потяните вниз, чтобы повторить.",
+  "deleteWorkspace.loadError": "Не удалось загрузить рабочее пространство. Нажмите «Попробовать снова».",
   "deleteWorkspace.teacherOnly": "Удалить рабочее пространство может только преподаватель.",
   "deleteWorkspace.nameMismatch": "Название рабочего пространства не совпадает.",
   "deleteWorkspace.nameMissing": "Введите название рабочего пространства.",

@@ -943,7 +943,7 @@
   "deleteWorkspace.irreversible": "This can't be undone.",
   "deleteWorkspace.nameLabel": "Workspace name",
   "deleteWorkspace.submit": "Delete workspace",
-  "deleteWorkspace.loadError": "Couldn't load your workspace. Pull down to try again.",
+  "deleteWorkspace.loadError": "Couldn't load your workspace. Tap Try again.",
   "deleteWorkspace.teacherOnly": "Only the teacher can delete the workspace.",
   "deleteWorkspace.nameMismatch": "The workspace name doesn't match.",
   "deleteWorkspace.nameMissing": "Type the workspace name.",
