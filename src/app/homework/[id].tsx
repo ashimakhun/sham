@@ -39,6 +39,9 @@ export default function HomeworkDetailScreen() {
   // The assignment it was sent for (ARU-32); none for homework sent before assignments existed.
   const assignment = assignments.find((a) => a.id === item.assignmentId);
   const meeting = meetings.find((m) => m.id === assignment?.meetingId);
+  // ARU-184: the "Assignment: …" row is left out when it would just repeat the heading (trimmed, ignoring case).
+  const showAssignmentTitle =
+    !!assignment && assignment.title.trim().toLowerCase() !== item.title.trim().toLowerCase();
   const photoUrl = freshPhotoUrl ?? item.photoUrl;
 
   function onPhotoError() {
@@ -58,10 +61,12 @@ export default function HomeworkDetailScreen() {
           <StatusBadge status={item.status} />
           <Text style={styles.h1}>{item.title}</Text>
           <Text style={[styles.label, { color: colors.primary }]}>{getCourse(item.courseId)?.title ?? t('homework.noCourse')}</Text>
-          {assignment ? (
+          {assignment && (showAssignmentTitle || meeting || assignment.dueAt) ? (
             // ARU-117: one row each, so a long title wraps on its own and never splits the meeting date.
             <View testID="homework-assignment">
-              <Text style={styles.muted}>{t('homework.assignmentLine', { title: assignment.title })}</Text>
+              {showAssignmentTitle ? (
+                <Text style={styles.muted}>{t('homework.assignmentLine', { title: assignment.title })}</Text>
+              ) : null}
               {meeting ? (
                 <Text style={styles.muted} testID="homework-assignment-meeting">
                   {t('homework.meetingAt', { date: formatDateTime(meeting.startsAt) })}
