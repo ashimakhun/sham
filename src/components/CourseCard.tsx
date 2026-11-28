@@ -170,6 +170,9 @@ export function CourseCard({ course, tag, onOpen }: Props) {
               <Pressable
                 onPress={() => open('/courses/[id]')}
                 accessible={false}
+                // ARU-201: no keyboard stop either. react-native-web's Pressable renders tabIndex 0 unless -1 is passed.
+                focusable={false}
+                tabIndex={-1}
                 importantForAccessibility="no-hide-descendants"
                 accessibilityElementsHidden
                 aria-hidden

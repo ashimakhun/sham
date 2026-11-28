@@ -1,7 +1,7 @@
 // ARU-194: the course card's 2-line description preview, its "Show description" button and the pop-up with the full
 // description. The pop-up's text is drawn only by CourseDescriptionText, so ARU-195 (formatted descriptions) changes
 // that one component.
-import { type Ref, useRef, useState } from 'react';
+import { type Ref, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   Modal,
@@ -51,27 +51,34 @@ export function DescriptionPreview({
   text: string;
   onTruncatedChange: (truncated: boolean) => void;
 }) {
-  const [clamped, setClamped] = useState<number | null>(null);
-  const [full, setFull] = useState<number | null>(null);
+  // ARU-200: both heights live in one state object, updated functionally, and are compared in an effect after the
+  // update. The two layout events usually arrive in one batch (one layout pass on native, one ResizeObserver callback
+  // on web) and often change together (rotation, resize, text size, an edit), so a handler must never compare its
+  // height with the other one from a stale render.
+  const [heights, setHeights] = useState<{ clamped: number | null; full: number | null }>({
+    clamped: null,
+    full: null,
+  });
   const last = useRef<boolean | null>(null);
 
-  const report = (c: number | null, f: number | null) => {
-    if (c == null || f == null) return;
+  useEffect(() => {
+    const { clamped, full } = heights;
+    if (clamped == null || full == null) return;
     // 1 pt of slack for sub-pixel rounding, so a description of exactly 2 lines isn't "cut short".
-    const truncated = f > c + 1;
+    const truncated = full > clamped + 1;
     if (last.current === truncated) return;
     last.current = truncated;
     onTruncatedChange(truncated);
-  };
+    // `last` makes a new onTruncatedChange identity harmless: it reports only a change of the result.
+  }, [heights, onTruncatedChange]);
+
   const onClamped = (e: LayoutChangeEvent) => {
     const h = e.nativeEvent.layout.height;
-    setClamped(h);
-    report(h, full);
+    setHeights((prev) => (prev.clamped === h ? prev : { ...prev, clamped: h }));
   };
   const onFull = (e: LayoutChangeEvent) => {
     const h = e.nativeEvent.layout.height;
-    setFull(h);
-    report(clamped, h);
+    setHeights((prev) => (prev.full === h ? prev : { ...prev, full: h }));
   };
 
   return (
