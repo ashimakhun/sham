@@ -971,5 +971,6 @@
   "homework.cardPhotoCount_many": "📎 {count} фото",
   "homework.cardPhotoCount_other": "📎 {count} фото",
   "db.homework_too_many_photos": "Можно прикрепить не больше 10 фото.",
-  "db.homework_photo_not_yours": "Фото домашнего задания должно быть в вашей папке."
+  "db.homework_photo_not_yours": "Фото домашнего задания должно быть в вашей папке.",
+  "signIn.language": "Язык"
 }

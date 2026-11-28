@@ -113,6 +113,10 @@ describe('Create account mode', () => {
       'Homework, checks and lessons in one place.',
       'Sign in',
       'Create account',
+      // ARU-189 AC 1 / AC 2: the Language switch, right below the selector, above Display name.
+      'Language',
+      'English',
+      'Русский',
       // ARU-164: Display name (with its hint) and Username replace Full name and Email.
       'Display name',
       "Doesn't have to be your real name",

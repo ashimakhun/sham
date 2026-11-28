@@ -351,6 +351,10 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    ("You already belong to a workspace.", `sham:workspace_already_member`). `profiles_workspace_guard()` lets the
    workspace change only inside them, for the caller's own deactivated row; a new update trigger sends the existing
    new-account notification when a deactivated account becomes pending. No table, column, policy or data changes),
+   `0080_signup_language.sql` (ARU-189: `handle_new_user()`, every 0075 rule kept, also saves the language picked on
+   the Create account form (`language` in the sign-up's user data) in `profiles.language` when it is exactly `'en'` or
+   `'ru'`; any other value, or none, is ignored (null: the phone's language) and never refuses the sign-up. No table,
+   column, policy or grant changes; changes no existing rows),
    `0081_homework_photos.sql` (ARU-191: up to 10 photos per homework. Adds `homework_files` (homework, path,
    position, kind `photo`, workspace; readable with its homework, workspace-guarded) and copies every existing
    `homework.photo_path` into it as position 1. App users add rows only through `submit_homework(...)`, which saves the

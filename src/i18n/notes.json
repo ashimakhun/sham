@@ -971,5 +971,6 @@
   "homework.cardPhotoCount_many": "Homework cards · end of the info line: how many photos are attached (2 to 10)",
   "homework.cardPhotoCount_other": "Homework cards · end of the info line: how many photos are attached (2 to 10)",
   "db.homework_too_many_photos": "Database error · an 11th photo on a homework",
-  "db.homework_photo_not_yours": "Database error · a homework photo that isn't in the sender's own folder for it"
+  "db.homework_photo_not_yours": "Database error · a homework photo that isn't in the sender's own folder for it",
+  "signIn.language": "Sign in screen · Create account form only (not on Sign in) · title of the Language switch"
 }

@@ -971,5 +971,6 @@
   "homework.cardPhotoCount_many": "📎 {count} photos",
   "homework.cardPhotoCount_other": "📎 {count} photos",
   "db.homework_too_many_photos": "You can attach up to 10 photos.",
-  "db.homework_photo_not_yours": "A homework photo must be in your own folder."
+  "db.homework_photo_not_yours": "A homework photo must be in your own folder.",
+  "signIn.language": "Language"
 }
