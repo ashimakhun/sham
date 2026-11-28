@@ -726,6 +726,7 @@
   "db.accountant_mentor_only": "Only mentors can be accountants.",
   "db.decline_only_waiting": "Only requests that are waiting can be declined.",
   "db.discipline_owner_only": "Only the course owner can change its discipline.",
+  "db.course_description_owner_only": "Only the course owner can change its description.",
   "db.assign_homework_role": "Only the course owner or the teacher can assign homework.",
   "db.meeting_status_role": "Only the course owner or the teacher can change a meeting's status.",
   "db.edit_meeting_role": "Only the course owner or the teacher can edit a meeting.",

@@ -114,6 +114,7 @@ export function fakeStore(who: keyof typeof users | null, over: Partial<Store> =
     addDiscipline: jest.fn(async () => {}),
     setDisciplineHidden: jest.fn(async () => {}),
     setCourseDiscipline: jest.fn(async () => {}),
+    setCourseDescription: jest.fn(async () => {}),
     setMeetingHomeworkChecked: jest.fn(async () => {}),
     loadMessages: jest.fn(async () => ({ messages: [], hasMore: false })),
     sendMessage: jest.fn(async () => {}),
