@@ -3,13 +3,19 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 
 import { useStore } from '@/lib/store';
 
-import { I18nContext, make, useI18n } from './context';
+import { FormLanguageContext, I18nContext, make, useI18n } from './context';
 import { isLanguage, type Language, phoneLanguage, setCurrentLanguage } from './index';
 
 export { useI18n };
 
 /** The language last shown on this device (AC 6 and the "profile not loaded yet" edge case). */
 export const LAST_LANGUAGE_KEY = 'sham.language';
+/**
+ * ARU-189 (analysis note 2): the language picked with the Create account form's switch, kept until a signed-in
+ * account's language replaces it. Separate from LAST_LANGUAGE_KEY, which an earlier account may have set: that one
+ * alone counts as not touched (AC 7).
+ */
+export const FORM_LANGUAGE_KEY = 'sham.formLanguage';
 
 /**
  * ARU-108: which language the app shows.
@@ -23,13 +29,40 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const { currentUser } = useStore();
   const [phone] = useState(phoneLanguage);
   const [lastShown, setLastShown] = useState<Language | null>(null);
+  // ARU-189: picked on the Create account form (null: not touched).
+  const [picked, setPicked] = useState<Language | null>(null);
+  // A tap on the form before storage has been read wins over what storage had.
+  const choseHere = useRef(false);
+
+  const account = currentUser ? (currentUser.language ?? phone) : null;
+  const accountRef = useRef(account);
+  useEffect(() => {
+    accountRef.current = account;
+  }, [account]);
+  // ARU-189 AC 4 / AC 6: a signed-in account's language replaces the form's pick (adjusted while rendering, as React
+  // recommends for state that follows a value).
+  const [pickAccount, setPickAccount] = useState(account);
+  if (pickAccount !== account) {
+    setPickAccount(account);
+    if (account) setPicked(null);
+  }
 
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
-        const saved = await AsyncStorage.getItem(LAST_LANGUAGE_KEY);
-        if (alive && isLanguage(saved)) setLastShown(saved);
+        const [saved, form] = await Promise.all([
+          AsyncStorage.getItem(LAST_LANGUAGE_KEY),
+          AsyncStorage.getItem(FORM_LANGUAGE_KEY),
+        ]);
+        if (!alive || choseHere.current) return;
+        if (isLanguage(saved)) setLastShown(saved);
+        // ARU-189 AC 4: a pick from an earlier visit shows again and still counts as picked (note 2), unless an
+        // account has signed in meanwhile (its language replaces it).
+        if (isLanguage(form) && !accountRef.current) {
+          setLastShown(form);
+          setPicked(form);
+        }
       } catch {
         // No storage (private browsing): the phone language it is.
       }
@@ -39,19 +72,35 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const account = currentUser ? (currentUser.language ?? phone) : null;
   const lang: Language = account ?? lastShown ?? phone;
 
   useEffect(() => {
     // Only a language decided by a loaded account is remembered for the sign-in screen.
     if (!account) return;
     AsyncStorage.setItem(LAST_LANGUAGE_KEY, account).catch(() => {});
+    // ARU-189 AC 4 / AC 6: the form's pick is forgotten on this device too.
+    AsyncStorage.removeItem(FORM_LANGUAGE_KEY).catch(() => {});
   }, [account]);
+
+  // ARU-189 AC 3 / AC 4: the Create account form's switch. Changes this device's language at once; nothing is sent
+  // until Create account (AC 5). With no storage it still works for this visit (edge case).
+  const chooseFormLanguage = useCallback((next: Language) => {
+    choseHere.current = true;
+    setLastShown(next);
+    setPicked(next);
+    AsyncStorage.setItem(LAST_LANGUAGE_KEY, next).catch(() => {});
+    AsyncStorage.setItem(FORM_LANGUAGE_KEY, next).catch(() => {});
+  }, []);
+  const form = useMemo(() => ({ picked, choose: chooseFormLanguage }), [picked, chooseFormLanguage]);
 
   // Before the screens below render, so helpers outside components (confirmAction, formatDate) use the same language.
   setCurrentLanguage(lang);
   const value = useMemo(() => make(lang), [lang]);
-  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
+  return (
+    <I18nContext.Provider value={value}>
+      <FormLanguageContext.Provider value={form}>{children}</FormLanguageContext.Provider>
+    </I18nContext.Provider>
+  );
 }
 
 

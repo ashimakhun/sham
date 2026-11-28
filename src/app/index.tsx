@@ -5,12 +5,14 @@ import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView, V
 import { Text } from '@/components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { SignUpLanguageSwitch } from '@/components/LanguageSwitch';
 import { AgreeCheckbox } from '@/components/LegalLinks';
 import { Button, ErrorText, Field, Segmented, styles } from '@/components/ui';
-import { useI18n } from '@/i18n/context';
+import { useFormLanguage, useI18n } from '@/i18n/context';
 import { PASSWORD_MIN, WORKSPACE_NAME_MAX } from '@/lib/password';
 import { NAME_MAX } from '@/lib/profileName';
 import { useStore } from '@/lib/store';
+import type { WorkspaceChoice } from '@/lib/types';
 import { colors } from '@/lib/theme';
 import { useAction } from '@/lib/useAction';
 import { isValidUsername, USERNAME_MAX } from '@/lib/username';
@@ -33,6 +35,8 @@ export default function SignInScreen() {
   const [agreed, setAgreed] = useState(false);
   const { busy, error, run } = useAction();
   const { t, tm } = useI18n();
+  // ARU-189: the language picked with the form's switch (kept on this device), or null when not touched (AC 7).
+  const { picked } = useFormLanguage();
 
   if (currentUser) return <Redirect href="/homework" />;
 
@@ -66,13 +70,12 @@ export default function SignInScreen() {
     usernameReady && password.length >= PASSWORD_MIN && (mode === 'signIn' || (name.trim() && name.trim().length <= NAME_MAX && choiceReady && agreed));
 
   function submit() {
+    // ARU-189 AC 6: signing in never sends or saves a language.
     if (mode === 'signIn') return signIn(username, password);
-    return signUp(
-      name,
-      username,
-      password,
-      choice === 'create' ? { kind: 'create', name: workspaceName } : { kind: 'join', code: inviteCode },
-    );
+    const workspace: WorkspaceChoice =
+      choice === 'create' ? { kind: 'create', name: workspaceName } : { kind: 'join', code: inviteCode };
+    // ARU-189 AC 5 / AC 7: the picked language goes with the account, only when the switch was touched.
+    return picked ? signUp(name, username, password, workspace, picked) : signUp(name, username, password, workspace);
   }
 
   return (
@@ -107,6 +110,9 @@ export default function SignInScreen() {
               { value: 'signUp', label: t('signIn.modeSignUp') },
             ]}
           />
+
+          {/* ARU-189 AC 1 / AC 2: Create account only, right below the selector, above the first field. */}
+          {mode === 'signUp' && <SignUpLanguageSwitch />}
 
           {mode === 'signUp' && (
             // ARU-164 AC 1: a display name, not a real name.

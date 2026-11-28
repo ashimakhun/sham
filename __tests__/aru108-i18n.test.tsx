@@ -325,7 +325,8 @@ describe('AC 7 / AC 12: the part-1 screens in Russian and English', () => {
     await tickAgree(); // ARU-159: the agreement box
     await fireEvent.press(screen.getAllByRole('button', { name: 'Create account' }).at(-1)!);
     expect(await screen.findByText('Signups not allowed for this instance')).toBeTruthy();
-    expect(CYRILLIC.test(allText())).toBe(false);
+    // ARU-189 AC 2: the Create account form's Language switch writes "Русский" in its own language (as Profile, above).
+    expect(CYRILLIC.test(allText().replace(/Русский/g, ''))).toBe(false);
   });
 
   it('the deleted-account notice is translated', async () => {
