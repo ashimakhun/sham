@@ -23,6 +23,21 @@ create function t.hw(name text, who text, course text, ago interval) returns voi
             t.id('M'), now() - ago);
     insert into storage.objects (bucket_id, name, owner) values ('homework', t.id(who) || '/' || name || '.jpg', t.id(who));
   end $$;
+-- A checked_at whose deletion date is the first reachable day >= today + days_left (UTC), at most 3 days later.
+-- "now() - (6 months - N days)" is off by a day whenever the months in between differ in length (on 28 Nov 2026 it
+-- gave 4 days, not 5), and some days (29-31 Aug from February) are never a deletion date, so the date is searched.
+-- Callers ask for 4 (lands on 4-7, inside the 7-day mark) and 20 (20-23, inside the 30-day mark only).
+create function t.checked_for(days_left int) returns timestamptz language plpgsql as $$
+  declare
+    target date := (now() at time zone 'utc')::date + days_left;
+    d date := (target - interval '6 months')::date - 3;
+  begin
+    -- Same rule as photo_deletion_date(): the UTC date of checked_at + 6 months.
+    while (d + interval '6 months')::date < target loop
+      d := d + 1;
+    end loop;
+    return (d + time '12:00') at time zone 'utc';
+  end $$;
 create function t.obj(bucket text, name text, age interval) returns void language sql security definer as $$
   insert into storage.objects (bucket_id, name, owner, created_at) values (bucket, name, t.id('S1'), now() - age)
 $$;
@@ -123,11 +138,13 @@ reset role;
 select t.ok((select photo_path = 'S2/new.jpg' and photo_removed_at is null from homework where id = t.hid('hidden')),
   'AC3 its new photo stays');
 
--- AC 4: marks. W5 first seen with 5 days left gets both marks with one message, counted once. W20 gets only the 30
+-- AC 4: marks. W5 first seen with 4-7 days left gets both marks with one message, counted once. W20 gets only the 30
 -- mark. A removed photo and an unchecked one never count.
 delete from homework where id = t.hid('hidden');
-select t.hw('W5', 'S1', 'A', interval '6 months' - interval '5 days');
-select t.hw('W20', 'S1', 'A', interval '6 months' - interval '20 days');
+select t.hw('W5', 'S1', 'A', interval '0');
+update homework set checked_at = t.checked_for(4) where id = t.hid('W5');
+select t.hw('W20', 'S1', 'A', interval '0');
+update homework set checked_at = t.checked_for(20) where id = t.hid('W20');
 select t.hw('GONE', 'S1', 'A', interval '6 months' - interval '10 days');
 update homework set photo_path = null, photo_removed_at = now() where id = t.hid('GONE');
 -- Pending S3's photo and the teacher's own homework: marks recorded, no message.
@@ -138,8 +155,8 @@ select t.bot();
 create temp table w as select * from claim_photo_deletion_warnings();
 reset role;
 select t.eq((select photo_count from w where user_id = t.id('S1')), 2, 'AC4 S1: one message counting W5 and W20 once each');
-select t.eq((select earliest - (now() at time zone 'utc')::date from w where user_id = t.id('S1')), 5,
-  'AC4 the earliest date is W5''s');
+select t.eq((select earliest from w where user_id = t.id('S1')),
+  (select photo_deletion_date(checked_at) from homework where id = t.hid('W5')), 'AC4 the earliest date is W5''s');
 select t.eq((select count(*) from w where user_id in (t.id('S3'), t.id('T'))), 0::bigint,
   'AC4 no message for a Pending sender or the teacher');
 select t.eq((select array_agg(mark order by mark) from photo_deletion_warnings where homework_id = t.hid('W5')),
@@ -153,11 +170,15 @@ select t.eq((select count(*) from photo_deletion_warnings where homework_id in (
 select t.eq((select count(*) from photo_deletion_warnings where homework_id in (t.id('HW_A1'), t.id('HW_B1'))), 0::bigint,
   'AC4 unchecked homework is never counted');
 
--- AC 4: 13 days later W20 reaches the 7-day mark: one more message counting only W20.
-update homework set checked_at = checked_at - interval '13 days' where id = t.hid('W20');
+-- AC 4: later W20 reaches the 7-day mark: one more message counting only W20.
+update homework set checked_at = t.checked_for(4) where id = t.hid('W20');
 select t.bot();
-select t.eq((select photo_count || ':' || (earliest - (now() at time zone 'utc')::date) from claim_photo_deletion_warnings()
-  where user_id = t.id('S1')), '1:7', 'AC4 the 7-day mark sends one more message for W20 only');
+create temp table w7 as select * from claim_photo_deletion_warnings();
+reset role;
+select t.eq((select photo_count || ':' || earliest from w7 where user_id = t.id('S1')),
+  '1:' || (select photo_deletion_date(checked_at) from homework where id = t.hid('W20')),
+  'AC4 the 7-day mark sends one more message for W20 only');
+select t.bot();
 select t.eq((select count(*) from claim_photo_deletion_warnings()), 0::bigint, 'AC4 a re-run sends nothing');
 reset role;
 
