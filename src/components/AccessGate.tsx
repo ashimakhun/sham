@@ -104,7 +104,7 @@ type Choice = 'create' | 'join';
  */
 function RejoinCard({ disabled }: { disabled: boolean }) {
   const { rejoinWorkspace } = useStore();
-  const { t, tm } = useI18n();
+  const { t } = useI18n();
   const { busy, error, run } = useAction();
   const [choice, setChoice] = useState<Choice>('join');
   const [workspaceName, setWorkspaceName] = useState('');
@@ -157,7 +157,10 @@ function RejoinCard({ disabled }: { disabled: boolean }) {
           onSubmitEditing={submit}
         />
       )}
-      <ErrorText error={tm(error)} />
+      {/* ARU-188: the store already gives the database error in the user's language (dbErrorMessage, ARU-111), and
+          ErrorText translates the app's own English messages (offline); tm() would turn Russian text into the generic
+          error. */}
+      <ErrorText error={error} />
       <Button title={label} onPress={submit} disabled={disabled || busy || !filled} />
     </Card>
   );
