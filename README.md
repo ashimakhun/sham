@@ -8,7 +8,7 @@ An educational mobile app where teachers, mentors and students work together:
 - **Teachers and mentors** create courses and add students and mentors to them as listeners.
 - **The course owner** (or the teacher) schedules meetings, named by their date and time (ARU-129); after a
   completed meeting they assign homework, and listeners mark that they attended. The pencil in the course name card
-  opens **Edit course** (discipline and owner, ARU-103).
+  opens **Edit course** (description, ARU-182; discipline and owner, ARU-103).
 - **Meeting notes** (ARU-142, ARU-143): listeners, the owner and the teacher each write their own signed notes on a
   completed meeting; a **Publish** switch keeps them private or shares them with the course (and can send a push
   notification, ARU-151).
@@ -329,9 +329,12 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    users (not anon). Deletes no data; existing accounts have no agreement, so the app asks each of them once. Ship it
    together with the app update: an older app's sign-ups are refused once it runs; see
    [Legal pages](#legal-pages-aru-159)),
-   `0076_deactivated_status.sql` and then `0077_delete_workspace.sql` (ARU-180: Delete workspace. 0076 only adds the
+   `0076_course_description.sql` (ARU-182: adds `set_course_description(course, description)`, a security definer
+   function for the course owner and the teacher (any course in their workspace, hidden ones too); the text is saved
+   trimmed and an unchanged value writes nothing. Authenticated only; no table, column, policy or data changes),
+   `0077_deactivated_status.sql` and then `0078_delete_workspace.sql` (ARU-180: Delete workspace. 0077 only adds the
    access status `deactivated` (Postgres can't use a new enum value in the transaction that adds it, so the rest is in
-   0077). 0077 makes `profiles.workspace_id` nullable, only together with `deactivated` (check constraint); lets every
+   0078). 0078 makes `profiles.workspace_id` nullable, only together with `deactivated` (check constraint); lets every
    account read its own profile row even with no workspace; lets a deactivated account update its own granted
    columns (name, languages); lets `profiles_before_delete()` remove the teacher only inside `delete_workspace()`;
    adds the service-role-only `workspace_deletion_target()`, `workspace_storage_objects()` and `delete_workspace()`
@@ -835,7 +838,7 @@ deactivates the other accounts (no workspace, no mentor, not an accountant; role
 and agreements kept), and deletes the teacher's Auth user with SQL, so it's all or nothing (the function never calls
 `auth.admin.deleteUser()` for the teacher). The teacher's other devices sign out with "Your account and workspace
 were deleted"; members see "Your workspace was deleted" when the app starts or comes back to the foreground. Without
-`workspace_name` the teacher is still refused ("The teacher's account can't be deleted."). Needs 0076 / 0077 and a
+`workspace_name` the teacher is still refused ("The teacher's account can't be deleted."). Needs 0077 / 0078 and a
 redeploy of `delete-account`.
 
 ### Handling reports (ARU-158)
@@ -1046,7 +1049,7 @@ src/app/                  screens (Expo Router — every file is a route)
   forgot-password.tsx     Forgot password?: username + recovery code + new password (signed out, ARU-165)
   recovery-code.tsx       Profile → Recovery code: a new recovery code after the current password (ARU-165)
   reset-password.tsx      the old email-reset link: redirects to the root (ARU-165)
-  courses/[id]/edit.tsx   Edit course (pencil in the course name card): discipline and owner, teacher or mentor (ARU-103)
+  courses/[id]/edit.tsx   Edit course (pencil in the course name card): description (ARU-182), discipline and owner, teacher or mentor (ARU-103)
   courses/[id]/owner.tsx  teacher or mentor changes the course owner (opened from Edit course)
   courses/[id]/meetings/  schedule / edit a meeting; [meetingId]/notes.tsx notes; [meetingId]/assign-homework.tsx;
                           [meetingId]/attendance.tsx who attended
@@ -1092,6 +1095,7 @@ teacher" is that workspace's teacher, and nobody can see or change anything in a
 | Delete a discipline and every course in it (ARU-83) | |         | ✓ (visible and hidden disciplines) |
 | Open Edit course (pencil on course details, ARU-103) | | ✓ (any course) | ✓ |
 | Set / change / clear a course's discipline (ARU-70) | | own courses   | any course |
+| Change a course's description (ARU-182) | | own courses   | any course (hidden ones too) |
 | Create courses             |           | ✓                  | ✓       |
 | Delete a course and everything in it (ARU-85) | |          | ✓ (any course, hidden ones too) |
 | Create a hidden course     |           | ✓                  | ✓       |

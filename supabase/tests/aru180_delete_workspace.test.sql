@@ -1,5 +1,5 @@
--- ARU-180: Delete workspace, part 1. Rules under test: supabase/migrations/0076_deactivated_status.sql and
--- 0077_delete_workspace.sql.
+-- ARU-180: Delete workspace, part 1. Rules under test: supabase/migrations/0077_deactivated_status.sql and
+-- 0078_delete_workspace.sql.
 -- W1 is the fixture's workspace (t.seed(): teacher T, mentors M, N, M2, students S1-S3, courses A and B), plus a waiting
 -- account P and a declined account D. W2 has teacher XT, mentor XM and student XS. Both get a row in every
 -- workspace table, people rows (reset codes, blocks, ZIP links, push devices, settings, usernames, recovery codes,

@@ -1,6 +1,6 @@
 -- ARU-180: Delete workspace, part 1. The teacher deletes their account together with their workspace and everything
 -- in it; the workspace's other accounts are deactivated, not deleted (they can join another workspace in part 2).
--- Uses the access status "deactivated" that 0076_deactivated_status.sql added (a separate file: see there).
+-- Uses the access status "deactivated" that 0077_deactivated_status.sql added (a separate file: see there).
 --
 -- The deletion is done by the Edge Function `delete-account` (service role), for the teacher only, in this order
 -- (AC 11): checks (workspace_deletion_target(): the caller is the teacher; the password; the typed workspace name),

@@ -5,7 +5,7 @@
 // No secrets to set: SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase.
 // Needs migration 0040_delete_account.sql (account_deletion_problem, account_storage_objects).
 // ARU-180: the teacher deletes their account and workspace through this function too (with "workspace_name"); needs
-// migrations 0076 / 0077 (workspace_deletion_target, workspace_storage_objects, delete_workspace).
+// migrations 0077 / 0078 (workspace_deletion_target, workspace_storage_objects, delete_workspace).
 //
 // Deploy (keep JWT verification on: only signed-in users may call it):
 //   npx supabase functions deploy delete-account

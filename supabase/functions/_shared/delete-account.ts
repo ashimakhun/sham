@@ -15,7 +15,7 @@
 //      name matches the workspace's name (case and outer spaces ignored, AC 3). If any fails, nothing is touched.
 //   b. files: every Storage object of the workspace's people (workspace_storage_objects()) is removed. A failure stops
 //      here: the account and the workspace stay and a retry continues.
-//   c. ONE database call, delete_workspace() (migration 0077): it re-checks the files, deletes the workspace's rows,
+//   c. ONE database call, delete_workspace() (migration 0078): it re-checks the files, deletes the workspace's rows,
 //      deactivates the other accounts and deletes the teacher's Auth user, all in one transaction. auth.admin.deleteUser()
 //      is never called for the teacher: it would be a second step outside that transaction.
 // Without workspace_name a teacher still gets "The teacher's account can't be deleted." (ARU-75), and anyone who

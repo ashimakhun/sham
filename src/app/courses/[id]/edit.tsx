@@ -1,11 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 
 import { EditCourseDisciplineSection } from '@/components/Disciplines';
+import { EditCourseDescriptionSection } from '@/components/EditCourseDescription';
+import { KeyboardForm } from '@/components/KeyboardForm';
 import { Card, EmptyState, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import { canChangeOwner } from '@/lib/roles';
@@ -16,8 +18,10 @@ import { colors } from '@/lib/theme';
 const TAP_GUARD_MS = 800;
 
 /**
- * ARU-103: Edit course, opened as a modal from the pencil in the course name card. A Discipline section (teacher on any
- * course, a mentor on a course they own) and an Owner section whose "Change owner" row opens the existing picker.
+ * ARU-103: Edit course, opened as a modal from the pencil in the course name card. A Description section (ARU-182) and
+ * a Discipline section (both: teacher on any course, a mentor on a course they own) and an Owner section whose
+ * "Change owner" row opens the existing picker. ARU-182 AC 9: a KeyboardForm, so the keyboard never covers the
+ * description field or its Save button and can be dismissed.
  * Everything is derived from the live store at render time, so a role change, an owner change or a deleted course
  * shows up without reopening the screen.
  */
@@ -43,7 +47,8 @@ export default function EditCourseScreen() {
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic">
+    <KeyboardForm contentContainerStyle={styles.content}>
+      <EditCourseDescriptionSection key={course.id} course={course} />
       <EditCourseDisciplineSection course={course} />
       <Card style={{ gap: 8 }}>
         <View style={{ gap: 2 }} accessible accessibilityLabel={ownerLabel}>
@@ -65,6 +70,6 @@ export default function EditCourseScreen() {
           <Ionicons name="chevron-forward" size={20} color={colors.muted} />
         </Pressable>
       </Card>
-    </ScrollView>
+    </KeyboardForm>
   );
 }

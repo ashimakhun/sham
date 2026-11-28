@@ -121,6 +121,9 @@ export type Store = {
   setDisciplineHidden: (id: string, hidden: boolean) => Promise<void>;
   /** The course's current owner (ARU-63): set, change or clear (null) its discipline. */
   setCourseDiscipline: (courseId: string, disciplineId: string | null) => Promise<void>;
+  /** ARU-182: the course owner, or the teacher on any course, changes its description (saved trimmed; '' clears it).
+   *  Offline: NETWORK_ERROR, nothing changes. */
+  setCourseDescription: (courseId: string, description: string) => Promise<void>;
   loading: boolean;
   /** True once data has been fetched (successfully or not) for the signed-in user. */
   dataLoaded: boolean;
@@ -2038,6 +2041,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setCourseDiscipline: async (courseId, disciplineId) => {
       requireRole('teacher', 'mentor');
       check(await supabase.rpc('set_course_discipline', { course: courseId, discipline: disciplineId }));
+      await load();
+    },
+    setCourseDescription: async (courseId, description) => {
+      requireRole('teacher', 'mentor');
+      const res = await Promise.resolve(
+        supabase.rpc('set_course_description', { course: courseId, description: description.trim() }),
+      ).catch(() => null);
+      if (!res) throw new Error(NETWORK_ERROR);
+      if (res.error) {
+        // No answer from the server (offline): supabase-js reports a fetch error without a code.
+        if (!res.error.hint && !res.error.code) throw new Error(NETWORK_ERROR);
+        throw new Error(dbErrorMessage(res.error));
+      }
       await load();
     },
     changeCourseOwner: async (courseId, userId) => {
