@@ -63,7 +63,8 @@ describe('AC 2: the footer is the last thing on Profile', () => {
     const json = serialise();
     const at = json.indexOf('"legal-links"');
     expect(at).toBeGreaterThan(json.lastIndexOf(cat['common.signOut']));
-    if (user.role !== 'teacher') expect(at).toBeGreaterThan(json.lastIndexOf(cat['common.deleteAccount']));
+    // ARU-180 AC 1: every role, the teacher included, has Delete account, and the footer comes after it.
+    expect(at).toBeGreaterThan(json.lastIndexOf(cat['common.deleteAccount']));
     // Negative: no longer between Reports / Manage roles and Change password.
     expect(at).toBeGreaterThan(json.indexOf(cat['profile.changePassword']));
     // Every button on Profile comes before the links (they're links, not buttons).
@@ -73,7 +74,7 @@ describe('AC 2: the footer is the last thing on Profile', () => {
     expect(within(footer).queryAllByRole('button')).toHaveLength(0);
   });
 
-  it('the last Profile button is still Delete account (student) / Sign out (teacher), so ARU-180 can keep Delete account last', async () => {
+  it('the last Profile button is still Delete account (student and teacher, ARU-180 AC 1), right after Sign out', async () => {
     setStore(fakeStore('S1'));
     const { unmount } = await render(<ProfileScreen />);
     let buttons = screen.getAllByRole('button');
@@ -82,7 +83,9 @@ describe('AC 2: the footer is the last thing on Profile', () => {
     setStore(fakeStore('T'));
     await render(<ProfileScreen />);
     buttons = screen.getAllByRole('button');
-    expect(buttons[buttons.length - 1]).toBe(screen.getByRole('button', { name: en['common.signOut'] }));
+    // ARU-180 AC 1: the teacher's last button is Delete account, below Sign out (was: Sign out last).
+    expect(buttons[buttons.length - 1]).toBe(screen.getByRole('button', { name: en['common.deleteAccount'] }));
+    expect(buttons[buttons.length - 2]).toBe(screen.getByRole('button', { name: en['common.signOut'] }));
   });
 });
 

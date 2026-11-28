@@ -68,10 +68,12 @@ describe('AC1: Delete account on the Profile tab', () => {
     expect(button('Delete account')).toBeTruthy();
   });
 
-  it('the teacher does not', async () => {
+  // ARU-180 AC 1 changed this: the teacher sees it too, and it opens Delete workspace (aru180-delete-workspace.test.tsx).
+  it('the teacher sees it too, opening Delete workspace', async () => {
     setStore(fakeStore('T'));
     await render(<ProfileScreen />);
-    expect(screen.queryByRole('button', { name: 'Delete account' })).toBeNull();
+    await fireEvent.press(button('Delete account'));
+    expect(router.push).toHaveBeenCalledWith('/delete-workspace');
   });
 });
 
