@@ -8,7 +8,7 @@ An educational mobile app where teachers, mentors and students work together:
 - **Teachers and mentors** create courses and add students and mentors to them as listeners.
 - **The course owner** (or the teacher) schedules meetings, named by their date and time (ARU-129); after a
   completed meeting they assign homework, and listeners mark that they attended. The pencil in the course name card
-  opens **Edit course** (discipline and owner, ARU-103).
+  opens **Edit course** (description, ARU-182; discipline and owner, ARU-103).
 - **Meeting notes** (ARU-142, ARU-143): listeners, the owner and the teacher each write their own signed notes on a
   completed meeting; a **Publish** switch keeps them private or shares them with the course (and can send a push
   notification, ARU-151).
@@ -323,7 +323,10 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    (`sham:signup_update_app`; SQL Editor admins are still exempt). Adds `agree_to_terms(version)` for signed-in
    users (not anon). Deletes no data; existing accounts have no agreement, so the app asks each of them once. Ship it
    together with the app update: an older app's sign-ups are refused once it runs; see
-   [Legal pages](#legal-pages-aru-159)).
+   [Legal pages](#legal-pages-aru-159)),
+   `0076_course_description.sql` (ARU-182: adds `set_course_description(course, description)`, a security definer
+   function for the course owner and the teacher (any course in their workspace, hidden ones too); the text is saved
+   trimmed and an unchanged value writes nothing. Authenticated only; no table, column, policy or data changes).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. Turn off **Authentication → Email → Confirm email**, in development and production, **before** applying
    `0067_username_sign_in.sql` (ARU-164). Username accounts sign up with an internal address that can't receive mail,
@@ -1018,7 +1021,7 @@ src/app/                  screens (Expo Router — every file is a route)
   forgot-password.tsx     Forgot password?: username + recovery code + new password (signed out, ARU-165)
   recovery-code.tsx       Profile → Recovery code: a new recovery code after the current password (ARU-165)
   reset-password.tsx      the old email-reset link: redirects to the root (ARU-165)
-  courses/[id]/edit.tsx   Edit course (pencil in the course name card): discipline and owner, teacher or mentor (ARU-103)
+  courses/[id]/edit.tsx   Edit course (pencil in the course name card): description (ARU-182), discipline and owner, teacher or mentor (ARU-103)
   courses/[id]/owner.tsx  teacher or mentor changes the course owner (opened from Edit course)
   courses/[id]/meetings/  schedule / edit a meeting; [meetingId]/notes.tsx notes; [meetingId]/assign-homework.tsx;
                           [meetingId]/attendance.tsx who attended
@@ -1064,6 +1067,7 @@ teacher" is that workspace's teacher, and nobody can see or change anything in a
 | Delete a discipline and every course in it (ARU-83) | |         | ✓ (visible and hidden disciplines) |
 | Open Edit course (pencil on course details, ARU-103) | | ✓ (any course) | ✓ |
 | Set / change / clear a course's discipline (ARU-70) | | own courses   | any course |
+| Change a course's description (ARU-182) | | own courses   | any course (hidden ones too) |
 | Create courses             |           | ✓                  | ✓       |
 | Delete a course and everything in it (ARU-85) | |          | ✓ (any course, hidden ones too) |
 | Create a hidden course     |           | ✓                  | ✓       |

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Clipboard from 'expo-clipboard';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, SectionList, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Modal, Pressable, ScrollView, SectionList, View } from 'react-native';
 
 import { Button, EmptyState, ErrorText, RoleBadge, styles, ThemedSwitch } from '@/components/ui';
 import type { TextId } from '@/i18n';
@@ -445,7 +445,36 @@ function ResetCodeSheet({
   );
 }
 
-/** ARU-146 AC 8: the teacher's workspace and its invite code, with Copy and a short "Copied". */
+/** One icon + label row of the invite Copy button (ARU-183). When not shown it keeps its width but no height. */
+function CopyLabel({
+  icon,
+  label,
+  shown,
+  testID,
+}: {
+  icon: 'copy-outline' | 'checkmark';
+  label: string;
+  shown: boolean;
+  testID: string;
+}) {
+  return (
+    <View
+      testID={shown ? testID : undefined}
+      accessibilityElementsHidden={!shown}
+      importantForAccessibility={shown ? 'auto' : 'no-hide-descendants'}
+      style={[
+        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+        !shown && { height: 0, opacity: 0, overflow: 'hidden' },
+      ]}>
+      <Ionicons name={icon} size={16} color={colors.primary} />
+      <Text style={{ color: colors.primary, fontSize: 14, ...font(500) }} numberOfLines={1}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+/** ARU-146 AC 8: the teacher's workspace and its invite code, with Copy that briefly turns into "Copied" (ARU-183). */
 function WorkspaceCard({ invite }: { invite: WorkspaceInvite }) {
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
@@ -461,6 +490,8 @@ function WorkspaceCard({ invite }: { invite: WorkspaceInvite }) {
       return; // the clipboard isn't available (e.g. a browser that refuses): no "Copied"
     }
     setCopied(true);
+    // ARU-183 AC 7: the app is iPhone-only, so announce for VoiceOver (accessibilityLiveRegion is Android-only).
+    AccessibilityInfo.announceForAccessibility(t('roles.copied'));
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => setCopied(false), 2000);
   }
@@ -473,30 +504,37 @@ function WorkspaceCard({ invite }: { invite: WorkspaceInvite }) {
       </Text>
       <Text style={[styles.label, { marginTop: 4 }]}>{t('roles.inviteCode').toUpperCase()}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <Text style={[styles.title, { flex: 1, letterSpacing: 2 }]} selectable testID="invite-code">
+        {/* ARU-183 AC 4: one line always; with a large text size the code shrinks rather than wraps. */}
+        <Text
+          style={[styles.title, { flex: 1, letterSpacing: 2 }]}
+          selectable
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.5}
+          testID="invite-code">
           {invite.code}
         </Text>
-        {copied && (
-          <Text style={{ color: colors.success, fontSize: 14 }} accessibilityLiveRegion="polite" testID="invite-copied">
-            {t('roles.copied')}
-          </Text>
-        )}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('roles.copyLabel')}
           hitSlop={6}
           onPress={copy}
+          testID="invite-copy"
           style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 4,
+            flexShrink: 0,
+            justifyContent: 'center',
             minHeight: 32,
             paddingHorizontal: 12,
             borderRadius: 16,
             backgroundColor: colors.primarySoft,
           }}>
-          <Ionicons name="copy-outline" size={16} color={colors.primary} />
-          <Text style={{ color: colors.primary, fontSize: 14, ...font(500) }}>{t('roles.copy')}</Text>
+          {/* ARU-183 AC 1 / AC 3: both labels are always laid out in one column, so the button is as wide as
+              the longer one in the current language and never changes size; the inactive one has no height,
+              is invisible and is hidden from VoiceOver. */}
+          <View>
+            <CopyLabel icon="copy-outline" label={t('roles.copy')} shown={!copied} testID="invite-copy-label" />
+            <CopyLabel icon="checkmark" label={t('roles.copied')} shown={copied} testID="invite-copy-done" />
+          </View>
         </Pressable>
       </View>
     </View>

@@ -726,6 +726,7 @@
   "db.accountant_mentor_only": "Manage roles · Accountant on for a non-mentor",
   "db.decline_only_waiting": "Manage roles · declining an accepted account",
   "db.discipline_owner_only": "Edit course · not the owner",
+  "db.course_description_owner_only": "Edit course · Description section, not the owner",
   "db.assign_homework_role": "Assign homework · not the owner",
   "db.meeting_status_role": "Meeting · Complete or Cancel by someone else",
   "db.edit_meeting_role": "Edit meeting · not the owner",
