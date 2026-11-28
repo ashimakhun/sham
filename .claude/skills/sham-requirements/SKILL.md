@@ -19,7 +19,7 @@ Rate every Idea issue that has no difficulty label yet, using the code in the re
 - **easy**: UI or copy change within one or two existing screens; no database, RLS or new package.
 - **medium**: touches several screens or src/lib/store.tsx, or adds a column/table with RLS in a new migration; no native modules.
 - **hard**: new native module or Expo config plugin (for example push notifications), new realtime feature (for example chat), new roles or access model changes, or anything needing a development build or external service.
-Apply it as the label difficulty/easy, difficulty/medium or difficulty/hard. A difficulty label a human set is an override: never change it.
+Apply it as **one** label from the `difficulty` label group: `easy`, `medium` or `hard` (IDs: easy `cb233dc9-0080-46d7-a7aa-12b7b18b0502`, medium `8b6a299c-ab9a-444c-aa33-74c40408197f`, hard `7a490a95-dd3b-41c4-9b18-0e5577d8b599`). Linear and its API show these as the plain names `easy` / `medium` / `hard` with parent `difficulty`: **that is the correct format**. There are no labels named `difficulty/easy` etc.; never create such labels and never report a plain `easy` / `medium` / `hard` label as a wrong format. The group is single select: to change a rating, `removeLabels` the old one and `addLabels` the new one in the same save. A difficulty label a human set is an override: never change it.
 
 ## Combining similar issues (step 0)
 Before choosing, load the `sham-merge-issues` skill with the Skill tool and follow it. It merges Idea issues that describe the same or overlapping work into one and marks the rest Duplicate (at most 3 merges per run; merges don't count as the run's one requirements issue). Then continue below; Duplicate issues are no longer candidates.

@@ -9,11 +9,13 @@ An independent review of each story the requirements agent wrote, done by the QA
 
 Sham is an Expo SDK 58 (React Native, TypeScript, Expo Router) + Supabase app. Roles: student, mentor, teacher. Repo: ashimakhun/sham. The real access rules are the RLS policies in `supabase/migrations`; README.md has the summary table.
 
+**Label format.** Linear label groups show as plain child names: difficulty is one of `easy` / `medium` / `hard` (group `difficulty`), and a bug's cause is `code` or `requirements` (group `bug-cause`, IDs: code `2fae7d1f-9b84-423e-af7f-888686c293d4`, requirements `73a7a225-7056-474b-9db4-c0839fdd4049`). This skill writes them as `bug-cause: code` / `bug-cause: requirements` for clarity, but the label to apply is the child (`code` or `requirements`); there are no labels named `bug-cause/code` or `difficulty/easy`. Never report a plain `easy` / `medium` / `hard` / `code` / `requirements` label as a wrong format. Each group is single select: to switch, `removeLabels` the old child and `addLabels` the new one in the same save.
+
 ## Pipeline (Linear, team Sham, key ARU)
 Idea → Requirements ready → **Ready for Dev** → In Dev → Ready for QA → Done. Side status: Needs Clarification.
 This skill owns **Requirements ready → Ready for Dev**, or back to **Idea** (the requirements agent fixes it) or **Needs Clarification** (a person decides).
 
-It also reviews **requirements bugs**: issues the QA agent filed with labels `Bug` + `bug-cause/requirements` (see section 5). They never go back to Idea.
+It also reviews **requirements bugs**: issues the QA agent filed with labels `Bug` + `bug-cause: requirements` (see section 5). They never go back to Idea.
 
 If the team has no **Ready for Dev** status, stop and report that it must be added in Linear first.
 
@@ -41,7 +43,7 @@ Go through every point. Record each problem with the criterion number it concern
 5. **Consistency with the app**: screens, fields and names in the story exist (or the story says they're new); no criterion contradicts current behaviour without saying so.
 6. **Dependencies**: blockers are linked and their status allows starting; nothing conflicts with another open story; missing links get added (blocks / blocked-by / related) with a comment.
 7. **Edge cases**: empty states, long text, invalid input, offline / failed requests, permission denied, double submit, iOS vs Android, photo upload failures, live updates arriving while a screen is open. Flag the ones that matter for this story and are missing.
-8. **Size and difficulty**: fits in one PR (about 12 criteria or fewer). If not, propose a split into named sub-stories. Check the difficulty label against the scale in `sham-requirements`; a label a person set is never changed, just comment if it looks wrong.
+8. **Size and difficulty**: fits in one PR (about 12 criteria or fewer). If not, propose a split into named sub-stories. Check the difficulty label (`easy` / `medium` / `hard` in the `difficulty` group: plain names are the correct format) against the scale in `sham-requirements`; a label a person set is never changed, just comment if it looks wrong.
 9. **Out of scope**: things a developer might reasonably assume are included are listed as out of scope.
 
 Classify each problem:
@@ -80,7 +82,7 @@ A requirements bug says the story's criteria didn't cover a case, were ambiguous
 Decide, then comment on the bug:
 
 **A. It's really a code bug** (the criterion is clear and the code doesn't meet it):
-comment `ANALYSIS: CODE BUG` naming the criterion that already covers it, switch the label to `bug-cause/code`, move the bug to **Ready for Dev**.
+comment `ANALYSIS: CODE BUG` naming the criterion that already covers it, switch the label to `bug-cause: code`, move the bug to **Ready for Dev**.
 
 **B. The criteria need a change, and the right behaviour is clear** from the story's intent, the README access table, other stories or existing behaviour:
 1. Comment on the bug starting `ANALYSIS: CRITERION CHANGE` with:
@@ -88,7 +90,7 @@ comment `ANALYSIS: CODE BUG` naming the criterion that already covers it, switch
    - why this is the right behaviour;
    - the test cases QA should run for it, including the denied cases per role.
 2. Post the same `ANALYSIS: CRITERION CHANGE` text on the **story** with `(from ARU-<bug>)`, so the dev and QA agents treat it as part of the story's criteria.
-3. Move the bug to **Ready for Dev**. Keep the `bug-cause/requirements` label for the record.
+3. Move the bug to **Ready for Dev**. Keep the `bug-cause: requirements` label for the record.
 
 **C. Not a bug** (the code and the criterion are right; the test or expectation was wrong):
 comment `ANALYSIS: NOT A BUG` explaining the correct reading of the criterion and which test to fix or remove, then move the bug to **Canceled**. If it was the story's last open bug, move the story to **Ready for QA** with a comment `All bugs closed (ARU-x, …), ready for re-test`.

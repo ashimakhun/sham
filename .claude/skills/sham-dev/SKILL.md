@@ -7,9 +7,11 @@ description: "Fix Sham bugs and implement Sham stories that are Ready for Dev in
 
 Repo: ashimakhun/sham (Expo SDK 58, React Native, TypeScript, Expo Router, Supabase). Follow AGENTS.md in the repo exactly: check versioned Expo docs instead of memory, use `npx expo install` for packages, never hand-edit ios/ or android/.
 
+**Label format.** Linear label groups show as plain child names: difficulty is one of `easy` / `medium` / `hard` (group `difficulty`), and a bug's cause is `code` or `requirements` (group `bug-cause`, IDs: code `2fae7d1f-9b84-423e-af7f-888686c293d4`, requirements `73a7a225-7056-474b-9db4-c0839fdd4049`). This skill writes them as `bug-cause: code` / `bug-cause: requirements` for clarity, but the label to apply is the child (`code` or `requirements`); there are no labels named `bug-cause/code` or `difficulty/easy`. Never report a plain `easy` / `medium` / `hard` / `code` / `requirements` label as a wrong format. Each group is single select: to switch, `removeLabels` the old child and `addLabels` the new one in the same save.
+
 ## Pipeline (Linear, team Sham)
 Idea → Requirements ready → Ready for Dev → In Dev → Ready for QA → Done. Side status: Needs Clarification.
-Only reviewed work reaches **Ready for Dev**: stories that passed requirements analysis, code bugs filed by the QA agent (`Bug` + `bug-cause/code`), and requirements bugs that analysis resolved (`Bug` + `bug-cause/requirements` with an `ANALYSIS:` comment). This agent owns **Ready for Dev → In Dev → Ready for QA**.
+Only reviewed work reaches **Ready for Dev**: stories that passed requirements analysis, code bugs filed by the QA agent (`Bug` + `bug-cause: code`), and requirements bugs that analysis resolved (`Bug` + `bug-cause: requirements` with an `ANALYSIS:` comment). This agent owns **Ready for Dev → In Dev → Ready for QA**.
 
 ## Choosing the issue
 1. Using the Linear connector, list Sham issues in **Ready for Dev** without `agent:working`. Never pick up anything in Requirements ready: it hasn't been reviewed.
@@ -27,7 +29,7 @@ Checks, used below: `npm ci`, then `npm run typecheck`, `npx expo lint`, `npm te
 2. Find the story the bug `blocks` and its PR.
    - **PR still open:** check out the PR branch and fix there, so the story ships with the fix.
    - **PR merged or closed, or no story:** branch `sham-<bug-id>-fix-<short-slug>` from main; you'll open a new PR.
-3. Run the bug's reproduction test and confirm it fails for the reason described. If it passes already, or you believe the test or the expected result is wrong, **don't change the test**: comment why, switch the label to `bug-cause/requirements`, move the bug to **Requirements ready**, remove `agent:working` and stop.
+3. Run the bug's reproduction test and confirm it fails for the reason described. If it passes already, or you believe the test or the expected result is wrong, **don't change the test**: comment why, switch the label to `bug-cause: requirements`, move the bug to **Requirements ready**, remove `agent:working` and stop.
 4. Fix the code with the smallest change that makes the expected behaviour true. Database changes go in a new numbered migration with RLS policies; never edit old migrations.
 5. Run the checks. Fix until all pass, the reproduction test included.
 6. Commit as `[<bug-id>] Fix: <bug title>` and push. On a new branch, open a PR titled `[<bug-id>] <bug title>` that links the bug.
