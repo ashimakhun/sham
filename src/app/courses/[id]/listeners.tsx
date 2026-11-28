@@ -6,6 +6,7 @@ import { Text } from '@/components/AppText';
 
 import { Button, EmptyState, ErrorText, RoleBadge, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
+import { isCourseCompleted } from '@/lib/courseCompletion';
 import { canManageListeners } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors } from '@/lib/theme';
@@ -23,6 +24,10 @@ export default function AddListenersScreen() {
     return <EmptyState title={t('courses.notAllowed')} hint={t('listeners.addNotAllowedHint')} />;
   }
   if (!course) return <EmptyState title={t('courses.notFound')} />;
+  // ARU-197 AC 7: a completed course takes no new listeners (an old link, or completed while this screen was open).
+  if (isCourseCompleted(course)) {
+    return <EmptyState title={t('courses.notAllowed')} hint={t('db.course_completed_no_listeners')} />;
+  }
 
   const inCourse = new Set(courseMembers.filter((m) => m.courseId === course.id).map((m) => m.userId));
   // Students and mentors who are not yet listeners; never the owner or the teacher (also enforced by RLS).

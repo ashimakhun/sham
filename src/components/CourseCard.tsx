@@ -13,8 +13,9 @@ import {
 } from '@/components/CourseDescription';
 import { DisciplineLabel } from '@/components/Disciplines';
 import { RatingSummary } from '@/components/RatingSummary';
-import { Card, HiddenBadge, OwnerLine, UnreadBadge, styles } from '@/components/ui';
+import { Card, CompletedBadge, HiddenBadge, OwnerLine, UnreadBadge, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
+import { isCourseCompleted } from '@/lib/courseCompletion';
 import { feedbackFor, ratingSummaryLabel } from '@/lib/feedback';
 import { inCourseChat, seesOnlyCourseSummary } from '@/lib/roles';
 import { useStore } from '@/lib/store';
@@ -56,6 +57,8 @@ export function CourseCard({ course, tag, onOpen }: Props) {
     focusAfterClose(showButton);
   };
   const ownerName = getUser(course.createdById)?.name ?? t('common.unknown');
+  // ARU-197: a grey Completed badge next to the title.
+  const completed = isCourseCompleted(course);
 
   const open = (pathname: '/courses/[id]' | '/courses/[id]/chat') => {
     const now = Date.now();
@@ -75,12 +78,14 @@ export function CourseCard({ course, tag, onOpen }: Props) {
           </Text>
         </View>
       ) : null}
-      {course.hidden ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      {course.hidden || completed ? (
+        // ARU-197: with the Completed badge the row wraps, so both badges fit under a long title on a narrow phone.
+        <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }, completed && { flexWrap: 'wrap' }]}>
           <Text style={[styles.title, { flexShrink: 1 }]} numberOfLines={2}>
             {course.title}
           </Text>
-          <HiddenBadge />
+          {course.hidden ? <HiddenBadge /> : null}
+          {completed ? <CompletedBadge /> : null}
         </View>
       ) : (
         <Text style={styles.title} numberOfLines={2}>
@@ -142,6 +147,7 @@ export function CourseCard({ course, tag, onOpen }: Props) {
       tag,
       course.title,
       course.hidden ? t('common.hidden') : undefined,
+      completed ? t('courses.completedBadge') : undefined,
       discipline ? t('disciplines.a11yLabel', { name: discipline.name }) : undefined,
       course.description,
       summaryOnly ? undefined : `${t('courses.ownerPrefix')} ${ownerName} · ${formatDate(course.createdAt)}`,

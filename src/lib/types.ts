@@ -177,6 +177,10 @@ export type Course = {
   hidden?: boolean;
   /** ARU-63: the course's discipline, if any. An id the viewer can't resolve is a discipline hidden from them. */
   disciplineId?: string;
+  /** ARU-197: when the owner or the teacher marked the course Completed; undefined = active. DB: completed_at. */
+  completedAt?: string;
+  /** ARU-197: who completed it; undefined when active, or when that account was deleted. DB: completed_by. */
+  completedById?: string;
 };
 
 /** ARU-63: a group of courses, created by the teacher. Hidden ones are visible only to the teacher. */

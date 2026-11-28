@@ -20,6 +20,7 @@ import {
   meetingBadge,
   type MeetingGroup,
 } from '@/lib/meetings';
+import { isCourseCompleted } from '@/lib/courseCompletion';
 import {
   canCheckMeetingHomework,
   canManageMeetings,
@@ -142,6 +143,8 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
 
   if (!canSeeMeetings(currentUser, course, courseMembers)) return null;
   const canManage = canManageMeetings(currentUser, course);
+  // ARU-197 AC 5 / AC 6: a completed course takes no new meeting or homework assignment (the database refuses too).
+  const completed = isCourseCompleted(course);
   const seesAttendance = canSeeAttendance(currentUser, course, courseMembers);
   const canCheck = canCheckMeetingHomework(currentUser, course, courseMembers);
   // ARU-190: meetings and assignments are loaded together (one load()), so this set is always current.
@@ -272,7 +275,7 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
           ))
       )}
       <ErrorText error={error} />
-      {canManage && (
+      {canManage && !completed && (
         <Button
           title={t('meetings.scheduleButton')}
           variant="secondary"
@@ -311,7 +314,7 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
           ];
     // Homework (ARU-32): one assignment per completed meeting, shown to everyone who sees the meeting.
     const assignment = assignments.find((a) => a.meetingId === m.id);
-    const canAssign = canManage && m.status === 'completed' && !assignment;
+    const canAssign = canManage && !completed && m.status === 'completed' && !assignment;
     // Attendance (ARU-33): listeners mark their own; the owner, the teacher and non-listener mentors see the count.
     // From the start time until the meeting is canceled (ARU-45); `now` ticks, so it appears without a refresh.
     const canMark = canMarkAttendance(currentUser, course, courseMembers, m, now);

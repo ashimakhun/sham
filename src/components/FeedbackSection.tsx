@@ -8,6 +8,7 @@ import { RatingSummary } from '@/components/RatingSummary';
 import { Button, Card, ErrorText, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import { confirmDestructive } from '@/lib/confirm';
+import { isCourseCompleted } from '@/lib/courseCompletion';
 import { courseStarted, feedbackFor, isEdited, stars, starsLabel } from '@/lib/feedback';
 import { isCourseListener } from '@/lib/roles';
 import { useStore } from '@/lib/store';
@@ -31,7 +32,8 @@ export function FeedbackSection({ course }: { course: Course }) {
   // Only current listeners write (owners and the teacher are never listeners; a removed listener's feedback stays
   // but is locked, AC 9).
   const listener = isCourseListener(currentUser, course, courseMembers);
-  const started = courseStarted(meetings, course.id);
+  // ARU-197 AC 9: a completed course takes feedback even if no meeting was ever completed.
+  const started = courseStarted(meetings, course.id) || isCourseCompleted(course);
   const mine = listener ? items.find((f) => f.userId === currentUser?.id) : undefined;
   const openForm = () => router.push({ pathname: '/courses/[id]/feedback', params: { id: course.id } });
 

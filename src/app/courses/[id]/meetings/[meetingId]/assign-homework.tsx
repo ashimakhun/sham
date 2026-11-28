@@ -8,6 +8,7 @@ import { KeyboardForm } from '@/components/KeyboardForm';
 import { nextFullHour } from '@/components/MeetingForm';
 import { Button, EmptyState, ErrorText, Field, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
+import { isCourseCompleted } from '@/lib/courseCompletion';
 import { newId } from '@/lib/id';
 import { canManageMeetings } from '@/lib/roles';
 import { useStore } from '@/lib/store';
@@ -39,6 +40,10 @@ export default function AssignHomeworkScreen() {
   if (!course || !meeting) return <EmptyState title={t('meetings.notFound')} />;
   if (currentUser && !canManageMeetings(currentUser, course)) {
     return <EmptyState title={t('meetings.notAllowed')} hint={t('meetings.onlyAssignHint')} />;
+  }
+  // ARU-197 AC 6: a completed course takes no new homework (an old link, or completed while this form was open).
+  if (isCourseCompleted(course)) {
+    return <EmptyState title={t('meetings.cantAssign')} hint={t('db.course_completed_no_homework')} />;
   }
   if (meeting.status !== 'completed') {
     return <EmptyState title={t('meetings.cantAssign')} hint={t('meetings.cantAssignHint')} />;

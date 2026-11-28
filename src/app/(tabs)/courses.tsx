@@ -8,6 +8,7 @@ import { CourseCard } from '@/components/CourseCard';
 import { DisciplineCard } from '@/components/Disciplines';
 import { Button, EmptyState, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
+import { completedLast } from '@/lib/courseCompletion';
 import { canManageDisciplines } from '@/lib/disciplines';
 import { canCreateCourse } from '@/lib/roles';
 import { useStore } from '@/lib/store';
@@ -65,7 +66,10 @@ export default function CoursesScreen() {
     // A student can't own a course, so the section is only for teachers and mentors.
     ...(canCreate ? [{ key: 'own', title: t('courses.sectionOwn'), data: owned }] : []),
     { key: 'none', title: t('courses.sectionNone'), data: noDiscipline },
-  ].filter((s) => s.data.length > 0); // no empty headings; with no sections the empty state shows
+  ]
+    .filter((s) => s.data.length > 0) // no empty headings; with no sections the empty state shows
+    // ARU-197 AC 4: in each section completed courses come after the active ones; each group keeps today's order.
+    .map((s) => ({ ...s, data: completedLast(s.data) }));
 
   const header = (
     <View style={{ gap: 12 }}>
