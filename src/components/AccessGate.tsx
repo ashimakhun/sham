@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from 'react';
-import { RefreshControl, ScrollView, View } from 'react-native';
+import { useRef, useState, type ReactNode } from 'react';
+import { Platform, RefreshControl, ScrollView, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,9 +9,10 @@ import { DeleteAccountForm } from '@/components/DeleteAccountForm';
 import { LegalLinks } from '@/components/LegalLinks';
 import { LegalUpdateScreen } from '@/components/LegalUpdateScreen';
 import { SaveRecoveryCodeScreen } from '@/components/RecoveryCode';
-import { Button, ErrorText, styles } from '@/components/ui';
+import { Button, Card, ErrorText, Field, Segmented, styles } from '@/components/ui';
 import { translate } from '@/i18n';
 import { useI18n } from '@/i18n/context';
+import { WORKSPACE_NAME_MAX } from '@/lib/password';
 import { useStore } from '@/lib/store';
 import { useAction } from '@/lib/useAction';
 
@@ -27,7 +28,8 @@ export const DEACTIVATED_TEXT = translate('en', 'gate.deactivatedText');
  * ARU-43: an account that isn't approved sees only this screen, whatever route it opens (deep links included).
  * Approved accounts, and signed-out visitors (the sign-in screen), get the app as usual. ARU-168: Choose a username
  * comes before all of it, then ARU-165's Save your recovery code. ARU-159's "We've updated our Terms" comes first.
- * ARU-180 AC 9: an account whose workspace was deleted (deactivated) sees only "Your workspace was deleted".
+ * ARU-180 AC 9: an account whose workspace was deleted (deactivated) sees only "Your workspace was deleted"; ARU-181
+ * adds the Join a workspace / Create a workspace card there.
  */
 export function AccessGate({ children }: { children: ReactNode }) {
   const { currentUser, needsUsername, needsRecoveryCode, needsLegalAgreement } = useStore();
@@ -66,7 +68,11 @@ function AccessScreen({ kind }: { kind: 'waiting' | 'declined' | 'deactivated' }
         // has nothing to check.
         refreshControl={
           declined ? undefined : <RefreshControl refreshing={loading} onRefresh={() => refresh().catch(() => {})} />
-        }>
+        }
+        // ARU-181 AC 11: the keyboard never covers the field or the button and can be dismissed (as KeyboardForm).
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        automaticallyAdjustKeyboardInsets>
         <View style={{ gap: 8 }}>
           <Text style={[styles.h1, { textAlign: 'center' }]} accessibilityRole="header">
             {t(kind === 'declined' ? 'gate.declinedTitle' : kind === 'deactivated' ? 'gate.deactivatedTitle' : 'gate.waitingTitle')}
@@ -75,6 +81,7 @@ function AccessScreen({ kind }: { kind: 'waiting' | 'declined' | 'deactivated' }
             {t(kind === 'declined' ? 'gate.declinedText' : kind === 'deactivated' ? 'gate.deactivatedText' : 'gate.waitingText')}
           </Text>
         </View>
+        {kind === 'deactivated' && <RejoinCard disabled={busy} />}
         <ErrorText error={tm(error)} />
         {kind === 'waiting' && (
           <Button title={busy ? t('gate.checking') : t('gate.checkAgain')} onPress={() => run(refresh)} disabled={busy} />
@@ -85,5 +92,76 @@ function AccessScreen({ kind }: { kind: 'waiting' | 'declined' | 'deactivated' }
         <LegalLinks />
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+type Choice = 'create' | 'join';
+
+/**
+ * ARU-181 AC 1-5, 9, 10: join another workspace with its invite code (as a waiting student) or create one (as its
+ * teacher). The same switch, fields and rules as at sign-up (src/app/index.tsx), set to Join. On success (or "You
+ * already belong to a workspace.") the store reloads and the gate shows the new status; the fields keep what was typed.
+ */
+function RejoinCard({ disabled }: { disabled: boolean }) {
+  const { rejoinWorkspace } = useStore();
+  const { t } = useI18n();
+  const { busy, error, run } = useAction();
+  const [choice, setChoice] = useState<Choice>('join');
+  const [workspaceName, setWorkspaceName] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
+  // AC 2: a double tap sends one request (the busy flag only applies after the next render).
+  const sending = useRef(false);
+  const filled = choice === 'create' ? workspaceName.trim() !== '' : inviteCode.trim() !== '';
+  const submit = () => {
+    if (sending.current || !filled) return;
+    sending.current = true;
+    run(() =>
+      rejoinWorkspace(choice === 'create' ? { kind: 'create', name: workspaceName } : { kind: 'join', code: inviteCode }),
+    ).finally(() => {
+      sending.current = false;
+    });
+  };
+  const label =
+    choice === 'create' ? (busy ? t('gate.creating') : t('gate.create')) : busy ? t('gate.joining') : t('gate.join');
+  return (
+    <Card testID="rejoin-card" style={{ gap: 12 }}>
+      <Segmented<Choice>
+        value={choice}
+        onChange={setChoice}
+        options={[
+          { value: 'create', label: t('signIn.workspaceCreate') },
+          { value: 'join', label: t('signIn.workspaceJoin') },
+        ]}
+      />
+      {choice === 'create' ? (
+        <Field
+          label={t('signIn.workspaceName')}
+          placeholder={t('signIn.workspaceNamePlaceholder')}
+          value={workspaceName}
+          onChangeText={setWorkspaceName}
+          maxLength={WORKSPACE_NAME_MAX}
+          returnKeyType="done"
+          onSubmitEditing={submit}
+        />
+      ) : (
+        <Field
+          label={t('signIn.inviteCode')}
+          placeholder={t('signIn.inviteCodePlaceholder')}
+          value={inviteCode}
+          onChangeText={setInviteCode}
+          autoCapitalize="characters"
+          autoCorrect={false}
+          autoComplete="off"
+          maxLength={20}
+          returnKeyType="done"
+          onSubmitEditing={submit}
+        />
+      )}
+      {/* ARU-188: the store already gives the database error in the user's language (dbErrorMessage, ARU-111), and
+          ErrorText translates the app's own English messages (offline); tm() would turn Russian text into the generic
+          error. */}
+      <ErrorText error={error} />
+      <Button title={label} onPress={submit} disabled={disabled || busy || !filled} />
+    </Card>
   );
 }

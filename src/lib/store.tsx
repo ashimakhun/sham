@@ -143,6 +143,10 @@ export type Store = {
   /** ARU-146: creates the account and, in the same step, the workspace (its teacher) or the request to join one (by
    *  invite code). Both travel in the sign-up's user data, so they also work with email confirmation on. */
   signUp: (displayName: string, username: string, password: string, workspace: WorkspaceChoice) => Promise<void>;
+  /** ARU-181: a deactivated account joins another workspace by invite code (rejoin_workspace(), as a waiting student)
+   *  or creates its own (create_my_workspace(), as its teacher), then reloads so the gate shows the new status. Already
+   *  in a workspace (another device, a retry after a lost response, AC 10): reloads, then throws that error. */
+  rejoinWorkspace: (workspace: WorkspaceChoice) => Promise<void>;
   /** ARU-146: the teacher's workspace name and invite code; null for anyone else (the database returns no row). */
   getWorkspaceInvite: () => Promise<WorkspaceInvite | null>;
   signOut: () => Promise<void>;
@@ -1181,6 +1185,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         deactivatedFor.current = userId;
         cancelAllReminders().catch(() => {});
       }
+      // ARU-181: no longer deactivated (joined or created a workspace), so a second deletion cancels again.
+      if (me && me.accessStatus !== 'deactivated' && deactivatedFor.current === userId) deactivatedFor.current = null;
       if (me?.accessStatus !== 'approved') {
         setAssignmentSentCounts({});
         setPhotoDeletionStart(null);
@@ -1781,6 +1787,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (res.data.user && Array.isArray(res.data.user.identities) && res.data.user.identities.length === 0) {
         throw new Error(USERNAME_TAKEN);
       }
+    },
+    rejoinWorkspace: async (workspace) => {
+      const res = await Promise.resolve(
+        workspace.kind === 'create'
+          ? supabase.rpc('create_my_workspace', { name: workspace.name.trim() })
+          : supabase.rpc('rejoin_workspace', { invite_code: workspace.code.trim().toUpperCase() }),
+      ).catch(() => null);
+      if (!res) throw new Error(NETWORK_ERROR);
+      if (res.error) {
+        // No database code: the request didn't get through (offline, server down). Nothing changed (AC 9).
+        if (!res.error.hint && !res.error.code) throw new Error(NETWORK_ERROR);
+        // AC 10: already in a workspace; show the screen for the current status.
+        if (res.error.hint === 'sham:workspace_already_member') await load().catch(() => {});
+        throw new Error(dbErrorMessage(res.error));
+      }
+      // AC 3 / AC 5: the gate switches to Waiting for approval or the tabs.
+      await load().catch(() => {});
     },
     signOut: async () => {
       // ARU-170 AC 3: every reminder on this phone is cancelled first (local, so offline too).

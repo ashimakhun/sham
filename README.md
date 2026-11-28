@@ -45,6 +45,10 @@ An educational mobile app where teachers, mentors and students work together:
   after typing the workspace name and the password. The workspace's other accounts are deactivated, not deleted: they
   keep their login but see only "Your workspace was deleted" (Sign out, Delete account) until they join another
   workspace (part 2).
+- **Join or create a workspace after a deletion** (ARU-181): on "Your workspace was deleted" a deactivated account
+  joins another workspace with its invite code (as a student waiting for approval; the new teacher gets the usual
+  new-account notification) or creates its own (as its teacher). Username, password, recovery code, agreements and
+  language are kept; nothing of the deleted workspace comes back.
 - **Change password** (ARU-76): any approved user changes their own password from the Profile tab, with the current
   password checked first.
 - **Username sign-in** (ARU-164): new accounts sign up with a **display name** (doesn't have to be a real name), a
@@ -340,7 +344,13 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    adds the service-role-only `workspace_deletion_target()`, `workspace_storage_objects()` and `delete_workspace()`
    (one transaction: re-checks the files, deletes every row of the workspace, deactivates the other accounts, deletes
    the teacher's Auth user and the workspace), and the teacher's `workspace_deletion_summary()`. Changes no existing
-   rows. Redeploy the `delete-account` Edge Function, see [Delete account](#delete-account-aru-75)).
+   rows. Redeploy the `delete-account` Edge Function, see [Delete account](#delete-account-aru-75)),
+   `0079_rejoin_workspace.sql` (ARU-181: a deactivated account joins another workspace by invite code
+   (`rejoin_workspace(invite_code)`, as a waiting student) or creates its own (`create_my_workspace(name)`, as its
+   teacher). Both are security definer, authenticated only, act only on the caller and refuse anyone not deactivated
+   ("You already belong to a workspace.", `sham:workspace_already_member`). `profiles_workspace_guard()` lets the
+   workspace change only inside them, for the caller's own deactivated row; a new update trigger sends the existing
+   new-account notification when a deactivated account becomes pending. No table, column, policy or data changes).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. Turn off **Authentication → Email → Confirm email**, in development and production, **before** applying
    `0067_username_sign_in.sql` (ARU-164). Username accounts sign up with an internal address that can't receive mail,
@@ -1148,6 +1158,8 @@ teacher" is that workspace's teacher, and nobody can see or change anything in a
 | Delete own account (ARU-75) | ✓ | ✓ (owning no course) | only with the workspace (below) |
 | Delete own account and the whole workspace; the other accounts are deactivated (ARU-180) | | | ✓ (own workspace) |
 | Deactivated account (workspace deleted): sign out, delete own account; reads only its own profile | ✓ | ✓ | |
+| Deactivated account: join another workspace with its invite code, as a waiting student (`rejoin_workspace`, ARU-181) | ✓ (own account) | ✓ (own account; joins as a student) | |
+| Deactivated account: create a new workspace and become its teacher (`create_my_workspace`, ARU-181) | ✓ (own account) | ✓ (own account) | |
 | Register / unregister own phone for push (`push_devices`, ARU-166; waiting / declined accounts: unregister only) | ✓ (own) | ✓ (own) | ✓ (own) |
 | See and change own notification switches (Profile → Notifications, `notification_settings`, ARU-166) | ✓ (own) | ✓ (own) | ✓ (own) |
 | See anyone else's phones or switches | | | (nobody) |
@@ -1156,7 +1168,7 @@ teacher" is that workspace's teacher, and nobody can see or change anything in a
 | Get a push for every new general chat message (ARU-87; **General chat** on) | ✓ | ✓ | ✓ |
 | Get "Your homework … was reviewed" (ARU-49; **Homework reviewed** on) | own homework, when checked | own homework (sent as a listener), when checked | (never sends homework) |
 | Get "New homework" (ARU-50; **New homework** on) | courses they're in | courses they're in (not their own) |  |
-| Get "New account waiting for your approval" (ARU-84; **New accounts** on) |  |  | ✓ (every new sign-up) |
+| Get "New account waiting for your approval" (ARU-84; **New accounts** on) |  |  | ✓ (every new sign-up, and every deactivated account that joins, ARU-181) |
 | Get "New homework to check" (ARU-89; **Homework submitted** on) | never | courses they own | courses they own |
 | Get "New blog post" / "New file in the knowledge base" (ARU-102; **New materials** on) | items they can see, not their own | items they can see, not their own | items they can see, not their own |
 | Get "New notes on a … meeting" (ARU-151; **Meeting notes** on) | courses they're in, not their own notes | courses they own or are in, not their own notes | all courses, not their own notes |
