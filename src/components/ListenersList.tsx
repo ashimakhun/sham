@@ -8,6 +8,7 @@ import { Text } from '@/components/AppText';
 import { Button, Card, ErrorText, RoleBadge, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import { confirmDestructive } from '@/lib/confirm';
+import { isCourseCompleted } from '@/lib/courseCompletion';
 import { canManageListeners } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { colors, formatDate } from '@/lib/theme';
@@ -89,7 +90,8 @@ export function ListenersList({ course }: { course: Course }) {
         ))
       )}
       <ErrorText error={error} />
-      {canManage && (
+      {/* ARU-197 AC 7: no new listeners in a completed course; removing (the X above) works as before. */}
+      {canManage && !isCourseCompleted(course) && (
         <Button
           title={t('listeners.addMore')}
           variant="secondary"

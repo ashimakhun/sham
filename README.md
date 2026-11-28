@@ -363,7 +363,13 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    copies it into the list. Every photo reader (storage policies, listener removal, course / discipline deletion,
    the ZIP, the daily deletion job) reads the list; `photo_zip_links` gets `photo_paths`. Then redeploy the
    `homework-photos-zip` Edge Function (see [Download my photos](#download-my-photos-aru-107)); `photo-deletion` is
-   unchanged and needs no redeploy).
+   unchanged and needs no redeploy),
+   `0082_complete_course.sql` (ARU-197: adds `courses.completed_at` / `completed_by` (null = active; a new course is
+   always active) and `complete_course(course)` / `reopen_course(course)` for the course owner and the teacher.
+   Completing also cancels the course's Scheduled meetings. A completed course refuses new meetings, homework
+   assignments and listeners (a before-insert trigger with `sham:course_completed_no_*` codes plus restrictive insert
+   policies); existing rows are untouched. The feedback insert policy also accepts a completed course. No read rule
+   changes; deletes nothing; no Edge Function needs redeploying).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. Turn off **Authentication → Email → Confirm email**, in development and production, **before** applying
    `0067_username_sign_in.sql` (ARU-164). Username accounts sign up with an internal address that can't receive mail,

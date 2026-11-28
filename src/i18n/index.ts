@@ -183,6 +183,8 @@ const APP_MESSAGE_IDS: [TextId, Params?][] = [
   ['homework.photosZipError'],
   // ARU-158: a delete the database refused (Reports list, chats).
   ['reports.cantDelete'],
+  // ARU-197: Complete / Reopen course with no answer from the server.
+  ['notifications.saveFailed'],
 ];
 /**
  * ARU-113: app messages that carry a value only known at run time; the named groups fill the text's placeholders.

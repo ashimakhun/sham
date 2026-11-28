@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { AppState } from 'react-native';
 
 import { periodProblem } from './billing';
+import { COURSE_SAVE_FAILED } from './courseCompletion';
 import { ACCOUNT_DELETED, DELETE_FAILED, DELETE_OFFLINE, WORKSPACE_DELETE_FAILED, WORKSPACE_DELETED } from './deleteAccount';
 import { FEEDBACK_MAX } from './feedback';
 import { fileFieldsError, isAllowedPdf, PDF_MAX_BYTES, PDF_RULE } from './files';
@@ -125,6 +126,11 @@ export type Store = {
   /** ARU-182: the course owner, or the teacher on any course, changes its description (saved trimmed; '' clears it).
    *  Offline: NETWORK_ERROR, nothing changes. */
   setCourseDescription: (courseId: string, description: string) => Promise<void>;
+  /** ARU-197: the course owner, or the teacher on any course, marks it Completed; its Scheduled meetings are canceled
+   *  in the same step. Completing a completed course changes nothing. Offline: COURSE_SAVE_FAILED, nothing changes. */
+  completeCourse: (courseId: string) => Promise<void>;
+  /** ARU-197: the same people make a completed course active again; the canceled meetings stay canceled. */
+  reopenCourse: (courseId: string) => Promise<void>;
   loading: boolean;
   /** True once data has been fetched (successfully or not) for the signed-in user. */
   dataLoaded: boolean;
@@ -454,6 +460,8 @@ type CourseRow = {
   created_at: string;
   hidden?: boolean | null;
   discipline_id?: string | null;
+  completed_at?: string | null;
+  completed_by?: string | null;
 };
 type DisciplineRow = { id: string; name: string; hidden: boolean; created_by: string | null; created_at: string };
 type CourseMemberRow = { course_id: string; user_id: string; added_by: string | null; added_at: string };
@@ -651,6 +659,9 @@ const toCourse = (r: CourseRow): Course => ({
   createdAt: r.created_at,
   hidden: !!r.hidden,
   disciplineId: r.discipline_id ?? undefined,
+  // ARU-197: undefined before 0082 runs, and for an active course.
+  completedAt: r.completed_at ?? undefined,
+  completedById: r.completed_by ?? undefined,
 });
 
 const toDiscipline = (r: DisciplineRow): Discipline => ({
@@ -1652,6 +1663,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return currentUser;
   };
 
+  // ARU-197: complete_course() / reopen_course(). Both are safe to retry (a second call changes nothing).
+  const setCourseCompleted = async (fn: 'complete_course' | 'reopen_course', courseId: string) => {
+    requireRole('teacher', 'mentor');
+    const res = await Promise.resolve(supabase.rpc(fn, { course: courseId })).catch(() => null);
+    // No answer from the server (offline): supabase-js reports a fetch error without a code.
+    if (!res || (res.error && !res.error.hint && !res.error.code)) throw new Error(COURSE_SAVE_FAILED);
+    if (res.error) throw new Error(dbErrorMessage(res.error));
+    await load();
+  };
+
   const store: Store = {
     ready,
     session,
@@ -2139,6 +2160,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       await load();
     },
+    completeCourse: (courseId) => setCourseCompleted('complete_course', courseId),
+    reopenCourse: (courseId) => setCourseCompleted('reopen_course', courseId),
     changeCourseOwner: async (courseId, userId) => {
       requireRole('teacher', 'mentor');
       // Idempotent on the server: a retry after a lost response is a no-op.

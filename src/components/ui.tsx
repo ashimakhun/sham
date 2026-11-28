@@ -191,6 +191,16 @@ export function HiddenBadge() {
   );
 }
 
+/** ARU-197: "Completed" next to a completed course's title, grey like the Hidden badge; read with the title. */
+export function CompletedBadge() {
+  const { t } = useI18n();
+  return (
+    <View testID="completed-badge" style={[styles.badge, { backgroundColor: '#F3F4F6' }]}>
+      <Text style={[styles.badgeText, { color: colors.muted }]}>{t('courses.completedBadge')}</Text>
+    </View>
+  );
+}
+
 /**
  * ARU-118 (same look as ARU-114): a round icon button, a glyph in a tinted 36 pt circle. Hit slop 4 makes the touch
  * area 44×44 pt. Dimmed (0.4) and disabled while `disabled`.

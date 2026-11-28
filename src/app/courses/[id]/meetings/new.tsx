@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { MeetingForm, nextFullHour } from '@/components/MeetingForm';
 import { EmptyState } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
+import { isCourseCompleted } from '@/lib/courseCompletion';
 import { newId } from '@/lib/id';
 import { canManageMeetings } from '@/lib/roles';
 import { useStore } from '@/lib/store';
@@ -23,6 +24,10 @@ export default function ScheduleMeetingScreen() {
   if (!course) return <EmptyState title={t('meetings.courseNotFound')} />;
   if (currentUser && !canManageMeetings(currentUser, course)) {
     return <EmptyState title={t('meetings.notAllowed')} hint={t('meetings.onlyScheduleHint')} />;
+  }
+  // ARU-197 AC 5: a completed course takes no new meetings (an old link, or completed while this form was open).
+  if (isCourseCompleted(course)) {
+    return <EmptyState title={t('meetings.notAllowed')} hint={t('db.course_completed_no_meetings')} />;
   }
 
   return (

@@ -8,6 +8,7 @@ import { KeyboardForm } from '@/components/KeyboardForm';
 import { Button, EmptyState, ErrorText, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
 import { confirmAction } from '@/lib/confirm';
+import { isCourseCompleted } from '@/lib/courseCompletion';
 import { courseStarted, FEEDBACK_MAX, starsLabel } from '@/lib/feedback';
 import { isCourseListener } from '@/lib/roles';
 import { useStore } from '@/lib/store';
@@ -26,7 +27,11 @@ export default function CourseFeedbackScreen() {
   const [course] = useState(() => getCourse(id));
   const [mine] = useState(() => courseFeedback.find((f) => f.courseId === id && f.userId === currentUser?.id));
   const [allowed] = useState(
-    () => !!course && isCourseListener(currentUser, course, courseMembers) && (!!mine || courseStarted(meetings, course.id)),
+    () =>
+      !!course &&
+      isCourseListener(currentUser, course, courseMembers) &&
+      // ARU-197 AC 9: a completed course takes feedback even if no meeting was ever completed.
+      (!!mine || courseStarted(meetings, course.id) || isCourseCompleted(course)),
   );
 
   if (!course) return <EmptyState title={t('courses.notFound')} />;

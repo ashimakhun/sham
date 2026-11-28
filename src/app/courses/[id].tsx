@@ -5,13 +5,15 @@ import { RefreshControl, ScrollView, View } from 'react-native';
 import { Text } from '@/components/AppText';
 
 import { CourseMaterialsSection } from '@/components/CourseMaterialsSection';
+import { CompleteCourseButton } from '@/components/CompleteCourseButton';
 import { DeleteCourseButton } from '@/components/DeleteCourseButton';
 import { canChangeCourseDiscipline, DisciplineLabel, EditCoursePencil } from '@/components/Disciplines';
 import { FeedbackSection } from '@/components/FeedbackSection';
 import { ListenersSection } from '@/components/ListenersSection';
 import { MeetingsSection } from '@/components/MeetingsSection';
-import { Card, EmptyState, HiddenBadge, OwnerLine, styles } from '@/components/ui';
+import { Card, CompletedBadge, EmptyState, HiddenBadge, OwnerLine, styles } from '@/components/ui';
 import { useI18n } from '@/i18n/context';
+import { isCourseCompleted } from '@/lib/courseCompletion';
 import { canChangeOwner, seesOnlyCourseSummary } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import { formatDate } from '@/lib/theme';
@@ -30,6 +32,15 @@ export default function CourseDetailScreen() {
 
   const course = getCourse(id);
   if (!course) return <EmptyState title={t('courses.notFound')} />;
+  // ARU-197 AC 4: the Completed badge next to the title and "Completed on <date>" under it, for everyone who sees
+  // the course. The date is in the app's date format and language.
+  const completed = isCourseCompleted(course);
+  const completedLine =
+    completed && course.completedAt ? (
+      <Text testID="course-completed-on" style={styles.muted}>
+        {t('courses.completedOn', { date: formatDate(course.completedAt) })}
+      </Text>
+    ) : null;
 
   // ARU-24: a student who is not a listener sees only the title and description. Derived at render time, so a
   // live update on course_members switches between this and the full screen on its own.
@@ -41,7 +52,15 @@ export default function CourseDetailScreen() {
         contentInsetAdjustmentBehavior="automatic"
         refreshControl={<RefreshControl refreshing={loading} onRefresh={() => refresh().catch(() => {})} />}>
         <Card>
-          <Text style={styles.h1}>{course.title}</Text>
+          {completed ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <Text style={[styles.h1, { flexShrink: 1 }]}>{course.title}</Text>
+              <CompletedBadge />
+            </View>
+          ) : (
+            <Text style={styles.h1}>{course.title}</Text>
+          )}
+          {completedLine}
           <DisciplineLabel course={course} />
           {course.description ? <Text style={styles.body}>{course.description}</Text> : null}
         </Card>
@@ -69,9 +88,11 @@ export default function CourseDetailScreen() {
               <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <Text style={[styles.h1, { flexShrink: 1 }]}>{course.title}</Text>
                 {course.hidden ? <HiddenBadge /> : null}
+                {completed ? <CompletedBadge /> : null}
               </View>
               {canEdit ? <EditCoursePencil courseId={course.id} /> : null}
             </View>
+            {completedLine}
             <OwnerLine name={getUser(course.createdById)?.name ?? t('common.unknown')} date={formatDate(course.createdAt)} />
             {/* ARU-63 AC 6: only a discipline the viewer can see. */}
             <DisciplineLabel course={course} />
@@ -86,6 +107,8 @@ export default function CourseDetailScreen() {
         </View>
       {/* ARU-60: checked and canceled meetings, at the very bottom. ARU-85: the teacher's "Delete course" below them. */}
       <MeetingsSection course={course} part="history" />
+      {/* ARU-197: Complete course / Reopen course for the owner and the teacher, above the teacher's Delete course. */}
+      <CompleteCourseButton course={course} />
       <DeleteCourseButton course={course} />
     </ScrollView>
   );
