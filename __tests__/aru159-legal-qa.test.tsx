@@ -1,4 +1,4 @@
-// QA ARU-159: gaps in aru159-legal.test.tsx. Profile links for every role, in place above Change password, in
+// QA ARU-159: gaps in aru159-legal.test.tsx. Profile links for every role (since ARU-185: last on Profile), in
 // English and Russian (AC 6); Contact us's mailto (AC 6); Create account still needs the workspace with the box ticked
 // (AC 4); the update screen before Save your recovery code and the declined screen, over any route, then the route
 // underneath after agreeing (AC 8–10); its links follow the app language; the public pages carry the effective date from
@@ -47,13 +47,16 @@ describe('AC 6: Profile links, every role', () => {
     ['mentor', users.M],
     ['accountant mentor', accountant],
     ['teacher', users.T],
-  ])('%s: Privacy Policy, Terms of Use and Contact us, above Change password', async (_role, user) => {
+  ])('%s: Privacy Policy, Terms of Use and Contact us, last on Profile after Sign out / Delete account', async (_role, user) => {
     setStore(fakeStore(null, { currentUser: user }));
     await render(<ProfileScreen />);
     const json = JSON.stringify(screen.toJSON());
     const links = json.indexOf('legal-links');
     expect(links).toBeGreaterThan(-1);
-    expect(links).toBeLessThan(json.indexOf('Change password'));
+    // ARU-185 AC 2 replaces ARU-159 AC 6's "above Change password": the links are now the footer of Profile.
+    expect(links).toBeGreaterThan(json.indexOf('Change password'));
+    expect(links).toBeGreaterThan(json.lastIndexOf('Sign out'));
+    if (user.role !== 'teacher') expect(links).toBeGreaterThan(json.lastIndexOf('Delete account'));
     expect(screen.getByTestId('legal-privacy-link')).toHaveTextContent('Privacy Policy');
     expect(screen.getByTestId('legal-terms-link')).toHaveTextContent('Terms of Use');
     expect(screen.getByTestId('legal-contact-link')).toHaveTextContent('Contact us');
