@@ -77,7 +77,7 @@ function AccessScreen({ declined }: { declined: boolean }) {
         <Button title={t('common.signOut')} variant="secondary" onPress={() => run(signOut)} disabled={busy} />
         <Button title={t('common.deleteAccount')} variant="danger" onPress={() => setDeleting(true)} disabled={busy} />
         {/* ARU-159 AC 7: the documents and Contact us, for waiting and declined accounts too. */}
-        <LegalLinks center />
+        <LegalLinks />
       </ScrollView>
     </SafeAreaView>
   );
