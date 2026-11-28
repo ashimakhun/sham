@@ -32,24 +32,58 @@ export async function contactUs(lang: Language): Promise<void> {
   }
 }
 
-const linkStyle = [styles.caps, { color: colors.primary, fontSize: 14, paddingVertical: 12 }];
+// ARU-185 AC 1: small quiet footer links: 12 pt, normal case as in the catalog (an exception to ARU-122's upper case),
+// muted grey, the app's body weight (AppText's default), not underlined.
+const linkTextStyle = { color: colors.muted, fontSize: 12, textAlign: 'center' } as const;
+// AC 5: a tap area of at least 44 × 44 pt around the 12 pt text.
+const tapArea = { minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'center' } as const;
 
-/** AC 6 / AC 7: Privacy Policy, Terms of Use and Contact us, as secondary links (Profile, waiting / declined screen). */
-export function LegalLinks({ center }: { center?: boolean }) {
+function FooterLink({ label, testID, onPress }: { label: string; testID: string; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="link" accessibilityLabel={label} onPress={onPress} style={tapArea}>
+      <Text testID={testID} style={linkTextStyle}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** AC 8: the middle dot between links: not tappable, not read or focused by screen readers. */
+function Separator() {
+  return (
+    <Text
+      accessible={false}
+      accessibilityElementsHidden
+      importantForAccessibility="no"
+      aria-hidden
+      style={[linkTextStyle, { paddingHorizontal: 6 }]}>
+      ·
+    </Text>
+  );
+}
+
+/**
+ * ARU-159 AC 6 / AC 7, restyled by ARU-185: Privacy Policy · Terms of Use · Contact us as one centred footer row
+ * (Profile, waiting / declined screen). Each dot stays in one group with the link before it, so when the row wraps
+ * (Russian, large text) whole links move to the next centred line and no line starts with a dot.
+ */
+export function LegalLinks() {
   const { t, lang } = useI18n();
+  const links = [
+    { label: t('legal.privacyPolicy'), testID: 'legal-privacy-link', onPress: () => openLegalDocument('privacy', lang) },
+    { label: t('legal.termsOfUse'), testID: 'legal-terms-link', onPress: () => openLegalDocument('terms', lang) },
+    { label: t('legal.contactUs'), testID: 'legal-contact-link', onPress: () => contactUs(lang) },
+  ];
   return (
     <View
       testID="legal-links"
-      style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 20, justifyContent: center ? 'center' : 'flex-start' }}>
-      <Text accessibilityRole="link" testID="legal-privacy-link" style={linkStyle} onPress={() => openLegalDocument('privacy', lang)}>
-        {t('legal.privacyPolicy')}
-      </Text>
-      <Text accessibilityRole="link" testID="legal-terms-link" style={linkStyle} onPress={() => openLegalDocument('terms', lang)}>
-        {t('legal.termsOfUse')}
-      </Text>
-      <Text accessibilityRole="link" testID="legal-contact-link" style={linkStyle} onPress={() => contactUs(lang)}>
-        {t('legal.contactUs')}
-      </Text>
+      style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
+      {links.map((link, i) => (
+        <View key={link.testID} style={{ flexDirection: 'row', alignItems: 'center', maxWidth: '100%' }}>
+          <FooterLink {...link} />
+          {i < links.length - 1 && <Separator />}
+        </View>
+      ))}
     </View>
   );
 }

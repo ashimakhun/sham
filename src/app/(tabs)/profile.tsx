@@ -66,8 +66,6 @@ export default function ProfileScreen() {
             onPress={() => router.push('/reports')}
           />
         )}
-        {/* ARU-159 AC 6: Privacy Policy, Terms of Use and Contact us, above Change password, for every role. */}
-        <LegalLinks />
         {/* ARU-76: own password only; waiting / declined accounts never get here (AccessGate). */}
         <Button title={t('profile.changePassword')} variant="secondary" onPress={() => router.push('/change-password')} />
         {/* ARU-165 AC 5: a new recovery code (current password checked on the server), under Change password. */}
@@ -86,6 +84,9 @@ export default function ProfileScreen() {
           disabled={busy}
           onPress={() => router.push(currentUser.role === 'teacher' ? '/delete-workspace' : '/delete-account')}
         />
+        {/* ARU-159 AC 6, moved by ARU-185 AC 2: Privacy Policy, Terms of Use and Contact us, for every role, as a
+            small footer: the last thing on Profile, below Sign out and Delete account. */}
+        <LegalLinks />
       </View>
     </ScrollView>
   );

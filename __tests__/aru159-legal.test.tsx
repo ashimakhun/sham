@@ -144,12 +144,13 @@ describe('AC 3 / AC 4: the sign-up checkbox', () => {
 });
 
 describe('AC 6: Profile', () => {
-  it.each(['S1', 'M', 'T'] as const)('%s sees Privacy Policy, Terms of Use and Contact us above Change password', async (who) => {
+  it.each(['S1', 'M', 'T'] as const)('%s sees Privacy Policy, Terms of Use and Contact us at the bottom of Profile', async (who) => {
     setStore(fakeStore(who));
     await render(<ProfileScreen />);
     const json = JSON.stringify(screen.toJSON());
     expect(json.indexOf('legal-links')).toBeGreaterThan(-1);
-    expect(json.indexOf('legal-links')).toBeLessThan(json.indexOf('Change password'));
+    // ARU-185 AC 2 replaced "above Change password": the links are now below Sign out (and Delete account).
+    expect(json.indexOf('legal-links')).toBeGreaterThan(json.indexOf(en['common.signOut']));
     await fireEvent.press(screen.getByText('Privacy Policy'));
     expect(openURL).toHaveBeenLastCalledWith(LEGAL_URLS.privacy.en);
     await fireEvent.press(screen.getByText('Terms of Use'));
