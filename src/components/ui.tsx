@@ -34,6 +34,10 @@ export function Card({ children, onPress, style, accessible, testID }: CardProps
       testID={testID}
       onPress={onPress}
       accessible={accessible}
+      // ARU-204: a card that opts out of grouping holds its own buttons, so it is no keyboard stop either.
+      // react-native-web's Pressable renders tabIndex 0 unless -1 is passed (as for ARU-201's owner line).
+      focusable={accessible === false ? false : undefined}
+      tabIndex={accessible === false ? -1 : undefined}
       style={({ pressed }) => [styles.card, pressed && { opacity: 0.7 }, style]}>
       {children}
     </Pressable>
