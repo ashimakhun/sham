@@ -144,9 +144,12 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
   const canManage = canManageMeetings(currentUser, course);
   const seesAttendance = canSeeAttendance(currentUser, course, courseMembers);
   const canCheck = canCheckMeetingHomework(currentUser, course, courseMembers);
+  // ARU-190: meetings and assignments are loaded together (one load()), so this set is always current.
+  const withHomework = new Set(assignments.map((a) => a.meetingId));
   const { inProgress, upcoming, awaitingCheck, history } = groupMeetings(
     meetings.filter((m) => m.courseId === course.id),
     now,
+    withHomework,
   );
   const current = [...inProgress, ...upcoming, ...awaitingCheck];
   // ARU-125: `mine` opens a listener's editor for their own notes.
@@ -314,7 +317,8 @@ export function MeetingsSection({ course, part = 'current' }: { course: Course; 
     const canMark = canMarkAttendance(currentUser, course, courseMembers, m, now);
     const attended = canMark && attendance.some((a) => a.meetingId === m.id && a.userId === currentUser?.id);
     // ARU-60: completed meetings awaiting the check only (ARU-126 AC 8: no undo, so nothing once it's in history).
-    const canMarkChecked = canCheck && m.status === 'completed' && !m.homeworkCheckedAt;
+    // ARU-190 AC 6: a no-homework meeting that moved to history by itself gets no Mark checked either.
+    const canMarkChecked = canCheck && group !== 'history' && m.status === 'completed' && !m.homeworkCheckedAt;
     const counts =
       seesAttendance && isOpenForAttendance(m, now)
         ? meetingAttendance(m.id, course.id, courseMembers, attendance)
