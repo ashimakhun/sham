@@ -10,22 +10,46 @@ export function sortMeetings(meetings: Meeting[], now: number = Date.now()) {
   return { upcoming, past };
 }
 
+/** ARU-190: a Completed meeting with no homework moves to MEETING HISTORY this long after it was marked Completed. */
+export const AUTO_HISTORY_MS = 24 * 60 * 60 * 1000;
+
+/** ARU-190: a Completed, unchecked meeting that got no homework within a day of being marked Completed (display only,
+ *  nothing is saved). `withHomework` is the IDs of meetings that have homework; `null` (not loaded) never moves one.
+ *  A meeting without `statusChangedAt` (written outside set_meeting_status()) stays in Awaiting homework check. */
+export function isAutoHistory(
+  m: Pick<Meeting, 'id' | 'status' | 'homeworkCheckedAt' | 'statusChangedAt'>,
+  now: number,
+  withHomework: ReadonlySet<string> | null,
+) {
+  if (m.status !== 'completed' || m.homeworkCheckedAt || !withHomework || withHomework.has(m.id)) return false;
+  const changed = m.statusChangedAt ? Date.parse(m.statusChangedAt) : NaN;
+  return Number.isFinite(changed) && now - changed >= AUTO_HISTORY_MS;
+}
+
 /** ARU-60: the course page's meeting groups (device clock, like sortMeetings).
  *  - inProgress: Scheduled and started, oldest start first
  *  - upcoming: Scheduled, start in the future, soonest first
  *  - awaitingCheck: Completed and homework not marked checked, newest first
- *  - history: Completed and checked, or Canceled, newest first (shown at the bottom of the page) */
-export function groupMeetings(meetings: Meeting[], now: number = Date.now()) {
+ *  - history: Completed and checked, or Canceled, newest first (shown at the bottom of the page)
+ *  ARU-190: also history: Completed with no homework 24 h after it was marked Completed (see `isAutoHistory`). */
+export function groupMeetings(
+  meetings: Meeting[],
+  now: number = Date.now(),
+  withHomework: ReadonlySet<string> | null = null,
+) {
   const time = (m: Meeting) => new Date(m.startsAt).getTime();
   const oldestFirst = (a: Meeting, b: Meeting) => time(a) - time(b);
   const newestFirst = (a: Meeting, b: Meeting) => time(b) - time(a);
   const scheduled = meetings.filter((m) => m.status === 'scheduled');
+  const auto = (m: Meeting) => isAutoHistory(m, now, withHomework);
   return {
     inProgress: scheduled.filter((m) => time(m) <= now).sort(oldestFirst),
     upcoming: scheduled.filter((m) => time(m) > now).sort(oldestFirst),
-    awaitingCheck: meetings.filter((m) => m.status === 'completed' && !m.homeworkCheckedAt).sort(newestFirst),
+    awaitingCheck: meetings
+      .filter((m) => m.status === 'completed' && !m.homeworkCheckedAt && !auto(m))
+      .sort(newestFirst),
     history: meetings
-      .filter((m) => m.status === 'canceled' || (m.status === 'completed' && !!m.homeworkCheckedAt))
+      .filter((m) => m.status === 'canceled' || (m.status === 'completed' && (!!m.homeworkCheckedAt || auto(m))))
       .sort(newestFirst),
   };
 }
