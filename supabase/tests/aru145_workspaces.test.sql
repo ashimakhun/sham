@@ -39,8 +39,11 @@ grant execute on function pg_temp.err(text) to authenticated, anon;
 select t.eq((select string_agg(name, ',') from workspaces), 'Sham', 'AC1 one workspace "Sham"');
 select t.ok(not exists (select 1 from profiles where workspace_id is distinct from signup_workspace()),
   'AC1 every account is in it');
+-- ARU-180 (0077): profiles.workspace_id is null only for a deactivated account (a check constraint keeps it so, and no
+-- profile is deactivated here); every other workspace_id stays not null.
 select t.ok((select bool_and(is_nullable = 'NO') from information_schema.columns where table_schema = 'public'
-  and column_name = 'workspace_id'), 'AC1 every workspace_id is not null');
+  and column_name = 'workspace_id' and table_name <> 'profiles'), 'AC1 every workspace_id is not null');
+select t.ok(not exists (select 1 from profiles where workspace_id is null), 'AC1 every account has a workspace');
 select t.ok(not exists (
   select 1 from information_schema.columns c where c.table_schema = 'public' and c.column_name = 'workspace_id'
     and not exists (select 1 from pg_indexes i where i.tablename = c.table_name and i.indexdef like '%(workspace_id)%')),

@@ -9,6 +9,17 @@
 //      references in one transaction (migration 0040), so this step is all-or-nothing. Supabase refuses to delete a
 //      user who still owns Storage objects (e.g. a file uploaded from another device after b): the step fails, and a
 //      retry removes that file too.
+// ARU-180: the teacher deletes their account together with their workspace. The app then also sends
+// {"workspace_name": "..."}; with it, the order is (AC 11):
+//   a. checks: the token's user is the teacher of a workspace (workspace_deletion_target()), the password, and the typed
+//      name matches the workspace's name (case and outer spaces ignored, AC 3). If any fails, nothing is touched.
+//   b. files: every Storage object of the workspace's people (workspace_storage_objects()) is removed. A failure stops
+//      here: the account and the workspace stay and a retry continues.
+//   c. ONE database call, delete_workspace() (migration 0077): it re-checks the files, deletes the workspace's rows,
+//      deactivates the other accounts and deletes the teacher's Auth user, all in one transaction. auth.admin.deleteUser()
+//      is never called for the teacher: it would be a second step outside that transaction.
+// Without workspace_name a teacher still gets "The teacher's account can't be deleted." (ARU-75), and anyone who
+// isn't a teacher sending it gets TEACHER_ONLY: nothing changes.
 // No Deno-only imports, so Jest can test it.
 
 /** The messages the app shows as they are (AC 3, 6, 12). */
@@ -16,7 +27,21 @@ export const WRONG_PASSWORD = 'Password is incorrect';
 export const DELETE_FAILED = "Your account couldn't be deleted. Please try again.";
 export const TOO_MANY_ATTEMPTS = 'Too many attempts. Please wait a minute and try again.';
 
+/** ARU-180: the workspace deletion's messages (AC 3, 4, 11, 12, Roles and access). */
+export const WORKSPACE_TEACHER_ONLY = 'Only the teacher can delete the workspace.';
+export const WORKSPACE_NAME_MISMATCH = "The workspace name doesn't match.";
+export const WORKSPACE_NAME_MISSING = 'Type the workspace name.';
+export const WORKSPACE_DELETE_FAILED = "Your account and workspace couldn't be deleted. Please try again.";
+
+/** AC 3: the typed name matches when it's the same apart from case and leading / trailing spaces. */
+export function workspaceNameMatches(typed: string, name: string): boolean {
+  const norm = (s: string) => s.trim().toLowerCase();
+  return norm(typed).length > 0 && norm(typed) === norm(name);
+}
+
 export type StorageObject = { bucket_id: string; name: string };
+
+export type WorkspaceTarget = { workspaceId: string; name: string; otherAccounts: number };
 
 export type DeleteAccountDeps = {
   /** The user the access token belongs to (auth.getUser(jwt) with the service role); null for a bad or expired token
@@ -33,12 +58,18 @@ export type DeleteAccountDeps = {
   removeObjects: (bucket: string, names: string[]) => Promise<void>;
   /** auth.admin.deleteUser(user). Throws on failure. */
   deleteUser: (userId: string) => Promise<void>;
+  /** ARU-180: workspace_deletion_target(user): the workspace the user is the teacher of, or null. Throws on error. */
+  workspaceTarget?: (userId: string) => Promise<WorkspaceTarget | null>;
+  /** ARU-180: workspace_storage_objects(workspace). Throws on a database error. */
+  workspaceStorageObjects?: (workspaceId: string) => Promise<StorageObject[]>;
+  /** ARU-180: delete_workspace(teacher), the one all-or-nothing database step. Throws on failure. */
+  deleteWorkspace?: (teacherId: string) => Promise<void>;
   log?: (line: string) => void;
 };
 
 export type DeleteAccountResult =
-  | { deleted: true; files: number }
-  | { error: string; code: 'unauthorized' | 'bad_request' | 'wrong_password' | 'not_allowed' | 'rate_limited' | 'failed'; step?: 'check' | 'files' | 'account' };
+  | { deleted: true; files: number; workspace?: true }
+  | { error: string; code: 'unauthorized' | 'bad_request' | 'wrong_password' | 'not_allowed' | 'name_mismatch' | 'rate_limited' | 'failed'; step?: 'check' | 'files' | 'account' | 'workspace' };
 
 /** The Storage API removes at most this many objects per call. */
 export const REMOVE_BATCH = 100;
@@ -80,13 +111,21 @@ export async function handleDeleteAccountRequest(request: Request, deps: DeleteA
   if (!jwt) return json({ error: 'Not signed in.', code: 'unauthorized' }, 401);
 
   let password: unknown;
+  let workspaceName: unknown;
   try {
-    password = ((await request.json()) as { password?: unknown } | null)?.password;
+    const body = (await request.json()) as { password?: unknown; workspace_name?: unknown } | null;
+    password = body?.password;
+    workspaceName = body?.workspace_name;
   } catch {
     password = undefined;
   }
   if (typeof password !== 'string' || password.length === 0) {
     return json({ error: 'Enter your password.', code: 'bad_request' }, 400);
+  }
+  // ARU-180: the teacher's workspace deletion.
+  const deletesWorkspace = workspaceName !== undefined && workspaceName !== null;
+  if (deletesWorkspace && (typeof workspaceName !== 'string' || workspaceName.trim().length === 0)) {
+    return json({ error: WORKSPACE_NAME_MISSING, code: 'bad_request' }, 400);
   }
 
   // a. Checks: nothing is touched until all pass.
@@ -102,6 +141,8 @@ export async function handleDeleteAccountRequest(request: Request, deps: DeleteA
     deps.log?.(`delete-account: ${user.id}: no email, password can't be checked`);
     return json({ error: DELETE_FAILED, code: 'failed', step: 'check' }, 500);
   }
+
+  if (deletesWorkspace) return deleteWorkspaceSteps(deps, user as { id: string; email: string }, password, workspaceName as string);
 
   try {
     const result = await deps.checkPassword(user.email, password);
@@ -143,4 +184,65 @@ export async function handleDeleteAccountRequest(request: Request, deps: DeleteA
 
   deps.log?.(`delete-account: ${user.id}: deleted (${files} files)`);
   return json({ deleted: true, files }, 200);
+}
+
+/** ARU-180: the teacher's account and workspace (see the header). The token's user is already known. */
+async function deleteWorkspaceSteps(
+  deps: DeleteAccountDeps,
+  user: { id: string; email: string },
+  password: string,
+  typedName: string,
+): Promise<Response> {
+  const { workspaceTarget, workspaceStorageObjects, deleteWorkspace } = deps;
+  if (!workspaceTarget || !workspaceStorageObjects || !deleteWorkspace) {
+    deps.log?.(`delete-account: ${user.id}: workspace deletion not configured`);
+    return json({ error: WORKSPACE_DELETE_FAILED, code: 'failed', step: 'check' }, 500);
+  }
+
+  // a. Checks: the teacher, the password, the name. Nothing is touched until all pass.
+  let target: WorkspaceTarget | null;
+  try {
+    target = await workspaceTarget(user.id);
+  } catch (e) {
+    deps.log?.(`delete-account: ${user.id}: workspace check failed: ${message(e)}`);
+    return json({ error: WORKSPACE_DELETE_FAILED, code: 'failed', step: 'check' }, 500);
+  }
+  if (!target) return json({ error: WORKSPACE_TEACHER_ONLY, code: 'not_allowed' }, 403);
+
+  try {
+    const result = await deps.checkPassword(user.email, password);
+    if (result === 'wrong') return json({ error: WRONG_PASSWORD, code: 'wrong_password' }, 403);
+    if (result === 'rate_limited') return json({ error: TOO_MANY_ATTEMPTS, code: 'rate_limited' }, 429);
+  } catch (e) {
+    deps.log?.(`delete-account: ${user.id}: password check failed: ${message(e)}`);
+    return json({ error: WORKSPACE_DELETE_FAILED, code: 'failed', step: 'check' }, 500);
+  }
+
+  if (!workspaceNameMatches(typedName, target.name)) {
+    return json({ error: WORKSPACE_NAME_MISMATCH, code: 'name_mismatch' }, 403);
+  }
+
+  // b. Files of everyone in the workspace.
+  let files = 0;
+  try {
+    const objects = await workspaceStorageObjects(target.workspaceId);
+    for (const batch of removalBatches(objects)) {
+      await deps.removeObjects(batch.bucket, batch.names);
+      files += batch.names.length;
+    }
+  } catch (e) {
+    deps.log?.(`delete-account: ${user.id}: removing workspace files failed after ${files}: ${message(e)}`);
+    return json({ error: WORKSPACE_DELETE_FAILED, code: 'failed', step: 'files' }, 500);
+  }
+
+  // c. One transaction: rows, members, the teacher's Auth user.
+  try {
+    await deleteWorkspace(user.id);
+  } catch (e) {
+    deps.log?.(`delete-account: ${user.id}: deleting the workspace failed: ${message(e)}`);
+    return json({ error: WORKSPACE_DELETE_FAILED, code: 'failed', step: 'workspace' }, 500);
+  }
+
+  deps.log?.(`delete-account: ${user.id}: workspace ${target.workspaceId} deleted (${files} files, ${target.otherAccounts} deactivated)`);
+  return json({ deleted: true, files, workspace: true }, 200);
 }

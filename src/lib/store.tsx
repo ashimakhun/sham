@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { AppState } from 'react-native';
 
 import { periodProblem } from './billing';
-import { ACCOUNT_DELETED, DELETE_FAILED, DELETE_OFFLINE } from './deleteAccount';
+import { ACCOUNT_DELETED, DELETE_FAILED, DELETE_OFFLINE, WORKSPACE_DELETE_FAILED, WORKSPACE_DELETED } from './deleteAccount';
 import { FEEDBACK_MAX } from './feedback';
 import { fileFieldsError, isAllowedPdf, PDF_MAX_BYTES, PDF_RULE } from './files';
 import { dbErrorMessage, phoneLanguage, translate } from '@/i18n';
@@ -147,6 +147,12 @@ export type Store = {
    *  password there. On success this device is signed out and the sign-in screen shows `accountNotice`. On failure
    *  the error is thrown and the user stays signed in (unless the account turns out to be gone already). */
   deleteAccount: (password: string) => Promise<void>;
+  /** ARU-180: the teacher deletes their account and the whole workspace (the same Edge Function, with the typed
+   *  workspace name). On success this device is signed out and the sign-in screen says "Your account and workspace
+   *  were deleted". On failure the error is thrown and the teacher stays signed in (unless already gone). */
+  deleteWorkspace: (workspaceName: string, password: string) => Promise<void>;
+  /** ARU-180 AC 2: the teacher's workspace name and the number of other accounts; null for anyone else. */
+  getWorkspaceDeletionSummary: () => Promise<{ name: string; otherAccounts: number } | null>;
   /** ARU-75: a message for the sign-in screen ("Your account was deleted"), or null. Cleared by the next sign-in. */
   accountNotice: string | null;
   /** ARU-76: the signed-in user changes their own password. The current password is checked first by signing in
@@ -781,7 +787,7 @@ async function functionAnswer(error: unknown): Promise<{ code?: string; error?: 
   }
 }
 
-async function deleteErrorMessage(error: unknown): Promise<string> {
+async function deleteErrorMessage(error: unknown, failed: string = DELETE_FAILED): Promise<string> {
   const e = error as { name?: string; context?: { json?: () => Promise<unknown>; status?: number } };
   if (e?.name === 'FunctionsFetchError') return DELETE_OFFLINE;
   if (typeof e?.context?.json === 'function') {
@@ -792,7 +798,7 @@ async function deleteErrorMessage(error: unknown): Promise<string> {
       // Not JSON (e.g. a gateway error page).
     }
   }
-  return DELETE_FAILED;
+  return failed;
 }
 
 type Result = { error: { message: string; code?: string; hint?: string | null; details?: string | null } | null };
@@ -962,6 +968,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const verifiedFor = useRef<string | null>(null);
   // ARU-110: the user whose phone language was last checked (once per sign-in).
   const deviceLanguageFor = useRef<string | null>(null);
+  // ARU-180 AC 10: whether the signed-in account was last seen as the teacher. A teacher is only ever deleted with the
+  // workspace, so a deleted teacher's other device says "Your account and workspace were deleted".
+  const lastSeenTeacher = useRef(false);
+  // ARU-180 AC 10: the account whose deactivation already cancelled this phone's reminders.
+  const deactivatedFor = useRef<string | null>(null);
   const verifyUser = useCallback(async (): Promise<boolean> => {
     try {
       const { data, error } = await supabase.auth.getUser();
@@ -973,7 +984,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const ended =
         e.code === 'session_not_found' || /session from session_id claim in jwt does not exist/i.test(e.message ?? '');
       if (!gone && !ended) return false;
-      setAccountNotice(gone ? ACCOUNT_DELETED : PASSWORD_CHANGED_SIGNED_OUT);
+      // The session's own user data says whether it created a workspace (ARU-146), also on a fresh app start.
+      const { data: stored } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+      const teacher = lastSeenTeacher.current || !!stored.session?.user?.user_metadata?.workspace_name;
+      setAccountNotice(gone ? (teacher ? WORKSPACE_DELETED : ACCOUNT_DELETED) : PASSWORD_CHANGED_SIGNED_OUT);
       // ARU-170 AC 3: the deleted (or signed-out) account's reminders go before the session does.
       await cancelAllReminders();
       await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
@@ -1158,6 +1172,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setCourseFeedback(rows<FeedbackRow>(fb).map(toFeedback));
       // Before 0031_disciplines.sql runs there is no table: no disciplines, and the rest of the app keeps working.
       setDisciplines(discs.error ? [] : ((discs.data as DisciplineRow[] | null) ?? []).map(toDiscipline));
+      if (me) lastSeenTeacher.current = me.role === 'teacher';
+      // ARU-180 AC 10: the workspace was deleted. Its reminders go now (they'd open deleted meetings and homework).
+      if (me?.accessStatus === 'deactivated' && deactivatedFor.current !== userId) {
+        deactivatedFor.current = userId;
+        cancelAllReminders().catch(() => {});
+      }
       if (me?.accessStatus !== 'approved') {
         setAssignmentSentCounts({});
         setPhotoDeletionStart(null);
@@ -1794,6 +1814,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       await cancelAllReminders();
       // The server already ended the account; only this device's stored session is left to remove.
       await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+    },
+    deleteWorkspace: async (workspaceName, password) => {
+      if (!userId) throw new Error('You are not signed in.');
+      let res: { error: unknown };
+      try {
+        res = await supabase.functions.invoke('delete-account', { body: { password, workspace_name: workspaceName } });
+      } catch {
+        throw new Error(DELETE_OFFLINE);
+      }
+      if (res.error) {
+        const message = await deleteErrorMessage(res.error, WORKSPACE_DELETE_FAILED);
+        // As deleteAccount: gone already (a lost answer, or the app stopped half-way) → signed out with the notice.
+        if (await verifyUser()) return;
+        throw new Error(message);
+      }
+      setAccountNotice(WORKSPACE_DELETED);
+      await cancelAllReminders();
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+    },
+    getWorkspaceDeletionSummary: async () => {
+      const res = await supabase.rpc('workspace_deletion_summary');
+      check(res);
+      const row = ((res.data as { name: string; other_accounts: number }[] | null) ?? [])[0];
+      return row ? { name: row.name, otherAccounts: row.other_accounts } : null;
     },
     changePassword: async (currentPassword, newPassword) => {
       const me = session?.user;

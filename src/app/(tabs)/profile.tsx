@@ -78,15 +78,14 @@ export default function ProfileScreen() {
         <ErrorText error={tm(error)} />
         {/* The root screen redirects to sign-in once the session is gone. */}
         <Button title={t('common.signOut')} variant="secondary" disabled={busy} onPress={() => run(signOut)} />
-        {/* ARU-75: last in the group; the teacher's account can't be deleted. */}
-        {currentUser.role !== 'teacher' && (
-          <Button
-            title={t('common.deleteAccount')}
-            variant="danger"
-            disabled={busy}
-            onPress={() => router.push('/delete-account')}
-          />
-        )}
+        {/* ARU-75: last in the group. ARU-180 AC 1: for the teacher too, opening Delete workspace (the account goes
+            with the whole workspace); students and mentors keep ARU-75's Delete account screen. */}
+        <Button
+          title={t('common.deleteAccount')}
+          variant="danger"
+          disabled={busy}
+          onPress={() => router.push(currentUser.role === 'teacher' ? '/delete-workspace' : '/delete-account')}
+        />
       </View>
     </ScrollView>
   );

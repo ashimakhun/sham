@@ -39,7 +39,12 @@ An educational mobile app where teachers, mentors and students work together:
 - **New accounts** wait for the teacher's approval before they can use the app.
 - **Delete account** (ARU-75): students and mentors (and waiting or declined accounts) delete their own account after
   re-entering their password. Personal data is removed; chat messages and work done for others stay, shown as
-  **Deleted account**. A mentor who owns courses must hand them over first; the teacher can't delete their account.
+  **Deleted account**. A mentor who owns courses must hand them over first. The teacher's account can only be deleted
+  together with the whole workspace (below).
+- **Delete workspace** (ARU-180): the teacher deletes their account together with the workspace and everything in it,
+  after typing the workspace name and the password. The workspace's other accounts are deactivated, not deleted: they
+  keep their login but see only "Your workspace was deleted" (Sign out, Delete account) until they join another
+  workspace (part 2).
 - **Change password** (ARU-76): any approved user changes their own password from the Profile tab, with the current
   password checked first.
 - **Username sign-in** (ARU-164): new accounts sign up with a **display name** (doesn't have to be a real name), a
@@ -323,7 +328,16 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    (`sham:signup_update_app`; SQL Editor admins are still exempt). Adds `agree_to_terms(version)` for signed-in
    users (not anon). Deletes no data; existing accounts have no agreement, so the app asks each of them once. Ship it
    together with the app update: an older app's sign-ups are refused once it runs; see
-   [Legal pages](#legal-pages-aru-159)).
+   [Legal pages](#legal-pages-aru-159)),
+   `0076_deactivated_status.sql` and then `0077_delete_workspace.sql` (ARU-180: Delete workspace. 0076 only adds the
+   access status `deactivated` (Postgres can't use a new enum value in the transaction that adds it, so the rest is in
+   0077). 0077 makes `profiles.workspace_id` nullable, only together with `deactivated` (check constraint); lets every
+   account read its own profile row even with no workspace; lets a deactivated account update its own granted
+   columns (name, languages); lets `profiles_before_delete()` remove the teacher only inside `delete_workspace()`;
+   adds the service-role-only `workspace_deletion_target()`, `workspace_storage_objects()` and `delete_workspace()`
+   (one transaction: re-checks the files, deletes every row of the workspace, deactivates the other accounts, deletes
+   the teacher's Auth user and the workspace), and the teacher's `workspace_deletion_summary()`. Changes no existing
+   rows. Redeploy the `delete-account` Edge Function, see [Delete account](#delete-account-aru-75)).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. Turn off **Authentication → Email → Confirm email**, in development and production, **before** applying
    `0067_username_sign_in.sql` (ARU-164). Username accounts sign up with an internal address that can't receive mail,
@@ -810,6 +824,20 @@ the foreground (it asks Auth whether the user still exists).
 3. Check: sign in as a test student and delete the account from Profile → **Delete account**; the user disappears
    from **Authentication → Users** and from `profiles`, and its files from the `homework` bucket.
 
+**Delete workspace (ARU-180).** The teacher's Profile → **Delete account** opens **Delete workspace**: it names the
+workspace and how many other accounts it has, and needs the workspace name (case and outer spaces ignored) and the
+password. The app calls the same `delete-account` function with `workspace_name`. For the teacher only
+(`workspace_deletion_target()`), it checks the password and the name, removes every file of the workspace's people
+in `homework`, `materials` and `payment-proofs` (`workspace_storage_objects()`), then makes one database call,
+`delete_workspace()`, which in one transaction re-checks that no file is left (a late upload stops it; tapping again
+removes it), deletes every row of the workspace (push devices and notification settings of everyone included),
+deactivates the other accounts (no workspace, no mentor, not an accountant; role, username, password, recovery code
+and agreements kept), and deletes the teacher's Auth user with SQL, so it's all or nothing (the function never calls
+`auth.admin.deleteUser()` for the teacher). The teacher's other devices sign out with "Your account and workspace
+were deleted"; members see "Your workspace was deleted" when the app starts or comes back to the foreground. Without
+`workspace_name` the teacher is still refused ("The teacher's account can't be deleted."). Needs 0076 / 0077 and a
+redeploy of `delete-account`.
+
 ### Handling reports (ARU-158)
 
 Users report a chat message, meeting notes, a Blog post, a Knowledge base PDF or a course review (long-press a chat
@@ -1113,6 +1141,9 @@ teacher" is that workspace's teacher, and nobody can see or change anything in a
 | Use a reset code on Forgot password (signed out, own username) | ✓ | ✓ | |
 | See or set someone else's password | | | (nobody) |
 | Accept or reject new accounts |        |                    | ✓       |
+| Delete own account (ARU-75) | ✓ | ✓ (owning no course) | only with the workspace (below) |
+| Delete own account and the whole workspace; the other accounts are deactivated (ARU-180) | | | ✓ (own workspace) |
+| Deactivated account (workspace deleted): sign out, delete own account; reads only its own profile | ✓ | ✓ | |
 | Register / unregister own phone for push (`push_devices`, ARU-166; waiting / declined accounts: unregister only) | ✓ (own) | ✓ (own) | ✓ (own) |
 | See and change own notification switches (Profile → Notifications, `notification_settings`, ARU-166) | ✓ (own) | ✓ (own) | ✓ (own) |
 | See anyone else's phones or switches | | | (nobody) |

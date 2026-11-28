@@ -1,7 +1,8 @@
 export type Role = 'teacher' | 'mentor' | 'student';
 
-/** ARU-43: only approved accounts can use the app. Missing means approved (before the migration). */
-export type AccessStatus = 'pending' | 'approved' | 'rejected';
+/** ARU-43: only approved accounts can use the app. Missing means approved (before the migration). ARU-180:
+ *  deactivated = the account's workspace was deleted; it belongs to no workspace. */
+export type AccessStatus = 'pending' | 'approved' | 'rejected' | 'deactivated';
 
 export type User = {
   id: string;

@@ -103,6 +103,8 @@ const MESSAGE_IDS: [TextId, Params?][] = [
   ['profile.waitingApproval'],
   ['profile.languageSaveFailed'],
   ['signIn.accountDeleted'],
+  // ARU-180: after the teacher's account and workspace were deleted.
+  ['signIn.workspaceDeleted'],
   // ARU-165: Forgot password with a recovery code, and the Save your recovery code screen.
   ['signIn.passwordChangedSignedOut'],
   ['forgot.wrong'],
@@ -165,6 +167,11 @@ const APP_MESSAGE_IDS: [TextId, Params?][] = [
   ['deleteAccount.offline'],
   ['deleteAccount.failed'],
   ['deleteAccount.teacherCant'],
+  // ARU-180: the Delete workspace screen's errors (from the delete-account function, as ARU-75's).
+  ['deleteWorkspace.teacherOnly'],
+  ['deleteWorkspace.nameMismatch'],
+  ['deleteWorkspace.nameMissing'],
+  ['deleteWorkspace.failed'],
   ['errors.notSignedIn'],
   ['materials.cantDeleteMaterial'],
   ['materials.cantEditFile'],

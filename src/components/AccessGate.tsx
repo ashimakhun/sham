@@ -20,11 +20,14 @@ export const WAITING_TITLE = translate('en', 'gate.waitingTitle');
 export const WAITING_TEXT = translate('en', 'gate.waitingText');
 export const DECLINED_TITLE = translate('en', 'gate.declinedTitle');
 export const DECLINED_TEXT = translate('en', 'gate.declinedText');
+export const DEACTIVATED_TITLE = translate('en', 'gate.deactivatedTitle');
+export const DEACTIVATED_TEXT = translate('en', 'gate.deactivatedText');
 
 /**
  * ARU-43: an account that isn't approved sees only this screen, whatever route it opens (deep links included).
  * Approved accounts, and signed-out visitors (the sign-in screen), get the app as usual. ARU-168: Choose a username
  * comes before all of it, then ARU-165's Save your recovery code. ARU-159's "We've updated our Terms" comes first.
+ * ARU-180 AC 9: an account whose workspace was deleted (deactivated) sees only "Your workspace was deleted".
  */
 export function AccessGate({ children }: { children: ReactNode }) {
   const { currentUser, needsUsername, needsRecoveryCode, needsLegalAgreement } = useStore();
@@ -38,10 +41,11 @@ export function AccessGate({ children }: { children: ReactNode }) {
   if (needsRecoveryCode) return <SaveRecoveryCodeScreen />;
   const status = currentUser?.accessStatus;
   if (!currentUser || !status || status === 'approved') return <>{children}</>;
-  return <AccessScreen declined={status === 'rejected'} />;
+  return <AccessScreen kind={status === 'rejected' ? 'declined' : status === 'deactivated' ? 'deactivated' : 'waiting'} />;
 }
 
-function AccessScreen({ declined }: { declined: boolean }) {
+function AccessScreen({ kind }: { kind: 'waiting' | 'declined' | 'deactivated' }) {
+  const declined = kind === 'declined';
   const { loading, refresh, signOut } = useStore();
   const { t, tm } = useI18n();
   const { busy, error, run } = useAction();
@@ -58,20 +62,21 @@ function AccessScreen({ declined }: { declined: boolean }) {
     <SafeAreaView style={styles.screen}>
       <ScrollView
         contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24, gap: 16 }}
-        // Pull to refresh checks again while waiting (a declined account has nothing to check).
+        // Pull to refresh checks again while waiting, and for a deactivated account (ARU-180 AC 9); a declined account
+        // has nothing to check.
         refreshControl={
           declined ? undefined : <RefreshControl refreshing={loading} onRefresh={() => refresh().catch(() => {})} />
         }>
         <View style={{ gap: 8 }}>
           <Text style={[styles.h1, { textAlign: 'center' }]} accessibilityRole="header">
-            {declined ? t('gate.declinedTitle') : t('gate.waitingTitle')}
+            {t(kind === 'declined' ? 'gate.declinedTitle' : kind === 'deactivated' ? 'gate.deactivatedTitle' : 'gate.waitingTitle')}
           </Text>
           <Text style={[styles.body, { textAlign: 'center' }]}>
-            {declined ? t('gate.declinedText') : t('gate.waitingText')}
+            {t(kind === 'declined' ? 'gate.declinedText' : kind === 'deactivated' ? 'gate.deactivatedText' : 'gate.waitingText')}
           </Text>
         </View>
         <ErrorText error={tm(error)} />
-        {!declined && (
+        {kind === 'waiting' && (
           <Button title={busy ? t('gate.checking') : t('gate.checkAgain')} onPress={() => run(refresh)} disabled={busy} />
         )}
         <Button title={t('common.signOut')} variant="secondary" onPress={() => run(signOut)} disabled={busy} />

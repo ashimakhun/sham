@@ -58,8 +58,9 @@ it('AC 2: exactly one chat button, and the bottom group keeps its order (teacher
   const all = screen.getAllByRole('button');
   const idx = ['Manage roles', 'Change password', 'Sign out'].map((n) => all.indexOf(screen.getByRole('button', { name: new RegExp(`^${n}`) })));
   expect(idx).toEqual([...idx].sort((a, b) => a - b));
-  expect(idx[2]).toBe(all.length - 1);
-  expect(screen.queryByRole('button', { name: 'Delete account' })).toBeNull();
+  // ARU-180 AC 1: the teacher's Delete account now comes last, right after Sign out.
+  expect(idx[2]).toBe(all.length - 2);
+  expect(all.indexOf(screen.getByRole('button', { name: 'Delete account' }))).toBe(all.length - 1);
 });
 
 it('AC 2: student bottom group is Change password, Sign out, Delete account last; chat before all of them', async () => {

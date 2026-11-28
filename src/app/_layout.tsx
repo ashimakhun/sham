@@ -92,6 +92,7 @@ function AppStack() {
           {/* ARU-162: the people I've blocked. */}
           <Stack.Screen name="blocked" options={{ title: t('block.profileRow') }} />
           <Stack.Screen name="delete-account" options={{ title: t('common.deleteAccount') }} />
+          <Stack.Screen name="delete-workspace" options={{ title: t('deleteWorkspace.title') }} />
           <Stack.Screen name="accountant/courses" options={{ title: t('accountant.selectTitle') }} />
           <Stack.Screen name="accountant/[id]" options={{ title: t('accountant.paymentsTitle') }} />
           <Stack.Screen name="general-chat" options={{ title: t('chat.generalTitle') }} />

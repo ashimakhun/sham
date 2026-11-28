@@ -8,6 +8,19 @@ export const DELETED_ACCOUNT = 'Deleted account';
 /** Shown on the sign-in screen after this device's account was deleted (here or on another device, AC 4, AC 9). */
 export const ACCOUNT_DELETED = 'Your account was deleted';
 
+/** ARU-180 AC 5 / AC 10: shown on the sign-in screen after the teacher's account and workspace were deleted. */
+export const WORKSPACE_DELETED = 'Your account and workspace were deleted';
+
+/** ARU-180: the Delete workspace errors, the same texts as the delete-account function. */
+export const WORKSPACE_DELETE_FAILED = "Your account and workspace couldn't be deleted. Please try again.";
+
+/** ARU-180 AC 3: the typed name matches when it's the same apart from case and leading / trailing spaces (as the
+ *  delete-account function's check). */
+export function workspaceNameMatches(typed: string, name: string): boolean {
+  const norm = (s: string) => s.trim().toLowerCase();
+  return norm(typed).length > 0 && norm(typed) === norm(name);
+}
+
 export const WRONG_PASSWORD = 'Password is incorrect';
 export const DELETE_OFFLINE = "Couldn't reach Sham. Check your connection and try again.";
 export const DELETE_FAILED = "Your account couldn't be deleted. Please try again.";

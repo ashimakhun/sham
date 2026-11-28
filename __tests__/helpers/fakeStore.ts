@@ -74,6 +74,8 @@ export function fakeStore(who: keyof typeof users | null, over: Partial<Store> =
     getWorkspaceInvite: jest.fn(async () => null),
     signOut: jest.fn(),
     deleteAccount: jest.fn(async () => {}),
+    deleteWorkspace: jest.fn(async () => {}),
+    getWorkspaceDeletionSummary: jest.fn(async () => null),
     setLanguage: jest.fn(async () => {}),
     accountNotice: null,
     changePassword: jest.fn(async () => {}),
