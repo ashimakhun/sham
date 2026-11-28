@@ -57,7 +57,7 @@ A proposal comment goes on each issue in the group, starting with `Merge proposa
    Include the keeper's own original title and description in that list too. Never drop text from any issue.
 4. **Keeper title:** keep it if it already covers the merged idea; otherwise rewrite it in plain words to cover both (the old titles stay in the Merged ideas list).
 5. **Relations:** copy every blocks, blocked-by and related link from the duplicates onto the keeper (skip links between issues in the group). Re-parent sub-issues of a duplicate to the keeper.
-6. **Labels:** copy non-agent labels from the duplicates to the keeper. For difficulty, keep the **highest** difficulty among the group (never lower one); if none is rated, leave it for the rating step.
+6. **Labels:** copy non-agent labels from the duplicates to the keeper. For difficulty (one of `easy` / `medium` / `hard` in the `difficulty` group; plain names are the correct format, there are no `difficulty/…` labels), keep the **highest** difficulty among the group (never lower one; the group is single select, so the keeper gets exactly one); if none is rated, leave it for the rating step.
 7. **Close the duplicates:** set each duplicate as `duplicateOf` the keeper and move it to status **Duplicate**.
 8. **Comments:**
    - On each duplicate: `Merged into ARU-<keeper>: <one line on why they overlap>. Its title and description were copied into ARU-<keeper> under "Merged ideas". To undo, move this issue back to Idea, clear "Duplicate of", and delete its entry from ARU-<keeper>.`
