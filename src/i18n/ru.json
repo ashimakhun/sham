@@ -277,6 +277,8 @@
   "courses.ownerListenerNote": "Слушатель этого курса — сначала уберите его из курса",
   "courses.ownerNoCandidates": "Других преподавателей или менторов нет",
   "courses.openChat": "Открыть чат курса «{title}»",
+  "courses.showDescription": "Показать описание",
+  "courses.descriptionClose": "Закрыть",
   "courses.deleteCourse": "Удалить курс",
   "courses.deleting": "Удаление…",
   "courses.deleteConfirm": "Удалить",
