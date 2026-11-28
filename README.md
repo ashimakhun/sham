@@ -350,7 +350,11 @@ Built with [Expo](https://expo.dev) (SDK 58, React Native, TypeScript), Expo Rou
    teacher). Both are security definer, authenticated only, act only on the caller and refuse anyone not deactivated
    ("You already belong to a workspace.", `sham:workspace_already_member`). `profiles_workspace_guard()` lets the
    workspace change only inside them, for the caller's own deactivated row; a new update trigger sends the existing
-   new-account notification when a deactivated account becomes pending. No table, column, policy or data changes).
+   new-account notification when a deactivated account becomes pending. No table, column, policy or data changes),
+   `0080_signup_language.sql` (ARU-189: `handle_new_user()`, every 0075 rule kept, also saves the language picked on
+   the Create account form (`language` in the sign-up's user data) in `profiles.language` when it is exactly `'en'` or
+   `'ru'`; any other value, or none, is ignored (null: the phone's language) and never refuses the sign-up. No table,
+   column, policy or grant changes; changes no existing rows).
    Each migration has its own number; `npm run test:db` fails if two files share one.
 3. Turn off **Authentication → Email → Confirm email**, in development and production, **before** applying
    `0067_username_sign_in.sql` (ARU-164). Username accounts sign up with an internal address that can't receive mail,

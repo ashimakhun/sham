@@ -954,5 +954,6 @@
   "deleteWorkspace.nameMissing": "Delete workspace · error when no name was typed",
   "deleteWorkspace.failed": "Delete workspace · error when deleting failed",
   "db.workspace_delete_teacher_only": "Database error · someone other than the teacher tries to delete the workspace",
-  "db.workspace_delete_files_left": "Database error · Delete workspace found a file uploaded during the deletion"
+  "db.workspace_delete_files_left": "Database error · Delete workspace found a file uploaded during the deletion",
+  "signIn.language": "Sign in screen · Create account form only (not on Sign in) · title of the Language switch"
 }
